@@ -10,27 +10,28 @@
     <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
     <style>
         :root {
-            --rojo:       #C0392B;
-            --rojo-dark:  #96281B;
-            --rojo-light: rgba(192,57,43,0.08);
-            --rojo-mid:   rgba(192,57,43,0.18);
-            --blanco:     #FFFFFF;
-            --crema:      #FAF9F7;
-            --gris-1:     #F2F0ED;
-            --gris-2:     #E4E1DC;
-            --gris-3:     #B8B4AE;
-            --gris-4:     #7A7670;
-            --negro:      #1A1714;
-            --txt:        #2C2A27;
-            --txt-mid:    #6B6762;
-            --txt-dim:    #A09C97;
-            --card-sombra: 0 2px 20px rgba(26,23,20,0.07);
-            --card-sombra-hover: 0 8px 40px rgba(26,23,20,0.13);
+            --rojo:        #C0392B;
+            --rojo-dark:   #96281B;
+            --rojo-glow:   rgba(192,57,43,0.35);
+            --rojo-light:  rgba(192,57,43,0.10);
+            --negro:       #111010;
+            --negro-2:     #1A1918;
+            --negro-3:     #242220;
+            --borde-dark:  #2E2C2A;
+            --blanco:      #FFFFFF;
+            --crema:       #F8F6F3;
+            --gris-1:      #F0EDE9;
+            --gris-2:      #E2DED9;
+            --gris-3:      #B5B0AA;
+            --txt-dark:    #FFFFFF;
+            --txt-dark-mid:#9E9A96;
+            --txt:         #1C1A18;
+            --txt-mid:     #6B6762;
+            --txt-dim:     #A09C97;
         }
  
         *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-        html { scroll-behavior:smooth; }
- 
+        html { scroll-behavior: smooth; }
         body {
             font-family: 'DM Sans', sans-serif;
             background: var(--crema);
@@ -39,393 +40,478 @@
             overflow-x: hidden;
         }
  
-        /* ── LOADING ── */
+        /* ── LOADING ─────────────────────────────────────── */
         .loading {
-            position: fixed; inset: 0; z-index: 999;
-            background: var(--blanco);
+            position: fixed; inset: 0; z-index: 9999;
+            background: var(--negro);
             display: flex; flex-direction: column;
-            align-items: center; justify-content: center; gap: 24px;
-            transition: opacity 0.6s, visibility 0.6s;
+            align-items: center; justify-content: center; gap: 28px;
+            transition: opacity 0.7s, visibility 0.7s;
         }
         .loading.oculto { opacity: 0; visibility: hidden; pointer-events: none; }
-        .loading-logo {
-            font-family: 'Playfair Display', serif;
-            font-size: 2.2rem; font-weight: 900;
-            color: var(--negro); letter-spacing: -0.02em;
+        .loading-wordmark {
+            display: flex; align-items: center; gap: 14px;
         }
-        .loading-logo span { color: var(--rojo); }
+        .loading-b {
+            width: 48px; height: 48px; border-radius: 10px;
+            background: var(--rojo);
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Playfair Display', serif;
+            font-size: 1.6rem; font-weight: 900; color: white;
+        }
+        .loading-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.6rem; font-weight: 700; color: white;
+            letter-spacing: -0.02em;
+        }
+        .loading-name span { color: var(--rojo); }
         .loading-bar {
-            width: 120px; height: 2px;
-            background: var(--gris-2); border-radius: 2px; overflow: hidden;
+            width: 160px; height: 1px;
+            background: var(--borde-dark); overflow: hidden;
         }
-        .loading-bar-inner {
-            height: 100%; width: 0; background: var(--rojo);
-            animation: loadBar 1.4s ease-in-out forwards;
+        .loading-bar-fill {
+            height: 100%; background: var(--rojo);
+            animation: fillBar 1.6s cubic-bezier(.4,0,.2,1) forwards;
         }
-        @keyframes loadBar { 0%{width:0} 60%{width:80%} 100%{width:100%} }
- 
-        /* ── NAV ── */
-        nav {
-            position: sticky; top: 0; z-index: 100;
-            background: rgba(255,255,255,0.92);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--gris-2);
-            height: 60px;
-            display: flex; align-items: center;
-            padding: 0 48px; gap: 20px;
-        }
-        .nav-marca {
-            font-family: 'Playfair Display', serif;
-            font-weight: 900; font-size: 1.1rem;
-            color: var(--negro); letter-spacing: -0.01em;
-            text-decoration: none; flex-shrink: 0;
-        }
-        .nav-marca span { color: var(--rojo); }
-        .nav-pill {
-            background: var(--rojo-light);
-            border: 1px solid rgba(192,57,43,0.15);
-            border-radius: 100px;
-            padding: 3px 10px;
-            font-size: 0.68rem; font-weight: 600;
-            letter-spacing: 0.12em; text-transform: uppercase;
-            color: var(--rojo);
-        }
-        .nav-sep { width:1px; height:18px; background:var(--gris-2); }
-        .nav-spacer { flex: 1; }
-        .nav-fecha {
-            font-size: 0.78rem; color: var(--txt-dim);
-            font-weight: 400; text-transform: capitalize;
-        }
- 
-        /* Auth area */
-        .btn-login {
-            display: flex; align-items: center; gap: 8px;
-            padding: 7px 16px; border-radius: 8px;
-            background: var(--rojo); border: none;
-            color: white; cursor: pointer;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 0.82rem; font-weight: 600;
-            transition: background 0.2s; white-space: nowrap;
-        }
-        .btn-login:hover { background: var(--rojo-dark); }
-        .btn-login svg { width:15px; height:15px; }
-        .user-chip {
-            display: flex; align-items: center; gap: 8px;
-            padding: 4px 12px 4px 4px;
-            background: var(--gris-1);
-            border: 1px solid var(--gris-2);
-            border-radius: 100px;
-        }
-        .user-avatar {
-            width: 28px; height: 28px; border-radius: 50%;
-            background: var(--rojo);
-            display: flex; align-items:center; justify-content:center;
-            font-family: 'Playfair Display', serif;
-            font-size: 0.78rem; font-weight: 700; color: white;
-        }
-        .user-name { font-size: 0.8rem; font-weight: 500; color: var(--txt); max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .btn-logout { background:none; border:none; color:var(--txt-dim); cursor:pointer; font-size:0.72rem; padding:0; transition:color 0.15s; }
-        .btn-logout:hover { color:var(--rojo); }
- 
-        /* ── HERO ── */
-        .hero {
-            padding: 64px 48px 48px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 48px;
-            align-items: center;
-            border-bottom: 1px solid var(--gris-2);
-            position: relative;
-            overflow: hidden;
-        }
-        .hero::before {
-            content: '';
-            position: absolute;
-            top: -60px; right: -60px;
-            width: 400px; height: 400px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(192,57,43,0.06) 0%, transparent 70%);
-            pointer-events: none;
-        }
-        .hero-eyebrow {
-            font-size: 0.72rem; font-weight: 600;
+        @keyframes fillBar { from{width:0} to{width:100%} }
+        .loading-label {
+            font-size: 0.7rem; color: var(--txt-dark-mid);
             letter-spacing: 0.2em; text-transform: uppercase;
-            color: var(--rojo); margin-bottom: 16px;
-            display: flex; align-items: center; gap: 8px;
-        }
-        .hero-eyebrow::before {
-            content: '';
-            width: 24px; height: 1px; background: var(--rojo);
-        }
-        .hero h1 {
-            font-family: 'Playfair Display', serif;
-            font-size: clamp(2.4rem, 4vw, 3.6rem);
-            font-weight: 900; line-height: 1.05;
-            letter-spacing: -0.03em; color: var(--negro);
-        }
-        .hero h1 em { font-style: italic; color: var(--rojo); }
-        .hero-sub {
-            margin-top: 20px; font-size: 0.95rem;
-            color: var(--txt-mid); line-height: 1.7;
-            font-weight: 300; max-width: 420px;
-        }
- 
-        /* Stats hero */
-        .hero-stats {
-            display: grid; grid-template-columns: 1fr 1fr;
-            gap: 1px; background: var(--gris-2);
-            border: 1px solid var(--gris-2);
-            border-radius: 16px; overflow: hidden;
-        }
-        .hstat {
-            background: var(--blanco);
-            padding: 28px 24px;
-            display: flex; flex-direction: column; gap: 6px;
-        }
-        .hstat-n {
-            font-family: 'Playfair Display', serif;
-            font-size: 2.4rem; font-weight: 700;
-            line-height: 1; color: var(--negro);
-        }
-        .hstat-n.rojo { color: var(--rojo); }
-        .hstat-l {
-            font-size: 0.72rem; color: var(--txt-dim);
-            text-transform: uppercase; letter-spacing: 0.1em;
-            font-weight: 500;
-        }
-        .hstat-sub {
-            font-size: 0.78rem; color: var(--txt-mid);
-            margin-top: 2px;
-        }
- 
-        /* ── MAIN ── */
-        .main { padding: 48px 48px 80px; }
- 
-        /* Sección título */
-        .seccion-header {
-            display: flex; align-items: baseline; gap: 16px;
-            margin-bottom: 24px;
-        }
-        .seccion-titulo {
-            font-family: 'Playfair Display', serif;
-            font-size: 1.4rem; font-weight: 700;
-            color: var(--negro); letter-spacing: -0.02em;
-        }
-        .seccion-linea {
-            flex: 1; height: 1px; background: var(--gris-2);
-        }
-        .seccion-count {
-            font-size: 0.72rem; color: var(--txt-dim);
-            text-transform: uppercase; letter-spacing: 0.1em;
-        }
- 
-        /* ── MÓDULOS ── */
-        .modulos-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 16px;
-            margin-bottom: 56px;
-        }
- 
-        .modulo-card {
-            background: var(--blanco);
-            border: 1px solid var(--gris-2);
-            border-radius: 14px;
-            padding: 28px;
-            cursor: pointer;
-            transition: all 0.25s;
-            text-decoration: none;
-            display: flex; flex-direction: column; gap: 16px;
-            position: relative; overflow: hidden;
-        }
-        .modulo-card::after {
-            content: '';
-            position: absolute;
-            bottom: 0; left: 0; right: 0; height: 3px;
-            background: var(--rojo);
-            transform: scaleX(0); transform-origin: left;
-            transition: transform 0.3s;
-        }
-        .modulo-card:hover {
-            border-color: var(--gris-3);
-            box-shadow: var(--card-sombra-hover);
-            transform: translateY(-2px);
-        }
-        .modulo-card:hover::after { transform: scaleX(1); }
-        .modulo-card.pronto { opacity: 0.5; cursor: default; pointer-events: none; }
- 
-        .modulo-icon {
-            width: 44px; height: 44px; border-radius: 10px;
-            background: var(--gris-1);
-            display: flex; align-items: center; justify-content: center;
-        }
-        .modulo-icon svg { width: 20px; height: 20px; color: var(--txt-mid); }
-        .modulo-icon.activo { background: var(--rojo-light); }
-        .modulo-icon.activo svg { color: var(--rojo); }
- 
-        .modulo-body { flex: 1; }
-        .modulo-nombre {
-            font-family: 'Playfair Display', serif;
-            font-size: 1.05rem; font-weight: 700;
-            color: var(--negro); margin-bottom: 6px;
-        }
-        .modulo-desc {
-            font-size: 0.82rem; color: var(--txt-mid);
-            line-height: 1.6;
-        }
-        .modulo-footer {
-            display: flex; align-items: center; justify-content: space-between;
-        }
-        .modulo-tag {
-            font-size: 0.68rem; font-weight: 600;
-            letter-spacing: 0.1em; text-transform: uppercase;
-            padding: 3px 8px; border-radius: 100px;
-        }
-        .tag-activo { background: rgba(39,174,96,0.1); color: #1a8a4a; border: 1px solid rgba(39,174,96,0.2); }
-        .tag-pronto { background: var(--gris-1); color: var(--txt-dim); border: 1px solid var(--gris-2); }
-        .modulo-arrow { color: var(--gris-3); transition: transform 0.2s, color 0.2s; }
-        .modulo-card:hover .modulo-arrow { transform: translateX(3px); color: var(--rojo); }
- 
-        /* ── NOTICIAS ── */
-        .noticias-grid {
-            display: grid;
-            grid-template-columns: 1.4fr 1fr 1fr;
-            gap: 16px;
-        }
- 
-        .noticia-card {
-            background: var(--blanco);
-            border: 1px solid var(--gris-2);
-            border-radius: 14px;
-            overflow: hidden;
-            transition: all 0.25s;
-        }
-        .noticia-card:hover {
-            box-shadow: var(--card-sombra-hover);
-            transform: translateY(-2px);
-        }
- 
-        .noticia-img {
-            height: 160px;
-            background: var(--gris-1);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 2.5rem;
-            position: relative; overflow: hidden;
-        }
-        .noticia-card.grande .noticia-img { height: 200px; }
- 
-        /* Patrón geométrico decorativo en fondo de noticias */
-        .noticia-img::before {
-            content: '';
-            position: absolute; inset: 0;
-            background:
-                repeating-linear-gradient(
-                    45deg,
-                    transparent,
-                    transparent 20px,
-                    rgba(192,57,43,0.04) 20px,
-                    rgba(192,57,43,0.04) 21px
-                );
-        }
-        .noticia-cat {
-            position: absolute; top: 12px; left: 12px;
-            font-size: 0.65rem; font-weight: 700;
-            letter-spacing: 0.12em; text-transform: uppercase;
-            padding: 3px 9px; border-radius: 100px;
-            background: var(--rojo); color: white;
-        }
- 
-        .noticia-body { padding: 20px; }
-        .noticia-fecha {
-            font-size: 0.7rem; color: var(--txt-dim);
-            text-transform: uppercase; letter-spacing: 0.1em;
-            margin-bottom: 8px;
             font-family: 'DM Mono', monospace;
         }
-        .noticia-titulo {
-            font-family: 'Playfair Display', serif;
-            font-size: 1rem; font-weight: 700;
-            color: var(--negro); line-height: 1.35;
-            margin-bottom: 8px;
-        }
-        .noticia-card.grande .noticia-titulo { font-size: 1.15rem; }
-        .noticia-extracto {
-            font-size: 0.8rem; color: var(--txt-mid);
-            line-height: 1.6;
-        }
  
-        /* ── LOGIN BLOCKER ── */
+        /* ── LOGIN BLOCKER ───────────────────────────────── */
         .login-blocker {
             position: fixed; inset: 0; z-index: 500;
-            background: rgba(250,249,247,0.96);
-            backdrop-filter: blur(12px);
+            background: rgba(17,16,16,0.97);
             display: flex; align-items: center; justify-content: center;
             padding: 20px;
             opacity: 0; pointer-events: none;
-            transition: opacity 0.3s;
+            transition: opacity 0.4s;
         }
         .login-blocker.visible { opacity: 1; pointer-events: all; }
         .login-box {
-            background: var(--blanco);
-            border: 1px solid var(--gris-2);
-            border-radius: 20px;
-            padding: 48px;
-            max-width: 420px; width: 100%;
+            max-width: 400px; width: 100%;
             text-align: center;
-            box-shadow: 0 24px 80px rgba(26,23,20,0.12);
         }
-        .login-logo {
-            font-family: 'Playfair Display', serif;
-            font-size: 1.8rem; font-weight: 900;
-            color: var(--negro); margin-bottom: 8px;
-        }
-        .login-logo span { color: var(--rojo); }
-        .login-sub {
-            font-size: 0.85rem; color: var(--txt-mid);
-            margin-bottom: 32px; line-height: 1.6;
-        }
-        .btn-login-grande {
+        .login-eyebrow {
+            font-size: 0.68rem; font-weight: 600;
+            letter-spacing: 0.22em; text-transform: uppercase;
+            color: var(--rojo); margin-bottom: 24px;
             display: flex; align-items: center; justify-content: center; gap: 10px;
-            width: 100%; padding: 13px;
+        }
+        .login-eyebrow::before, .login-eyebrow::after {
+            content: ''; width: 32px; height: 1px; background: var(--rojo); opacity: 0.5;
+        }
+        .login-logo-grande {
+            font-family: 'Playfair Display', serif;
+            font-size: 3.2rem; font-weight: 900;
+            color: var(--blanco); letter-spacing: -0.03em;
+            line-height: 1; margin-bottom: 6px;
+        }
+        .login-logo-grande span { color: var(--rojo); }
+        .login-tagline {
+            font-size: 0.82rem; color: var(--txt-dark-mid);
+            margin-bottom: 40px; line-height: 1.7;
+        }
+        .btn-ms {
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            width: 100%; padding: 14px;
             background: var(--rojo); border: none; border-radius: 10px;
             color: white; cursor: pointer;
             font-family: 'DM Sans', sans-serif;
             font-size: 0.9rem; font-weight: 600;
             transition: background 0.2s, transform 0.1s;
-            margin-bottom: 14px;
+            margin-bottom: 16px;
         }
-        .btn-login-grande:hover { background: var(--rojo-dark); }
-        .btn-login-grande:active { transform: scale(0.98); }
-        .btn-login-grande svg { width: 18px; height: 18px; }
-        .login-dominio {
-            font-size: 0.72rem; color: var(--txt-dim);
-            display: flex; align-items: center; justify-content: center; gap: 6px;
+        .btn-ms:hover { background: var(--rojo-dark); }
+        .btn-ms:active { transform: scale(0.98); }
+        .btn-ms svg { width: 18px; height: 18px; }
+        .login-restriccion {
+            font-size: 0.7rem; color: #4a4845;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
         }
-        .login-dominio::before, .login-dominio::after {
-            content: ''; flex: 1; height: 1px; background: var(--gris-2);
+        .login-restriccion::before, .login-restriccion::after {
+            content: ''; flex: 1; height: 1px; background: #2a2826;
         }
  
-        /* ── FOOTER ── */
+        /* ── NAV ─────────────────────────────────────────── */
+        nav {
+            position: sticky; top: 0; z-index: 200;
+            background: rgba(17,16,16,0.92);
+            backdrop-filter: blur(24px);
+            border-bottom: 1px solid var(--borde-dark);
+            height: 60px;
+            display: flex; align-items: center;
+            padding: 0 48px; gap: 20px;
+        }
+        .nav-wordmark {
+            display: flex; align-items: center; gap: 10px;
+            text-decoration: none; flex-shrink: 0;
+        }
+        .nav-b {
+            width: 28px; height: 28px; border-radius: 6px;
+            background: var(--rojo);
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Playfair Display', serif;
+            font-size: 0.9rem; font-weight: 900; color: white;
+        }
+        .nav-nombre {
+            font-family: 'Playfair Display', serif;
+            font-size: 1rem; font-weight: 700;
+            color: var(--blanco); letter-spacing: -0.01em;
+        }
+        .nav-nombre span { color: var(--rojo); }
+        .nav-badge {
+            padding: 2px 9px; border-radius: 100px;
+            font-size: 0.62rem; font-weight: 700;
+            letter-spacing: 0.14em; text-transform: uppercase;
+            background: rgba(192,57,43,0.15);
+            color: #ff8070;
+            border: 1px solid rgba(192,57,43,0.25);
+        }
+        .nav-sep { width:1px; height:18px; background: var(--borde-dark); }
+        .nav-spacer { flex: 1; }
+        .nav-clock {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.8rem; color: var(--txt-dark-mid);
+        }
+        .btn-nav-login {
+            display: flex; align-items: center; gap: 7px;
+            padding: 6px 14px; border-radius: 7px;
+            background: var(--rojo); border: none;
+            color: white; cursor: pointer;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.78rem; font-weight: 600;
+            transition: background 0.2s; white-space: nowrap;
+        }
+        .btn-nav-login:hover { background: var(--rojo-dark); }
+        .btn-nav-login svg { width: 14px; height: 14px; }
+        .user-chip {
+            display: flex; align-items: center; gap: 8px;
+            padding: 4px 12px 4px 4px;
+            background: var(--negro-3);
+            border: 1px solid var(--borde-dark);
+            border-radius: 100px;
+        }
+        .user-av {
+            width: 26px; height: 26px; border-radius: 50%;
+            background: var(--rojo);
+            display: flex; align-items:center; justify-content:center;
+            font-family: 'Playfair Display', serif;
+            font-size: 0.72rem; font-weight: 700; color: white;
+        }
+        .user-nm {
+            font-size: 0.78rem; font-weight: 500; color: var(--blanco);
+            max-width: 120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+        }
+        .btn-out {
+            background:none; border:none; color: var(--txt-dark-mid);
+            cursor:pointer; font-size:0.7rem; padding:0; transition:color 0.15s;
+        }
+        .btn-out:hover { color: var(--rojo); }
+ 
+        /* ── HERO OSCURO ─────────────────────────────────── */
+        .hero {
+            background: var(--negro);
+            padding: 72px 48px 64px;
+            position: relative; overflow: hidden;
+        }
+ 
+        /* Grid de fondo decorativo */
+        .hero::before {
+            content: '';
+            position: absolute; inset: 0;
+            background-image:
+                linear-gradient(var(--borde-dark) 1px, transparent 1px),
+                linear-gradient(90deg, var(--borde-dark) 1px, transparent 1px);
+            background-size: 48px 48px;
+            opacity: 0.4;
+        }
+        /* Gradiente encima del grid */
+        .hero::after {
+            content: '';
+            position: absolute; inset: 0;
+            background: radial-gradient(ellipse 70% 80% at 60% 50%,
+                rgba(192,57,43,0.12) 0%,
+                transparent 70%);
+        }
+ 
+        .hero-inner {
+            position: relative; z-index: 2;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: end; gap: 48px;
+        }
+        .hero-eyebrow {
+            font-size: 0.68rem; font-weight: 600;
+            letter-spacing: 0.22em; text-transform: uppercase;
+            color: var(--rojo); margin-bottom: 20px;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .hero-eyebrow::before {
+            content: ''; width: 20px; height: 1px; background: var(--rojo);
+        }
+        .hero h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2.6rem, 5vw, 4.2rem);
+            font-weight: 900; line-height: 0.95;
+            letter-spacing: -0.03em;
+            color: var(--blanco);
+        }
+        .hero h1 em { font-style: italic; color: var(--rojo); }
+        .hero-sub {
+            margin-top: 22px;
+            font-size: 0.92rem; color: var(--txt-dark-mid);
+            line-height: 1.75; font-weight: 300;
+            max-width: 460px;
+        }
+        .hero-bienvenida {
+            margin-top: 28px;
+            display: flex; align-items: center; gap: 12px;
+        }
+        .hero-av {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: var(--rojo);
+            display: flex; align-items:center; justify-content:center;
+            font-family: 'Playfair Display', serif;
+            font-size: 0.9rem; font-weight: 700; color: white;
+        }
+        .hero-hola {
+            font-size: 0.85rem; color: var(--txt-dark-mid);
+        }
+        .hero-hola strong { color: white; }
+ 
+        /* Stats en hero */
+        .hero-stats {
+            display: flex; flex-direction: column; gap: 1px;
+            min-width: 200px;
+        }
+        .hstat {
+            background: var(--negro-3);
+            border: 1px solid var(--borde-dark);
+            border-radius: 12px;
+            padding: 20px 22px;
+            display: flex; align-items: center; gap: 16px;
+            margin-bottom: 8px;
+        }
+        .hstat:last-child { margin-bottom: 0; }
+        .hstat-icon {
+            width: 36px; height: 36px; border-radius: 8px;
+            background: var(--rojo-light);
+            border: 1px solid rgba(192,57,43,0.2);
+            display: flex; align-items:center; justify-content:center;
+            flex-shrink: 0;
+        }
+        .hstat-icon svg { width: 16px; height: 16px; color: var(--rojo); }
+        .hstat-data {}
+        .hstat-n {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.4rem; font-weight: 700;
+            color: var(--blanco); line-height: 1;
+        }
+        .hstat-l {
+            font-size: 0.68rem; color: var(--txt-dark-mid);
+            text-transform: uppercase; letter-spacing: 0.1em;
+            margin-top: 3px;
+        }
+ 
+        /* ── CONTENIDO CLARO ─────────────────────────────── */
+        .main {
+            background: var(--crema);
+            padding: 52px 48px 80px;
+        }
+ 
+        /* Título de sección */
+        .sec-header {
+            display: flex; align-items: center; gap: 16px;
+            margin-bottom: 24px;
+        }
+        .sec-titulo {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.2rem; font-weight: 700;
+            color: var(--txt); letter-spacing: -0.02em;
+            white-space: nowrap;
+        }
+        .sec-linea { flex:1; height:1px; background: var(--gris-2); }
+        .sec-label {
+            font-size: 0.68rem; color: var(--txt-dim);
+            text-transform: uppercase; letter-spacing: 0.1em;
+            white-space: nowrap;
+        }
+ 
+        /* ── MÓDULOS ─────────────────────────────────────── */
+        .modulos { margin-bottom: 52px; }
+        .modulos-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+        }
+ 
+        .mod-card {
+            background: var(--blanco);
+            border: 1px solid var(--gris-2);
+            border-radius: 14px;
+            padding: 24px;
+            text-decoration: none;
+            display: flex; flex-direction: column; gap: 20px;
+            transition: all 0.25s;
+            position: relative; overflow: hidden;
+            cursor: pointer;
+        }
+        .mod-card.disabled { opacity: 0.45; cursor: default; pointer-events: none; }
+        .mod-card:not(.disabled):hover {
+            border-color: var(--rojo);
+            box-shadow: 0 0 0 1px var(--rojo), 0 12px 40px rgba(26,23,20,0.1);
+            transform: translateY(-3px);
+        }
+        .mod-numero {
+            position: absolute; top: 16px; right: 18px;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.65rem; color: var(--gris-2);
+            font-weight: 500;
+        }
+        .mod-icon {
+            width: 42px; height: 42px; border-radius: 10px;
+            display: flex; align-items:center; justify-content:center;
+        }
+        .mod-icon.on  { background: var(--negro); }
+        .mod-icon.off { background: var(--gris-1); }
+        .mod-icon svg { width: 18px; height: 18px; }
+        .mod-icon.on svg  { color: white; }
+        .mod-icon.off svg { color: var(--gris-3); }
+ 
+        .mod-nombre {
+            font-family: 'Playfair Display', serif;
+            font-size: 0.95rem; font-weight: 700;
+            color: var(--txt); line-height: 1.2;
+        }
+        .mod-desc {
+            font-size: 0.78rem; color: var(--txt-mid);
+            line-height: 1.55; margin-top: 5px;
+        }
+        .mod-footer {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-top: auto;
+        }
+        .mod-status {
+            font-size: 0.65rem; font-weight: 700;
+            letter-spacing: 0.1em; text-transform: uppercase;
+            padding: 3px 8px; border-radius: 100px;
+        }
+        .status-on  { background: rgba(26,122,74,0.1); color: #1a7a4a; border: 1px solid rgba(26,122,74,0.2); }
+        .status-off { background: var(--gris-1); color: var(--txt-dim); border: 1px solid var(--gris-2); }
+        .mod-arrow { color: var(--gris-2); transition: all 0.2s; }
+        .mod-card:not(.disabled):hover .mod-arrow { color: var(--rojo); transform: translateX(3px); }
+ 
+        /* ── NOTICIAS ────────────────────────────────────── */
+        .noticias-grid {
+            display: grid;
+            grid-template-columns: 1.6fr 1fr 1fr;
+            gap: 14px;
+        }
+ 
+        .not-card {
+            background: var(--blanco);
+            border: 1px solid var(--gris-2);
+            border-radius: 14px;
+            overflow: hidden;
+            transition: all 0.25s;
+        }
+        .not-card:hover {
+            box-shadow: 0 12px 40px rgba(26,23,20,0.1);
+            transform: translateY(-2px);
+        }
+ 
+        .not-visual {
+            height: 140px;
+            background: var(--negro);
+            position: relative; overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .not-card.principal .not-visual { height: 180px; }
+ 
+        /* Patron de fondo para noticias */
+        .not-visual::before {
+            content: '';
+            position: absolute; inset: 0;
+            background-image:
+                linear-gradient(var(--borde-dark) 1px, transparent 1px),
+                linear-gradient(90deg, var(--borde-dark) 1px, transparent 1px);
+            background-size: 32px 32px;
+            opacity: 0.5;
+        }
+        .not-visual-emoji {
+            position: relative; z-index: 1;
+            font-size: 2.4rem;
+            filter: grayscale(0.2);
+        }
+        .not-card.principal .not-visual-emoji { font-size: 3rem; }
+        .not-cat {
+            position: absolute; bottom: 12px; left: 14px; z-index: 2;
+            font-size: 0.62rem; font-weight: 700;
+            letter-spacing: 0.14em; text-transform: uppercase;
+            padding: 3px 9px; border-radius: 100px;
+            background: var(--rojo); color: white;
+        }
+        /* Gradiente decorativo en visual */
+        .not-visual::after {
+            content: '';
+            position: absolute; inset: 0;
+            background: radial-gradient(ellipse 80% 80% at 50% 50%,
+                rgba(192,57,43,0.12) 0%, transparent 70%);
+        }
+ 
+        .not-body { padding: 18px 20px 20px; }
+        .not-fecha {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.65rem; color: var(--txt-dim);
+            text-transform: uppercase; letter-spacing: 0.1em;
+            margin-bottom: 8px;
+        }
+        .not-titulo {
+            font-family: 'Playfair Display', serif;
+            font-size: 0.95rem; font-weight: 700;
+            color: var(--txt); line-height: 1.35; margin-bottom: 8px;
+        }
+        .not-card.principal .not-titulo { font-size: 1.1rem; }
+        .not-extracto {
+            font-size: 0.78rem; color: var(--txt-mid);
+            line-height: 1.6;
+        }
+ 
+        /* ── FOOTER ──────────────────────────────────────── */
         footer {
-            border-top: 1px solid var(--gris-2);
+            background: var(--negro);
+            border-top: 1px solid var(--borde-dark);
             padding: 20px 48px;
             display: flex; align-items: center; justify-content: space-between;
-            font-size: 0.75rem; color: var(--txt-dim);
         }
-        .footer-version {
+        .footer-l {
+            font-size: 0.75rem; color: var(--txt-dark-mid);
+        }
+        .footer-r {
             font-family: 'DM Mono', monospace;
-            font-size: 0.68rem; color: var(--gris-3);
+            font-size: 0.65rem; color: #3a3836;
         }
  
-        /* ── RESPONSIVE ── */
-        @media (max-width: 900px) {
-            nav { padding: 0 20px; }
-            .hero { grid-template-columns: 1fr; padding: 40px 20px 32px; }
-            .hero::before { display: none; }
-            .hero-stats { grid-template-columns: 1fr 1fr; }
-            .main { padding: 32px 20px 60px; }
+        /* ── RESPONSIVE ──────────────────────────────────── */
+        @media (max-width: 1024px) {
+            .modulos-grid { grid-template-columns: repeat(2, 1fr); }
             .noticias-grid { grid-template-columns: 1fr; }
-            footer { padding: 16px 20px; flex-direction: column; gap: 6px; text-align: center; }
+        }
+        @media (max-width: 768px) {
+            nav { padding: 0 20px; }
+            .hero { padding: 48px 20px 40px; }
+            .hero-inner { grid-template-columns: 1fr; }
+            .hero-stats { flex-direction: row; flex-wrap: wrap; }
+            .hstat { flex: 1; min-width: 140px; }
+            .main { padding: 36px 20px 60px; }
+            .modulos-grid { grid-template-columns: 1fr 1fr; }
+            footer { padding: 16px 20px; flex-direction: column; gap: 6px; }
+        }
+        @media (max-width: 480px) {
+            .modulos-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -433,17 +519,22 @@
  
 <!-- LOADING -->
 <div class="loading" id="loading">
-    <div class="loading-logo">Baker<span>.</span></div>
-    <div class="loading-bar"><div class="loading-bar-inner"></div></div>
+    <div class="loading-wordmark">
+        <div class="loading-b">B</div>
+        <div class="loading-name">Baker<span>.</span></div>
+    </div>
+    <div class="loading-bar"><div class="loading-bar-fill"></div></div>
+    <div class="loading-label">Cargando portal</div>
 </div>
  
 <!-- LOGIN BLOCKER -->
 <div class="login-blocker" id="login-blocker">
     <div class="login-box">
-        <div class="login-logo">Baker<span>.</span></div>
-        <div class="login-sub">Portal interno de Inmobiliaria Baker SPA.<br>Acceso exclusivo para colaboradores.</div>
-        <button class="btn-login-grande" onclick="loginMicrosoft()">
-            <svg viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <div class="login-eyebrow">Portal Corporativo</div>
+        <div class="login-logo-grande">Baker<span>.</span></div>
+        <div class="login-tagline">Acceso exclusivo para colaboradores<br>de Inmobiliaria Baker SPA.</div>
+        <button class="btn-ms" onclick="loginMicrosoft()">
+            <svg viewBox="0 0 21 21" fill="none">
                 <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
                 <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
                 <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
@@ -451,20 +542,23 @@
             </svg>
             Ingresar con Microsoft
         </button>
-        <div class="login-dominio">Solo cuentas @ibaker.cl</div>
+        <div class="login-restriccion">Solo cuentas @ibaker.cl</div>
     </div>
 </div>
  
 <!-- NAV -->
 <nav>
-    <a class="nav-marca" href="#">Baker<span>.</span></a>
-    <div class="nav-pill">Intranet</div>
+    <a class="nav-wordmark" href="#">
+        <div class="nav-b">B</div>
+        <div class="nav-nombre">Baker<span>.</span></div>
+    </a>
+    <div class="nav-badge">Intranet</div>
     <div class="nav-sep"></div>
     <div class="nav-spacer"></div>
-    <div class="nav-fecha" id="nav-fecha">—</div>
+    <div class="nav-clock" id="nav-clock">—</div>
     <div id="auth-area">
-        <button class="btn-login" onclick="loginMicrosoft()">
-            <svg viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <button class="btn-nav-login" onclick="loginMicrosoft()">
+            <svg viewBox="0 0 21 21" fill="none">
                 <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
                 <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
                 <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
@@ -475,178 +569,198 @@
     </div>
 </nav>
  
-<!-- HERO -->
+<!-- HERO OSCURO -->
 <section class="hero">
-    <div>
-        <div class="hero-eyebrow">Portal Corporativo</div>
-        <h1>Bienvenido a<br><em>Intranet</em><br>Baker.</h1>
-        <p class="hero-sub">Tu espacio de trabajo digital. Accede a las herramientas, información y sistemas de Inmobiliaria Baker desde un solo lugar.</p>
-    </div>
-    <div class="hero-stats">
-        <div class="hstat">
-            <div class="hstat-n rojo">5</div>
-            <div class="hstat-l">Empresas</div>
-            <div class="hstat-sub">Romeral · Baker · y más</div>
+    <div class="hero-inner">
+        <div>
+            <div class="hero-eyebrow">Portal Interno 2025</div>
+            <h1>Tu espacio<br>de trabajo,<br><em>digital.</em></h1>
+            <p class="hero-sub">Accede a los sistemas, herramientas e información del grupo Baker desde un solo lugar, disponible para todo el equipo.</p>
+            <div class="hero-bienvenida" id="hero-bienvenida" style="display:none">
+                <div class="hero-av" id="hero-av">—</div>
+                <div class="hero-hola">Bienvenido, <strong id="hero-nombre">—</strong></div>
+            </div>
         </div>
-        <div class="hstat">
-            <div class="hstat-n" id="stat-fecha">—</div>
-            <div class="hstat-l">Hoy</div>
-            <div class="hstat-sub" id="stat-hora">—</div>
-        </div>
-        <div class="hstat">
-            <div class="hstat-n">2</div>
-            <div class="hstat-l">Módulos activos</div>
-            <div class="hstat-sub">Softland · Salas</div>
-        </div>
-        <div class="hstat">
-            <div class="hstat-n">∞</div>
-            <div class="hstat-l">Próximamente</div>
-            <div class="hstat-sub">Más herramientas</div>
+        <div class="hero-stats">
+            <div class="hstat">
+                <div class="hstat-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                    </svg>
+                </div>
+                <div class="hstat-data">
+                    <div class="hstat-n">5</div>
+                    <div class="hstat-l">Empresas conectadas</div>
+                </div>
+            </div>
+            <div class="hstat">
+                <div class="hstat-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                </div>
+                <div class="hstat-data">
+                    <div class="hstat-n" id="stat-fecha">—</div>
+                    <div class="hstat-l" id="stat-dia">—</div>
+                </div>
+            </div>
+            <div class="hstat">
+                <div class="hstat-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                </div>
+                <div class="hstat-data">
+                    <div class="hstat-n">2</div>
+                    <div class="hstat-l">Módulos activos</div>
+                </div>
+            </div>
         </div>
     </div>
 </section>
  
-<!-- MAIN -->
+<!-- MAIN CLARO -->
 <div class="main">
  
     <!-- Módulos -->
-    <div class="seccion-header">
-        <div class="seccion-titulo">Módulos</div>
-        <div class="seccion-linea"></div>
-        <div class="seccion-count">2 activos</div>
-    </div>
+    <div class="modulos">
+        <div class="sec-header">
+            <div class="sec-titulo">Módulos</div>
+            <div class="sec-linea"></div>
+            <div class="sec-label">2 activos · 2 próximamente</div>
+        </div>
+        <div class="modulos-grid">
  
-    <div class="modulos-grid">
+            <a class="mod-card" href="softland.html">
+                <div class="mod-numero">01</div>
+                <div class="mod-icon on">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="mod-nombre">Consultas Softland</div>
+                    <div class="mod-desc">Busca asientos contables, vouchers y movimientos de las 5 empresas. Exporta a Excel.</div>
+                </div>
+                <div class="mod-footer">
+                    <div class="mod-status status-on">Activo</div>
+                    <div class="mod-arrow">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </div>
+                </div>
+            </a>
  
-        <!-- Consultas Softland -->
-        <a class="modulo-card" href="softland.html">
-            <div class="modulo-icon activo">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-                </svg>
-            </div>
-            <div class="modulo-body">
-                <div class="modulo-nombre">Consultas Softland</div>
-                <div class="modulo-desc">Busca asientos contables, vouchers y movimientos de las 5 empresas. Exporta a Excel directamente.</div>
-            </div>
-            <div class="modulo-footer">
-                <div class="modulo-tag tag-activo">Activo</div>
-                <div class="modulo-arrow">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            <a class="mod-card" href="https://salasbaker.netlify.app" target="_blank">
+                <div class="mod-numero">02</div>
+                <div class="mod-icon on">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="mod-nombre">Salas de Reunión</div>
+                    <div class="mod-desc">Disponibilidad en tiempo real y agendamiento directo desde Outlook.</div>
+                </div>
+                <div class="mod-footer">
+                    <div class="mod-status status-on">Activo</div>
+                    <div class="mod-arrow">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </div>
+                </div>
+            </a>
+ 
+            <div class="mod-card disabled">
+                <div class="mod-numero">03</div>
+                <div class="mod-icon off">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="mod-nombre">Documentos</div>
+                    <div class="mod-desc">Repositorio centralizado de contratos, formularios y documentos internos.</div>
+                </div>
+                <div class="mod-footer">
+                    <div class="mod-status status-off">Próximamente</div>
                 </div>
             </div>
-        </a>
  
-        <!-- Salas de reunión -->
-        <a class="modulo-card" href="https://salasbaker.netlify.app" target="_blank">
-            <div class="modulo-icon activo">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                </svg>
-            </div>
-            <div class="modulo-body">
-                <div class="modulo-nombre">Salas de Reunión</div>
-                <div class="modulo-desc">Consulta disponibilidad en tiempo real y agenda salas directamente desde Outlook.</div>
-            </div>
-            <div class="modulo-footer">
-                <div class="modulo-tag tag-activo">Activo</div>
-                <div class="modulo-arrow">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            <div class="mod-card disabled">
+                <div class="mod-numero">04</div>
+                <div class="mod-icon off">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="mod-nombre">Directorio</div>
+                    <div class="mod-desc">Contactos internos y organigrama de todas las empresas del grupo Baker.</div>
+                </div>
+                <div class="mod-footer">
+                    <div class="mod-status status-off">Próximamente</div>
                 </div>
             </div>
-        </a>
  
-        <!-- Documentos — próximamente -->
-        <div class="modulo-card pronto">
-            <div class="modulo-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
-                </svg>
-            </div>
-            <div class="modulo-body">
-                <div class="modulo-nombre">Documentos</div>
-                <div class="modulo-desc">Repositorio centralizado de documentos internos, contratos y formularios.</div>
-            </div>
-            <div class="modulo-footer">
-                <div class="modulo-tag tag-pronto">Próximamente</div>
-            </div>
         </div>
- 
-        <!-- Directorio — próximamente -->
-        <div class="modulo-card pronto">
-            <div class="modulo-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
-                </svg>
-            </div>
-            <div class="modulo-body">
-                <div class="modulo-nombre">Directorio</div>
-                <div class="modulo-desc">Contactos internos, áreas y organigrama de todas las empresas del grupo.</div>
-            </div>
-            <div class="modulo-footer">
-                <div class="modulo-tag tag-pronto">Próximamente</div>
-            </div>
-        </div>
- 
     </div>
  
     <!-- Noticias -->
-    <div class="seccion-header">
-        <div class="seccion-titulo">Novedades internas</div>
-        <div class="seccion-linea"></div>
-        <div class="seccion-count">3 publicaciones</div>
-    </div>
- 
-    <div class="noticias-grid">
- 
-        <div class="noticia-card grande">
-            <div class="noticia-img">
-                🏢
-                <div class="noticia-cat">Tecnología</div>
-            </div>
-            <div class="noticia-body">
-                <div class="noticia-fecha">Jun 2025</div>
-                <div class="noticia-titulo">Lanzamiento del portal de intranet Baker</div>
-                <div class="noticia-extracto">A partir de hoy, el grupo Baker cuenta con un portal interno centralizado para acceder a herramientas, sistemas y comunicaciones internas desde cualquier dispositivo.</div>
-            </div>
+    <div>
+        <div class="sec-header">
+            <div class="sec-titulo">Novedades internas</div>
+            <div class="sec-linea"></div>
+            <div class="sec-label">Junio 2025</div>
         </div>
+        <div class="noticias-grid">
  
-        <div class="noticia-card">
-            <div class="noticia-img" style="font-size:2rem">
-                📊
-                <div class="noticia-cat">Sistemas</div>
+            <div class="not-card principal">
+                <div class="not-visual">
+                    <div class="not-visual-emoji">🏢</div>
+                    <div class="not-cat">Tecnología</div>
+                </div>
+                <div class="not-body">
+                    <div class="not-fecha">08 Jun 2025</div>
+                    <div class="not-titulo">Lanzamiento del portal de intranet Baker</div>
+                    <div class="not-extracto">El grupo Baker cuenta ahora con un portal interno centralizado para acceder a herramientas, sistemas y comunicaciones internas desde cualquier dispositivo con correo corporativo.</div>
+                </div>
             </div>
-            <div class="noticia-body">
-                <div class="noticia-fecha">Jun 2025</div>
-                <div class="noticia-titulo">Consultas Softland disponibles en línea</div>
-                <div class="noticia-extracto">Ya puedes buscar asientos contables y exportar a Excel sin necesitar ayuda de TI.</div>
+ 
+            <div class="not-card">
+                <div class="not-visual">
+                    <div class="not-visual-emoji">📊</div>
+                    <div class="not-cat">Sistemas</div>
+                </div>
+                <div class="not-body">
+                    <div class="not-fecha">08 Jun 2025</div>
+                    <div class="not-titulo">Consultas Softland disponibles en línea</div>
+                    <div class="not-extracto">Ya puedes buscar asientos contables y exportar a Excel sin necesitar ayuda de TI.</div>
+                </div>
             </div>
+ 
+            <div class="not-card">
+                <div class="not-visual">
+                    <div class="not-visual-emoji">🖨️</div>
+                    <div class="not-cat">TI</div>
+                </div>
+                <div class="not-body">
+                    <div class="not-fecha">Jun 2025</div>
+                    <div class="not-titulo">Instalación de impresoras ahora es autoservicio</div>
+                    <div class="not-extracto">Descarga el driver de la RICOH IM 430 directamente desde el portal sin contactar soporte.</div>
+                </div>
+            </div>
+ 
         </div>
- 
-        <div class="noticia-card">
-            <div class="noticia-img" style="font-size:2rem">
-                🖨️
-                <div class="noticia-cat">TI</div>
-            </div>
-            <div class="noticia-body">
-                <div class="noticia-fecha">Jun 2025</div>
-                <div class="noticia-titulo">Instalación de impresoras ahora es autoservicio</div>
-                <div class="noticia-extracto">Descarga el driver de la RICOH IM 430 directamente desde el portal de salas sin contactar a soporte.</div>
-            </div>
-        </div>
- 
     </div>
  
 </div>
  
 <!-- FOOTER -->
 <footer>
-    <div>Inmobiliaria Baker SPA &mdash; Portal Interno</div>
-    <div class="footer-version">v1.0.0 &mdash; 2025</div>
+    <div class="footer-l">Inmobiliaria Baker SPA &mdash; Portal Interno</div>
+    <div class="footer-r">v1.0.0 · 2025</div>
 </footer>
  
 <script>
-// ── MSAL Config ───────────────────────────────────────────────
 const msalConfig = {
     auth: {
         clientId:    "d9664e06-7fd2-401d-b27b-97116fed7d9f",
@@ -656,19 +770,18 @@ const msalConfig = {
     cache: { cacheLocation: "sessionStorage" }
 };
 const msalInstance = new msal.PublicClientApplication(msalConfig);
-const SCOPES = ["User.Read"];
+const SCOPES   = ["User.Read"];
 const DOMINIOS = ['@ibaker.cl'];
 let usuarioActual = null;
  
-// ── Login ─────────────────────────────────────────────────────
 async function loginMicrosoft() {
     try {
         await msalInstance.initialize();
         const result = await msalInstance.loginPopup({ scopes: SCOPES });
-        const email = result.account.username || '';
+        const email  = result.account.username || '';
         if (!DOMINIOS.some(d => email.endsWith(d))) {
             await msalInstance.logoutPopup({ account: result.account });
-            alert('Acceso restringido. Solo usuarios @ibaker.cl pueden ingresar.');
+            alert('Acceso restringido. Solo cuentas @ibaker.cl.');
             return;
         }
         usuarioActual = result.account;
@@ -685,22 +798,32 @@ function logout() {
 function actualizarUI() {
     const blocker = document.getElementById('login-blocker');
     const area    = document.getElementById('auth-area');
+    const bienvenida = document.getElementById('hero-bienvenida');
  
     if (usuarioActual) {
         blocker.classList.remove('visible');
-        const nombre = usuarioActual.name || usuarioActual.username;
+        const nombre   = usuarioActual.name || usuarioActual.username;
         const iniciales = nombre.split(' ').map(p => p[0]).join('').slice(0,2).toUpperCase();
+        const primerNombre = nombre.split(' ')[0];
+ 
+        // Nav chip
         area.innerHTML = `
             <div class="user-chip">
-                <div class="user-avatar">${iniciales}</div>
-                <span class="user-name">${nombre.split(' ').slice(0,2).join(' ')}</span>
-                <button class="btn-logout" onclick="logout()">✕</button>
+                <div class="user-av">${iniciales}</div>
+                <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
+                <button class="btn-out" onclick="logout()">✕</button>
             </div>`;
+ 
+        // Hero bienvenida
+        document.getElementById('hero-av').innerText = iniciales;
+        document.getElementById('hero-nombre').innerText = primerNombre;
+        bienvenida.style.display = 'flex';
     } else {
         blocker.classList.add('visible');
+        bienvenida.style.display = 'none';
         area.innerHTML = `
-            <button class="btn-login" onclick="loginMicrosoft()">
-                <svg viewBox="0 0 21 21" fill="none" style="width:14px;height:14px">
+            <button class="btn-nav-login" onclick="loginMicrosoft()">
+                <svg viewBox="0 0 21 21" fill="none" style="width:13px;height:13px">
                     <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
                     <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
                     <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
@@ -715,33 +838,26 @@ async function intentarLoginSilencioso() {
     try {
         await msalInstance.initialize();
         const accounts = msalInstance.getAllAccounts();
-        if (accounts.length > 0) {
-            usuarioActual = accounts[0];
-        }
+        if (accounts.length > 0) usuarioActual = accounts[0];
     } catch(e) {}
 }
  
-// ── Reloj y fecha ─────────────────────────────────────────────
 function tickClock() {
     const n = new Date();
-    const fecha = n.toLocaleDateString('es-CL', { weekday:'long', day:'numeric', month:'long' });
-    const hora  = n.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' });
-    const dia   = n.toLocaleDateString('es-CL', { day:'numeric', month:'short' });
- 
-    document.getElementById('nav-fecha').innerText = fecha.charAt(0).toUpperCase() + fecha.slice(1);
-    document.getElementById('stat-fecha').innerText = dia.toUpperCase();
-    document.getElementById('stat-hora').innerText  = hora;
+    document.getElementById('nav-clock').innerText =
+        n.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' });
+    document.getElementById('stat-fecha').innerText =
+        n.toLocaleDateString('es-CL', { day:'numeric', month:'short' }).toUpperCase();
+    document.getElementById('stat-dia').innerText =
+        n.toLocaleDateString('es-CL', { weekday:'long' });
 }
 setInterval(tickClock, 1000);
 tickClock();
  
-// ── Init ──────────────────────────────────────────────────────
 async function init() {
     await intentarLoginSilencioso();
     actualizarUI();
-    setTimeout(() => {
-        document.getElementById('loading').classList.add('oculto');
-    }, 1500);
+    setTimeout(() => document.getElementById('loading').classList.add('oculto'), 1600);
 }
 init();
 </script>
