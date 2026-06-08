@@ -6,28 +6,30 @@
     <title>Intranet — Inmobiliaria Baker</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
     <style>
         :root {
             --rojo:        #C0392B;
             --rojo-dark:   #96281B;
-            --rojo-glow:   rgba(192,57,43,0.35);
-            --rojo-light:  rgba(192,57,43,0.10);
-            --negro:       #111010;
-            --negro-2:     #1A1918;
-            --negro-3:     #242220;
-            --borde-dark:  #2E2C2A;
+            --rojo-glow:   rgba(192,57,43,0.25);
+            --rojo-light:  rgba(192,57,43,0.08);
+            --negro:       #0F0E0E;
+            --negro-2:     #161514;
+            --negro-3:     #1F1D1C;
+            --borde-dark:  #2A2826;
             --blanco:      #FFFFFF;
-            --crema:       #F8F6F3;
-            --gris-1:      #F0EDE9;
-            --gris-2:      #E2DED9;
-            --gris-3:      #B5B0AA;
+            --crema:       #F9F8F6;
+            --gris-1:      #F1EEFA;
+            --gris-2:      #E5E1DB;
+            --gris-3:      #BAB5AF;
             --txt-dark:    #FFFFFF;
-            --txt-dark-mid:#9E9A96;
-            --txt:         #1C1A18;
-            --txt-mid:     #6B6762;
-            --txt-dim:     #A09C97;
+            --txt-dark-mid:#A5A19D;
+            --txt:         #1E1C1A;
+            --txt-mid:     #6E6A64;
+            --txt-dim:     #A4A09B;
+            --sombra:      0 10px 30px -10px rgba(28, 26, 24, 0.08);
+            --sombra-hover:0 20px 40px -15px rgba(192, 57, 43, 0.15);
         }
  
         *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
@@ -46,493 +48,211 @@
             background: var(--negro);
             display: flex; flex-direction: column;
             align-items: center; justify-content: center; gap: 28px;
-            transition: opacity 0.7s, visibility 0.7s;
+            transition: opacity 0.6s cubic-bezier(0.25, 1, 0.5, 1), visibility 0.6s;
         }
         .loading.oculto { opacity: 0; visibility: hidden; pointer-events: none; }
-        .loading-wordmark {
-            display: flex; align-items: center; gap: 14px;
-        }
+        .loading-wordmark { display: flex; align-items: center; gap: 14px; }
         .loading-b {
-            width: 48px; height: 48px; border-radius: 10px;
+            width: 52px; height: 52px; border-radius: 12px;
             background: var(--rojo);
             display: flex; align-items: center; justify-content: center;
             font-family: 'Playfair Display', serif;
-            font-size: 1.6rem; font-weight: 900; color: white;
+            font-size: 1.8rem; font-weight: 900; color: white;
+            box-shadow: 0 0 30px var(--rojo-glow);
         }
         .loading-name {
             font-family: 'Playfair Display', serif;
-            font-size: 1.6rem; font-weight: 700; color: white;
+            font-size: 1.8rem; font-weight: 700; color: white;
             letter-spacing: -0.02em;
         }
         .loading-name span { color: var(--rojo); }
-        .loading-bar {
-            width: 160px; height: 1px;
-            background: var(--borde-dark); overflow: hidden;
-        }
-        .loading-bar-fill {
-            height: 100%; background: var(--rojo);
-            animation: fillBar 1.6s cubic-bezier(.4,0,.2,1) forwards;
-        }
+        .loading-bar { width: 180px; height: 2px; background: var(--borde-dark); overflow: hidden; border-radius: 2px; }
+        .loading-bar-fill { height: 100%; background: var(--rojo); animation: fillBar 1.6s cubic-bezier(.4,0,.2,1) forwards; }
         @keyframes fillBar { from{width:0} to{width:100%} }
-        .loading-label {
-            font-size: 0.7rem; color: var(--txt-dark-mid);
-            letter-spacing: 0.2em; text-transform: uppercase;
-            font-family: 'DM Mono', monospace;
-        }
+        .loading-label { font-size: 0.75rem; color: var(--txt-dark-mid); letter-spacing: 0.25em; text-transform: uppercase; font-family: 'DM Mono', monospace; }
  
         /* ── LOGIN BLOCKER ───────────────────────────────── */
         .login-blocker {
             position: fixed; inset: 0; z-index: 500;
-            background: rgba(17,16,16,0.97);
+            background: linear-gradient(135deg, rgba(15,14,14,0.98) 0%, rgba(25,23,22,0.99) 100%);
+            backdrop-filter: blur(16px);
             display: flex; align-items: center; justify-content: center;
-            padding: 20px;
-            opacity: 0; pointer-events: none;
-            transition: opacity 0.4s;
+            padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.4s ease;
         }
         .login-blocker.visible { opacity: 1; pointer-events: all; }
-        .login-box {
-            max-width: 400px; width: 100%;
-            text-align: center;
-        }
-        .login-eyebrow {
-            font-size: 0.68rem; font-weight: 600;
-            letter-spacing: 0.22em; text-transform: uppercase;
-            color: var(--rojo); margin-bottom: 24px;
-            display: flex; align-items: center; justify-content: center; gap: 10px;
-        }
-        .login-eyebrow::before, .login-eyebrow::after {
-            content: ''; width: 32px; height: 1px; background: var(--rojo); opacity: 0.5;
-        }
-        .login-logo-grande {
-            font-family: 'Playfair Display', serif;
-            font-size: 3.2rem; font-weight: 900;
-            color: var(--blanco); letter-spacing: -0.03em;
-            line-height: 1; margin-bottom: 6px;
-        }
+        .login-box { max-width: 420px; width: 100%; background: var(--negro-2); padding: 40px; border-radius: 24px; border: 1px solid var(--borde-dark); box-shadow: 0 30px 60px rgba(0,0,0,0.4); text-align: center; }
+        .login-eyebrow { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: var(--rojo); margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .login-eyebrow::before, .login-eyebrow::after { content: ''; width: 24px; height: 1px; background: var(--rojo); opacity: 0.4; }
+        .login-logo-grande { font-family: 'Playfair Display', serif; font-size: 3.5rem; font-weight: 900; color: var(--blanco); letter-spacing: -0.03em; margin-bottom: 10px; }
         .login-logo-grande span { color: var(--rojo); }
-        .login-tagline {
-            font-size: 0.82rem; color: var(--txt-dark-mid);
-            margin-bottom: 40px; line-height: 1.7;
-        }
+        .login-tagline { font-size: 0.88rem; color: var(--txt-dark-mid); margin-bottom: 36px; line-height: 1.6; }
         .btn-ms {
-            display: flex; align-items: center; justify-content: center; gap: 10px;
-            width: 100%; padding: 14px;
-            background: var(--rojo); border: none; border-radius: 10px;
-            color: white; cursor: pointer;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 0.9rem; font-weight: 600;
-            transition: background 0.2s, transform 0.1s;
-            margin-bottom: 16px;
+            display: flex; align-items: center; justify-content: center; gap: 12px;
+            width: 100%; padding: 16px; background: var(--rojo); border: none; border-radius: 12px;
+            color: white; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.95rem; font-weight: 600;
+            transition: all 0.2s ease; box-shadow: 0 4px 15px var(--rojo-glow);
         }
-        .btn-ms:hover { background: var(--rojo-dark); }
-        .btn-ms:active { transform: scale(0.98); }
-        .btn-ms svg { width: 18px; height: 18px; }
-        .login-restriccion {
-            font-size: 0.7rem; color: #4a4845;
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-        }
-        .login-restriccion::before, .login-restriccion::after {
-            content: ''; flex: 1; height: 1px; background: #2a2826;
-        }
+        .btn-ms:hover { background: var(--rojo-dark); transform: translateY(-2px); box-shadow: 0 6px 20px var(--rojo-glow); }
+        .btn-ms:active { transform: translateY(0); }
+        .btn-ms svg { width: 20px; height: 20px; }
+        .login-restriccion { font-size: 0.75rem; color: #5a5652; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 24px; }
+        .login-restriccion::before, .login-restriccion::after { content: ''; flex: 1; height: 1px; background: #2A2826; }
  
         /* ── NAV ─────────────────────────────────────────── */
         nav {
             position: sticky; top: 0; z-index: 200;
-            background: rgba(17,16,16,0.92);
-            backdrop-filter: blur(24px);
-            border-bottom: 1px solid var(--borde-dark);
-            height: 60px;
-            display: flex; align-items: center;
-            padding: 0 48px; gap: 20px;
+            background: rgba(15,14,14,0.85); backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--borde-dark); height: 65px;
+            display: flex; align-items: center; padding: 0 48px; gap: 20px;
         }
-        .nav-wordmark {
-            display: flex; align-items: center; gap: 10px;
-            text-decoration: none; flex-shrink: 0;
-        }
-        .nav-b {
-            width: 28px; height: 28px; border-radius: 6px;
-            background: var(--rojo);
-            display: flex; align-items: center; justify-content: center;
-            font-family: 'Playfair Display', serif;
-            font-size: 0.9rem; font-weight: 900; color: white;
-        }
-        .nav-nombre {
-            font-family: 'Playfair Display', serif;
-            font-size: 1rem; font-weight: 700;
-            color: var(--blanco); letter-spacing: -0.01em;
-        }
+        .nav-wordmark { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+        .nav-b { width: 32px; height: 32px; border-radius: 8px; background: var(--rojo); display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', serif; font-size: 1rem; font-weight: 900; color: white; }
+        .nav-nombre { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; color: var(--blanco); letter-spacing: -0.01em; }
         .nav-nombre span { color: var(--rojo); }
-        .nav-badge {
-            padding: 2px 9px; border-radius: 100px;
-            font-size: 0.62rem; font-weight: 700;
-            letter-spacing: 0.14em; text-transform: uppercase;
-            background: rgba(192,57,43,0.15);
-            color: #ff8070;
-            border: 1px solid rgba(192,57,43,0.25);
-        }
-        .nav-sep { width:1px; height:18px; background: var(--borde-dark); }
+        .nav-badge { padding: 3px 10px; border-radius: 100px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; background: rgba(192,57,43,0.15); color: #ff8a7a; border: 1px solid rgba(192,57,43,0.2); }
+        .nav-sep { width:1px; height:20px; background: var(--borde-dark); }
         .nav-spacer { flex: 1; }
-        .nav-clock {
-            font-family: 'DM Mono', monospace;
-            font-size: 0.8rem; color: var(--txt-dark-mid);
-        }
+        .nav-clock { font-family: 'DM Mono', monospace; font-size: 0.85rem; color: var(--txt-dark-mid); background: var(--negro-3); padding: 4px 12px; border-radius: 6px; border: 1px solid var(--borde-dark); }
         .btn-nav-login {
-            display: flex; align-items: center; gap: 7px;
-            padding: 6px 14px; border-radius: 7px;
-            background: var(--rojo); border: none;
-            color: white; cursor: pointer;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 0.78rem; font-weight: 600;
-            transition: background 0.2s; white-space: nowrap;
+            display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 8px;
+            background: var(--rojo); border: none; color: white; cursor: pointer;
+            font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 600; transition: background 0.2s;
         }
         .btn-nav-login:hover { background: var(--rojo-dark); }
-        .btn-nav-login svg { width: 14px; height: 14px; }
-        .user-chip {
-            display: flex; align-items: center; gap: 8px;
-            padding: 4px 12px 4px 4px;
-            background: var(--negro-3);
-            border: 1px solid var(--borde-dark);
-            border-radius: 100px;
-        }
-        .user-av {
-            width: 26px; height: 26px; border-radius: 50%;
-            background: var(--rojo);
-            display: flex; align-items:center; justify-content:center;
-            font-family: 'Playfair Display', serif;
-            font-size: 0.72rem; font-weight: 700; color: white;
-        }
-        .user-nm {
-            font-size: 0.78rem; font-weight: 500; color: var(--blanco);
-            max-width: 120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-        }
-        .btn-out {
-            background:none; border:none; color: var(--txt-dark-mid);
-            cursor:pointer; font-size:0.7rem; padding:0; transition:color 0.15s;
-        }
+        .user-chip { display: flex; align-items: center; gap: 10px; padding: 5px 14px 5px 5px; background: var(--negro-3); border: 1px solid var(--borde-dark); border-radius: 100px; }
+        .user-av { width: 28px; height: 28px; border-radius: 50%; background: var(--rojo); display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', serif; font-size: 0.78rem; font-weight: 700; color: white; }
+        .user-nm { font-size: 0.82rem; font-weight: 500; color: var(--blanco); max-width: 130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .btn-out { background:none; border:none; color: var(--txt-dark-mid); cursor:pointer; font-size: 0.85rem; display: flex; align-items: center; transition:color 0.15s; }
         .btn-out:hover { color: var(--rojo); }
  
         /* ── HERO OSCURO ─────────────────────────────────── */
-        .hero {
-            background: var(--negro);
-            padding: 72px 48px 64px;
-            position: relative; overflow: hidden;
-        }
+        .hero { background: var(--negro); padding: 80px 48px 72px; position: relative; overflow: hidden; }
+        .hero::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(var(--borde-dark) 1px, transparent 1px), linear-gradient(90deg, var(--borde-dark) 1px, transparent 1px); background-size: 56px 56px; opacity: 0.25; }
+        .hero::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 70% 50%, rgba(192,57,43,0.15) 0%, transparent 65%); }
+        .hero-inner { position: relative; z-index: 2; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 64px; }
+        .hero-eyebrow { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: var(--rojo); margin-bottom: 24px; display: flex; align-items: center; gap: 10px; }
+        .hero-eyebrow::before { content: ''; width: 24px; height: 1px; background: var(--rojo); }
+        .hero h1 { font-family: 'Playfair Display', serif; font-size: clamp(2.8rem, 5vw, 4.5rem); font-weight: 900; line-height: 1.05; letter-spacing: -0.03em; color: var(--blanco); }
+        .hero h1 em { font-style: italic; color: var(--rojo); font-weight: 700; }
+        .hero-sub { margin-top: 20px; font-size: 1rem; color: var(--txt-dark-mid); line-height: 1.7; font-weight: 300; max-width: 520px; }
+        .hero-bienvenida { margin-top: 32px; display: flex; align-items: center; gap: 14px; background: rgba(255,255,255,0.03); padding: 10px 18px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.05); width: fit-content; }
+        .hero-av { width: 40px; height: 40px; border-radius: 50%; background: var(--rojo); display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', serif; font-size: 0.95rem; font-weight: 700; color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .hero-hola { font-size: 0.9rem; color: var(--txt-dark-mid); }
+        .hero-hola strong { color: white; font-weight: 600; }
+        .hero-stats { display: flex; flex-direction: column; gap: 12px; min-width: 240px; }
+        .hstat { background: linear-gradient(135deg, var(--negro-2) 0%, var(--negro-3) 100%); border: 1px solid var(--borde-dark); border-radius: 16px; padding: 18px 24px; display: flex; align-items: center; gap: 18px; transition: transform 0.3s ease; }
+        .hstat:hover { transform: translateX(-5px); border-color: rgba(192,57,43,0.3); }
+        .hstat-icon { width: 42px; height: 42px; border-radius: 10px; background: var(--rojo-light); border: 1px solid rgba(192,57,43,0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .hstat-icon svg { width: 18px; height: 18px; color: var(--rojo); }
+        .hstat-n { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 700; color: var(--blanco); line-height: 1; }
+        .hstat-l { font-size: 0.7rem; color: var(--txt-dark-mid); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
  
-        /* Grid de fondo decorativo */
-        .hero::before {
-            content: '';
-            position: absolute; inset: 0;
-            background-image:
-                linear-gradient(var(--borde-dark) 1px, transparent 1px),
-                linear-gradient(90deg, var(--borde-dark) 1px, transparent 1px);
-            background-size: 48px 48px;
-            opacity: 0.4;
-        }
-        /* Gradiente encima del grid */
-        .hero::after {
-            content: '';
-            position: absolute; inset: 0;
-            background: radial-gradient(ellipse 70% 80% at 60% 50%,
-                rgba(192,57,43,0.12) 0%,
-                transparent 70%);
-        }
- 
-        .hero-inner {
-            position: relative; z-index: 2;
-            display: grid;
-            grid-template-columns: 1fr auto;
-            align-items: end; gap: 48px;
-        }
-        .hero-eyebrow {
-            font-size: 0.68rem; font-weight: 600;
-            letter-spacing: 0.22em; text-transform: uppercase;
-            color: var(--rojo); margin-bottom: 20px;
-            display: flex; align-items: center; gap: 10px;
-        }
-        .hero-eyebrow::before {
-            content: ''; width: 20px; height: 1px; background: var(--rojo);
-        }
-        .hero h1 {
-            font-family: 'Playfair Display', serif;
-            font-size: clamp(2.6rem, 5vw, 4.2rem);
-            font-weight: 900; line-height: 0.95;
-            letter-spacing: -0.03em;
-            color: var(--blanco);
-        }
-        .hero h1 em { font-style: italic; color: var(--rojo); }
-        .hero-sub {
-            margin-top: 22px;
-            font-size: 0.92rem; color: var(--txt-dark-mid);
-            line-height: 1.75; font-weight: 300;
-            max-width: 460px;
-        }
-        .hero-bienvenida {
-            margin-top: 28px;
-            display: flex; align-items: center; gap: 12px;
-        }
-        .hero-av {
-            width: 36px; height: 36px; border-radius: 50%;
-            background: var(--rojo);
-            display: flex; align-items:center; justify-content:center;
-            font-family: 'Playfair Display', serif;
-            font-size: 0.9rem; font-weight: 700; color: white;
-        }
-        .hero-hola {
-            font-size: 0.85rem; color: var(--txt-dark-mid);
-        }
-        .hero-hola strong { color: white; }
- 
-        /* Stats en hero */
-        .hero-stats {
-            display: flex; flex-direction: column; gap: 1px;
-            min-width: 200px;
-        }
-        .hstat {
-            background: var(--negro-3);
-            border: 1px solid var(--borde-dark);
-            border-radius: 12px;
-            padding: 20px 22px;
-            display: flex; align-items: center; gap: 16px;
-            margin-bottom: 8px;
-        }
-        .hstat:last-child { margin-bottom: 0; }
-        .hstat-icon {
-            width: 36px; height: 36px; border-radius: 8px;
-            background: var(--rojo-light);
-            border: 1px solid rgba(192,57,43,0.2);
-            display: flex; align-items:center; justify-content:center;
-            flex-shrink: 0;
-        }
-        .hstat-icon svg { width: 16px; height: 16px; color: var(--rojo); }
-        .hstat-data {}
-        .hstat-n {
-            font-family: 'Playfair Display', serif;
-            font-size: 1.4rem; font-weight: 700;
-            color: var(--blanco); line-height: 1;
-        }
-        .hstat-l {
-            font-size: 0.68rem; color: var(--txt-dark-mid);
-            text-transform: uppercase; letter-spacing: 0.1em;
-            margin-top: 3px;
-        }
- 
-        /* ── CONTENIDO CLARO ─────────────────────────────── */
-        .main {
-            background: var(--crema);
-            padding: 52px 48px 80px;
-        }
- 
-        /* Título de sección */
-        .sec-header {
-            display: flex; align-items: center; gap: 16px;
-            margin-bottom: 24px;
-        }
-        .sec-titulo {
-            font-family: 'Playfair Display', serif;
-            font-size: 1.2rem; font-weight: 700;
-            color: var(--txt); letter-spacing: -0.02em;
-            white-space: nowrap;
-        }
+        /* ── CONTENIDO MAIN ─────────────────────────────── */
+        .main { background: var(--crema); padding: 60px 48px 96px; max-width: 1400px; margin: 0 auto; }
+        .sec-header { display: flex; align-items: center; gap: 20px; margin-bottom: 32px; }
+        .sec-titulo { font-family: 'Playfair Display', serif; font-size: 1.5rem; font-weight: 700; color: var(--txt); letter-spacing: -0.02em; }
         .sec-linea { flex:1; height:1px; background: var(--gris-2); }
-        .sec-label {
-            font-size: 0.68rem; color: var(--txt-dim);
-            text-transform: uppercase; letter-spacing: 0.1em;
-            white-space: nowrap;
-        }
+        .sec-label { font-size: 0.72rem; color: var(--txt-dim); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 500; }
  
-        /* ── MÓDULOS ─────────────────────────────────────── */
-        .modulos { margin-bottom: 52px; }
-        .modulos-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 14px;
-        }
- 
+        /* barra utilidades */
+        .util-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 16px; }
+        .search-wrapper { position: relative; width: 100%; max-width: 320px; }
+        .search-input { width: 100%; padding: 11px 16px 11px 40px; background: var(--blanco); border: 1px solid var(--gris-2); border-radius: 10px; font-family: inherit; font-size: 0.88rem; color: var(--txt); transition: all 0.25s; }
+        .search-input:focus { outline: none; border-color: var(--rojo); box-shadow: 0 0 0 3px var(--rojo-light); }
+        .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--txt-dim); width: 16px; height: 16px; }
+
+        /* ── MÓDULOS GRID ────────────────────────────────── */
+        .modulos { margin-bottom: 64px; }
+        .modulos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
         .mod-card {
-            background: var(--blanco);
-            border: 1px solid var(--gris-2);
-            border-radius: 14px;
-            padding: 24px;
-            text-decoration: none;
-            display: flex; flex-direction: column; gap: 20px;
-            transition: all 0.25s;
-            position: relative; overflow: hidden;
-            cursor: pointer;
+            background: var(--blanco); border: 1px solid rgba(226,222,217,0.7); border-radius: 18px; padding: 28px;
+            text-decoration: none; display: flex; flex-direction: column; gap: 24px; transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            position: relative; overflow: hidden; box-shadow: var(--sombra);
         }
-        .mod-card.disabled { opacity: 0.45; cursor: default; pointer-events: none; }
+        .mod-card.disabled { opacity: 0.55; cursor: not-allowed; background: rgba(245,243,240,0.5); }
         .mod-card:not(.disabled):hover {
-            border-color: var(--rojo);
-            box-shadow: 0 0 0 1px var(--rojo), 0 12px 40px rgba(26,23,20,0.1);
-            transform: translateY(-3px);
+            border-color: var(--rojo); box-shadow: var(--sombra-hover); transform: translateY(-5px);
         }
-        .mod-numero {
-            position: absolute; top: 16px; right: 18px;
-            font-family: 'DM Mono', monospace;
-            font-size: 0.65rem; color: var(--gris-2);
-            font-weight: 500;
-        }
-        .mod-icon {
-            width: 42px; height: 42px; border-radius: 10px;
-            display: flex; align-items:center; justify-content:center;
-        }
-        .mod-icon.on  { background: var(--negro); }
-        .mod-icon.off { background: var(--gris-1); }
-        .mod-icon svg { width: 18px; height: 18px; }
-        .mod-icon.on svg  { color: white; }
-        .mod-icon.off svg { color: var(--gris-3); }
+        .mod-numero { position: absolute; top: 24px; right: 28px; font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--gris-2); font-weight: 600; }
+        .mod-icon { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items:center; justify-content:center; transition: transform 0.3s ease; }
+        .mod-icon.on  { background: var(--negro); color: white; }
+        .mod-icon.off { background: var(--gris-1); color: var(--gris-3); }
+        .mod-icon svg { width: 20px; height: 20px; }
+        .mod-card:not(.disabled):hover .mod-icon.on { transform: scale(1.05) rotate(-3deg); background: var(--rojo); }
+        
+        .mod-info { display: flex; flex-direction: column; gap: 8px; }
+        .mod-nombre { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; color: var(--txt); line-height: 1.2; }
+        .mod-desc { font-size: 0.85rem; color: var(--txt-mid); line-height: 1.6; }
+        .mod-footer { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 12px; border-top: 1px solid linear-gradient(90deg, var(--gris-1), transparent); }
+        .mod-status { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 10px; border-radius: 100px; }
+        .status-on  { background: rgba(26,122,74,0.08); color: #157343; border: 1px solid rgba(26,122,74,0.15); }
+        .status-off { background: #EAE8EV; color: var(--txt-dim); border: 1px solid var(--gris-2); }
+        .mod-arrow { color: var(--gris-3); transition: all 0.2s; display: flex; align-items: center; }
+        .mod-card:not(.disabled):hover .mod-arrow { color: var(--rojo); transform: translateX(4px); }
  
-        .mod-nombre {
-            font-family: 'Playfair Display', serif;
-            font-size: 0.95rem; font-weight: 700;
-            color: var(--txt); line-height: 1.2;
-        }
-        .mod-desc {
-            font-size: 0.78rem; color: var(--txt-mid);
-            line-height: 1.55; margin-top: 5px;
-        }
-        .mod-footer {
-            display: flex; align-items: center; justify-content: space-between;
-            margin-top: auto;
-        }
-        .mod-status {
-            font-size: 0.65rem; font-weight: 700;
-            letter-spacing: 0.1em; text-transform: uppercase;
-            padding: 3px 8px; border-radius: 100px;
-        }
-        .status-on  { background: rgba(26,122,74,0.1); color: #1a7a4a; border: 1px solid rgba(26,122,74,0.2); }
-        .status-off { background: var(--gris-1); color: var(--txt-dim); border: 1px solid var(--gris-2); }
-        .mod-arrow { color: var(--gris-2); transition: all 0.2s; }
-        .mod-card:not(.disabled):hover .mod-arrow { color: var(--rojo); transform: translateX(3px); }
- 
-        /* ── NOTICIAS ────────────────────────────────────── */
-        .noticias-grid {
-            display: grid;
-            grid-template-columns: 1.6fr 1fr 1fr;
-            gap: 14px;
-        }
- 
-        .not-card {
-            background: var(--blanco);
-            border: 1px solid var(--gris-2);
-            border-radius: 14px;
-            overflow: hidden;
-            transition: all 0.25s;
-        }
-        .not-card:hover {
-            box-shadow: 0 12px 40px rgba(26,23,20,0.1);
-            transform: translateY(-2px);
-        }
- 
-        .not-visual {
-            height: 140px;
-            background: var(--negro);
-            position: relative; overflow: hidden;
-            display: flex; align-items: center; justify-content: center;
-        }
-        .not-card.principal .not-visual { height: 180px; }
- 
-        /* Patron de fondo para noticias */
-        .not-visual::before {
-            content: '';
-            position: absolute; inset: 0;
-            background-image:
-                linear-gradient(var(--borde-dark) 1px, transparent 1px),
-                linear-gradient(90deg, var(--borde-dark) 1px, transparent 1px);
-            background-size: 32px 32px;
-            opacity: 0.5;
-        }
-        .not-visual-emoji {
-            position: relative; z-index: 1;
-            font-size: 2.4rem;
-            filter: grayscale(0.2);
-        }
-        .not-card.principal .not-visual-emoji { font-size: 3rem; }
-        .not-cat {
-            position: absolute; bottom: 12px; left: 14px; z-index: 2;
-            font-size: 0.62rem; font-weight: 700;
-            letter-spacing: 0.14em; text-transform: uppercase;
-            padding: 3px 9px; border-radius: 100px;
-            background: var(--rojo); color: white;
-        }
-        /* Gradiente decorativo en visual */
-        .not-visual::after {
-            content: '';
-            position: absolute; inset: 0;
-            background: radial-gradient(ellipse 80% 80% at 50% 50%,
-                rgba(192,57,43,0.12) 0%, transparent 70%);
-        }
- 
-        .not-body { padding: 18px 20px 20px; }
-        .not-fecha {
-            font-family: 'DM Mono', monospace;
-            font-size: 0.65rem; color: var(--txt-dim);
-            text-transform: uppercase; letter-spacing: 0.1em;
-            margin-bottom: 8px;
-        }
-        .not-titulo {
-            font-family: 'Playfair Display', serif;
-            font-size: 0.95rem; font-weight: 700;
-            color: var(--txt); line-height: 1.35; margin-bottom: 8px;
-        }
-        .not-card.principal .not-titulo { font-size: 1.1rem; }
-        .not-extracto {
-            font-size: 0.78rem; color: var(--txt-mid);
-            line-height: 1.6;
-        }
- 
+        /* ── NOTICIAS (BENTO STYLE) ──────────────────────── */
+        .noticias-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; }
+        .noticias-col-secundarias { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        .not-card { background: var(--blanco); border: 1px solid rgba(226,222,217,0.6); border-radius: 18px; overflow: hidden; transition: all 0.3s ease; box-shadow: var(--sombra); display: flex; flex-direction: column; }
+        .not-card:hover { box-shadow: 0 15px 35px rgba(28,26,24,0.06); transform: translateY(-3px); border-color: var(--gris-3); }
+        .not-visual { height: 160px; background: #161514; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        .not-card.principal .not-visual { height: 220px; }
+        .not-visual::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 24px 24px; }
+        .not-visual::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.7)); }
+        .not-visual-emoji { position: relative; z-index: 1; font-size: 2.8rem; transform: transition 0.3s; }
+        .not-card:hover .not-visual-emoji { transform: scale(1.1) rotate(4deg); }
+        .not-card.principal .not-visual-emoji { font-size: 3.8rem; }
+        .not-cat { position: absolute; top: 16px; left: 16px; z-index: 2; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 4px 10px; border-radius: 6px; background: rgba(255,255,255,0.15); color: white; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.1); }
+        .not-card.principal .not-cat { background: var(--rojo); border-color: transparent; }
+        .not-body { padding: 24px; display: flex; flex-direction: column; flex: 1; }
+        .not-fecha { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--txt-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+        .not-titulo { font-family: 'Playfair Display', serif; font-size: 1.15rem; font-weight: 700; color: var(--txt); line-height: 1.35; margin-bottom: 10px; }
+        .not-card.principal .not-titulo { font-size: 1.4rem; }
+        .not-extracto { font-size: 0.88rem; color: var(--txt-mid); line-height: 1.6; }
+        
+        /* Variante horizontal para notas secundarias */
+        .not-card.horizontal { flex-direction: row; height: calc(50% - 10px); }
+        .not-card.horizontal .not-visual { width: 140px; height: 100%; flex-shrink: 0; }
+        .not-card.horizontal .not-body { padding: 20px; justify-content: center; }
+
         /* ── FOOTER ──────────────────────────────────────── */
-        footer {
-            background: var(--negro);
-            border-top: 1px solid var(--borde-dark);
-            padding: 20px 48px;
-            display: flex; align-items: center; justify-content: space-between;
-        }
-        .footer-l {
-            font-size: 0.75rem; color: var(--txt-dark-mid);
-        }
-        .footer-r {
-            font-family: 'DM Mono', monospace;
-            font-size: 0.65rem; color: #3a3836;
-        }
+        footer { background: var(--negro); border-top: 1px solid var(--borde-dark); padding: 24px 48px; display: flex; align-items: center; justify-content: space-between; }
+        .footer-l { font-size: 0.8rem; color: var(--txt-dark-mid); }
+        .footer-r { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: #4E4A46; }
  
         /* ── RESPONSIVE ──────────────────────────────────── */
         @media (max-width: 1024px) {
-            .modulos-grid { grid-template-columns: repeat(2, 1fr); }
+            nav { padding: 0 24px; }
+            .hero { padding: 60px 24px; }
+            .main { padding: 40px 24px; }
             .noticias-grid { grid-template-columns: 1fr; }
+            .not-card.horizontal { flex-direction: column; height: auto; }
+            .not-card.horizontal .not-visual { width: 100%; height: 140px; }
         }
         @media (max-width: 768px) {
-            nav { padding: 0 20px; }
-            .hero { padding: 48px 20px 40px; }
-            .hero-inner { grid-template-columns: 1fr; }
+            .hero-inner { grid-template-columns: 1fr; gap: 40px; }
             .hero-stats { flex-direction: row; flex-wrap: wrap; }
-            .hstat { flex: 1; min-width: 140px; }
-            .main { padding: 36px 20px 60px; }
-            .modulos-grid { grid-template-columns: 1fr 1fr; }
-            footer { padding: 16px 20px; flex-direction: column; gap: 6px; }
-        }
-        @media (max-width: 480px) {
-            .modulos-grid { grid-template-columns: 1fr; }
+            .hstat { flex: 1; min-width: 200px; }
+            footer { padding: 24px; flex-direction: column; gap: 10px; text-align: center; }
         }
     </style>
 </head>
 <body>
  
-<!-- LOADING -->
 <div class="loading" id="loading">
     <div class="loading-wordmark">
         <div class="loading-b">B</div>
         <div class="loading-name">Baker<span>.</span></div>
     </div>
     <div class="loading-bar"><div class="loading-bar-fill"></div></div>
-    <div class="loading-label">Cargando portal</div>
+    <div class="loading-label">Iniciando Portal</div>
 </div>
  
-<!-- LOGIN BLOCKER -->
 <div class="login-blocker" id="login-blocker">
     <div class="login-box">
         <div class="login-eyebrow">Portal Corporativo</div>
         <div class="login-logo-grande">Baker<span>.</span></div>
-        <div class="login-tagline">Acceso exclusivo para colaboradores<br>de Inmobiliaria Baker SPA.</div>
+        <div class="login-tagline">Acceso exclusivo para colaboradores e integrantes<br>de Inmobiliaria Baker SPA.</div>
         <button class="btn-ms" onclick="loginMicrosoft()">
             <svg viewBox="0 0 21 21" fill="none">
                 <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
@@ -546,7 +266,6 @@
     </div>
 </div>
  
-<!-- NAV -->
 <nav>
     <a class="nav-wordmark" href="#">
         <div class="nav-b">B</div>
@@ -558,27 +277,20 @@
     <div class="nav-clock" id="nav-clock">—</div>
     <div id="auth-area">
         <button class="btn-nav-login" onclick="loginMicrosoft()">
-            <svg viewBox="0 0 21 21" fill="none">
-                <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
-                <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
-                <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
-                <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
-            </svg>
             Ingresar
         </button>
     </div>
 </nav>
  
-<!-- HERO OSCURO -->
 <section class="hero">
     <div class="hero-inner">
         <div>
-            <div class="hero-eyebrow">Portal Interno 2025</div>
+            <div class="hero-eyebrow">Ecosistema Digital Interno</div>
             <h1>Tu espacio<br>de trabajo,<br><em>digital.</em></h1>
-            <p class="hero-sub">Accede a los sistemas, herramientas e información del grupo Baker desde un solo lugar, disponible para todo el equipo.</p>
+            <p class="hero-sub">Accede de forma segura y unificada a todos los sistemas, herramientas clave e información relevante del Grupo Baker.</p>
             <div class="hero-bienvenida" id="hero-bienvenida" style="display:none">
                 <div class="hero-av" id="hero-av">—</div>
-                <div class="hero-hola">Bienvenido, <strong id="hero-nombre">—</strong></div>
+                <div class="hero-hola">Buenas tardes, <strong id="hero-nombre">—</strong></div>
             </div>
         </div>
         <div class="hero-stats">
@@ -590,7 +302,7 @@
                 </div>
                 <div class="hstat-data">
                     <div class="hstat-n">5</div>
-                    <div class="hstat-l">Empresas conectadas</div>
+                    <div class="hstat-l">Empresas Activas</div>
                 </div>
             </div>
             <div class="hstat">
@@ -612,89 +324,95 @@
                 </div>
                 <div class="hstat-data">
                     <div class="hstat-n">2</div>
-                    <div class="hstat-l">Módulos activos</div>
+                    <div class="hstat-l">Sistemas On-line</div>
                 </div>
             </div>
         </div>
     </div>
 </section>
  
-<!-- MAIN CLARO -->
 <div class="main">
  
-    <!-- Módulos -->
     <div class="modulos">
         <div class="sec-header">
-            <div class="sec-titulo">Módulos</div>
+            <div class="sec-titulo">Módulos Corporativos</div>
             <div class="sec-linea"></div>
-            <div class="sec-label">2 activos · 2 próximamente</div>
+            <div class="sec-label">2 Disponibles · 2 En Desarrollo</div>
         </div>
-        <div class="modulos-grid">
+
+        <div class="util-bar">
+            <div class="search-wrapper">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" class="search-input" id="mod-search" placeholder="Buscar módulo o servicio..." onkeyup="filtrarModulos()">
+            </div>
+        </div>
+
+        <div class="modulos-grid" id="grid-modulos">
  
-            <a class="mod-card" href="softland.html">
+            <a class="mod-card" href="softland.html" data-name="consultas softland contabilidad finanzas vouchers">
                 <div class="mod-numero">01</div>
                 <div class="mod-icon on">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
                     </svg>
                 </div>
-                <div>
+                <div class="mod-info">
                     <div class="mod-nombre">Consultas Softland</div>
-                    <div class="mod-desc">Busca asientos contables, vouchers y movimientos de las 5 empresas. Exporta a Excel.</div>
+                    <div class="mod-desc">Visualiza y analiza de forma centralizada asientos contables, vouchers y movimientos de las 5 empresas con exportación directa a Excel.</div>
                 </div>
                 <div class="mod-footer">
-                    <div class="mod-status status-on">Activo</div>
+                    <div class="mod-status status-on">Acceso Activo</div>
                     <div class="mod-arrow">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                     </div>
                 </div>
             </a>
  
-            <a class="mod-card" href="https://salasbaker.netlify.app" target="_blank">
+            <a class="mod-card" href="https://salasbaker.netlify.app" target="_blank" data-name="salas de reunion agendamiento outlook hq">
                 <div class="mod-numero">02</div>
                 <div class="mod-icon on">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                     </svg>
                 </div>
-                <div>
+                <div class="mod-info">
                     <div class="mod-nombre">Salas de Reunión</div>
-                    <div class="mod-desc">Disponibilidad en tiempo real y agendamiento directo desde Outlook.</div>
+                    <div class="mod-desc">Verifica la disponibilidad en tiempo real de los espacios compartidos y gestiona tus reservas integradas directamente con Outlook.</div>
                 </div>
                 <div class="mod-footer">
-                    <div class="mod-status status-on">Activo</div>
+                    <div class="mod-status status-on">Acceso Activo</div>
                     <div class="mod-arrow">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                     </div>
                 </div>
             </a>
  
-            <div class="mod-card disabled">
+            <div class="mod-card disabled" data-name="documentos repositorio contratos carpetas formularios">
                 <div class="mod-numero">03</div>
                 <div class="mod-icon off">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
                     </svg>
                 </div>
-                <div>
-                    <div class="mod-nombre">Documentos</div>
-                    <div class="mod-desc">Repositorio centralizado de contratos, formularios y documentos internos.</div>
+                <div class="mod-info">
+                    <div class="mod-nombre">Repositorio Documental</div>
+                    <div class="mod-desc">Biblioteca centralizada para la descarga de políticas internas, formularios oficiales, plantillas corporativas y contratos tipo.</div>
                 </div>
                 <div class="mod-footer">
                     <div class="mod-status status-off">Próximamente</div>
                 </div>
             </div>
  
-            <div class="mod-card disabled">
+            <div class="mod-card disabled" data-name="directorio contactos organigrama telefonos correos personal">
                 <div class="mod-numero">04</div>
                 <div class="mod-icon off">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
                     </svg>
                 </div>
-                <div>
-                    <div class="mod-nombre">Directorio</div>
-                    <div class="mod-desc">Contactos internos y organigrama de todas las empresas del grupo Baker.</div>
+                <div class="mod-info">
+                    <div class="mod-nombre">Directorio & Organigrama</div>
+                    <div class="mod-desc">Información de contacto, anexos telefónicos y estructura organizativa de todas las áreas y empresas que componen el grupo.</div>
                 </div>
                 <div class="mod-footer">
                     <div class="mod-status status-off">Próximamente</div>
@@ -704,63 +422,63 @@
         </div>
     </div>
  
-    <!-- Noticias -->
     <div>
         <div class="sec-header">
-            <div class="sec-titulo">Novedades internas</div>
+            <div class="sec-titulo">Comunicados y Novedades</div>
             <div class="sec-linea"></div>
             <div class="sec-label">Junio 2025</div>
         </div>
+
         <div class="noticias-grid">
- 
             <div class="not-card principal">
                 <div class="not-visual">
                     <div class="not-visual-emoji">🏢</div>
-                    <div class="not-cat">Tecnología</div>
+                    <div class="not-cat">Institucional</div>
                 </div>
                 <div class="not-body">
                     <div class="not-fecha">08 Jun 2025</div>
-                    <div class="not-titulo">Lanzamiento del portal de intranet Baker</div>
-                    <div class="not-extracto">El grupo Baker cuenta ahora con un portal interno centralizado para acceder a herramientas, sistemas y comunicaciones internas desde cualquier dispositivo con correo corporativo.</div>
+                    <div class="not-titulo">Lanzamiento oficial del nuevo Portal Intranet Baker</div>
+                    <div class="not-extracto">Damos inicio formal a nuestra nueva plataforma digital interna. Un espacio diseñado centralizadamente para optimizar el acceso a herramientas corporativas, simplificar procesos diarios y mantener canales abiertos de comunicación para todo el equipo humano desde cualquier locación.</div>
                 </div>
             </div>
  
-            <div class="not-card">
-                <div class="not-visual">
-                    <div class="not-visual-emoji">📊</div>
-                    <div class="not-cat">Sistemas</div>
+            <div class="noticias-col-secundarias">
+                <div class="not-card horizontal">
+                    <div class="not-visual">
+                        <div class="not-visual-emoji">📊</div>
+                        <div class="not-cat">Sistemas</div>
+                    </div>
+                    <div class="not-body">
+                        <div class="not-fecha">08 Jun 2025</div>
+                        <div class="not-titulo">Consultas Softland online</div>
+                        <div class="not-extracto">Ya se encuentra operativo el módulo para la consulta autónoma de asientos y vouchers sin intermediaciones de soporte TI.</div>
+                    </div>
                 </div>
-                <div class="not-body">
-                    <div class="not-fecha">08 Jun 2025</div>
-                    <div class="not-titulo">Consultas Softland disponibles en línea</div>
-                    <div class="not-extracto">Ya puedes buscar asientos contables y exportar a Excel sin necesitar ayuda de TI.</div>
+     
+                <div class="not-card horizontal">
+                    <div class="not-visual">
+                        <div class="not-visual-emoji">🖨️</div>
+                        <div class="not-cat">Soporte TI</div>
+                    </div>
+                    <div class="not-body">
+                        <div class="not-fecha">Junio 2025</div>
+                        <div class="not-titulo">Autogestión de Impresoras</div>
+                        <div class="not-extracto">Instala los controladores necesarios para los equipos de impresión RICOH IM 430 directamente mediante los recursos descargables del portal.</div>
+                    </div>
                 </div>
             </div>
- 
-            <div class="not-card">
-                <div class="not-visual">
-                    <div class="not-visual-emoji">🖨️</div>
-                    <div class="not-cat">TI</div>
-                </div>
-                <div class="not-body">
-                    <div class="not-fecha">Jun 2025</div>
-                    <div class="not-titulo">Instalación de impresoras ahora es autoservicio</div>
-                    <div class="not-extracto">Descarga el driver de la RICOH IM 430 directamente desde el portal sin contactar soporte.</div>
-                </div>
-            </div>
- 
         </div>
     </div>
  
 </div>
  
-<!-- FOOTER -->
 <footer>
-    <div class="footer-l">Inmobiliaria Baker SPA &mdash; Portal Interno</div>
-    <div class="footer-r">v1.0.0 · 2025</div>
+    <div class="footer-l">Inmobiliaria Baker SPA &mdash; Plataforma de Servicios Internos</div>
+    <div class="footer-r">v1.1.0 · 2025</div>
 </footer>
  
 <script>
+// --- CONFIGURACIÓN DE MSAL ---
 const msalConfig = {
     auth: {
         clientId:    "d9664e06-7fd2-401d-b27b-97116fed7d9f",
@@ -805,32 +523,30 @@ function actualizarUI() {
         const nombre   = usuarioActual.name || usuarioActual.username;
         const iniciales = nombre.split(' ').map(p => p[0]).join('').slice(0,2).toUpperCase();
         const primerNombre = nombre.split(' ')[0];
+
+        // Cambiar saludo según la hora del día de manera dinámica
+        const horaActual = new Date().getHours();
+        let saludo = "Bienvenido";
+        if (horaActual >= 6 && horaActual < 12) saludo = "Buenos días";
+        else if (horaActual >= 12 && horaActual < 20) saludo = "Buenas tardes";
+        else saludo = "Buenas noches";
  
         // Nav chip
         area.innerHTML = `
             <div class="user-chip">
                 <div class="user-av">${iniciales}</div>
                 <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
-                <button class="btn-out" onclick="logout()">✕</button>
+                <button class="btn-out" onclick="logout()" title="Cerrar Sesión">✕</button>
             </div>`;
- 
+
         // Hero bienvenida
         document.getElementById('hero-av').innerText = iniciales;
-        document.getElementById('hero-nombre').innerText = primerNombre;
+        bienvenida.innerHTML = `<div class="hero-av">${iniciales}</div><div class="hero-hola">${saludo}, <strong>${primerNombre}</strong></div>`;
         bienvenida.style.display = 'flex';
     } else {
         blocker.classList.add('visible');
         bienvenida.style.display = 'none';
-        area.innerHTML = `
-            <button class="btn-nav-login" onclick="loginMicrosoft()">
-                <svg viewBox="0 0 21 21" fill="none" style="width:13px;height:13px">
-                    <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
-                    <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
-                    <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
-                    <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
-                </svg>
-                Ingresar
-            </button>`;
+        area.innerHTML = `<button class="btn-nav-login" onclick="loginMicrosoft()">Ingresar</button>`;
     }
 }
  
@@ -844,15 +560,27 @@ async function intentarLoginSilencioso() {
  
 function tickClock() {
     const n = new Date();
-    document.getElementById('nav-clock').innerText =
-        n.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' });
-    document.getElementById('stat-fecha').innerText =
-        n.toLocaleDateString('es-CL', { day:'numeric', month:'short' }).toUpperCase();
-    document.getElementById('stat-dia').innerText =
-        n.toLocaleDateString('es-CL', { weekday:'long' });
+    document.getElementById('nav-clock').innerText = n.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' });
+    document.getElementById('stat-fecha').innerText = n.toLocaleDateString('es-CL', { day:'numeric', month:'short' }).toUpperCase();
+    document.getElementById('stat-dia').innerText = n.toLocaleDateString('es-CL', { weekday:'long' });
 }
 setInterval(tickClock, 1000);
 tickClock();
+
+// Función del buscador en tiempo real
+function filtrarModulos() {
+    const query = document.getElementById('mod-search').value.toLowerCase();
+    const cards = document.querySelectorAll('#grid-modulos .mod-card');
+    
+    cards.forEach(card => {
+        const searchTags = card.getAttribute('data-name');
+        if(searchTags.includes(query)) {
+            card.style.display = "flex";
+        } else {
+            card.style.display = "none";
+        }
+    });
+}
  
 async function init() {
     await intentarLoginSilencioso();
