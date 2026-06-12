@@ -813,9 +813,30 @@ function tickClock() {
 setInterval(tickClock, 1000);
 tickClock();
  
+// ── Toast acceso denegado ─────────────────────────────────────
+function checkAccesoDenegado() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('acceso') !== 'denegado') return;
+    const toast = document.createElement('div');
+    toast.style.cssText = [
+        'position:fixed','bottom:24px','left:50%','transform:translateX(-50%)',
+        'background:#2a1a18','border:1px solid rgba(192,57,43,0.4)',
+        'border-radius:10px','padding:14px 20px',
+        'display:flex','align-items:center','gap:10px',
+        'font-family:DM Sans,sans-serif','font-size:0.84rem',
+        'color:#ffaa90','z-index:9999',
+        'box-shadow:0 8px 32px rgba(0,0,0,0.4)'
+    ].join(';');
+    toast.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C0392B" stroke-width="2" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> No tienes acceso al módulo de Consultas Softland.';
+    document.body.appendChild(toast);
+    window.history.replaceState({}, '', window.location.pathname);
+    setTimeout(() => toast.remove(), 5000);
+}
+ 
 async function init() {
     await intentarLoginSilencioso();
     actualizarUI();
+    checkAccesoDenegado();
     setTimeout(() => document.getElementById('loading').classList.add('oculto'), 1600);
 }
 init();
