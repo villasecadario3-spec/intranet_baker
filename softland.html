@@ -507,12 +507,23 @@ const msalConfig = {
 const msalInstance = new msal.PublicClientApplication(msalConfig);
 let usuarioActual = null;
  
+// ── Lista blanca de acceso a Softland ─────────────────────────
+const ACCESO_SOFTLAND = [
+    'dvillaseca@ibaker.cl',
+    // Agregar más correos aquí cuando sea necesario
+];
+ 
 async function initAuth() {
     try {
         await msalInstance.initialize();
         const accounts = msalInstance.getAllAccounts();
         if (accounts.length > 0) {
             usuarioActual = accounts[0];
+            const email = usuarioActual.username.toLowerCase();
+            if (!ACCESO_SOFTLAND.includes(email)) {
+                window.location.href = 'index.html?acceso=denegado';
+                return;
+            }
             renderUserChip();
         } else {
             window.location.href = 'index.html';
