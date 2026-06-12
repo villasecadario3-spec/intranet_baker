@@ -3,183 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intranet — Inmobiliaria Baker</title>
+    <title>Salas de Reunión — Baker</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&family=Barlow+Condensed:ital,wght@0,300;0,500;0,700;0,900;1,700&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
     <style>
         :root {
+            /* Intranet */
             --rojo:        #C0392B;
             --rojo-dark:   #96281B;
-            --rojo-glow:   rgba(192,57,43,0.35);
-            --rojo-light:  rgba(192,57,43,0.10);
             --negro:       #111010;
             --negro-2:     #1A1918;
             --negro-3:     #242220;
             --borde-dark:  #2E2C2A;
             --blanco:      #FFFFFF;
             --crema:       #F8F6F3;
-            --gris-1:      #F0EDE9;
-            --gris-2:      #E2DED9;
             --gris-3:      #B5B0AA;
-            --txt-dark:    #FFFFFF;
             --txt-dark-mid:#9E9A96;
-            --txt:         #1C1A18;
-            --txt-mid:     #6B6762;
-            --txt-dim:     #A09C97;
+            /* Salas */
+            --rojo-light:  rgba(192,57,43,0.12);
+            --ocupado-bg:  rgba(192,57,43,0.15);
+            --ocupado-brd: rgba(192,57,43,0.4);
+            --libre-bg:    rgba(26,122,74,0.13);
+            --libre-brd:   rgba(26,122,74,0.4);
+            --verde:       #27ae60;
+            --card-bg:     #222222;
+            --card-brd:    #333333;
+            --gris-1:      #2a2a2a;
+            --gris-2:      #363636;
+            --txt-dim:     #666;
+            --txt-mid:     #999;
         }
- 
         *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
         html { scroll-behavior: smooth; }
         body {
-            font-family: 'DM Sans', sans-serif;
-            background: var(--crema);
-            color: var(--txt);
+            font-family: 'Barlow', sans-serif;
+            background: var(--negro);
+            color: var(--blanco);
             min-height: 100vh;
             overflow-x: hidden;
         }
  
-        /* ── LOADING ─────────────────────────────────────── */
-        .loading {
-            position: fixed; inset: 0; z-index: 9999;
-            background: var(--negro);
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center; gap: 28px;
-            transition: opacity 0.7s, visibility 0.7s;
-        }
-        .loading.oculto { opacity: 0; visibility: hidden; pointer-events: none; }
-        
-        
-        
-        .loading-name span { color: var(--rojo); }
-        .loading-bar {
-            width: 160px; height: 1px;
-            background: var(--borde-dark); overflow: hidden;
-        }
-        .loading-bar-fill {
-            height: 100%; background: var(--rojo);
-            animation: fillBar 1.6s cubic-bezier(.4,0,.2,1) forwards;
-        }
-        @keyframes fillBar { from{width:0} to{width:100%} }
-        .loading-label {
-            font-size: 0.7rem; color: var(--txt-dark-mid);
-            letter-spacing: 0.2em; text-transform: uppercase;
-            font-family: 'DM Mono', monospace;
-        }
- 
-        /* ── LOGIN BLOCKER ───────────────────────────────── */
-        .login-blocker {
-            position: fixed; inset: 0; z-index: 500;
-            background: rgba(17,16,16,0.97);
-            display: flex; align-items: center; justify-content: center;
-            padding: 20px;
-            opacity: 0; pointer-events: none;
-            transition: opacity 0.4s;
-        }
-        .login-blocker.visible { opacity: 1; pointer-events: all; }
-        .login-box {
-            max-width: 400px; width: 100%;
-            text-align: center;
-        }
-        .login-eyebrow {
-            font-size: 0.68rem; font-weight: 600;
-            letter-spacing: 0.22em; text-transform: uppercase;
-            color: var(--rojo); margin-bottom: 24px;
-            display: flex; align-items: center; justify-content: center; gap: 10px;
-        }
-        .login-eyebrow::before, .login-eyebrow::after {
-            content: ''; width: 32px; height: 1px; background: var(--rojo); opacity: 0.5;
-        }
-        .login-logo-grande {
-            font-family: 'Playfair Display', serif;
-            font-size: 3.2rem; font-weight: 900;
-            color: var(--blanco); letter-spacing: -0.03em;
-            line-height: 1; margin-bottom: 6px;
-        }
-        .login-logo-grande span { color: var(--rojo); }
-        .login-tagline {
-            font-size: 0.82rem; color: var(--txt-dark-mid);
-            margin-bottom: 40px; line-height: 1.7;
-        }
-        .btn-ms {
-            display: flex; align-items: center; justify-content: center; gap: 10px;
-            width: 100%; padding: 14px;
-            background: var(--rojo); border: none; border-radius: 10px;
-            color: white; cursor: pointer;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 0.9rem; font-weight: 600;
-            transition: background 0.2s, transform 0.1s;
-            margin-bottom: 16px;
-        }
-        .btn-ms:hover { background: var(--rojo-dark); }
-        .btn-ms:active { transform: scale(0.98); }
-        .btn-ms svg { width: 18px; height: 18px; }
-        .login-restriccion {
-            font-size: 0.7rem; color: #4a4845;
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-        }
-        .login-restriccion::before, .login-restriccion::after {
-            content: ''; flex: 1; height: 1px; background: #2a2826;
-        }
- 
-        /* ── NAV ─────────────────────────────────────────── */
+        /* ── NAV INTRANET ─────────────────────────────── */
         nav {
             position: sticky; top: 0; z-index: 200;
-            background: rgba(17,16,16,0.92);
+            background: rgba(17,16,16,0.95);
             backdrop-filter: blur(24px);
             border-bottom: 1px solid var(--borde-dark);
             height: 60px;
             display: flex; align-items: center;
-            padding: 0 48px; gap: 20px;
+            padding: 0 40px; gap: 16px;
         }
-        .nav-wordmark {
-            display: flex; align-items: center; gap: 10px;
-            text-decoration: none; flex-shrink: 0;
-        }
-        .nav-b {
-            width: 28px; height: 28px; border-radius: 6px;
-            background: var(--rojo);
-            display: flex; align-items: center; justify-content: center;
-            font-family: 'Playfair Display', serif;
-            font-size: 0.9rem; font-weight: 900; color: white;
-        }
-        .nav-nombre {
-            font-family: 'Playfair Display', serif;
-            font-size: 1rem; font-weight: 700;
-            color: var(--blanco); letter-spacing: -0.01em;
-        }
-        .nav-nombre span { color: var(--rojo); }
-        .nav-badge {
-            padding: 2px 9px; border-radius: 100px;
-            font-size: 0.62rem; font-weight: 700;
-            letter-spacing: 0.14em; text-transform: uppercase;
-            background: rgba(192,57,43,0.15);
-            color: #ff8070;
-            border: 1px solid rgba(192,57,43,0.25);
+        .nav-logo { text-decoration: none; flex-shrink: 0; }
+        .nav-logo img {
+            height: 26px; width: auto; display: block;
+            background: white; border-radius: 6px; padding: 4px 10px;
         }
         .nav-sep { width:1px; height:18px; background: var(--borde-dark); }
-        .nav-spacer { flex: 1; }
-        .nav-clock {
+        .nav-back {
+            display: flex; align-items: center; gap: 6px;
+            color: var(--gris-3); text-decoration: none;
+            font-size: 0.78rem; font-weight: 500;
+            transition: color 0.2s;
+        }
+        .nav-back:hover { color: white; }
+        .nav-back svg { width:14px; height:14px; }
+        .nav-title {
             font-family: 'DM Mono', monospace;
-            font-size: 0.8rem; color: var(--txt-dark-mid);
+            font-size: 0.72rem; color: var(--gris-3);
+            letter-spacing: 0.1em; text-transform: uppercase;
         }
-        .btn-nav-login {
-            display: flex; align-items: center; gap: 7px;
-            padding: 6px 14px; border-radius: 7px;
-            background: var(--rojo); border: none;
-            color: white; cursor: pointer;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 0.78rem; font-weight: 600;
-            transition: background 0.2s; white-space: nowrap;
+        .nav-spacer { flex: 1; }
+        .nav-clock-wrap { text-align: right; }
+        .nav-clock {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 1.4rem; font-weight: 300;
+            letter-spacing: 0.03em; line-height: 1;
+            color: white;
         }
-        .btn-nav-login:hover { background: var(--rojo-dark); }
-        .btn-nav-login svg { width: 14px; height: 14px; }
+        .nav-fecha {
+            font-size: 0.68rem; color: var(--txt-dim);
+            text-transform: capitalize; text-align: right;
+            margin-top: 2px;
+        }
         .user-chip {
             display: flex; align-items: center; gap: 8px;
             padding: 4px 12px 4px 4px;
-            background: var(--negro-3);
-            border: 1px solid var(--borde-dark);
+            background: var(--negro-3); border: 1px solid var(--borde-dark);
             border-radius: 100px;
         }
         .user-av {
@@ -189,541 +100,465 @@
             font-family: 'Playfair Display', serif;
             font-size: 0.72rem; font-weight: 700; color: white;
         }
-        .user-nm {
-            font-size: 0.78rem; font-weight: 500; color: var(--blanco);
-            max-width: 120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-        }
-        .btn-out {
-            background:none; border:none; color: var(--txt-dark-mid);
-            cursor:pointer; font-size:0.7rem; padding:0; transition:color 0.15s;
-        }
-        .btn-out:hover { color: var(--rojo); }
+        .user-nm { font-size: 0.78rem; font-weight: 500; color: white; max-width: 120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .btn-logout-nav { background:none; border:none; color:var(--txt-dim); cursor:pointer; font-size:0.7rem; padding:0; transition:color 0.15s; }
+        .btn-logout-nav:hover { color: var(--rojo); }
  
-        /* ── HERO OSCURO ─────────────────────────────────── */
+        /* ── HERO SALAS ───────────────────────────────── */
         .hero {
+            padding: 32px 40px 28px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: end;
+            gap: 40px;
+            border-bottom: 1px solid var(--card-brd);
             background: var(--negro);
-            padding: 72px 48px 64px;
             position: relative; overflow: hidden;
         }
-        .hero-bg-img {
-            position: absolute; inset: 0;
-            overflow: hidden;
-            z-index: 1;
-        }
-        .hero-bg-img img {
-            width: 100%; height: 100%;
-            object-fit: cover; object-position: center 40%;
-            opacity: 0.18;
-            display: block;
-        }
- 
-        /* Grid de fondo decorativo */
         .hero::before {
-            content: '';
-            position: absolute; inset: 0;
+            content:'';
+            position:absolute; inset:0;
             background-image:
                 linear-gradient(var(--borde-dark) 1px, transparent 1px),
                 linear-gradient(90deg, var(--borde-dark) 1px, transparent 1px);
-            background-size: 48px 48px;
-            opacity: 0.4;
+            background-size: 40px 40px;
+            opacity: 0.3;
         }
-        /* Gradiente encima del grid */
         .hero::after {
-            content: '';
-            position: absolute; inset: 0;
-            background: radial-gradient(ellipse 70% 80% at 60% 50%,
-                rgba(192,57,43,0.12) 0%,
-                transparent 70%);
+            content:'';
+            position:absolute; inset:0;
+            background: radial-gradient(ellipse 60% 100% at 80% 50%, rgba(192,57,43,0.08) 0%, transparent 70%);
         }
- 
-        .hero-inner {
-            position: relative; z-index: 2;
-            display: grid;
-            grid-template-columns: 1fr;
-            align-items: start; gap: 0;
-        }
-        .hero-eyebrow {
-            font-size: 0.68rem; font-weight: 600;
-            letter-spacing: 0.22em; text-transform: uppercase;
-            color: var(--rojo); margin-bottom: 20px;
-            display: flex; align-items: center; gap: 10px;
-        }
-        .hero-eyebrow::before {
-            content: ''; width: 20px; height: 1px; background: var(--rojo);
-        }
+        .hero-inner { position: relative; z-index: 2; display:contents; }
         .hero h1 {
-            font-family: 'Playfair Display', serif;
-            font-size: clamp(2.6rem, 5vw, 4.2rem);
-            font-weight: 900; line-height: 0.95;
-            letter-spacing: -0.03em;
-            color: var(--blanco);
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: clamp(2rem, 4vw, 3.2rem);
+            font-weight: 900; line-height: 0.88;
+            letter-spacing: -0.02em; text-transform: uppercase;
+            position: relative; z-index: 2;
         }
-        .hero h1 em { font-style: italic; color: var(--rojo); }
-        .hero-sub {
-            margin-top: 22px;
-            font-size: 0.92rem; color: var(--txt-dark-mid);
-            line-height: 1.75; font-weight: 300;
-            max-width: 460px;
+        .hero h1 em { font-style:italic; color: var(--rojo); }
+        .hero p {
+            margin-top: 14px; font-size: 0.88rem;
+            color: var(--txt-mid); max-width: 480px;
+            line-height: 1.65; font-weight: 300;
+            position: relative; z-index: 2;
         }
-        .hero-bienvenida {
-            margin-top: 28px;
-            display: flex; align-items: center; gap: 12px;
+        .hero-stats {
+            display: flex; gap: 28px; flex-shrink: 0;
+            padding-bottom: 4px;
+            position: relative; z-index: 2;
         }
-        .hero-av {
-            width: 36px; height: 36px; border-radius: 50%;
-            background: var(--rojo);
-            display: flex; align-items:center; justify-content:center;
-            font-family: 'Playfair Display', serif;
-            font-size: 0.9rem; font-weight: 700; color: white;
-        }
-        .hero-hola {
-            font-size: 0.85rem; color: var(--txt-dark-mid);
-        }
-        .hero-hola strong { color: white; }
- 
-        
-        .hstat {
-            background: var(--negro-3);
-            border: 1px solid var(--borde-dark);
-            border-radius: 12px;
-            padding: 20px 22px;
-            display: flex; align-items: center; gap: 16px;
-            margin-bottom: 8px;
-        }
-        .hstat:last-child { margin-bottom: 0; }
-        .hstat-icon {
-            width: 36px; height: 36px; border-radius: 8px;
-            background: var(--rojo-light);
-            border: 1px solid rgba(192,57,43,0.2);
-            display: flex; align-items:center; justify-content:center;
-            flex-shrink: 0;
-        }
-        .hstat-icon svg { width: 16px; height: 16px; color: var(--rojo); }
-        .hstat-data {}
+        .hstat { text-align: right; }
         .hstat-n {
-            font-family: 'Playfair Display', serif;
-            font-size: 1.4rem; font-weight: 700;
-            color: var(--blanco); line-height: 1;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 3rem; font-weight: 700; line-height: 1;
         }
+        .hstat-n.v { color: var(--verde); }
+        .hstat-n.o { color: var(--rojo); }
         .hstat-l {
-            font-size: 0.68rem; color: var(--txt-dark-mid);
-            text-transform: uppercase; letter-spacing: 0.1em;
-            margin-top: 3px;
+            font-size: 0.7rem; color: var(--txt-dim);
+            text-transform: uppercase; letter-spacing: 0.12em;
+            margin-top: 4px;
         }
  
-        /* ── CONTENIDO CLARO ─────────────────────────────── */
-        .main {
-            background: var(--crema);
-            padding: 52px 48px 80px;
+        /* ── TOOLBAR ──────────────────────────────────── */
+        .toolbar {
+            padding: 16px 40px;
+            display: flex; align-items: center; gap: 12px;
+            flex-wrap: wrap;
+            border-bottom: 1px solid var(--card-brd);
+            background: var(--negro);
         }
- 
-        /* Título de sección */
-        .sec-header {
-            display: flex; align-items: center; gap: 16px;
-            margin-bottom: 24px;
+        .view-toggle {
+            display: flex;
+            background: var(--gris-1);
+            border: 1px solid var(--card-brd);
+            border-radius: 10px; overflow: hidden;
         }
-        .sec-titulo {
-            font-family: 'Playfair Display', serif;
-            font-size: 1.2rem; font-weight: 700;
-            color: var(--txt); letter-spacing: -0.02em;
-            white-space: nowrap;
+        .view-btn {
+            padding: 7px 16px;
+            background: transparent; border: none;
+            color: var(--txt-dim); cursor: pointer;
+            font-family: 'Barlow', sans-serif;
+            font-size: 0.8rem; font-weight: 600;
+            letter-spacing: 0.06em; text-transform: uppercase;
+            transition: all 0.2s;
         }
-        .sec-linea { flex:1; height:1px; background: var(--gris-2); }
-        .sec-label {
-            font-size: 0.68rem; color: var(--txt-dim);
-            text-transform: uppercase; letter-spacing: 0.1em;
-            white-space: nowrap;
-        }
- 
-        /* ── MÓDULOS ─────────────────────────────────────── */
-        .modulos { margin-bottom: 52px; }
-        .modulos-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 14px;
-        }
- 
-        .mod-card {
-            background: var(--blanco);
-            border: 1px solid var(--gris-2);
-            border-radius: 14px;
-            padding: 24px;
-            text-decoration: none;
-            display: flex; flex-direction: column; gap: 20px;
-            transition: all 0.25s;
-            position: relative; overflow: hidden;
-            cursor: pointer;
-        }
-        .mod-card.disabled { opacity: 0.45; cursor: default; pointer-events: none; }
-        .mod-card:not(.disabled):hover {
-            border-color: var(--rojo);
-            box-shadow: 0 0 0 1px var(--rojo), 0 12px 40px rgba(26,23,20,0.1);
-            transform: translateY(-3px);
-        }
-        .mod-numero {
-            position: absolute; top: 16px; right: 18px;
-            font-family: 'DM Mono', monospace;
-            font-size: 0.65rem; color: var(--gris-2);
-            font-weight: 500;
-        }
-        .mod-icon {
-            width: 42px; height: 42px; border-radius: 10px;
+        .view-btn.activo { background: var(--rojo); color: white; }
+        .nav-periodo { display: flex; align-items: center; gap: 8px; }
+        .nav-btn {
+            width: 32px; height: 32px; border-radius: 7px;
+            background: var(--gris-1); border: 1px solid var(--card-brd);
+            color: var(--blanco); cursor: pointer; font-size: 1rem;
             display: flex; align-items:center; justify-content:center;
+            transition: all 0.15s;
         }
-        .mod-icon.on  { background: var(--negro); }
-        .mod-icon.off { background: var(--gris-1); }
-        .mod-icon svg { width: 18px; height: 18px; }
-        .mod-icon.on svg  { color: white; }
-        .mod-icon.off svg { color: var(--gris-3); }
+        .nav-btn:hover { background: var(--gris-2); border-color: #444; }
+        #periodo-label {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 1rem; font-weight: 500;
+            letter-spacing: 0.05em; min-width: 180px; text-align:center;
+            text-transform: capitalize;
+        }
+        .btn-hoy {
+            padding: 6px 14px; border-radius: 7px;
+            background: transparent; border: 1px solid var(--card-brd);
+            color: var(--txt-mid); cursor: pointer;
+            font-family: 'Barlow', sans-serif; font-size: 0.8rem;
+            font-weight: 600; letter-spacing:0.05em; text-transform:uppercase;
+            transition: all 0.2s;
+        }
+        .btn-hoy:hover { border-color:#555; color: white; }
+        .tb-spacer { flex:1; }
+        .sync-info { display: flex; align-items:center; gap:7px; font-size: 0.75rem; color: var(--txt-dim); }
+        .sync-dot { width:7px; height:7px; border-radius:50%; background: var(--verde); opacity:0; transition: opacity 0.3s; }
  
-        .mod-nombre {
-            font-family: 'Playfair Display', serif;
-            font-size: 0.95rem; font-weight: 700;
-            color: var(--txt); line-height: 1.2;
-        }
-        .mod-desc {
-            font-size: 0.78rem; color: var(--txt-mid);
-            line-height: 1.55; margin-top: 5px;
-        }
-        .mod-footer {
-            display: flex; align-items: center; justify-content: space-between;
-            margin-top: auto;
-        }
-        .mod-status {
-            font-size: 0.65rem; font-weight: 700;
-            letter-spacing: 0.1em; text-transform: uppercase;
-            padding: 3px 8px; border-radius: 100px;
-        }
-        .status-on  { background: rgba(26,122,74,0.1); color: #1a7a4a; border: 1px solid rgba(26,122,74,0.2); }
-        .status-off { background: var(--gris-1); color: var(--txt-dim); border: 1px solid var(--gris-2); }
-        .mod-arrow { color: var(--gris-2); transition: all 0.2s; }
-        .mod-card:not(.disabled):hover .mod-arrow { color: var(--rojo); transform: translateX(3px); }
+        /* ── GRID SEMANAL ─────────────────────────────── */
+        .main { padding: 28px 40px 80px; background: var(--negro); }
+        #vista-semana { display: block; }
+        #vista-mes    { display: none; }
  
-        /* ── NOTICIAS ────────────────────────────────────── */
-        .noticias-grid {
-            display: grid;
-            grid-template-columns: 1.6fr 1fr 1fr;
-            gap: 14px;
+        .salas-tabs {
+            display: flex; gap: 4px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--card-brd);
         }
+        .sala-tab {
+            padding: 9px 18px;
+            background: transparent; border: none;
+            color: var(--txt-dim); cursor: pointer;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 0.9rem; font-weight: 600;
+            letter-spacing: 0.08em; text-transform: uppercase;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px; transition: all 0.15s;
+        }
+        .sala-tab:hover { color: var(--blanco); }
+        .sala-tab.activo { color: var(--blanco); border-bottom-color: var(--rojo); }
  
-        .not-card {
-            background: var(--blanco);
-            border: 1px solid var(--gris-2);
-            border-radius: 14px;
-            overflow: hidden;
-            transition: all 0.25s;
-        }
-        .not-card:hover {
-            box-shadow: 0 12px 40px rgba(26,23,20,0.1);
-            transform: translateY(-2px);
-        }
+        .semana-wrap { overflow-x: auto; border: 1px solid var(--card-brd); border-radius: 14px; }
+        .semana-grid { display: grid; grid-template-columns: 54px repeat(5, 1fr); min-width: 700px; }
  
-        .not-visual {
-            height: 140px;
-            background: var(--negro);
-            position: relative; overflow: hidden;
-            display: flex; align-items: center; justify-content: center;
+        .sg-corner { background: var(--gris-1); border-bottom: 1px solid var(--card-brd); }
+        .sg-dia-header {
+            background: var(--gris-1); border-bottom: 1px solid var(--card-brd);
+            border-left: 1px solid var(--card-brd); padding: 12px 10px 10px; text-align: center;
         }
-        .not-card.principal .not-visual { height: 180px; }
+        .sg-dia-nombre { font-family: 'Barlow Condensed', sans-serif; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.15em; text-transform:uppercase; color: var(--txt-dim); }
+        .sg-dia-num { font-family: 'Barlow Condensed', sans-serif; font-size: 1.5rem; font-weight: 700; line-height:1; margin-top: 2px; }
+        .sg-dia-header.hoy .sg-dia-num { color: var(--rojo); }
+        .sg-dia-header.hoy .sg-dia-nombre { color: var(--rojo); }
  
-        /* Patron de fondo para noticias */
-        .not-visual::before {
-            content: '';
-            position: absolute; inset: 0;
-            background-image:
-                linear-gradient(var(--borde-dark) 1px, transparent 1px),
-                linear-gradient(90deg, var(--borde-dark) 1px, transparent 1px);
-            background-size: 32px 32px;
-            opacity: 0.5;
+        .sg-hora-cell { padding: 0 8px; display: flex; align-items: flex-start; justify-content: flex-end; border-right: 1px solid var(--card-brd); }
+        .sg-hora-label { font-family: 'Barlow Condensed', sans-serif; font-size: 0.7rem; color: var(--txt-dim); transform: translateY(-8px); white-space: nowrap; }
+ 
+        .sg-day-col { border-left: 1px solid var(--card-brd); position: relative; }
+ 
+        .bloque {
+            position: absolute; left: 3px; right: 3px;
+            background: var(--ocupado-bg); border: 1px solid var(--ocupado-brd);
+            border-radius: 5px; display: flex; align-items: center; justify-content: center;
+            overflow: hidden; transition: all 0.2s; z-index: 2;
         }
-        .not-visual-emoji {
-            position: relative; z-index: 1;
-            font-size: 2.4rem;
-            filter: grayscale(0.2);
-        }
-        .not-card.principal .not-visual-emoji { font-size: 3rem; }
-        .not-cat {
-            position: absolute; bottom: 12px; left: 14px; z-index: 2;
-            font-size: 0.62rem; font-weight: 700;
-            letter-spacing: 0.14em; text-transform: uppercase;
-            padding: 3px 9px; border-radius: 100px;
-            background: var(--rojo); color: white;
-        }
-        /* Gradiente decorativo en visual */
-        .not-visual::after {
-            content: '';
-            position: absolute; inset: 0;
-            background: radial-gradient(ellipse 80% 80% at 50% 50%,
-                rgba(192,57,43,0.12) 0%, transparent 70%);
+        .bloque:hover { background: rgba(192,57,43,0.25); border-color: var(--rojo); transform: scaleX(1.02); }
+        .bloque-inner {
+            font-family: 'Barlow Condensed', sans-serif; font-size: 0.75rem; font-weight: 700;
+            color: #fff; letter-spacing: 0.06em; text-transform: uppercase; text-align:center;
+            padding: 2px 6px; text-shadow: 0 1px 3px rgba(0,0,0,0.5);
         }
  
-        .not-body { padding: 18px 20px 20px; }
-        .not-fecha {
-            font-family: 'DM Mono', monospace;
-            font-size: 0.65rem; color: var(--txt-dim);
-            text-transform: uppercase; letter-spacing: 0.1em;
-            margin-bottom: 8px;
-        }
-        .not-titulo {
-            font-family: 'Playfair Display', serif;
-            font-size: 0.95rem; font-weight: 700;
-            color: var(--txt); line-height: 1.35; margin-bottom: 8px;
-        }
-        .not-card.principal .not-titulo { font-size: 1.1rem; }
-        .not-extracto {
-            font-size: 0.78rem; color: var(--txt-mid);
-            line-height: 1.6;
+        .linea-ahora { position: absolute; left: 0; right: 0; height: 2px; background: var(--rojo); z-index: 10; pointer-events: none; }
+        .linea-ahora::before { content:''; position:absolute; left: -4px; top:-4px; width:10px; height:10px; border-radius:50%; background: var(--rojo); }
+ 
+        .slot-libre { position: absolute; left:3px; right:3px; border-radius: 5px; cursor: pointer; background: transparent; transition: background 0.15s; z-index: 1; }
+        .slot-libre:hover { background: rgba(39,174,96,0.12); border: 1px dashed rgba(39,174,96,0.4); }
+        .slot-libre:hover::after {
+            content: '+ Agendar';
+            position: absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+            font-family: 'Barlow Condensed', sans-serif; font-size: 0.7rem; font-weight: 700;
+            letter-spacing: 0.1em; color: #5dde90; white-space: nowrap;
         }
  
-        /* ── FOOTER ──────────────────────────────────────── */
+        /* ── VISTA MENSUAL ────────────────────────────── */
+        .mes-salas-wrap { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .mes-sala-card { background: var(--card-bg); border: 1px solid var(--card-brd); border-radius: 14px; overflow: hidden; }
+        .mes-card-header { padding: 14px 18px; border-bottom: 1px solid var(--card-brd); display: flex; align-items:center; justify-content:space-between; }
+        .mes-card-nombre { font-family: 'Barlow Condensed', sans-serif; font-size: 1rem; font-weight: 700; letter-spacing: 0.08em; text-transform:uppercase; }
+        .mes-card-count { font-size: 0.72rem; color: var(--txt-dim); background: var(--gris-1); padding: 3px 10px; border-radius: 100px; }
+        .mini-cal { padding: 14px 18px; }
+        .mini-cal-header { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 6px; }
+        .mini-cal-dh { text-align: center; font-size: 0.62rem; font-weight: 600; color: var(--txt-dim); letter-spacing:0.08em; text-transform: uppercase; padding: 3px 0; }
+        .mini-cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; }
+        .mini-dia { aspect-ratio: 1; border-radius: 6px; display: flex; flex-direction:column; align-items: center; justify-content: center; font-size: 0.72rem; font-weight:500; cursor: pointer; position: relative; transition: all 0.15s; }
+        .mini-dia:not(.vacio):not(.finde):hover { filter: brightness(1.3); transform: scale(1.08); }
+        .mini-dia.vacio { background: transparent; }
+        .mini-dia.finde { opacity: 0.2; background: transparent; }
+        .mini-dia.pasado { opacity: 0.35; }
+        .mini-dia.libre { background: var(--libre-bg); border: 1px solid var(--libre-brd); color: var(--verde); }
+        .mini-dia.ocupado-parcial { background: rgba(192,57,43,0.08); border: 1px solid rgba(192,57,43,0.25); }
+        .mini-dia.ocupado-total { background: var(--ocupado-bg); border: 1px solid var(--ocupado-brd); color: #ff8070; }
+        .mini-dia.hoy-dia { outline: 2px solid var(--rojo); outline-offset: -2px; }
+        .mini-dia-num { font-size: 0.68rem; line-height:1; }
+        .mini-dia-dots { display: flex; gap: 2px; margin-top: 2px; }
+        .mini-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--rojo); }
+ 
+        /* ── LOADING ──────────────────────────────────── */
+        .loading-overlay { position: fixed; inset:0; z-index:500; background: var(--negro); display: flex; flex-direction:column; align-items:center; justify-content:center; gap: 20px; transition: opacity 0.5s; }
+        .loading-overlay.oculto { opacity:0; pointer-events:none; }
+        .load-logo { background: white; border-radius: 10px; padding: 10px 20px; }
+        .load-logo img { height: 44px; width: auto; display: block; }
+        .load-bar-wrap { width: 160px; height: 2px; background: var(--borde-dark); border-radius: 10px; overflow:hidden; }
+        .load-bar { height: 100%; background: var(--rojo); border-radius: 10px; animation: loadAnim 1.5s ease-in-out infinite; }
+        @keyframes loadAnim { 0%{width:0%;margin-left:0} 50%{width:60%;margin-left:20%} 100%{width:0%;margin-left:100%} }
+        .load-txt { font-size:0.72rem; color:var(--txt-dim); letter-spacing:0.15em; text-transform:uppercase; font-family:'DM Mono',monospace; }
+ 
+        /* ── FOOTER ───────────────────────────────────── */
         footer {
-            background: var(--negro);
             border-top: 1px solid var(--borde-dark);
-            padding: 20px 48px;
-            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 40px;
+            display: flex; align-items:center; justify-content:space-between;
+            flex-wrap: wrap; gap: 12px;
+            background: var(--negro);
         }
-        .footer-l {
-            font-size: 0.75rem; color: var(--txt-dark-mid);
-        }
-        .footer-r {
-            font-family: 'DM Mono', monospace;
-            font-size: 0.65rem; color: #3a3836;
-        }
+        .footer-l { font-size:0.75rem; color:var(--txt-dim); }
+        .leyenda-colores { display: flex; align-items:center; gap:14px; font-size: 0.7rem; color: var(--txt-dim); }
+        .lc-item { display:flex; align-items:center; gap:5px; }
+        .lc-box { width:11px; height:11px; border-radius:3px; }
+        .lc-box.libre   { background: var(--libre-bg); border:1px solid var(--libre-brd); }
+        .lc-box.ocupado { background: var(--ocupado-bg); border:1px solid var(--ocupado-brd); }
  
-        /* ── RESPONSIVE ──────────────────────────────────── */
-        @media (max-width: 1024px) {
-            .modulos-grid { grid-template-columns: repeat(2, 1fr); }
-            .noticias-grid { grid-template-columns: 1fr; }
+        /* ── MODAL ────────────────────────────────────── */
+        .modal-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+        .modal-overlay.visible { opacity: 1; pointer-events: all; }
+        .modal { background: #222; border: 1px solid #3a3a3a; border-radius: 18px; width: 100%; max-width: 480px; overflow: hidden; transform: translateY(20px); transition: transform 0.25s; }
+        .modal-overlay.visible .modal { transform: translateY(0); }
+        .modal-header { padding: 22px 26px 18px; border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; }
+        .modal-titulo { font-family: 'Barlow Condensed', sans-serif; font-size: 1.2rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+        .modal-sala-badge { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 10px; border-radius: 100px; background: var(--rojo-light); color: #ff8070; border: 1px solid var(--ocupado-brd); }
+        .modal-close { background: none; border: none; color: var(--txt-dim); cursor: pointer; font-size: 1.4rem; line-height:1; padding: 4px; transition: color 0.15s; }
+        .modal-close:hover { color: white; }
+        .modal-body { padding: 22px 26px; display: flex; flex-direction: column; gap: 14px; }
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        .form-label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--txt-mid); }
+        .form-input { padding: 9px 13px; border-radius: 8px; background: var(--gris-1); border: 1px solid #3a3a3a; color: white; font-family: 'Barlow', sans-serif; font-size: 0.9rem; transition: border-color 0.2s; width: 100%; }
+        .form-input:focus { outline: none; border-color: var(--rojo); }
+        .form-input::placeholder { color: var(--txt-dim); }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .modal-footer { padding: 0 26px 22px; display: flex; gap: 10px; }
+        .btn-cancelar { flex: 1; padding: 10px; background: transparent; border: 1px solid #3a3a3a; border-radius: 8px; color: var(--txt-mid); cursor: pointer; font-family: 'Barlow', sans-serif; font-size: 0.88rem; font-weight: 600; transition: all 0.2s; }
+        .btn-cancelar:hover { border-color: #555; color: white; }
+        .btn-agendar { flex: 2; padding: 10px; background: var(--rojo); border: none; border-radius: 8px; color: white; cursor: pointer; font-family: 'Barlow', sans-serif; font-size: 0.88rem; font-weight: 600; transition: background 0.2s; display: flex; align-items:center; justify-content:center; gap: 8px; }
+        .btn-agendar:hover { background: var(--rojo-dark); }
+        .btn-agendar:disabled { opacity: 0.5; cursor: not-allowed; }
+        .modal-msg { margin: 0 26px 18px; padding: 9px 13px; border-radius: 8px; font-size: 0.83rem; display: none; }
+        .modal-msg.ok  { background: rgba(39,174,96,0.15); border: 1px solid rgba(39,174,96,0.3); color: #5dde90; display:block; }
+        .modal-msg.err { background: var(--ocupado-bg); border: 1px solid var(--ocupado-brd); color: #ff8070; display:block; }
+ 
+        .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--rojo-light); border: 1px solid var(--ocupado-brd); border-radius: 100px; padding: 4px 10px 4px 12px; font-size: 0.78rem; font-weight: 500; color: #ff9080; }
+        .chip-remove { background: none; border: none; color: #ff9080; cursor: pointer; font-size: 1rem; line-height:1; padding:0; opacity: 0.7; }
+        .chip-remove:hover { opacity: 1; }
+        .sug-item { padding: 9px 13px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.15s; }
+        .sug-item:last-child { border-bottom: none; }
+        .sug-item:hover { background: rgba(255,255,255,0.06); }
+        .sug-nombre { font-size: 0.86rem; font-weight: 500; }
+        .sug-email  { font-size: 0.73rem; color: var(--txt-dim); }
+ 
+        .btn-login-nav {
+            display: flex; align-items: center; gap: 7px;
+            padding: 6px 14px; border-radius: 7px;
+            background: var(--rojo); border: none;
+            color: white; cursor: pointer;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.78rem; font-weight: 600;
+            transition: background 0.2s; white-space: nowrap;
         }
+        .btn-login-nav:hover { background: var(--rojo-dark); }
+        .btn-login-nav svg { width:14px; height:14px; }
+ 
         @media (max-width: 768px) {
-            nav { padding: 0 20px; }
-            .hero { padding: 48px 20px 40px; }
-            .hero-inner { grid-template-columns: 1fr; }
-            .hero-stats { flex-direction: row; flex-wrap: wrap; }
-            .hstat { flex: 1; min-width: 140px; }
-            .main { padding: 36px 20px 60px; }
-            .modulos-grid { grid-template-columns: 1fr 1fr; }
-            footer { padding: 16px 20px; flex-direction: column; gap: 6px; }
-        }
-        @media (max-width: 480px) {
-            .modulos-grid { grid-template-columns: 1fr; }
+            nav { padding: 0 16px; }
+            .hero { padding: 24px 16px 20px; grid-template-columns:1fr; }
+            .hero-stats { justify-content: flex-start; }
+            .toolbar { padding: 12px 16px; }
+            .main { padding: 20px 16px 60px; }
+            footer { padding: 14px 16px; }
         }
     </style>
 </head>
 <body>
  
 <!-- LOADING -->
-<div class="loading" id="loading">
-    <img src="LOGO_BAKER.png" alt="Baker Inmobiliaria"
-         style="height:44px;width:auto;display:block;background:white;border-radius:8px;padding:6px 16px"
-         onerror="this.outerHTML='<div style='font-family:serif;font-size:1.8rem;font-weight:900;color:white'>BAKER</div>'">
-    <div class="loading-bar"><div class="loading-bar-fill"></div></div>
-    <div class="loading-label">Cargando portal</div>
+<div class="loading-overlay" id="loading">
+    <div class="load-logo"><img src="LOGO_BAKER.png" alt="Baker" onerror="this.style.display='none'"></div>
+    <div class="load-bar-wrap"><div class="load-bar"></div></div>
+    <div class="load-txt">Cargando salas…</div>
 </div>
  
-<!-- LOGIN BLOCKER -->
-<div class="login-blocker" id="login-blocker">
-    <div class="login-box">
-        <div class="login-eyebrow">Portal Corporativo</div>
-        <img src="LOGO_BAKER.png" alt="Baker Inmobiliaria"
-             style="height:52px;width:auto;margin:0 auto 16px;display:block;background:white;border-radius:8px;padding:6px 16px"
-             onerror="this.outerHTML='<div style='font-family:serif;font-size:2rem;font-weight:900;color:white;text-align:center;margin-bottom:16px'>BAKER</div>'">
-        <div class="login-tagline">Acceso exclusivo para colaboradores<br>de Inmobiliaria Baker SPA.</div>
-        <button class="btn-ms" onclick="loginMicrosoft()">
-            <svg viewBox="0 0 21 21" fill="none">
-                <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
-                <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
-                <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
-                <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
-            </svg>
-            Ingresar con Microsoft
-        </button>
-        <div class="login-restriccion">Solo cuentas @ibaker.cl</div>
-    </div>
-</div>
- 
-<!-- NAV -->
+<!-- NAV INTRANET -->
 <nav>
-    <a class="nav-wordmark" href="#">
+    <a class="nav-logo" href="index.html">
         <img src="LOGO_BAKER.png" alt="Baker"
-             style="height:26px;width:auto;display:block;background:white;border-radius:6px;padding:4px 10px"
-             onerror="this.style.display='none'">
+             onerror="this.outerHTML='<span style=\'font-family:serif;font-weight:900;color:white;font-size:1rem\'>BAKER</span>'">
     </a>
-    <div class="nav-badge">Intranet</div>
     <div class="nav-sep"></div>
+    <a class="nav-back" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        Inicio
+    </a>
+    <div class="nav-sep"></div>
+    <div class="nav-title">Salas de Reunión</div>
     <div class="nav-spacer"></div>
-    <div class="nav-clock" id="nav-clock">—</div>
     <div id="auth-area">
-        <button class="btn-nav-login" onclick="loginMicrosoft()">
+        <button class="btn-login-nav" onclick="loginMicrosoft()">
             <svg viewBox="0 0 21 21" fill="none">
                 <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
                 <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
                 <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
                 <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
             </svg>
-            Ingresar
+            Iniciar sesión
         </button>
+    </div>
+    <div class="nav-clock-wrap">
+        <div class="nav-clock" id="nav-clock">00:00</div>
+        <div class="nav-fecha" id="nav-fecha">—</div>
     </div>
 </nav>
  
-<!-- HERO OSCURO -->
+<!-- HERO -->
 <section class="hero">
-    <div class="hero-bg-img"><img src="vista-panoramica.jpg" alt="" fetchpriority="high"></div>
-    <div class="hero-inner">
-        <div>
-            <div class="hero-eyebrow">Portal Interno 2026</div>
-            <h1>Tu espacio<br>de trabajo,<br><em>digital.</em></h1>
-            <p class="hero-sub">Accede a los sistemas, herramientas e información del grupo Baker desde un solo lugar, disponible para todo el equipo.</p>
-            <div class="hero-bienvenida" id="hero-bienvenida" style="display:none">
-                <div class="hero-av" id="hero-av">—</div>
-                <div class="hero-hola">Bienvenido, <strong id="hero-nombre">—</strong></div>
-            </div>
+    <div>
+        <h1>Disponibilidad<br>de <em>Salas</em></h1>
+        <p>Consulta en tiempo real qué salas están libres. Actualizado cada 60 segundos.</p>
+    </div>
+    <div class="hero-stats">
+        <div class="hstat">
+            <div class="hstat-n v" id="stat-libres">—</div>
+            <div class="hstat-l">Disponibles</div>
+        </div>
+        <div class="hstat">
+            <div class="hstat-n o" id="stat-ocupadas">—</div>
+            <div class="hstat-l">Ocupadas</div>
         </div>
     </div>
 </section>
  
-<!-- MAIN CLARO -->
+<!-- TOOLBAR -->
+<div class="toolbar">
+    <div class="view-toggle">
+        <button class="view-btn activo" id="btn-semana" onclick="setVista('semana')">Semana</button>
+        <button class="view-btn"        id="btn-mes"    onclick="setVista('mes')">Mes</button>
+    </div>
+    <div class="nav-periodo">
+        <button class="nav-btn" onclick="navegar(-1)">&#8249;</button>
+        <div id="periodo-label">—</div>
+        <button class="nav-btn" onclick="navegar(1)">&#8250;</button>
+    </div>
+    <button class="btn-hoy" onclick="irHoy()">Hoy</button>
+    <div class="tb-spacer"></div>
+    <div class="sync-info">
+        <div class="sync-dot" id="sync-dot"></div>
+        <span id="sync-label">—</span>
+    </div>
+</div>
+ 
+<!-- MAIN -->
 <div class="main">
- 
-    <!-- Módulos -->
-    <div class="modulos">
-        <div class="sec-header">
-            <div class="sec-titulo">Módulos</div>
-            <div class="sec-linea"></div>
-            <div class="sec-label">2 activos · 2 próximamente</div>
-        </div>
-        <div class="modulos-grid">
- 
-            <a class="mod-card" href="softland.html">
-                <div class="mod-numero">01</div>
-                <div class="mod-icon on">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-                    </svg>
-                </div>
-                <div>
-                    <div class="mod-nombre">Consultas Softland</div>
-                    <div class="mod-desc">Busca asientos contables, vouchers y movimientos de las 5 empresas. Exporta a Excel.</div>
-                </div>
-                <div class="mod-footer">
-                    <div class="mod-status status-on">Activo</div>
-                    <div class="mod-arrow">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                    </div>
-                </div>
-            </a>
- 
-            <a class="mod-card" href="salas.html">
-                <div class="mod-numero">02</div>
-                <div class="mod-icon on">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                    </svg>
-                </div>
-                <div>
-                    <div class="mod-nombre">Salas de Reunión</div>
-                    <div class="mod-desc">Disponibilidad en tiempo real y agendamiento directo desde Outlook.</div>
-                </div>
-                <div class="mod-footer">
-                    <div class="mod-status status-on">Activo</div>
-                    <div class="mod-arrow">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                    </div>
-                </div>
-            </a>
- 
-            <div class="mod-card disabled">
-                <div class="mod-numero">03</div>
-                <div class="mod-icon off">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
-                    </svg>
-                </div>
-                <div>
-                    <div class="mod-nombre">Documentos</div>
-                    <div class="mod-desc">Repositorio centralizado de contratos, formularios y documentos internos.</div>
-                </div>
-                <div class="mod-footer">
-                    <div class="mod-status status-off">Próximamente</div>
-                </div>
-            </div>
- 
-            <div class="mod-card disabled">
-                <div class="mod-numero">04</div>
-                <div class="mod-icon off">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
-                    </svg>
-                </div>
-                <div>
-                    <div class="mod-nombre">Directorio</div>
-                    <div class="mod-desc">Contactos internos y organigrama de todas las empresas del grupo Baker.</div>
-                </div>
-                <div class="mod-footer">
-                    <div class="mod-status status-off">Próximamente</div>
-                </div>
-            </div>
- 
+    <div id="vista-semana">
+        <div class="salas-tabs" id="salas-tabs"></div>
+        <div class="semana-wrap">
+            <div class="semana-grid" id="semana-grid"></div>
         </div>
     </div>
- 
-    <!-- Noticias -->
-    <div>
-        <div class="sec-header">
-            <div class="sec-titulo">Novedades internas</div>
-            <div class="sec-linea"></div>
-            <div class="sec-label">Junio 2026</div>
-        </div>
-        <div class="noticias-grid">
- 
-            <div class="not-card principal">
-                <div class="not-visual">
-                    <div class="not-visual-emoji">🏢</div>
-                    <div class="not-cat">Tecnología</div>
-                </div>
-                <div class="not-body">
-                    <div class="not-fecha">08 Jun 2026</div>
-                    <div class="not-titulo">Lanzamiento del portal de intranet Baker</div>
-                    <div class="not-extracto">El grupo Baker cuenta ahora con un portal interno centralizado para acceder a herramientas, sistemas y comunicaciones internas desde cualquier dispositivo con correo corporativo.</div>
-                </div>
-            </div>
- 
-            <div class="not-card">
-                <div class="not-visual">
-                    <div class="not-visual-emoji">📊</div>
-                    <div class="not-cat">Sistemas</div>
-                </div>
-                <div class="not-body">
-                    <div class="not-fecha">08 Jun 2026</div>
-                    <div class="not-titulo">Consultas Softland disponibles en línea</div>
-                    <div class="not-extracto">Ya puedes buscar asientos contables y exportar a Excel sin necesitar ayuda de TI.</div>
-                </div>
-            </div>
- 
-            <div class="not-card">
-                <div class="not-visual">
-                    <div class="not-visual-emoji">🖨️</div>
-                    <div class="not-cat">TI</div>
-                </div>
-                <div class="not-body">
-                    <div class="not-fecha">Jun 2026</div>
-                    <div class="not-titulo">Instalación de impresoras ahora es autoservicio</div>
-                    <div class="not-extracto">Descarga el driver de la RICOH IM 430 directamente desde el portal sin contactar soporte.</div>
-                </div>
-            </div>
- 
-        </div>
+    <div id="vista-mes">
+        <div class="mes-salas-wrap" id="mes-salas-wrap"></div>
     </div>
- 
 </div>
  
 <!-- FOOTER -->
 <footer>
-    <div class="footer-l">Inmobiliaria Baker SPA &mdash; Portal Interno</div>
-    <div class="footer-r">v1.0.0 · 2026</div>
+    <div class="footer-l">Inmobiliaria Baker SPA &mdash; Salas de Reunión</div>
+    <div class="leyenda-colores">
+        <div class="lc-item"><div class="lc-box libre"></div> Disponible</div>
+        <div class="lc-item"><div class="lc-box ocupado"></div> Ocupado</div>
+    </div>
 </footer>
  
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="cerrarModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <div>
+                <div class="modal-titulo">Nueva Reserva</div>
+                <div style="margin-top:4px"><span class="modal-sala-badge" id="modal-sala-badge">SALA</span></div>
+            </div>
+            <button class="modal-close" onclick="cerrarModal(null)">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Asunto de la reunión</label>
+                <input class="form-input" id="f-asunto" type="text" placeholder="Ej: Reunión de equipo comercial">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Asistentes</label>
+                <div style="position:relative">
+                    <input class="form-input" id="f-buscar-asistente" type="text" placeholder="Buscar por nombre…" autocomplete="off" oninput="buscarAsistentes(this.value)">
+                    <div id="sugerencias" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#2a2a2a;border:1px solid #444;border-radius:9px;margin-top:4px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.4);"></div>
+                </div>
+                <div id="asistentes-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Fecha</label>
+                    <input class="form-input" id="f-fecha" type="date">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Sala</label>
+                    <select class="form-input" id="f-sala">
+                        <option value="salabaker@ibaker.cl">Baker</option>
+                        <option value="salaromeral@ibaker.cl">Romeral</option>
+                        <option value="salacmc@ibaker.cl">CMC</option>
+                        <option value="salarionef@ibaker.cl">Río Nef</option>
+                        <option value="salabrotar@ibaker.cl">Brotar</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Hora inicio</label>
+                    <input class="form-input" id="f-inicio" type="time" step="900">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Hora fin</label>
+                    <input class="form-input" id="f-fin" type="time" step="900">
+                </div>
+            </div>
+        </div>
+        <div class="modal-msg" id="modal-msg"></div>
+        <div class="modal-footer">
+            <button class="btn-cancelar" onclick="cerrarModal(null)">Cancelar</button>
+            <button class="btn-agendar" id="btn-agendar" onclick="confirmarReserva()">
+                <span id="btn-agendar-txt">Confirmar reserva</span>
+            </button>
+        </div>
+    </div>
+</div>
+ 
 <script>
+const SALAS = [
+    { nombre: "Baker",   email: "salabaker@ibaker.cl",   color: "#C0392B" },
+    { nombre: "Romeral", email: "salaromeral@ibaker.cl", color: "#E67E22" },
+    { nombre: "CMC",     email: "salacmc@ibaker.cl",     color: "#8E44AD" },
+    { nombre: "Río Nef", email: "salarionef@ibaker.cl",  color: "#2980B9" },
+    { nombre: "Brotar",  email: "salabrotar@ibaker.cl",  color: "#16A085" },
+];
+const HORA_INI = 8;
+const HORA_FIN = 20;
+const SLOT_H   = 48;
+const API      = "https://salasbaker.netlify.app/.netlify/functions/disponibilidad";
+ 
+// ── MSAL — mismo clientId que la intranet para SSO ───────────
 const msalConfig = {
     auth: {
         clientId:    "d9664e06-7fd2-401d-b27b-97116fed7d9f",
@@ -733,66 +568,62 @@ const msalConfig = {
     cache: { cacheLocation: "sessionStorage" }
 };
 const msalInstance = new msal.PublicClientApplication(msalConfig);
-const SCOPES   = ["User.Read"];
-const DOMINIOS = ['@ibaker.cl'];
+const SCOPES = ["Calendars.ReadWrite", "User.Read", "User.ReadBasic.All"];
 let usuarioActual = null;
+let tokenActual   = null;
  
 async function loginMicrosoft() {
     try {
         await msalInstance.initialize();
         const result = await msalInstance.loginPopup({ scopes: SCOPES });
-        const email  = result.account.username || '';
-        if (!DOMINIOS.some(d => email.endsWith(d))) {
-            await msalInstance.logoutPopup({ account: result.account });
-            alert('Acceso restringido. Solo cuentas @ibaker.cl.');
+        tokenActual   = result.accessToken;
+        usuarioActual = result.account;
+        const DOMINIOS = ['@ibaker.cl', '@cmcromeral.cl', '@epbrotar.cl'];
+        if (!DOMINIOS.some(d => (usuarioActual.username||'').endsWith(d))) {
+            await msalInstance.logoutPopup({ account: usuarioActual });
+            usuarioActual = null; tokenActual = null;
+            alert('Acceso restringido.');
             return;
         }
-        usuarioActual = result.account;
-        actualizarUI();
-    } catch(e) { console.error('Login cancelado', e); }
+        actualizarUIAuth(); cache = {}; render();
+    } catch(e) { console.error("Login cancelado", e); }
 }
  
-function logout() {
-    msalInstance.logoutPopup();
-    usuarioActual = null;
-    actualizarUI();
+async function getToken() {
+    if (!usuarioActual) return null;
+    try {
+        await msalInstance.initialize();
+        const r = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: usuarioActual });
+        tokenActual = r.accessToken; return tokenActual;
+    } catch(e) {
+        const r = await msalInstance.acquireTokenPopup({ scopes: SCOPES });
+        tokenActual = r.accessToken; return tokenActual;
+    }
 }
  
-function actualizarUI() {
-    const blocker = document.getElementById('login-blocker');
-    const area    = document.getElementById('auth-area');
-    const bienvenida = document.getElementById('hero-bienvenida');
+function logout() { msalInstance.logoutPopup(); usuarioActual = null; tokenActual = null; actualizarUIAuth(); }
  
+function actualizarUIAuth() {
+    const area = document.getElementById('auth-area');
     if (usuarioActual) {
-        blocker.classList.remove('visible');
-        const nombre   = usuarioActual.name || usuarioActual.username;
-        const iniciales = nombre.split(' ').map(p => p[0]).join('').slice(0,2).toUpperCase();
-        const primerNombre = nombre.split(' ')[0];
- 
-        // Nav chip
+        const nombre = usuarioActual.name || usuarioActual.username;
+        const iniciales = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
         area.innerHTML = `
             <div class="user-chip">
                 <div class="user-av">${iniciales}</div>
                 <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
-                <button class="btn-out" onclick="logout()">✕</button>
+                <button class="btn-logout-nav" onclick="logout()">✕</button>
             </div>`;
- 
-        // Hero bienvenida
-        document.getElementById('hero-av').innerText = iniciales;
-        document.getElementById('hero-nombre').innerText = primerNombre;
-        bienvenida.style.display = 'flex';
     } else {
-        blocker.classList.add('visible');
-        bienvenida.style.display = 'none';
         area.innerHTML = `
-            <button class="btn-nav-login" onclick="loginMicrosoft()">
+            <button class="btn-login-nav" onclick="loginMicrosoft()">
                 <svg viewBox="0 0 21 21" fill="none" style="width:13px;height:13px">
                     <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
                     <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
                     <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
                     <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
                 </svg>
-                Ingresar
+                Iniciar sesión
             </button>`;
     }
 }
@@ -801,44 +632,272 @@ async function intentarLoginSilencioso() {
     try {
         await msalInstance.initialize();
         const accounts = msalInstance.getAllAccounts();
-        if (accounts.length > 0) usuarioActual = accounts[0];
+        if (accounts.length > 0) { usuarioActual = accounts[0]; await getToken(); actualizarUIAuth(); }
     } catch(e) {}
 }
  
+// Asistentes
+let asistentesSeleccionados = [], buscarTimeout = null;
+async function buscarAsistentes(query) {
+    const sugs = document.getElementById('sugerencias');
+    if (!query || query.length < 2) { sugs.style.display = 'none'; return; }
+    clearTimeout(buscarTimeout);
+    buscarTimeout = setTimeout(async () => {
+        const token = await getToken();
+        if (!token) return;
+        try {
+            const res = await fetch(`https://graph.microsoft.com/v1.0/users?$filter=startswith(displayName,'${encodeURIComponent(query)}')&$select=displayName,mail&$top=6`, { headers: { Authorization: `Bearer ${token}` } });
+            const data = await res.json();
+            const DOMINIOS = ['@ibaker.cl', '@cmcromeral.cl', '@epbrotar.cl'];
+            const usuarios = (data.value||[]).filter(u => u.mail && DOMINIOS.some(d => u.mail.endsWith(d)) && !asistentesSeleccionados.find(a => a.email === u.mail));
+            if (!usuarios.length) { sugs.style.display = 'none'; return; }
+            sugs.innerHTML = usuarios.map(u => `<div class="sug-item" onclick="agregarAsistente('${u.displayName}','${u.mail}')"><div class="sug-nombre">${u.displayName}</div><div class="sug-email">${u.mail}</div></div>`).join('');
+            sugs.style.display = 'block';
+        } catch(e) {}
+    }, 300);
+}
+function agregarAsistente(nombre, email) {
+    if (asistentesSeleccionados.find(a => a.email === email)) return;
+    asistentesSeleccionados.push({ nombre, email });
+    document.getElementById('f-buscar-asistente').value = '';
+    document.getElementById('sugerencias').style.display = 'none';
+    renderChips();
+}
+function quitarAsistente(email) { asistentesSeleccionados = asistentesSeleccionados.filter(a => a.email !== email); renderChips(); }
+function renderChips() {
+    document.getElementById('asistentes-chips').innerHTML = asistentesSeleccionados.map(a => `
+        <div class="chip">${a.nombre.split(' ').slice(0,2).join(' ')}<button class="chip-remove" onclick="quitarAsistente('${a.email}')">×</button></div>`).join('');
+}
+document.addEventListener('click', e => { if (!e.target.closest('#f-buscar-asistente') && !e.target.closest('#sugerencias')) { const s = document.getElementById('sugerencias'); if(s) s.style.display='none'; } });
+ 
+// Modal
+function abrirModal({ salaEmail, salaNombre, fecha, horaIni, horaFin }) {
+    if (!usuarioActual) { loginMicrosoft(); return; }
+    document.getElementById('modal-sala-badge').innerText = salaNombre;
+    document.getElementById('f-sala').value   = salaEmail;
+    document.getElementById('f-fecha').value  = fecha || isoDate(new Date());
+    document.getElementById('f-inicio').value = horaIni || '09:00';
+    document.getElementById('f-fin').value    = horaFin  || '10:00';
+    document.getElementById('f-asunto').value = '';
+    document.getElementById('f-buscar-asistente').value = '';
+    asistentesSeleccionados = []; renderChips();
+    document.getElementById('modal-msg').className = 'modal-msg';
+    document.getElementById('btn-agendar').disabled = false;
+    document.getElementById('btn-agendar-txt').innerText = 'Confirmar reserva';
+    document.getElementById('modal-overlay').classList.add('visible');
+}
+function cerrarModal(e) { if (e && e.target !== document.getElementById('modal-overlay')) return; document.getElementById('modal-overlay').classList.remove('visible'); }
+async function confirmarReserva() {
+    const asunto = document.getElementById('f-asunto').value.trim();
+    const fecha  = document.getElementById('f-fecha').value;
+    const salaEmail = document.getElementById('f-sala').value;
+    const inicio = document.getElementById('f-inicio').value;
+    const fin    = document.getElementById('f-fin').value;
+    if (!asunto) { mostrarMsgModal('err','Ingresa un asunto.'); return; }
+    if (!fecha)  { mostrarMsgModal('err','Selecciona una fecha.'); return; }
+    if (!inicio || !fin || inicio >= fin) { mostrarMsgModal('err','Horario no válido.'); return; }
+    const token = await getToken();
+    if (!token) { mostrarMsgModal('err','Error de autenticación.'); return; }
+    document.getElementById('btn-agendar').disabled = true;
+    document.getElementById('btn-agendar-txt').innerText = 'Agendando…';
+    try {
+        const res = await fetch('https://salasbaker.netlify.app/.netlify/functions/agendar', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, salaEmail, asunto, inicio:`${fecha}T${inicio}:00`, fin:`${fecha}T${fin}:00`, asistentes: asistentesSeleccionados.map(a=>a.email) })
+        });
+        const data = await res.json();
+        if (res.ok) { mostrarMsgModal('ok','✓ Reserva creada correctamente.'); cache={}; setTimeout(()=>{ cerrarModal(null); render(); }, 2000); }
+        else { mostrarMsgModal('err', data.error||'No se pudo crear la reserva.'); document.getElementById('btn-agendar').disabled=false; document.getElementById('btn-agendar-txt').innerText='Confirmar reserva'; }
+    } catch(e) { mostrarMsgModal('err','Error de conexión.'); document.getElementById('btn-agendar').disabled=false; document.getElementById('btn-agendar-txt').innerText='Confirmar reserva'; }
+}
+function mostrarMsgModal(tipo, txt) { const el=document.getElementById('modal-msg'); el.className=`modal-msg ${tipo}`; el.innerText=txt; }
+ 
+// Estado
+let vista='semana', salaActiva=0, offsetSemana=0, offsetMes=0, cache={};
+ 
+// Reloj
 function tickClock() {
     const n = new Date();
-    document.getElementById('nav-clock').innerText =
-        n.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' });
+    document.getElementById('nav-clock').innerText = n.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('nav-fecha').innerText = n.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'});
 }
-setInterval(tickClock, 1000);
-tickClock();
+setInterval(tickClock,1000); tickClock();
  
-// ── Toast acceso denegado ─────────────────────────────────────
-function checkAccesoDenegado() {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('acceso') !== 'denegado') return;
-    const toast = document.createElement('div');
-    toast.style.cssText = [
-        'position:fixed','bottom:24px','left:50%','transform:translateX(-50%)',
-        'background:#2a1a18','border:1px solid rgba(192,57,43,0.4)',
-        'border-radius:10px','padding:14px 20px',
-        'display:flex','align-items:center','gap:10px',
-        'font-family:DM Sans,sans-serif','font-size:0.84rem',
-        'color:#ffaa90','z-index:9999',
-        'box-shadow:0 8px 32px rgba(0,0,0,0.4)'
-    ].join(';');
-    toast.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C0392B" stroke-width="2" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> No tienes acceso al módulo de Consultas Softland.';
-    document.body.appendChild(toast);
-    window.history.replaceState({}, '', window.location.pathname);
-    setTimeout(() => toast.remove(), 5000);
+// Helpers
+function isoDate(d) { return d.toISOString().split('T')[0]; }
+function addDays(d,n) { const r=new Date(d); r.setDate(r.getDate()+n); return r; }
+function startOfWeek(d) { const r=new Date(d); const day=r.getDay(); r.setDate(r.getDate()+(day===0?-6:1-day)); r.setHours(0,0,0,0); return r; }
+function daysInMonth(y,m) { return new Date(y,m+1,0).getDate(); }
+function isToday(d) { const t=new Date(); return d.getFullYear()===t.getFullYear()&&d.getMonth()===t.getMonth()&&d.getDate()===t.getDate(); }
+function isPast(d) { const t=new Date(); t.setHours(0,0,0,0); return d<t; }
+ 
+// API
+async function fetchBloques(email,fechaIni,fechaFin) {
+    const key=email+fechaIni;
+    if(cache[key]) return cache[key];
+    try {
+        const res=await fetch(`${API}?email=${email}&fechaInicio=${fechaIni}T00:00:00Z&fechaFin=${fechaFin}T23:59:59Z`);
+        const data=await res.json();
+        cache[key]=data.bloques||[]; return cache[key];
+    } catch(e) { return []; }
+}
+async function fetchSemana(sala,lunes,viernes) { return fetchBloques(sala.email,isoDate(lunes),isoDate(viernes)); }
+async function fetchMes(sala,inicio,fin) { return fetchBloques(sala.email,isoDate(inicio),isoDate(fin)); }
+ 
+async function actualizarStats() {
+    const ahora=new Date(), hoy=isoDate(ahora);
+    let libres=0, ocupadas=0;
+    await Promise.all(SALAS.map(async sala => {
+        const bloques=await fetchBloques(sala.email,hoy,hoy);
+        const ocupada=bloques.some(b=>{ const i=new Date(b.inicio.replace('Z','')),f=new Date(b.fin.replace('Z','')); return ahora>=i&&ahora<=f; });
+        ocupada?ocupadas++:libres++;
+    }));
+    document.getElementById('stat-libres').innerText=libres;
+    document.getElementById('stat-ocupadas').innerText=ocupadas;
+}
+ 
+function setVista(v) {
+    vista=v;
+    document.getElementById('btn-semana').classList.toggle('activo',v==='semana');
+    document.getElementById('btn-mes').classList.toggle('activo',v==='mes');
+    document.getElementById('vista-semana').style.display=v==='semana'?'block':'none';
+    document.getElementById('vista-mes').style.display=v==='mes'?'block':'none';
+    render();
+}
+function navegar(dir) { if(vista==='semana') offsetSemana+=dir; else offsetMes+=dir; cache={}; render(); }
+function irHoy() { offsetSemana=0; offsetMes=0; cache={}; render(); }
+function render() { if(vista==='semana') renderSemana(); else renderMes(); }
+ 
+function getLunesViernes() {
+    const lunes=startOfWeek(new Date());
+    lunes.setDate(lunes.getDate()+offsetSemana*7);
+    return { lunes, viernes:addDays(lunes,4) };
+}
+ 
+function renderSemana() {
+    const {lunes,viernes}=getLunesViernes();
+    const opts={day:'numeric',month:'long'};
+    document.getElementById('periodo-label').innerText=`${lunes.toLocaleDateString('es-CL',opts)} – ${viernes.toLocaleDateString('es-CL',opts)}`;
+    document.getElementById('salas-tabs').innerHTML=SALAS.map((s,i)=>`
+        <button class="sala-tab ${i===salaActiva?'activo':''}" onclick="setSalaActiva(${i})" style="${i===salaActiva?`border-bottom-color:${s.color}`:''}">
+            ${s.nombre}</button>`).join('');
+    buildGridSemana(lunes);
+}
+function setSalaActiva(idx) { salaActiva=idx; renderSemana(); }
+ 
+async function buildGridSemana(lunes) {
+    const grid=document.getElementById('semana-grid');
+    const sala=SALAS[salaActiva];
+    const diasSemana=['Lun','Mar','Mié','Jue','Vie'];
+    const totalHoras=HORA_FIN-HORA_INI, slotPx=SLOT_H;
+    let html=`<div class="sg-corner" style="height:52px"></div>`;
+    for(let d=0;d<5;d++){
+        const dia=addDays(lunes,d);
+        html+=`<div class="sg-dia-header ${isToday(dia)?'hoy':''}"><div class="sg-dia-nombre">${diasSemana[d]}</div><div class="sg-dia-num">${dia.getDate()}</div></div>`;
+    }
+    for(let h=HORA_INI;h<=HORA_FIN;h++){
+        const label=h<HORA_FIN?`${String(h).padStart(2,'0')}:00`:'';
+        html+=`<div class="sg-hora-cell" style="height:${slotPx}px"><span class="sg-hora-label">${label}</span></div>`;
+        if(h<HORA_FIN) for(let d=0;d<5;d++) html+=`<div class="sg-day-col" id="col-${d}-${h}" style="height:${slotPx}px"></div>`;
+    }
+    grid.style.gridTemplateRows=`52px repeat(${totalHoras},${slotPx}px)`;
+    grid.innerHTML=html;
+    const bloques=await fetchSemana(sala,lunes,addDays(lunes,4));
+    for(let d=0;d<5;d++){
+        const dia=addDays(lunes,d), diaStr=isoDate(dia);
+        if(usuarioActual){
+            for(let h=HORA_INI;h<HORA_FIN;h++){
+                const colEl=document.getElementById(`col-${d}-${h}`); if(!colEl) continue;
+                const sl=document.createElement('div'); sl.className='slot-libre'; sl.style.cssText=`top:0;height:${slotPx}px;`;
+                sl.onclick=()=>abrirModal({salaEmail:sala.email,salaNombre:sala.nombre,fecha:isoDate(dia),horaIni:String(h).padStart(2,'0')+':00',horaFin:String(h+1).padStart(2,'0')+':00'});
+                colEl.appendChild(sl);
+            }
+        }
+        if(isToday(dia)){
+            const ahora=new Date(), min=(ahora.getHours()-HORA_INI)*60+ahora.getMinutes();
+            if(min>=0&&min<=totalHoras*60){
+                const col=document.getElementById(`col-${d}-${HORA_INI}`);
+                if(col){ const l=document.createElement('div'); l.className='linea-ahora'; l.style.cssText=`top:${(min/60)*slotPx}px;position:absolute;left:0;right:0;z-index:10;`; col.style.position='relative'; col.appendChild(l); }
+            }
+        }
+        bloques.forEach(b=>{
+            const ini=new Date(b.inicio.replace('Z','')), fin=new Date(b.fin.replace('Z',''));
+            if(isoDate(ini)!==diaStr) return;
+            const iniMin=(ini.getHours()-HORA_INI)*60+ini.getMinutes(), finMin=(fin.getHours()-HORA_INI)*60+fin.getMinutes();
+            if(finMin<=0||iniMin>=totalHoras*60) return;
+            const heightPx=Math.max(4,(finMin-iniMin)/60*slotPx-2);
+            const colEl=document.getElementById(`col-${d}-${HORA_INI+Math.floor(iniMin/60)}`); if(!colEl) return;
+            const bloque=document.createElement('div'); bloque.className='bloque';
+            bloque.style.cssText=`top:${(iniMin%60)/60*slotPx}px;height:${heightPx}px;position:absolute;left:3px;right:3px;`;
+            bloque.title=b.organizador?`${b.organizador}`:' Ocupado';
+            const nombre=b.organizador?b.organizador.split(' ').slice(0,2).join(' '):'Ocupado';
+            bloque.innerHTML=heightPx>20?`<div class="bloque-inner">${nombre}</div>`:'';
+            colEl.style.position='relative'; colEl.appendChild(bloque);
+        });
+    }
+    document.getElementById('sync-label').innerText=`Act. ${new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}`;
+}
+ 
+function getMesActual() { return new Date(new Date().getFullYear(),new Date().getMonth()+offsetMes,1); }
+function renderMes() {
+    const mes=getMesActual();
+    document.getElementById('periodo-label').innerText=mes.toLocaleDateString('es-CL',{month:'long',year:'numeric'});
+    const wrap=document.getElementById('mes-salas-wrap');
+    wrap.innerHTML=SALAS.map((s,i)=>`
+        <div class="mes-sala-card"><div class="mes-card-header"><div class="mes-card-nombre" style="color:${s.color}">${s.nombre}</div><div class="mes-card-count" id="count-${i}">—</div></div>
+        <div class="mini-cal" id="mcal-${i}"><div style="text-align:center;font-size:0.75rem;color:var(--txt-dim);padding:20px 0">Cargando…</div></div></div>`).join('');
+    SALAS.forEach((sala,idx)=>buildMiniCal(sala,idx,mes));
+}
+async function buildMiniCal(sala,idx,mes) {
+    const year=mes.getFullYear(), month=mes.getMonth(), total=daysInMonth(year,month);
+    const primerDia=new Date(year,month,1).getDay(), offset=primerDia===0?6:primerDia-1;
+    const bloques=await fetchMes(sala,new Date(year,month,1),new Date(year,month,total));
+    const porDia={};
+    bloques.forEach(b=>{ const d=isoDate(new Date(b.inicio.replace('Z',''))); if(!porDia[d]) porDia[d]=0; porDia[d]++; });
+    const hoyStr=isoDate(new Date());
+    let totalR=0; Object.values(porDia).forEach(v=>totalR+=v);
+    document.getElementById(`count-${idx}`).innerText=`${totalR} reserva${totalR!==1?'s':''}`;
+    const dias=['L','M','X','J','V','S','D'];
+    let html=`<div class="mini-cal-header">${dias.map(d=>`<div class="mini-cal-dh">${d}</div>`).join('')}</div><div class="mini-cal-grid">`;
+    for(let i=0;i<offset;i++) html+=`<div class="mini-dia vacio"></div>`;
+    for(let d=1;d<=total;d++){
+        const fecha=new Date(year,month,d), fStr=isoDate(fecha);
+        const esFinde=fecha.getDay()===0||fecha.getDay()===6, esHoy=fStr===hoyStr, esPasado=isPast(fecha)&&!esHoy, reservas=porDia[fStr]||0;
+        let clase='', dotsHtml='';
+        if(esFinde){clase='finde';}
+        else if(esPasado){clase='pasado'+(reservas>0?' ocupado-parcial':'');}
+        else if(reservas===0){clase='libre';}
+        else if(reservas>=4){clase='ocupado-total';}
+        else{clase='ocupado-parcial';dotsHtml=`<div class="mini-dia-dots">${'<div class="mini-dot"></div>'.repeat(Math.min(reservas,3))}</div>`;}
+        if(esHoy) clase+=' hoy-dia';
+        const click=(!esFinde&&!esPasado)?`onclick="irASemana('${fStr}')"`:'' ;
+        html+=`<div class="mini-dia ${clase}" ${click}><div class="mini-dia-num">${d}</div>${dotsHtml}</div>`;
+    }
+    html+=`</div>`;
+    document.getElementById(`mcal-${idx}`).innerHTML=html;
+}
+ 
+function irASemana(fechaStr) {
+    const fecha=new Date(fechaStr+'T12:00:00'), lunesHoy=startOfWeek(new Date()), lunesFecha=startOfWeek(fecha);
+    offsetSemana=Math.round((lunesFecha-lunesHoy)/(7*24*60*60*1000));
+    cache={}; setVista('semana'); window.scrollTo({top:0,behavior:'smooth'});
+}
+ 
+async function syncAll() {
+    const dot=document.getElementById('sync-dot'); dot.style.opacity='1';
+    cache={}; await actualizarStats(); render();
+    setTimeout(()=>dot.style.opacity='0',800);
 }
  
 async function init() {
     await intentarLoginSilencioso();
-    actualizarUI();
-    checkAccesoDenegado();
-    setTimeout(() => document.getElementById('loading').classList.add('oculto'), 1600);
+    render();
+    await actualizarStats();
+    document.getElementById('loading').classList.add('oculto');
+    setTimeout(()=>document.getElementById('loading').remove(),600);
 }
+ 
+setInterval(syncAll,60000);
 init();
 </script>
 </body>
