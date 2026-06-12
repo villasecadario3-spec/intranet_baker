@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consultas Softland — Baker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+    <!-- SheetJS para exportar Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --rojo:       #C0392B;
+            --rojo-dark:  #96281B;
+            --rojo-light: rgba(192,57,43,0.08);
+            --negro:      #111010;
+            --negro-2:    #1A1918;
+            --negro-3:    #242220;
+            --borde-dark: #2E2C2A;
+            --blanco:     #FFFFFF;
+            --crema:      #F8F6F3;
+            --gris-1:     #F0EDE9;
+            --gris-2:     #E2DED9;
+            --gris-3:     #B5B0AA;
+            --txt:        #1C1A18;
+            --txt-mid:    #6B6762;
+            --txt-dim:    #A09C97;
+            --verde:      #1a7a4a;
+            --verde-bg:   rgba(26,122,74,0.08);
+        }
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+        html { scroll-behavior: smooth; }
+        body { font-family:'DM Sans',sans-serif; background:var(--crema); color:var(--txt); min-height:100vh; }
+ 
+        /* NAV */
+        nav {
+            background: rgba(17,16,16,0.95);
+            backdrop-filter: blur(24px);
+            border-bottom: 1px solid var(--borde-dark);
+            height: 60px;
+            display: flex; align-items: center;
+            padding: 0 48px; gap: 16px;
+            position: sticky; top: 0; z-index: 100;
+        }
+        .nav-logo { text-decoration:none; flex-shrink:0; }
+        .nav-logo img { height:26px; width:auto; display:block; background:white; border-radius:6px; padding:4px 10px; }
+        .nav-sep { width:1px; height:18px; background:var(--borde-dark); }
+        .nav-back {
+            display:flex; align-items:center; gap:6px;
+            color: var(--gris-3); text-decoration:none;
+            font-size:0.78rem; font-weight:500;
+            transition: color 0.2s;
+        }
+        .nav-back:hover { color: white; }
+        .nav-back svg { width:14px; height:14px; }
+        .nav-title {
+            font-family:'DM Mono',monospace;
+            font-size:0.72rem; color:var(--gris-3);
+            letter-spacing:0.1em; text-transform:uppercase;
+        }
+        .nav-spacer { flex:1; }
+        .nav-clock { font-family:'DM Mono',monospace; font-size:0.78rem; color:var(--gris-3); }
+        .user-chip {
+            display:flex; align-items:center; gap:8px;
+            padding:4px 12px 4px 4px;
+            background:var(--negro-3); border:1px solid var(--borde-dark);
+            border-radius:100px;
+        }
+        .user-av {
+            width:26px; height:26px; border-radius:50%;
+            background:var(--rojo);
+            display:flex; align-items:center; justify-content:center;
+            font-family:'Playfair Display',serif;
+            font-size:0.72rem; font-weight:700; color:white;
+        }
+        .user-nm { font-size:0.78rem; font-weight:500; color:white; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+ 
+        /* HEADER */
+        .page-header {
+            background: var(--negro);
+            padding: 40px 48px 36px;
+            border-bottom: 1px solid var(--borde-dark);
+            position: relative; overflow: hidden;
+        }
+        .page-header::before {
+            content:'';
+            position:absolute; inset:0;
+            background-image:
+                linear-gradient(var(--borde-dark) 1px, transparent 1px),
+                linear-gradient(90deg, var(--borde-dark) 1px, transparent 1px);
+            background-size: 40px 40px;
+            opacity: 0.3;
+        }
+        .page-header::after {
+            content:'';
+            position:absolute; inset:0;
+            background: radial-gradient(ellipse 50% 100% at 0% 50%, rgba(192,57,43,0.1) 0%, transparent 70%);
+        }
+        .page-header-inner { position:relative; z-index:2; }
+        .page-eyebrow {
+            font-size:0.65rem; font-weight:600;
+            letter-spacing:0.2em; text-transform:uppercase;
+            color:var(--rojo); margin-bottom:10px;
+            display:flex; align-items:center; gap:8px;
+        }
+        .page-eyebrow::before { content:''; width:16px; height:1px; background:var(--rojo); }
+        .page-header h1 {
+            font-family:'Playfair Display',serif;
+            font-size:2rem; font-weight:900;
+            color:white; letter-spacing:-0.02em;
+            line-height:1.1;
+        }
+        .page-header h1 em { font-style:italic; color:var(--rojo); }
+        .page-header-sub {
+            font-size:0.82rem; color:#6b6762;
+            margin-top:8px; line-height:1.6;
+        }
+ 
+        /* MAIN */
+        .main { padding:36px 48px 80px; max-width:1400px; }
+ 
+        /* PANEL FILTROS */
+        .filtros-panel {
+            background: white;
+            border: 1px solid var(--gris-2);
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+        .filtros-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--gris-2);
+            display: flex; align-items: center; gap: 10px;
+        }
+        .filtros-header-icon {
+            width: 30px; height: 30px; border-radius: 7px;
+            background: var(--negro);
+            display: flex; align-items:center; justify-content:center;
+        }
+        .filtros-header-icon svg { width:14px; height:14px; color:white; }
+        .filtros-header-title {
+            font-family:'Playfair Display',serif;
+            font-size:0.95rem; font-weight:700; color:var(--txt);
+        }
+        .filtros-body {
+            padding: 24px;
+            display: grid;
+            grid-template-columns: 1.2fr 0.6fr 0.6fr 1fr 1fr;
+            gap: 16px;
+            align-items: end;
+        }
+        .form-group { display:flex; flex-direction:column; gap:6px; }
+        .form-label {
+            font-size:0.68rem; font-weight:600;
+            letter-spacing:0.1em; text-transform:uppercase;
+            color:var(--txt-dim);
+        }
+        .form-label span { color:var(--rojo); margin-left:2px; }
+        .form-input, .form-select {
+            padding: 10px 14px;
+            border: 1px solid var(--gris-2);
+            border-radius: 9px;
+            background: var(--crema);
+            color: var(--txt);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.88rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--rojo);
+            box-shadow: 0 0 0 3px rgba(192,57,43,0.08);
+            background: white;
+        }
+        .form-input::placeholder { color: var(--txt-dim); }
+        .form-hint {
+            font-size:0.65rem; color:var(--txt-dim);
+            margin-top:3px;
+        }
+        .btn-buscar {
+            display:flex; align-items:center; justify-content:center; gap:8px;
+            padding: 10px 24px;
+            background: var(--negro);
+            border: none; border-radius: 9px;
+            color: white; cursor: pointer;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.88rem; font-weight: 600;
+            transition: background 0.2s, transform 0.1s;
+            white-space: nowrap; height: 42px;
+        }
+        .btn-buscar:hover { background: var(--rojo); }
+        .btn-buscar:active { transform: scale(0.98); }
+        .btn-buscar:disabled { opacity:0.5; cursor:not-allowed; }
+        .btn-buscar svg { width:15px; height:15px; }
+ 
+        /* RESULTADOS */
+        .resultados-header {
+            display:flex; align-items:center; justify-content:space-between;
+            margin-bottom:16px; flex-wrap:wrap; gap:12px;
+        }
+        .resultados-info {
+            display:flex; align-items:center; gap:12px;
+        }
+        .resultados-titulo {
+            font-family:'Playfair Display',serif;
+            font-size:1rem; font-weight:700; color:var(--txt);
+        }
+        .resultados-badge {
+            padding:3px 10px; border-radius:100px;
+            font-size:0.68rem; font-weight:600;
+            letter-spacing:0.08em; text-transform:uppercase;
+        }
+        .badge-ok { background:var(--verde-bg); color:var(--verde); border:1px solid rgba(26,122,74,0.2); }
+        .badge-empty { background:var(--gris-1); color:var(--txt-dim); border:1px solid var(--gris-2); }
+ 
+        .btn-excel {
+            display:flex; align-items:center; gap:7px;
+            padding:8px 18px; border-radius:8px;
+            background:var(--verde-bg); border:1px solid rgba(26,122,74,0.25);
+            color:var(--verde); cursor:pointer;
+            font-family:'DM Sans',sans-serif;
+            font-size:0.82rem; font-weight:600;
+            transition: all 0.2s;
+        }
+        .btn-excel:hover { background:rgba(26,122,74,0.15); }
+        .btn-excel:disabled { opacity:0.4; cursor:not-allowed; }
+        .btn-excel svg { width:15px; height:15px; }
+ 
+        /* TABLA */
+        .tabla-wrap {
+            background: white;
+            border: 1px solid var(--gris-2);
+            border-radius: 14px;
+            overflow: hidden;
+        }
+        .tabla-scroll { overflow-x: auto; }
+        table {
+            width:100%; border-collapse:collapse;
+            font-size:0.82rem;
+        }
+        thead {
+            background: var(--negro);
+            position: sticky; top: 60px; z-index: 10;
+        }
+        th {
+            padding: 12px 16px;
+            text-align: left;
+            font-family:'DM Mono',monospace;
+            font-size:0.62rem; font-weight:500;
+            letter-spacing:0.1em; text-transform:uppercase;
+            color: #6b6762;
+            white-space: nowrap;
+        }
+        th.num { text-align:right; }
+        tbody tr {
+            border-bottom: 1px solid var(--gris-1);
+            transition: background 0.15s;
+        }
+        tbody tr:last-child { border-bottom:none; }
+        tbody tr:hover { background: var(--crema); }
+        td {
+            padding: 11px 16px;
+            color: var(--txt);
+            white-space: nowrap;
+        }
+        td.num { text-align:right; font-family:'DM Mono',monospace; font-size:0.8rem; }
+        td.voucher { font-family:'DM Mono',monospace; color:var(--rojo); font-size:0.8rem; }
+        td.cuenta { font-family:'DM Mono',monospace; font-size:0.8rem; }
+        td.glosa { white-space:normal; max-width:280px; color:var(--txt-mid); }
+        td.rut { font-family:'DM Mono',monospace; font-size:0.8rem; }
+ 
+        /* TOTALES */
+        tfoot tr { background:var(--gris-1); border-top:2px solid var(--gris-2); }
+        tfoot td {
+            padding:11px 16px;
+            font-weight:600; font-size:0.82rem;
+        }
+        tfoot td.num { font-family:'DM Mono',monospace; color:var(--txt); }
+ 
+        /* ESTADOS */
+        .estado {
+            padding:48px 24px;
+            text-align:center;
+            color:var(--txt-dim);
+        }
+        .estado-icon { font-size:2rem; margin-bottom:12px; }
+        .estado-titulo {
+            font-family:'Playfair Display',serif;
+            font-size:1rem; font-weight:700;
+            color:var(--txt); margin-bottom:6px;
+        }
+        .estado-sub { font-size:0.82rem; line-height:1.6; }
+ 
+        /* SPINNER */
+        .spinner {
+            width:20px; height:20px;
+            border:2px solid rgba(255,255,255,0.2);
+            border-top-color:white;
+            border-radius:50%;
+            animation:spin 0.7s linear infinite;
+        }
+        @keyframes spin { to{transform:rotate(360deg)} }
+ 
+        /* ERROR */
+        .error-box {
+            background:rgba(192,57,43,0.06);
+            border:1px solid rgba(192,57,43,0.2);
+            border-radius:10px;
+            padding:16px 20px;
+            display:flex; align-items:flex-start; gap:12px;
+            margin-bottom:20px;
+        }
+        .error-box svg { width:18px; height:18px; color:var(--rojo); flex-shrink:0; margin-top:1px; }
+        .error-txt { font-size:0.84rem; color:#8a2e23; line-height:1.5; }
+ 
+        @media(max-width:900px) {
+            nav { padding:0 20px; }
+            .page-header { padding:32px 20px 28px; }
+            .main { padding:24px 20px 60px; }
+            .filtros-body { grid-template-columns:1fr 1fr; }
+        }
+        @media(max-width:600px) {
+            .filtros-body { grid-template-columns:1fr; }
+        }
+    </style>
+</head>
+<body>
+ 
+<nav>
+    <a class="nav-logo" href="index.html">
+        <img src="LOGO_BAKER.png" alt="Baker"
+             onerror="this.outerHTML='<span style=\'font-family:serif;font-weight:900;color:white;font-size:1rem\'>BAKER</span>'">
+    </a>
+    <div class="nav-sep"></div>
+    <a class="nav-back" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        Inicio
+    </a>
+    <div class="nav-sep"></div>
+    <div class="nav-title">Consultas Softland</div>
+    <div class="nav-spacer"></div>
+    <div class="nav-clock" id="nav-clock">—</div>
+    <div id="auth-area"></div>
+</nav>
+ 
+<div class="page-header">
+    <div class="page-header-inner">
+        <div class="page-eyebrow">Softland · Asientos Contables</div>
+        <h1>Consultas a<br><em>Base de Datos</em></h1>
+        <div class="page-header-sub">Busca movimientos contables de las 5 empresas y exporta a Excel directamente.</div>
+    </div>
+</div>
+ 
+<div class="main">
+ 
+    <!-- Error box -->
+    <div class="error-box" id="error-box" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <div class="error-txt" id="error-txt">—</div>
+    </div>
+ 
+    <!-- Filtros -->
+    <div class="filtros-panel">
+        <div class="filtros-header">
+            <div class="filtros-header-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
+                </svg>
+            </div>
+            <div class="filtros-header-title">Filtros de búsqueda</div>
+        </div>
+        <div class="filtros-body">
+            <div class="form-group">
+                <label class="form-label">Empresa <span>*</span></label>
+                <select class="form-select" id="f-empresa">
+                    <option value="">Seleccionar empresa…</option>
+                    <option value="ROMERAL">Romeral</option>
+                    <option value="BAKER DOS">Baker Dos</option>
+                    <option value="BAKER">Baker</option>
+                    <option value="BAKER CUATRO">Baker Cuatro</option>
+                    <option value="BAKER CINCO">Baker Cinco</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Año <span>*</span></label>
+                <input class="form-input" id="f-ano" type="number"
+                       min="2000" max="2099"
+                       placeholder="2024">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Mes <span>*</span></label>
+                <select class="form-select" id="f-mes">
+                    <option value="">Mes…</option>
+                    <option value="1">Enero</option>
+                    <option value="2">Febrero</option>
+                    <option value="3">Marzo</option>
+                    <option value="4">Abril</option>
+                    <option value="5">Mayo</option>
+                    <option value="6">Junio</option>
+                    <option value="7">Julio</option>
+                    <option value="8">Agosto</option>
+                    <option value="9">Septiembre</option>
+                    <option value="10">Octubre</option>
+                    <option value="11">Noviembre</option>
+                    <option value="12">Diciembre</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Voucher(s)</label>
+                <input class="form-input" id="f-voucher" type="text"
+                       placeholder="00011622, 00011625…">
+                <div class="form-hint">Separar múltiples con coma</div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">RUT Auxiliar</label>
+                <input class="form-input" id="f-rut" type="text"
+                       placeholder="77398220">
+                <div class="form-hint">Sin puntos ni guión</div>
+            </div>
+        </div>
+        <div style="padding:0 24px 20px;display:flex;gap:10px;align-items:center">
+            <button class="btn-buscar" id="btn-buscar" onclick="buscar()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <span id="btn-buscar-txt">Consultar</span>
+            </button>
+            <button onclick="limpiar()" style="padding:10px 16px;border-radius:9px;background:transparent;border:1px solid var(--gris-2);color:var(--txt-mid);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:500;transition:all 0.2s;height:42px"
+                onmouseover="this.style.borderColor='var(--gris-3)'"
+                onmouseout="this.style.borderColor='var(--gris-2)'">
+                Limpiar
+            </button>
+        </div>
+    </div>
+ 
+    <!-- Resultados -->
+    <div id="resultados-section">
+ 
+        <div class="estado" id="estado-inicial">
+            <div class="estado-icon">🔍</div>
+            <div class="estado-titulo">Ingresa los filtros para consultar</div>
+            <div class="estado-sub">Selecciona empresa, año y mes para comenzar.<br>Voucher y RUT son opcionales para afinar la búsqueda.</div>
+        </div>
+ 
+        <div style="display:none" id="resultados-contenido">
+            <div class="resultados-header">
+                <div class="resultados-info">
+                    <div class="resultados-titulo">Resultados</div>
+                    <div class="resultados-badge" id="resultados-badge">—</div>
+                </div>
+                <button class="btn-excel" id="btn-excel" onclick="exportarExcel()" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                        <line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="12" y2="18"/><line x1="15" y1="15" x2="12" y2="18"/>
+                    </svg>
+                    Exportar Excel
+                </button>
+            </div>
+ 
+            <div class="tabla-wrap">
+                <div class="tabla-scroll">
+                    <table id="tabla-resultados">
+                        <thead>
+                            <tr>
+                                <th>Cuenta</th>
+                                <th>Año</th>
+                                <th>Mes</th>
+                                <th>Voucher</th>
+                                <th>Fecha</th>
+                                <th>RUT Auxiliar</th>
+                                <th class="num">Debe</th>
+                                <th class="num">Haber</th>
+                                <th>Glosa</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-body"></tbody>
+                        <tfoot id="tabla-foot"></tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+ 
+        <div style="display:none" id="estado-vacio" class="estado">
+            <div class="estado-icon">📭</div>
+            <div class="estado-titulo">Sin resultados</div>
+            <div class="estado-sub">No se encontraron movimientos con los filtros seleccionados.<br>Intenta con otros parámetros.</div>
+        </div>
+ 
+    </div>
+ 
+</div>
+ 
+<script>
+const API = 'https://api.ibaker.cl';
+ 
+// ── MSAL ──────────────────────────────────────────────────────
+const msalConfig = {
+    auth: {
+        clientId:    "d9664e06-7fd2-401d-b27b-97116fed7d9f",
+        authority:   "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
+        redirectUri: window.location.origin,
+    },
+    cache: { cacheLocation: "sessionStorage" }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+let usuarioActual = null;
+ 
+async function initAuth() {
+    try {
+        await msalInstance.initialize();
+        const accounts = msalInstance.getAllAccounts();
+        if (accounts.length > 0) {
+            usuarioActual = accounts[0];
+            renderUserChip();
+        } else {
+            window.location.href = 'index.html';
+        }
+    } catch(e) {
+        window.location.href = 'index.html';
+    }
+}
+ 
+function renderUserChip() {
+    if (!usuarioActual) return;
+    const nombre = usuarioActual.name || usuarioActual.username;
+    const iniciales = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+    document.getElementById('auth-area').innerHTML = `
+        <div class="user-chip">
+            <div class="user-av">${iniciales}</div>
+            <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
+        </div>`;
+}
+ 
+// ── Reloj ──────────────────────────────────────────────────────
+function tickClock() {
+    document.getElementById('nav-clock').innerText =
+        new Date().toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' });
+}
+setInterval(tickClock, 1000); tickClock();
+ 
+// ── Datos actuales ─────────────────────────────────────────────
+let datosActuales = [];
+let consultaActual = {};
+ 
+// ── Buscar ─────────────────────────────────────────────────────
+async function buscar() {
+    const empresa = document.getElementById('f-empresa').value.trim();
+    const ano     = document.getElementById('f-ano').value.trim();
+    const mes     = document.getElementById('f-mes').value.trim();
+    const voucher = document.getElementById('f-voucher').value.trim();
+    const rut     = document.getElementById('f-rut').value.trim();
+ 
+    ocultarError();
+ 
+    if (!empresa) { mostrarError('Selecciona una empresa.'); return; }
+    if (!ano)     { mostrarError('Ingresa el año.'); return; }
+    if (!mes)     { mostrarError('Selecciona el mes.'); return; }
+ 
+    // Estado cargando
+    const btn = document.getElementById('btn-buscar');
+    btn.disabled = true;
+    document.getElementById('btn-buscar-txt').innerText = 'Consultando…';
+    btn.querySelector('svg').style.display = 'none';
+    const spinner = document.createElement('div');
+    spinner.className = 'spinner';
+    btn.insertBefore(spinner, btn.querySelector('#btn-buscar-txt'));
+ 
+    document.getElementById('estado-inicial').style.display    = 'none';
+    document.getElementById('resultados-contenido').style.display = 'none';
+    document.getElementById('estado-vacio').style.display      = 'none';
+ 
+    try {
+        const res = await fetch(`${API}/asientos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ empresa, ano, mes, voucher, rut })
+        });
+        const data = await res.json();
+ 
+        if (!res.ok) {
+            mostrarError(data.error || 'Error al consultar la base de datos.');
+            document.getElementById('estado-inicial').style.display = 'block';
+            return;
+        }
+ 
+        datosActuales = data.datos || [];
+        consultaActual = { empresa, ano, mes, voucher, rut };
+        renderTabla(datosActuales, data);
+ 
+    } catch(err) {
+        mostrarError('No se pudo conectar con la API. Verifica que el servidor esté encendido.');
+        document.getElementById('estado-inicial').style.display = 'block';
+    } finally {
+        btn.disabled = false;
+        document.getElementById('btn-buscar-txt').innerText = 'Consultar';
+        btn.querySelector('svg').style.display = '';
+        if (spinner.parentNode) spinner.parentNode.removeChild(spinner);
+    }
+}
+ 
+function renderTabla(datos, meta) {
+    if (datos.length === 0) {
+        document.getElementById('estado-vacio').style.display = 'block';
+        return;
+    }
+ 
+    // Badge
+    const badge = document.getElementById('resultados-badge');
+    badge.className = 'resultados-badge badge-ok';
+    badge.innerText = `${datos.length} registro${datos.length !== 1 ? 's' : ''}`;
+ 
+    // Tbody
+    const tbody = document.getElementById('tabla-body');
+    tbody.innerHTML = datos.map(r => {
+        const fecha = r['Fecha Asiento']
+            ? new Date(r['Fecha Asiento']).toLocaleDateString('es-CL')
+            : '—';
+        return `<tr>
+            <td class="cuenta">${r['Cuenta Contable'] || '—'}</td>
+            <td>${r['Año'] || '—'}</td>
+            <td>${String(r['Mes'] || '').padStart(2,'0')}</td>
+            <td class="voucher">${r['Voucher'] || '—'}</td>
+            <td>${fecha}</td>
+            <td class="rut">${r['RUT Auxiliar'] || '—'}</td>
+            <td class="num">${formatNum(r['Debe'])}</td>
+            <td class="num">${formatNum(r['Haber'])}</td>
+            <td class="glosa">${r['Glosa Asiento'] || '—'}</td>
+        </tr>`;
+    }).join('');
+ 
+    // Totales
+    const totalDebe   = datos.reduce((s,r) => s + (r['Debe']   || 0), 0);
+    const totalHaber  = datos.reduce((s,r) => s + (r['Haber']  || 0), 0);
+    document.getElementById('tabla-foot').innerHTML = `
+        <tr>
+            <td colspan="6" style="color:var(--txt-mid);font-size:0.78rem">
+                Total · ${meta.empresa} · ${meta.base_datos}
+            </td>
+            <td class="num">${formatNum(totalDebe)}</td>
+            <td class="num">${formatNum(totalHaber)}</td>
+            <td></td>
+        </tr>`;
+ 
+    document.getElementById('resultados-contenido').style.display = 'block';
+    document.getElementById('btn-excel').disabled = false;
+}
+ 
+function formatNum(n) {
+    if (n === null || n === undefined || n === 0) return '—';
+    return new Intl.NumberFormat('es-CL', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(n);
+}
+ 
+// ── Exportar Excel ─────────────────────────────────────────────
+function exportarExcel() {
+    if (!datosActuales.length) return;
+ 
+    const filas = datosActuales.map(r => ({
+        'Cuenta Contable': r['Cuenta Contable'],
+        'Año':             r['Año'],
+        'Mes':             r['Mes'],
+        'Voucher':         r['Voucher'],
+        'Fecha Asiento':   r['Fecha Asiento']
+            ? new Date(r['Fecha Asiento']).toLocaleDateString('es-CL') : '',
+        'RUT Auxiliar':    r['RUT Auxiliar'],
+        'Debe':            r['Debe'] || 0,
+        'Haber':           r['Haber'] || 0,
+        'Glosa Asiento':   r['Glosa Asiento'],
+    }));
+ 
+    const ws   = XLSX.utils.json_to_sheet(filas);
+    const wb   = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Asientos');
+ 
+    // Ancho de columnas
+    ws['!cols'] = [
+        {wch:14},{wch:6},{wch:5},{wch:12},{wch:14},
+        {wch:14},{wch:14},{wch:14},{wch:40}
+    ];
+ 
+    const empresa = consultaActual.empresa.replace(/ /g,'_');
+    const nombre  = `Softland_${empresa}_${consultaActual.ano}_${String(consultaActual.mes).padStart(2,'0')}.xlsx`;
+    XLSX.writeFile(wb, nombre);
+}
+ 
+// ── Helpers ────────────────────────────────────────────────────
+function limpiar() {
+    document.getElementById('f-empresa').value = '';
+    document.getElementById('f-ano').value     = '';
+    document.getElementById('f-mes').value     = '';
+    document.getElementById('f-voucher').value = '';
+    document.getElementById('f-rut').value     = '';
+    datosActuales = [];
+    ocultarError();
+    document.getElementById('resultados-contenido').style.display = 'none';
+    document.getElementById('estado-vacio').style.display         = 'none';
+    document.getElementById('estado-inicial').style.display       = 'block';
+    document.getElementById('btn-excel').disabled = true;
+    document.getElementById('resultados-badge').innerText         = '—';
+}
+ 
+function mostrarError(msg) {
+    const box = document.getElementById('error-box');
+    document.getElementById('error-txt').innerText = msg;
+    box.style.display = 'flex';
+}
+function ocultarError() {
+    document.getElementById('error-box').style.display = 'none';
+}
+ 
+// Buscar con Enter
+document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') buscar();
+});
+ 
+// Init
+initAuth();
+</script>
+</body>
+</html>
