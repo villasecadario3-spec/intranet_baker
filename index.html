@@ -809,10 +809,6 @@ function tickClock() {
     const n = new Date();
     document.getElementById('nav-clock').innerText =
         n.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' });
-    document.getElementById('stat-fecha').innerText =
-        n.toLocaleDateString('es-CL', { day:'numeric', month:'short' }).toUpperCase();
-    document.getElementById('stat-dia').innerText =
-        n.toLocaleDateString('es-CL', { weekday:'long' });
 }
 setInterval(tickClock, 1000);
 tickClock();
