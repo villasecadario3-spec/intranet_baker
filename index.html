@@ -538,7 +538,7 @@
             </svg>
             Ingresar con Microsoft
         </button>
-        <div class="login-restriccion">Solo cuentas @ibaker.cl</div>
+        <div class="login-restriccion">Ingresar solo correos corporativos Baker, CMC y Brotar</div>
     </div>
 </div>
  
@@ -734,7 +734,7 @@ const msalConfig = {
 };
 const msalInstance = new msal.PublicClientApplication(msalConfig);
 const SCOPES   = ["User.Read"];
-const DOMINIOS = ['@ibaker.cl'];
+const DOMINIOS = ['@ibaker.cl', '@cmcromeral.cl', '@epbrotar.cl'];
 let usuarioActual = null;
  
 async function loginMicrosoft() {
@@ -744,7 +744,7 @@ async function loginMicrosoft() {
         const email  = result.account.username || '';
         if (!DOMINIOS.some(d => email.endsWith(d))) {
             await msalInstance.logoutPopup({ account: result.account });
-            alert('Acceso restringido. Solo cuentas @ibaker.cl.');
+            alert('Acceso restringido. Ingresar solo correos corporativos Baker, CMC y Brotar.');
             return;
         }
         usuarioActual = result.account;
