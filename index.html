@@ -29,7 +29,7 @@
             --txt-mid:     #6B6762;
             --txt-dim:     #A09C97;
         }
- 
+
         *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
         html { scroll-behavior: smooth; }
         body {
@@ -39,7 +39,7 @@
             min-height: 100vh;
             overflow-x: hidden;
         }
- 
+
         /* ── LOADING ─────────────────────────────────────── */
         .loading {
             position: fixed; inset: 0; z-index: 9999;
@@ -67,7 +67,7 @@
             letter-spacing: 0.2em; text-transform: uppercase;
             font-family: 'DM Mono', monospace;
         }
- 
+
         /* ── LOGIN BLOCKER ───────────────────────────────── */
         .login-blocker {
             position: fixed; inset: 0; z-index: 500;
@@ -122,7 +122,7 @@
         .login-restriccion::before, .login-restriccion::after {
             content: ''; flex: 1; height: 1px; background: #2a2826;
         }
- 
+
         /* ── NAV ─────────────────────────────────────────── */
         nav {
             position: sticky; top: 0; z-index: 200;
@@ -198,7 +198,7 @@
             cursor:pointer; font-size:0.7rem; padding:0; transition:color 0.15s;
         }
         .btn-out:hover { color: var(--rojo); }
- 
+
         /* ── HERO OSCURO ─────────────────────────────────── */
         .hero {
             background: var(--negro);
@@ -216,7 +216,7 @@
             opacity: 0.18;
             display: block;
         }
- 
+
         /* Grid de fondo decorativo */
         .hero::before {
             content: '';
@@ -235,7 +235,7 @@
                 rgba(192,57,43,0.12) 0%,
                 transparent 70%);
         }
- 
+
         .hero-inner {
             position: relative; z-index: 2;
             display: grid;
@@ -280,7 +280,7 @@
             font-size: 0.85rem; color: var(--txt-dark-mid);
         }
         .hero-hola strong { color: white; }
- 
+
         
         .hstat {
             background: var(--negro-3);
@@ -310,13 +310,13 @@
             text-transform: uppercase; letter-spacing: 0.1em;
             margin-top: 3px;
         }
- 
+
         /* ── CONTENIDO CLARO ─────────────────────────────── */
         .main {
             background: var(--crema);
             padding: 52px 48px 80px;
         }
- 
+
         /* Título de sección */
         .sec-header {
             display: flex; align-items: center; gap: 16px;
@@ -334,7 +334,7 @@
             text-transform: uppercase; letter-spacing: 0.1em;
             white-space: nowrap;
         }
- 
+
         /* ── MÓDULOS ─────────────────────────────────────── */
         .modulos { margin-bottom: 52px; }
         .modulos-grid {
@@ -342,7 +342,7 @@
             grid-template-columns: repeat(4, 1fr);
             gap: 14px;
         }
- 
+
         .mod-card {
             background: var(--blanco);
             border: 1px solid var(--gris-2);
@@ -375,7 +375,7 @@
         .mod-icon svg { width: 18px; height: 18px; }
         .mod-icon.on svg  { color: white; }
         .mod-icon.off svg { color: var(--gris-3); }
- 
+
         .mod-nombre {
             font-family: 'Playfair Display', serif;
             font-size: 0.95rem; font-weight: 700;
@@ -398,14 +398,14 @@
         .status-off { background: var(--gris-1); color: var(--txt-dim); border: 1px solid var(--gris-2); }
         .mod-arrow { color: var(--gris-2); transition: all 0.2s; }
         .mod-card:not(.disabled):hover .mod-arrow { color: var(--rojo); transform: translateX(3px); }
- 
+
         /* ── NOTICIAS ────────────────────────────────────── */
         .noticias-grid {
             display: grid;
             grid-template-columns: 1.6fr 1fr 1fr;
             gap: 14px;
         }
- 
+
         .not-card {
             background: var(--blanco);
             border: 1px solid var(--gris-2);
@@ -417,7 +417,7 @@
             box-shadow: 0 12px 40px rgba(26,23,20,0.1);
             transform: translateY(-2px);
         }
- 
+
         .not-visual {
             height: 140px;
             background: var(--negro);
@@ -425,7 +425,7 @@
             display: flex; align-items: center; justify-content: center;
         }
         .not-card.principal .not-visual { height: 180px; }
- 
+
         /* Patron de fondo para noticias */
         .not-visual::before {
             content: '';
@@ -456,7 +456,7 @@
             background: radial-gradient(ellipse 80% 80% at 50% 50%,
                 rgba(192,57,43,0.12) 0%, transparent 70%);
         }
- 
+
         .not-body { padding: 18px 20px 20px; }
         .not-fecha {
             font-family: 'DM Mono', monospace;
@@ -474,7 +474,7 @@
             font-size: 0.78rem; color: var(--txt-mid);
             line-height: 1.6;
         }
- 
+
         /* ── FOOTER ──────────────────────────────────────── */
         footer {
             background: var(--negro);
@@ -489,7 +489,7 @@
             font-family: 'DM Mono', monospace;
             font-size: 0.65rem; color: #3a3836;
         }
- 
+
         /* ── RESPONSIVE ──────────────────────────────────── */
         @media (max-width: 1024px) {
             .modulos-grid { grid-template-columns: repeat(2, 1fr); }
@@ -512,7 +512,7 @@
     <link rel="preload" as="image" href="vista-panoramica.jpg">
 </head>
 <body>
- 
+
 <!-- LOADING -->
 <div class="loading" id="loading">
     <img src="LOGO_BAKER.png" alt="Baker Inmobiliaria"
@@ -521,7 +521,7 @@
     <div class="loading-bar"><div class="loading-bar-fill"></div></div>
     <div class="loading-label">Cargando portal</div>
 </div>
- 
+
 <!-- LOGIN BLOCKER -->
 <div class="login-blocker" id="login-blocker">
     <div class="login-box">
@@ -542,7 +542,7 @@
         <div class="login-restriccion">Ingresar solo correos corporativos Baker, CMC y Brotar</div>
     </div>
 </div>
- 
+
 <!-- NAV -->
 <nav>
     <a class="nav-wordmark" href="#">
@@ -566,7 +566,7 @@
         </button>
     </div>
 </nav>
- 
+
 <!-- HERO OSCURO -->
 <section class="hero">
     <div class="hero-bg-img"><img src="vista-panoramica.jpg" alt="" fetchpriority="high"></div>
@@ -582,10 +582,10 @@
         </div>
     </div>
 </section>
- 
+
 <!-- MAIN CLARO -->
 <div class="main">
- 
+
     <!-- Módulos -->
     <div class="modulos">
         <div class="sec-header">
@@ -594,7 +594,7 @@
             <div class="sec-label">4 activos · 2 próximamente</div>
         </div>
         <div class="modulos-grid">
- 
+
             <a class="mod-card" href="softland.html">
                 <div class="mod-numero">01</div>
                 <div class="mod-icon on">
@@ -613,7 +613,7 @@
                     </div>
                 </div>
             </a>
- 
+
             <a class="mod-card" href="salas.html">
                 <div class="mod-numero">02</div>
                 <div class="mod-icon on">
@@ -632,7 +632,7 @@
                     </div>
                 </div>
             </a>
- 
+
             <a class="mod-card" href="impresoras.html">
                 <div class="mod-numero">03</div>
                 <div class="mod-icon on">
@@ -651,7 +651,7 @@
                     </div>
                 </div>
             </a>
- 
+
             <a class="mod-card" href="solicitud-ti.html">
                 <div class="mod-numero">04</div>
                 <div class="mod-icon on">
@@ -670,7 +670,7 @@
                     </div>
                 </div>
             </a>
- 
+
             <div class="mod-card disabled">
                 <div class="mod-numero">05</div>
                 <div class="mod-icon off">
@@ -686,7 +686,7 @@
                     <div class="mod-status status-off">Próximamente</div>
                 </div>
             </div>
- 
+
             <div class="mod-card disabled">
                 <div class="mod-numero">06</div>
                 <div class="mod-icon off">
@@ -702,10 +702,10 @@
                     <div class="mod-status status-off">Próximamente</div>
                 </div>
             </div>
- 
+
         </div>
     </div>
- 
+
     <!-- Noticias -->
     <div>
         <div class="sec-header">
@@ -714,7 +714,7 @@
             <div class="sec-label">Junio 2026</div>
         </div>
         <div class="noticias-grid">
- 
+
             <div class="not-card principal">
                 <div class="not-visual">
                     <div class="not-visual-emoji">🏢</div>
@@ -726,7 +726,7 @@
                     <div class="not-extracto">El grupo Baker cuenta ahora con un portal interno centralizado para acceder a herramientas, sistemas y comunicaciones internas desde cualquier dispositivo con correo corporativo.</div>
                 </div>
             </div>
- 
+
             <div class="not-card">
                 <div class="not-visual">
                     <div class="not-visual-emoji">📊</div>
@@ -738,7 +738,7 @@
                     <div class="not-extracto">Ya puedes buscar asientos contables y exportar a Excel sin necesitar ayuda de TI.</div>
                 </div>
             </div>
- 
+
             <div class="not-card">
                 <div class="not-visual">
                     <div class="not-visual-emoji">🖨️</div>
@@ -750,18 +750,18 @@
                     <div class="not-extracto">Descarga el driver de la RICOH IM 430 directamente desde el portal sin contactar soporte.</div>
                 </div>
             </div>
- 
+
         </div>
     </div>
- 
+
 </div>
- 
+
 <!-- FOOTER -->
 <footer>
     <div class="footer-l">Inmobiliaria Baker SPA &mdash; Portal Interno</div>
     <div class="footer-r">v1.0.0 · 2026</div>
 </footer>
- 
+
 <script>
 const msalConfig = {
     auth: {
@@ -775,7 +775,7 @@ const msalInstance = new msal.PublicClientApplication(msalConfig);
 const SCOPES   = ["User.Read"];
 const DOMINIOS = ['@ibaker.cl', '@cmcromeral.cl', '@epbrotar.cl'];
 let usuarioActual = null;
- 
+
 async function loginMicrosoft() {
     try {
         await msalInstance.initialize();
@@ -790,24 +790,24 @@ async function loginMicrosoft() {
         actualizarUI();
     } catch(e) { console.error('Login cancelado', e); }
 }
- 
+
 function logout() {
     msalInstance.logoutPopup();
     usuarioActual = null;
     actualizarUI();
 }
- 
+
 function actualizarUI() {
     const blocker = document.getElementById('login-blocker');
     const area    = document.getElementById('auth-area');
     const bienvenida = document.getElementById('hero-bienvenida');
- 
+
     if (usuarioActual) {
         blocker.classList.remove('visible');
         const nombre   = usuarioActual.name || usuarioActual.username;
         const iniciales = nombre.split(' ').map(p => p[0]).join('').slice(0,2).toUpperCase();
         const primerNombre = nombre.split(' ')[0];
- 
+
         // Nav chip
         area.innerHTML = `
             <div class="user-chip">
@@ -815,7 +815,7 @@ function actualizarUI() {
                 <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
                 <button class="btn-out" onclick="logout()">✕</button>
             </div>`;
- 
+
         // Hero bienvenida
         document.getElementById('hero-av').innerText = iniciales;
         document.getElementById('hero-nombre').innerText = primerNombre;
@@ -835,7 +835,7 @@ function actualizarUI() {
             </button>`;
     }
 }
- 
+
 async function intentarLoginSilencioso() {
     try {
         await msalInstance.initialize();
@@ -843,7 +843,7 @@ async function intentarLoginSilencioso() {
         if (accounts.length > 0) usuarioActual = accounts[0];
     } catch(e) {}
 }
- 
+
 function tickClock() {
     const n = new Date();
     document.getElementById('nav-clock').innerText =
@@ -851,7 +851,7 @@ function tickClock() {
 }
 setInterval(tickClock, 1000);
 tickClock();
- 
+
 // ── Toast acceso denegado ─────────────────────────────────────
 function checkAccesoDenegado() {
     const params = new URLSearchParams(window.location.search);
@@ -871,7 +871,7 @@ function checkAccesoDenegado() {
     window.history.replaceState({}, '', window.location.pathname);
     setTimeout(() => toast.remove(), 5000);
 }
- 
+
 async function init() {
     await intentarLoginSilencioso();
     actualizarUI();
