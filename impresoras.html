@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Impresoras — Inmobiliaria Baker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --rojo:#C0392B;--rojo-dark:#96281B;--rojo-light:rgba(192,57,43,0.08);
+            --verde:#27ae60;--negro:#111010;--negro-2:#1A1918;--negro-3:#242220;
+            --borde-dark:#2E2C2A;--blanco:#FFFFFF;--crema:#F8F6F3;
+            --gris-1:#F0EDE9;--gris-2:#E2DED9;--gris-3:#B5B0AA;
+            --txt:#1C1A18;--txt-mid:#6B6762;--txt-dim:#A09C97;
+        }
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+        html{scroll-behavior:smooth}
+        body{font-family:'DM Sans',sans-serif;background:var(--crema);color:var(--txt);min-height:100vh}
+ 
+        nav{position:sticky;top:0;z-index:100;background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px solid var(--borde-dark);height:60px;display:flex;align-items:center;padding:0 48px;gap:16px}
+        .nav-logo{text-decoration:none;flex-shrink:0}
+        .nav-logo img{height:26px;width:auto;display:block;background:white;border-radius:6px;padding:4px 10px}
+        .nav-sep{width:1px;height:18px;background:var(--borde-dark)}
+        .nav-back{display:flex;align-items:center;gap:6px;color:var(--gris-3);text-decoration:none;font-size:0.78rem;font-weight:500;transition:color 0.2s}
+        .nav-back:hover{color:white}
+        .nav-back svg{width:14px;height:14px}
+        .nav-title{font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--gris-3);letter-spacing:0.1em;text-transform:uppercase}
+        .nav-spacer{flex:1}
+ 
+        .page-header{background:var(--negro);padding:40px 48px 36px;border-bottom:1px solid var(--borde-dark);position:relative;overflow:hidden}
+        .page-header::before{content:'';position:absolute;inset:0;background-image:linear-gradient(var(--borde-dark) 1px,transparent 1px),linear-gradient(90deg,var(--borde-dark) 1px,transparent 1px);background-size:40px 40px;opacity:0.3}
+        .page-header::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 50% 100% at 0% 50%,rgba(192,57,43,0.1) 0%,transparent 70%)}
+        .page-header-inner{position:relative;z-index:2}
+        .page-eyebrow{font-size:0.65rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--rojo);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+        .page-eyebrow::before{content:'';width:16px;height:1px;background:var(--rojo)}
+        .page-header h1{font-family:'Playfair Display',serif;font-size:2rem;font-weight:900;color:white;letter-spacing:-0.02em;line-height:1.1}
+        .page-header h1 em{font-style:italic;color:var(--rojo)}
+        .page-header-sub{font-size:0.82rem;color:#6b6762;margin-top:8px;line-height:1.6}
+ 
+        .main{padding:36px 48px 80px;max-width:1000px}
+ 
+        /* GRID de 2 columnas */
+        .printers-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+ 
+        .printer-card{background:white;border:1px solid var(--gris-2);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+ 
+        .card-header{padding:22px 24px 18px;border-bottom:1px solid var(--gris-2);display:flex;align-items:flex-start;gap:14px}
+        .card-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0}
+        .card-icon.bn{background:rgba(255,255,255,0.06);border:1px solid var(--gris-2)}
+        .card-icon.clr{background:rgba(192,57,43,0.08);border:1px solid rgba(192,57,43,0.15)}
+        .card-meta{flex:1}
+        .card-nombre{font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;color:var(--txt);margin-bottom:3px}
+        .card-modelo{font-size:0.72rem;color:var(--txt-dim);letter-spacing:0.06em;text-transform:uppercase}
+        .card-badge{padding:3px 10px;border-radius:100px;font-size:0.65rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;flex-shrink:0;margin-top:2px}
+        .badge-bn{background:var(--gris-1);color:var(--txt-mid);border:1px solid var(--gris-2)}
+        .badge-color{background:rgba(192,57,43,0.08);color:var(--rojo);border:1px solid rgba(192,57,43,0.2)}
+ 
+        .card-specs{padding:16px 24px;border-bottom:1px solid var(--gris-2);display:flex;flex-direction:column;gap:9px}
+        .spec-row{display:flex;align-items:center;justify-content:space-between;font-size:0.8rem}
+        .spec-label{color:var(--txt-dim)}
+        .spec-val{font-weight:500;color:var(--txt-mid)}
+        .spec-val.ok{color:var(--verde)}
+        .spec-val.warn{color:#e6a817}
+ 
+        /* Pasos */
+        .card-steps{padding:18px 24px;border-bottom:1px solid var(--gris-2);flex:1}
+        .steps-titulo{font-family:'DM Mono',monospace;font-size:0.65rem;font-weight:500;letter-spacing:0.15em;text-transform:uppercase;color:var(--txt-dim);margin-bottom:14px}
+        .steps{display:flex;flex-direction:column}
+        .step{display:flex;gap:0;align-items:stretch}
+        .step-left{display:flex;flex-direction:column;align-items:center;width:28px;flex-shrink:0}
+        .step-n{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;flex-shrink:0}
+        .step-n.dl{background:rgba(192,57,43,0.1);border:1px solid rgba(192,57,43,0.25);color:var(--rojo)}
+        .step-n.act{background:var(--gris-1);border:1px solid var(--gris-2);color:var(--txt-mid)}
+        .step-n.ok{background:rgba(39,174,96,0.1);border:1px solid rgba(39,174,96,0.25);color:var(--verde)}
+        .step-n.warn{background:rgba(230,168,23,0.1);border:1px solid rgba(230,168,23,0.25);color:#b8860b}
+        .step-line{width:1px;background:var(--gris-2);flex:1;margin:3px 0}
+        .step-body{padding:0 0 16px 12px;flex:1}
+        .step:last-child .step-body{padding-bottom:0}
+        .step:last-child .step-line{display:none}
+        .step-title{font-size:0.84rem;font-weight:600;color:var(--txt);margin-bottom:3px}
+        .step-desc{font-size:0.78rem;color:var(--txt-mid);line-height:1.55}
+        .step-desc code{font-family:'DM Mono',monospace;background:var(--gris-1);border:1px solid var(--gris-2);border-radius:4px;padding:1px 5px;font-size:0.76rem;color:var(--txt)}
+        .step-tip{margin-top:8px;background:rgba(230,168,23,0.07);border:1px solid rgba(230,168,23,0.2);border-radius:7px;padding:8px 11px;font-size:0.75rem;color:#8a6400;line-height:1.5}
+        .step-tip strong{color:#b8860b}
+ 
+        .card-footer{padding:18px 24px}
+        .btn-descargar{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;padding:11px;background:var(--rojo);border:none;border-radius:9px;color:white;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.88rem;font-weight:600;transition:background 0.2s,transform 0.1s;text-decoration:none}
+        .btn-descargar:hover{background:var(--rojo-dark)}
+        .btn-descargar:active{transform:scale(0.98)}
+        .btn-descargar svg{width:16px;height:16px;flex-shrink:0}
+        .btn-size{margin-top:8px;font-size:0.72rem;color:var(--txt-dim);text-align:center}
+ 
+        @media(max-width:768px){
+            nav{padding:0 16px}.nav-title{display:none}
+            .page-header{padding:28px 16px 24px}
+            .main{padding:24px 16px 60px}
+            .printers-grid{grid-template-columns:1fr}
+        }
+    </style>
+</head>
+<body>
+ 
+<nav>
+    <a class="nav-logo" href="index.html">
+        <img src="LOGO_BAKER.png" alt="Baker" onerror="this.outerHTML='<span style=&quot;font-family:serif;font-weight:900;color:white;font-size:1rem&quot;>BAKER</span>'">
+    </a>
+    <div class="nav-sep"></div>
+    <a class="nav-back" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        Inicio
+    </a>
+    <div class="nav-sep"></div>
+    <div class="nav-title">Impresoras</div>
+    <div class="nav-spacer"></div>
+</nav>
+ 
+<div class="page-header">
+    <div class="page-header-inner">
+        <div class="page-eyebrow">Soporte TI</div>
+        <h1>Instala tu<br><em>Impresora</em></h1>
+        <div class="page-header-sub">Descarga el instalador de tu impresora y sigue los pasos. Sin necesidad de contactar a TI.</div>
+    </div>
+</div>
+ 
+<div class="main">
+    <div class="printers-grid">
+ 
+        <!-- RICOH IM 430 -->
+        <div class="printer-card">
+            <div class="card-header">
+                <div class="card-icon bn">&#128424;</div>
+                <div class="card-meta">
+                    <div class="card-nombre">RICOH IM 430</div>
+                    <div class="card-modelo">Impresora principal &middot; Blanco y negro</div>
+                </div>
+                <div class="card-badge badge-bn">B&amp;N</div>
+            </div>
+            <div class="card-specs">
+                <div class="spec-row"><span class="spec-label">Ubicacion</span><span class="spec-val">Sala principal</span></div>
+                <div class="spec-row"><span class="spec-label">Conexion</span><span class="spec-val ok">Red local &middot; IP fija</span></div>
+                <div class="spec-row"><span class="spec-label">Formatos</span><span class="spec-val">Carta &middot; Oficio &middot; SERVIU</span></div>
+                <div class="spec-row"><span class="spec-label">Doble cara</span><span class="spec-val ok">Si (automatico)</span></div>
+            </div>
+            <div class="card-steps">
+                <div class="steps-titulo">Pasos para instalar</div>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-left"><div class="step-n dl">1</div><div class="step-line"></div></div>
+                        <div class="step-body">
+                            <div class="step-title">Descarga el instalador</div>
+                            <div class="step-desc">Haz clic en el boton rojo de abajo. Se descargara un archivo <code>.exe</code> en tu carpeta de Descargas.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-left"><div class="step-n act">2</div><div class="step-line"></div></div>
+                        <div class="step-body">
+                            <div class="step-title">Ejecuta el instalador</div>
+                            <div class="step-desc"><strong style="color:var(--txt)">Doble clic</strong> sobre el archivo descargado. Si Windows pregunta, haz clic en <code>Si</code> o <code>Ejecutar de todas formas</code>.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-left"><div class="step-n act">3</div><div class="step-line"></div></div>
+                        <div class="step-body">
+                            <div class="step-title">Siguiente &rarr; Siguiente &rarr; Instalar</div>
+                            <div class="step-desc">Acepta las condiciones y haz clic en <code>Siguiente</code> en cada pantalla hasta llegar al boton <code>Instalar</code>.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-left"><div class="step-n ok">4</div></div>
+                        <div class="step-body">
+                            <div class="step-title">Finalizar</div>
+                            <div class="step-desc">Haz clic en <code>Finalizar</code>. La impresora quedara lista automaticamente.</div>
+                            <div class="step-tip"><strong>Si aparece aviso de reinicio</strong>, elige <strong>Reiniciar mas tarde</strong> para no interrumpir tu trabajo.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <a class="btn-descargar" href="https://ibaker-my.sharepoint.com/:u:/g/personal/dvillaseca_ibaker_cl/IQD8Ni8lPABQTLCq1Epl8RGAAZqpWxF-WESAEn6VWivI4sI?e=cCukqA&download=1" target="_blank" rel="noopener">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Descargar instalador RICOH
+                </a>
+                <div class="btn-size">Driver_Ricoh.exe &mdash; 56 MB &mdash; Instalador oficial RICOH</div>
+            </div>
+        </div>
+ 
+        <!-- HP Smart Tank 530 -->
+        <div class="printer-card">
+            <div class="card-header">
+                <div class="card-icon clr">&#128424;</div>
+                <div class="card-meta">
+                    <div class="card-nombre">HP Smart Tank 530</div>
+                    <div class="card-modelo">Impresora secundaria &middot; Color</div>
+                </div>
+                <div class="card-badge badge-color">Color</div>
+            </div>
+            <div class="card-specs">
+                <div class="spec-row"><span class="spec-label">Ubicacion</span><span class="spec-val">Area administrativa</span></div>
+                <div class="spec-row"><span class="spec-label">Conexion</span><span class="spec-val warn">Red WiFi &middot; IP variable</span></div>
+                <div class="spec-row"><span class="spec-label">Formatos</span><span class="spec-val">Carta &middot; A4</span></div>
+                <div class="spec-row"><span class="spec-label">Doble cara</span><span class="spec-val">Manual</span></div>
+            </div>
+            <div class="card-steps">
+                <div class="steps-titulo">Pasos para instalar</div>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-left"><div class="step-n dl">1</div><div class="step-line"></div></div>
+                        <div class="step-body">
+                            <div class="step-title">Descarga HP Smart</div>
+                            <div class="step-desc">Haz clic en el boton rojo de abajo para descargar el instalador <code>HP Smart</code>.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-left"><div class="step-n act">2</div><div class="step-line"></div></div>
+                        <div class="step-body">
+                            <div class="step-title">Instala HP Smart</div>
+                            <div class="step-desc"><strong style="color:var(--txt)">Doble clic</strong> sobre el archivo descargado y sigue el asistente hasta completar la instalacion.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-left"><div class="step-n act">3</div><div class="step-line"></div></div>
+                        <div class="step-body">
+                            <div class="step-title">Abre HP Smart y agrega la impresora</div>
+                            <div class="step-desc">Abre la app <code>HP Smart</code> desde el menu inicio. Haz clic en el boton <code>+ Agregar impresora</code> o el icono <code>+</code>.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-left"><div class="step-n act">4</div><div class="step-line"></div></div>
+                        <div class="step-body">
+                            <div class="step-title">Selecciona la HP Smart Tank 530</div>
+                            <div class="step-desc">La app buscara impresoras en la red. Cuando aparezca <code>HP Smart Tank 530</code> en la lista, haz clic sobre ella para seleccionarla.</div>
+                            <div class="step-tip"><strong>Si no aparece:</strong> Verifica que la impresora este encendida y conectada al WiFi de la oficina.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-left"><div class="step-n ok">5</div></div>
+                        <div class="step-body">
+                            <div class="step-title">Listo</div>
+                            <div class="step-desc">Sigue las instrucciones en pantalla para completar la conexion. La impresora quedara disponible en Windows automaticamente.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <a class="btn-descargar" href="HP_Smart_Installer.exe" download="HP_Smart_Installer.exe">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Descargar HP Smart
+                </a>
+                <div class="btn-size">HP_Smart_Installer.exe &mdash; 1.3 MB</div>
+            </div>
+        </div>
+ 
+    </div>
+</div>
+ 
+</body>
+</html>
