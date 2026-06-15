@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solicitudes TI — Baker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+    <style>
+        :root {
+            --rojo:#C0392B;--rojo-dark:#96281B;--rojo-light:rgba(192,57,43,0.08);
+            --negro:#111010;--negro-3:#242220;--borde-dark:#2E2C2A;
+            --blanco:#FFFFFF;--crema:#F8F6F3;--gris-1:#F0EDE9;--gris-2:#E2DED9;--gris-3:#B5B0AA;
+            --txt:#1C1A18;--txt-mid:#6B6762;--txt-dim:#A09C97;
+            --verde:#27ae60;--verde-bg:rgba(39,174,96,0.08);
+        }
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+        html{scroll-behavior:smooth}
+        body{font-family:'DM Sans',sans-serif;background:var(--crema);color:var(--txt);min-height:100vh}
+ 
+        nav{position:sticky;top:0;z-index:100;background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px solid var(--borde-dark);height:60px;display:flex;align-items:center;padding:0 48px;gap:16px}
+        .nav-logo{text-decoration:none;flex-shrink:0}
+        .nav-logo img{height:26px;width:auto;display:block;background:white;border-radius:6px;padding:4px 10px}
+        .nav-sep{width:1px;height:18px;background:var(--borde-dark)}
+        .nav-back{display:flex;align-items:center;gap:6px;color:var(--gris-3);text-decoration:none;font-size:0.78rem;font-weight:500;transition:color 0.2s}
+        .nav-back:hover{color:white}
+        .nav-back svg{width:14px;height:14px}
+        .nav-title{font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--gris-3);letter-spacing:0.1em;text-transform:uppercase}
+        .nav-spacer{flex:1}
+        .user-chip{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;background:var(--negro-3);border:1px solid var(--borde-dark);border-radius:100px}
+        .user-av{width:26px;height:26px;border-radius:50%;background:var(--rojo);display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:0.72rem;font-weight:700;color:white}
+        .user-nm{font-size:0.78rem;font-weight:500;color:white;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ 
+        .page-header{background:var(--negro);padding:40px 48px 36px;border-bottom:1px solid var(--borde-dark);position:relative;overflow:hidden}
+        .page-header::before{content:'';position:absolute;inset:0;background-image:linear-gradient(var(--borde-dark) 1px,transparent 1px),linear-gradient(90deg,var(--borde-dark) 1px,transparent 1px);background-size:40px 40px;opacity:0.3}
+        .page-header::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 50% 100% at 0% 50%,rgba(192,57,43,0.1) 0%,transparent 70%)}
+        .page-header-inner{position:relative;z-index:2}
+        .page-eyebrow{font-size:0.65rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--rojo);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+        .page-eyebrow::before{content:'';width:16px;height:1px;background:var(--rojo)}
+        .page-header h1{font-family:'Playfair Display',serif;font-size:2rem;font-weight:900;color:white;letter-spacing:-0.02em;line-height:1.1}
+        .page-header h1 em{font-style:italic;color:var(--rojo)}
+        .page-header-sub{font-size:0.82rem;color:#6b6762;margin-top:8px;line-height:1.6}
+ 
+        .main{padding:40px 48px 80px;max-width:760px}
+ 
+        .form-card{background:white;border:1px solid var(--gris-2);border-radius:16px;overflow:hidden}
+        .form-card-header{padding:20px 28px;border-bottom:1px solid var(--gris-2);display:flex;align-items:center;gap:12px}
+        .form-card-icon{width:36px;height:36px;border-radius:8px;background:var(--negro);display:flex;align-items:center;justify-content:center}
+        .form-card-icon svg{width:16px;height:16px;color:white}
+        .form-card-title{font-family:'Playfair Display',serif;font-size:1rem;font-weight:700;color:var(--txt)}
+        .form-card-sub{font-size:0.78rem;color:var(--txt-dim);margin-top:2px}
+ 
+        .form-body{padding:28px}
+        .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+        .form-group{display:flex;flex-direction:column;gap:6px}
+        .form-group.full{grid-column:1/-1}
+        .form-label{font-size:0.7rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--txt-dim)}
+        .form-label span{color:var(--rojo);margin-left:2px}
+        .form-input,.form-select,.form-textarea{padding:10px 14px;border:1px solid var(--gris-2);border-radius:9px;background:var(--crema);color:var(--txt);font-family:'DM Sans',sans-serif;font-size:0.88rem;transition:border-color 0.2s,box-shadow 0.2s;width:100%}
+        .form-input:focus,.form-select:focus,.form-textarea:focus{outline:none;border-color:var(--rojo);box-shadow:0 0 0 3px rgba(192,57,43,0.08);background:white}
+        .form-input::placeholder,.form-textarea::placeholder{color:var(--txt-dim)}
+        .form-input:read-only{background:var(--gris-1);color:var(--txt-mid);cursor:default}
+        .form-input:read-only:focus{border-color:var(--gris-2);box-shadow:none}
+        .form-textarea{resize:vertical;min-height:100px;line-height:1.6}
+        .form-hint{font-size:0.68rem;color:var(--txt-dim);margin-top:2px}
+        .char-count{font-size:0.68rem;color:var(--txt-dim);text-align:right;margin-top:2px}
+ 
+        .form-footer{padding:0 28px 28px;display:flex;align-items:center;gap:14px}
+        .btn-enviar{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 28px;background:var(--rojo);border:none;border-radius:9px;color:white;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.9rem;font-weight:600;transition:background 0.2s,transform 0.1s}
+        .btn-enviar:hover{background:var(--rojo-dark)}
+        .btn-enviar:active{transform:scale(0.98)}
+        .btn-enviar:disabled{opacity:0.5;cursor:not-allowed}
+        .btn-enviar svg{width:16px;height:16px}
+        .btn-limpiar{padding:11px 20px;border-radius:9px;background:transparent;border:1px solid var(--gris-2);color:var(--txt-mid);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.88rem;font-weight:500;transition:all 0.2s}
+        .btn-limpiar:hover{border-color:var(--gris-3);color:var(--txt)}
+ 
+        /* Spinner */
+        .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.7s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+ 
+        /* Toast */
+        .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);padding:14px 20px;border-radius:10px;display:flex;align-items:center;gap:10px;font-size:0.84rem;font-weight:500;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,0.15);transition:opacity 0.3s;white-space:nowrap}
+        .toast.ok{background:#1a4a2a;border:1px solid rgba(39,174,96,0.3);color:#5dde90}
+        .toast.err{background:#2a1a18;border:1px solid rgba(192,57,43,0.3);color:#ff8070}
+        .toast svg{width:16px;height:16px;flex-shrink:0}
+ 
+        /* Ticket confirmación */
+        .ticket-box{display:none;background:var(--verde-bg);border:1px solid rgba(39,174,96,0.2);border-radius:12px;padding:20px 24px;margin-bottom:20px}
+        .ticket-box.visible{display:flex;align-items:center;gap:14px}
+        .ticket-icon{width:36px;height:36px;border-radius:50%;background:rgba(39,174,96,0.15);border:1px solid rgba(39,174,96,0.25);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .ticket-icon svg{width:16px;height:16px;color:var(--verde)}
+        .ticket-info{}
+        .ticket-titulo{font-size:0.88rem;font-weight:600;color:#1a5c32;margin-bottom:2px}
+        .ticket-sub{font-size:0.78rem;color:#2d7a46}
+ 
+        @media(max-width:768px){
+            nav{padding:0 16px}.nav-title{display:none}
+            .page-header{padding:28px 16px 24px}
+            .main{padding:24px 16px 60px}
+            .form-grid{grid-template-columns:1fr}
+            .form-group.full{grid-column:1}
+        }
+    </style>
+</head>
+<body>
+ 
+<nav>
+    <a class="nav-logo" href="index.html">
+        <img src="LOGO_BAKER.png" alt="Baker" onerror="this.outerHTML='<span style=&quot;font-family:serif;font-weight:900;color:white;font-size:1rem&quot;>BAKER</span>'">
+    </a>
+    <div class="nav-sep"></div>
+    <a class="nav-back" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        Inicio
+    </a>
+    <div class="nav-sep"></div>
+    <div class="nav-title">Solicitudes TI</div>
+    <div class="nav-spacer"></div>
+    <div id="auth-area"></div>
+</nav>
+ 
+<div class="page-header">
+    <div class="page-header-inner">
+        <div class="page-eyebrow">Soporte TI</div>
+        <h1>Solicitudes<br><em>TI</em></h1>
+        <div class="page-header-sub">Completa el formulario y tu solicitud llegará directamente al equipo de TI. Sin llamadas, sin WhatsApp.</div>
+    </div>
+</div>
+ 
+<div class="main">
+ 
+    <!-- Confirmación -->
+    <div class="ticket-box" id="ticket-box">
+        <div class="ticket-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div class="ticket-info">
+            <div class="ticket-titulo" id="ticket-titulo">Solicitud enviada correctamente</div>
+            <div class="ticket-sub" id="ticket-sub">Tu ticket ha sido creado en Monday. TI lo revisará a la brevedad.</div>
+        </div>
+    </div>
+ 
+    <div class="form-card">
+        <div class="form-card-header">
+            <div class="form-card-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+                </svg>
+            </div>
+            <div>
+                <div class="form-card-title">Nueva solicitud</div>
+                <div class="form-card-sub">Todos los campos marcados con * son obligatorios</div>
+            </div>
+        </div>
+ 
+        <div class="form-body">
+            <div class="form-grid">
+ 
+                <div class="form-group">
+                    <label class="form-label">E-mail <span>*</span></label>
+                    <input class="form-input" id="f-email" type="email" placeholder="tu@ibaker.cl" readonly>
+                    <div class="form-hint">Se completa automáticamente con tu sesión</div>
+                </div>
+ 
+                <div class="form-group">
+                    <label class="form-label">Prioridad <span>*</span></label>
+                    <select class="form-select" id="f-prioridad">
+                        <option value="">Seleccionar…</option>
+                        <option value="Alto">Alto</option>
+                        <option value="Medio">Medio</option>
+                        <option value="Bajo">Bajo</option>
+                    </select>
+                </div>
+ 
+                <div class="form-group">
+                    <label class="form-label">Área <span>*</span></label>
+                    <select class="form-select" id="f-area">
+                        <option value="">Seleccionar…</option>
+                        <option value="G. General">G. General</option>
+                        <option value="Adm y Finanzas">Adm y Finanzas</option>
+                        <option value="Personas">Personas</option>
+                        <option value="Comercial">Comercial</option>
+                        <option value="Proyectos DS19">Proyectos DS19</option>
+                        <option value="Proyectos DS49">Proyectos DS49</option>
+                        <option value="Control de Gestión y TI">Control de Gestión y TI</option>
+                        <option value="Obras">Obras</option>
+                    </select>
+                </div>
+ 
+                <div class="form-group">
+                    <label class="form-label">Tipo Requerimiento</label>
+                    <select class="form-select" id="f-tipo">
+                        <option value="">Seleccionar…</option>
+                        <option value="Soporte">Soporte</option>
+                        <option value="Habilitación Internet">Habilitación Internet</option>
+                        <option value="Asignación Teléfono">Asignación Teléfono</option>
+                        <option value="Asignación Computador">Asignación Computador</option>
+                        <option value="Asignación Impresora o Tóner">Asignación Impresora o Tóner</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                </div>
+ 
+                <div class="form-group full">
+                    <label class="form-label">Descripción <span>*</span></label>
+                    <textarea class="form-textarea" id="f-descripcion" placeholder="Describe detalladamente lo que necesitas o el problema que tienes…" maxlength="2000" oninput="actualizarContador()"></textarea>
+                    <div class="char-count" id="char-count">0 / 2000</div>
+                </div>
+ 
+            </div>
+        </div>
+ 
+        <div class="form-footer">
+            <button class="btn-enviar" id="btn-enviar" onclick="enviarSolicitud()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+                <span id="btn-txt">Enviar solicitud</span>
+            </button>
+            <button class="btn-limpiar" onclick="limpiar()">Limpiar</button>
+        </div>
+    </div>
+</div>
+ 
+<script>
+const MONDAY_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjYyNTk2MzMyOCwiYWFpIjoxMSwidWlkIjo5NjE4MzkzMiwiaWFkIjoiMjAyNi0wMi0yNVQxODo1MzozMC4wMDBaIiwicGVyIjoibWU6d3JpdGUiLCJhY3RpZCI6MjcwNjIwMjEsInJnbiI6InVzZTEifQ.imA7e4na1zcKdLWkx2N-viFdBTgP5rRe5nsXs5-WMUI';
+const BOARD_ID = '18374789123';
+ 
+// ── MSAL ──────────────────────────────────────────────────────
+const msalConfig = {
+    auth: {
+        clientId:    "d9664e06-7fd2-401d-b27b-97116fed7d9f",
+        authority:   "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
+        redirectUri: window.location.origin,
+    },
+    cache: { cacheLocation: "sessionStorage" }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+let usuarioActual = null;
+ 
+async function initAuth() {
+    try {
+        await msalInstance.initialize();
+        const accounts = msalInstance.getAllAccounts();
+        if (accounts.length > 0) {
+            usuarioActual = accounts[0];
+            renderUserChip();
+            // Autocompletar email
+            document.getElementById('f-email').value = usuarioActual.username || '';
+        } else {
+            window.location.href = 'index.html';
+        }
+    } catch(e) { window.location.href = 'index.html'; }
+}
+ 
+function renderUserChip() {
+    if (!usuarioActual) return;
+    const nombre = usuarioActual.name || usuarioActual.username;
+    const iniciales = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+    document.getElementById('auth-area').innerHTML = `
+        <div class="user-chip">
+            <div class="user-av">${iniciales}</div>
+            <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
+        </div>`;
+}
+ 
+// ── Contador descripción ──────────────────────────────────────
+function actualizarContador() {
+    const v = document.getElementById('f-descripcion').value.length;
+    document.getElementById('char-count').innerText = `${v} / 2000`;
+}
+ 
+// ── Enviar a Monday ───────────────────────────────────────────
+async function enviarSolicitud() {
+    const email       = document.getElementById('f-email').value.trim();
+    const descripcion = document.getElementById('f-descripcion').value.trim();
+    const prioridad   = document.getElementById('f-prioridad').value;
+    const area        = document.getElementById('f-area').value;
+    const tipo        = document.getElementById('f-tipo').value;
+ 
+    if (!email)       { mostrarToast('err', 'El email es requerido.'); return; }
+    if (!descripcion) { mostrarToast('err', 'Ingresa una descripción.'); return; }
+    if (!prioridad)   { mostrarToast('err', 'Selecciona la prioridad.'); return; }
+    if (!area)        { mostrarToast('err', 'Selecciona el área.'); return; }
+ 
+    // Estado cargando
+    const btn = document.getElementById('btn-enviar');
+    const txt = document.getElementById('btn-txt');
+    btn.disabled = true;
+    txt.innerText = 'Enviando…';
+    const spinner = document.createElement('div');
+    spinner.className = 'spinner';
+    btn.insertBefore(spinner, btn.querySelector('svg'));
+    btn.querySelector('svg').style.display = 'none';
+ 
+    try {
+        // Nombre del item = primeras palabras de la descripción
+        const nombreItem = descripcion.length > 60
+            ? descripcion.substring(0, 57) + '...'
+            : descripcion;
+ 
+        // Columnas de Monday — los IDs se obtienen del tablero
+        const columnValues = JSON.stringify({
+            "email":     { "email": email, "text": email },
+            "texto":     descripcion,
+            "prioridad": { "label": prioridad },
+            "area":      { "label": area },
+            "tipo":      { "label": tipo || "Otro" }
+        });
+ 
+        const query = `
+            mutation {
+                create_item (
+                    board_id: ${BOARD_ID},
+                    item_name: "${nombreItem.replace(/"/g, '\\"')}",
+                    column_values: ${JSON.stringify(columnValues)}
+                ) {
+                    id
+                    name
+                }
+            }
+        `;
+ 
+        const res = await fetch('https://api.monday.com/v2', {
+            method: 'POST',
+            headers: {
+                'Content-Type':  'application/json',
+                'Authorization': MONDAY_TOKEN,
+                'API-Version':   '2024-01'
+            },
+            body: JSON.stringify({ query })
+        });
+ 
+        const data = await res.json();
+ 
+        if (data.errors) {
+            throw new Error(data.errors[0]?.message || 'Error de Monday');
+        }
+ 
+        const itemId = data?.data?.create_item?.id;
+ 
+        // Éxito
+        document.getElementById('ticket-titulo').innerText = `✓ Solicitud creada — Ticket #${itemId}`;
+        document.getElementById('ticket-sub').innerText = 'Tu solicitud llegó a Monday. El equipo de TI la revisará a la brevedad.';
+        document.getElementById('ticket-box').classList.add('visible');
+        document.getElementById('ticket-box').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        limpiar(false); // limpiar sin borrar confirmación
+ 
+    } catch(err) {
+        console.error(err);
+        mostrarToast('err', 'No se pudo enviar. Intenta nuevamente.');
+    } finally {
+        btn.disabled = false;
+        txt.innerText = 'Enviar solicitud';
+        btn.querySelector('svg').style.display = '';
+        if (spinner.parentNode) spinner.parentNode.removeChild(spinner);
+    }
+}
+ 
+// ── Helpers ───────────────────────────────────────────────────
+function limpiar(limpiarConfirm = true) {
+    document.getElementById('f-descripcion').value = '';
+    document.getElementById('f-prioridad').value   = '';
+    document.getElementById('f-area').value        = '';
+    document.getElementById('f-tipo').value        = '';
+    actualizarContador();
+    if (limpiarConfirm) {
+        document.getElementById('ticket-box').classList.remove('visible');
+    }
+}
+ 
+function mostrarToast(tipo, msg) {
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+    const t = document.createElement('div');
+    t.className = `toast ${tipo}`;
+    const icon = tipo === 'ok'
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+    t.innerHTML = icon + msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 4000);
+}
+ 
+// Reloj nav
+function tickClock() {}
+initAuth();
+</script>
+</body>
+</html>
