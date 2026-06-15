@@ -40,6 +40,8 @@
         .btn-login-nav:hover{background:var(--rojo-dark)}
         .btn-login-nav svg{width:14px;height:14px}
         .hero{padding:32px 40px 28px;display:grid;grid-template-columns:1fr auto;align-items:end;gap:40px;border-bottom:1px solid var(--card-brd);background:var(--negro);position:relative;overflow:hidden}
+        .hero-bg{position:absolute;inset:0;overflow:hidden;z-index:1}
+        .hero-bg img{width:100%;height:100%;object-fit:cover;object-position:center 40%;opacity:0.15;display:block}
         .hero::before{content:'';position:absolute;inset:0;background-image:linear-gradient(var(--borde-dark) 1px,transparent 1px),linear-gradient(90deg,var(--borde-dark) 1px,transparent 1px);background-size:40px 40px;opacity:0.3}
         .hero::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 100% at 80% 50%,rgba(192,57,43,0.08) 0%,transparent 70%)}
         .hero h1{font-family:'Barlow Condensed',sans-serif;font-size:clamp(2rem,4vw,3.2rem);font-weight:900;line-height:0.88;letter-spacing:-0.02em;text-transform:uppercase;position:relative;z-index:2}
@@ -151,6 +153,7 @@
         .sug-nombre{font-size:0.86rem;font-weight:500}.sug-email{font-size:0.73rem;color:var(--txt-dim)}
         @media(max-width:768px){nav{padding:0 16px}.hero{padding:24px 16px 20px;grid-template-columns:1fr}.hero-stats{justify-content:flex-start}.toolbar{padding:12px 16px}.main{padding:20px 16px 60px}footer{padding:14px 16px}}
     </style>
+    <link rel="preload" as="image" href="plm_panoramica.png">
 </head>
 <body>
  
@@ -185,6 +188,7 @@
 </nav>
  
 <section class="hero">
+    <div class="hero-bg"><img src="plm_panoramica.png" alt="" fetchpriority="high"></div>
     <div>
         <h1>Disponibilidad<br>de <em>Salas</em></h1>
         <p>Consulta en tiempo real qué salas están libres. Actualizado cada 60 segundos.</p>
