@@ -464,11 +464,11 @@ async function fetchBloques(email,fechaIni,fechaFin){
         cache[key]=data.bloques||[];return cache[key];
     }catch(e){return[];}
 }
-async function fetchSemana(sala,lunes,viernes){return fetchBloques(sala.email,isoDate(lunes),isoDate(viernes));}
-async function fetchMes(sala,inicio,fin){return fetchBloques(sala.email,isoDate(inicio),isoDate(fin));}
+async function fetchSemana(sala,lunes,viernes){return fetchBloques(sala.email,isoDateLocal(lunes),isoDateLocal(viernes));}
+async function fetchMes(sala,inicio,fin){return fetchBloques(sala.email,isoDateLocal(inicio),isoDateLocal(fin));}
  
 async function actualizarStats(){
-    const ahora=new Date(),hoy=isoDate(ahora);
+    const ahora=new Date(),hoy=isoDateLocal(ahora);
     let libres=0,ocupadas=0;
     await Promise.all(SALAS.map(async sala=>{
         const bloques=await fetchBloques(sala.email,hoy,hoy);
@@ -509,7 +509,7 @@ function renderSemana(){
             ${s.nombre}</button>`).join('');
     buildGridSemana(lunes);
 }
-function setSalaActiva(idx){salaActiva=idx;renderSemana();}
+function setSalaActiva(idx){salaActiva=idx;cache={};renderSemana();}
  
 async function buildGridSemana(lunes){
     const grid=document.getElementById('semana-grid');
