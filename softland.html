@@ -127,7 +127,7 @@
             background: white;
             border: 1px solid var(--gris-2);
             border-radius: 16px;
-            overflow: hidden;
+            overflow: visible;
             margin-bottom: 24px;
         }
         .filtros-header {
@@ -151,6 +151,7 @@
             grid-template-columns: 1.2fr 0.6fr 0.6fr 1fr 1fr;
             gap: 16px;
             align-items: end;
+            overflow: visible;
         }
         .form-group { display:flex; flex-direction:column; gap:6px; }
         .form-label {
@@ -342,7 +343,8 @@
             position: absolute; top: calc(100% + 4px); left: 0;
             background: white; border: 1px solid var(--gris-2);
             border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-            z-index: 300; min-width: 160px; overflow: hidden; display: none;
+            z-index: 9999; min-width: 180px; overflow: visible; display: none;
+            max-height: 300px; overflow-y: auto;
         }
         .ms-dropdown.visible { display: block; }
         .ms-item {
@@ -811,9 +813,21 @@ function toggleMs(tipo) {
     const trigger  = document.getElementById(`trigger-${tipo}`);
     const isOpen   = dropdown.classList.contains('visible');
     // Cerrar todos
-    document.querySelectorAll('.ms-dropdown').forEach(d => d.classList.remove('visible'));
+    document.querySelectorAll('.ms-dropdown').forEach(d => {
+        d.classList.remove('visible');
+        d.style.position = '';
+        d.style.top = '';
+        d.style.left = '';
+        d.style.width = '';
+    });
     document.querySelectorAll('.ms-trigger').forEach(t => t.classList.remove('abierto'));
     if (!isOpen) {
+        // Calcular posición del trigger para posicionar el dropdown con position:fixed
+        const rect = trigger.getBoundingClientRect();
+        dropdown.style.position = 'fixed';
+        dropdown.style.top  = (rect.bottom + 4) + 'px';
+        dropdown.style.left = rect.left + 'px';
+        dropdown.style.width = Math.max(rect.width, 180) + 'px';
         dropdown.classList.add('visible');
         trigger.classList.add('abierto');
     }
