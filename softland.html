@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Consultas Softland — Baker</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -565,16 +566,23 @@ let consultaActual = {};
 // ── Buscar ─────────────────────────────────────────────────────
 async function buscar() {
     const empresa = document.getElementById('f-empresa').value.trim();
-    const ano     = document.getElementById('f-ano').value.trim();
-    const mes     = document.getElementById('f-mes').value.trim();
+    // Leer múltiples años seleccionados
+    const anoSelect = document.getElementById('f-ano');
+    const anos = Array.from(anoSelect.selectedOptions).map(o => o.value);
+    const ano = anos.join(','); // para validación
+
+    // Leer múltiples meses seleccionados  
+    const mesSelect = document.getElementById('f-mes');
+    const meses = Array.from(mesSelect.selectedOptions).map(o => o.value);
+    const mes = meses.join(','); // para validación
     const voucher = document.getElementById('f-voucher').value.trim();
     const rut     = document.getElementById('f-rut').value.trim();
 
     ocultarError();
 
     if (!empresa) { mostrarError('Selecciona una empresa.'); return; }
-    if (!ano)     { mostrarError('Ingresa el año.'); return; }
-    if (!mes)     { mostrarError('Selecciona el mes.'); return; }
+    if (!ano)     { mostrarError('Selecciona al menos un año.'); return; }
+    if (!mes)     { mostrarError('Selecciona al menos un mes.'); return; }
 
     // Estado cargando
     const btn = document.getElementById('btn-buscar');
@@ -593,7 +601,7 @@ async function buscar() {
         const res = await fetch(`${API}/asientos`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ empresa, ano, mes, voucher, rut })
+            body: JSON.stringify({ empresa, ano: anos, mes: meses, voucher, rut })
         });
         const data = await res.json();
 
@@ -604,7 +612,7 @@ async function buscar() {
         }
 
         datosActuales = data.datos || [];
-        consultaActual = { empresa, ano, mes, voucher, rut };
+        consultaActual = { empresa, ano: anos.join(', '), mes: meses.join(', '), voucher, rut };
         renderTabla(datosActuales, data);
 
     } catch(err) {
@@ -708,8 +716,9 @@ function exportarExcel() {
 // ── Helpers ────────────────────────────────────────────────────
 function limpiar() {
     document.getElementById('f-empresa').value = '';
-    document.getElementById('f-ano').value     = '';
-    document.getElementById('f-mes').value     = '';
+    Array.from(document.getElementById('f-ano').options).forEach(o => o.selected = false);
+    document.getElementById('f-ano').options[4].selected = true; // default 2024
+    Array.from(document.getElementById('f-mes').options).forEach(o => o.selected = false);
     document.getElementById('f-voucher').value = '';
     document.getElementById('f-rut').value     = '';
     datosActuales = [];
