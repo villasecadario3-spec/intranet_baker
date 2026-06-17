@@ -100,6 +100,7 @@
             .page-header{padding:28px 16px 24px}
         }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
@@ -203,10 +204,16 @@
         <div class="preview-card">
             <div class="preview-header">
                 <div class="preview-titulo">Vista previa</div>
-                <button class="btn-copiar" id="btn-copiar" onclick="copiarFirma()" style="display:none">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-                    Copiar firma
-                </button>
+                <div id="btn-area" style="display:none;gap:8px;display:none">
+                    <button class="btn-copiar" id="btn-copiar" onclick="copiarFirma()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                        Copiar firma
+                    </button>
+                    <button class="btn-copiar" id="btn-jpg" onclick="descargarJPG()" style="border-color:var(--rojo);color:var(--rojo)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Descargar JPG
+                    </button>
+                </div>
             </div>
             <div class="preview-body" id="preview-body">
                 <div class="preview-placeholder">
@@ -377,8 +384,9 @@ function generarFirma() {
     previewBody.innerHTML = firmaHTML;
     document.getElementById('firma-html-container').innerHTML = firmaHTML;
 
+    const btnArea = document.getElementById('btn-area');
+    btnArea.style.display = 'flex';
     const btn = document.getElementById('btn-copiar');
-    btn.style.display = 'flex';
     btn.classList.remove('copiado');
     btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copiar firma`;
     previewBody.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -414,6 +422,38 @@ async function copiarFirma() {
         window.getSelection().removeAllRanges();
         window.getSelection().addRange(range);
         alert('Presiona Ctrl+C para copiar la firma seleccionada.');
+    }
+}
+
+async function descargarJPG() {
+    const btn = document.getElementById('btn-jpg');
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = 'Generando…';
+    btn.disabled = true;
+
+    try {
+        const el = document.getElementById('firma-html-container').firstElementChild;
+        if (!el) return;
+
+        const canvas = await html2canvas(el, {
+            scale: 3,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#ffffff',
+            logging: false,
+        });
+
+        // Descargar como JPG
+        const link = document.createElement('a');
+        link.download = `firma_${sociedadActual || 'baker'}.jpg`;
+        link.href = canvas.toDataURL('image/jpeg', 0.95);
+        link.click();
+    } catch(e) {
+        console.error(e);
+        alert('No se pudo generar el JPG. Intenta con el botón Copiar firma.');
+    } finally {
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
     }
 }
 </script>
