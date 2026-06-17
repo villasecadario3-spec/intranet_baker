@@ -325,6 +325,52 @@
         @media(max-width:600px) {
             .filtros-body { grid-template-columns:1fr; }
         }
+
+        /* ══ MULTI-SELECT DROPDOWN ══════════════════════════════ */
+        .ms-wrap { position: relative; }
+        .ms-trigger {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 12px; border: 1px solid var(--gris-2); border-radius: 9px;
+            background: var(--crema); color: var(--txt);
+            font-family: 'DM Sans', sans-serif; font-size: 0.88rem;
+            cursor: pointer; user-select: none; transition: border-color 0.2s; min-width: 140px;
+        }
+        .ms-trigger:hover, .ms-trigger.abierto { border-color: var(--rojo); }
+        .ms-trigger svg { width: 14px; height: 14px; color: var(--txt-dim); flex-shrink: 0; margin-left: 8px; transition: transform 0.2s; }
+        .ms-trigger.abierto svg { transform: rotate(180deg); }
+        .ms-dropdown {
+            position: absolute; top: calc(100% + 4px); left: 0;
+            background: white; border: 1px solid var(--gris-2);
+            border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            z-index: 300; min-width: 160px; overflow: hidden; display: none;
+        }
+        .ms-dropdown.visible { display: block; }
+        .ms-item {
+            display: flex; align-items: center; gap: 9px;
+            padding: 8px 14px; cursor: pointer; font-size: 0.84rem; color: var(--txt);
+            transition: background 0.12s; border-bottom: 1px solid var(--gris-1);
+        }
+        .ms-item:last-child { border-bottom: none; }
+        .ms-item:hover { background: var(--gris-1); }
+        .ms-item.todos { font-weight: 600; color: var(--rojo); border-bottom: 1px solid var(--gris-2) !important; }
+        .ms-item input[type="checkbox"] { accent-color: var(--rojo); width: 14px; height: 14px; flex-shrink: 0; cursor: pointer; pointer-events: none; }
+        /* ══ PAGINACIÓN ════════════════════════════════════════ */
+        .pag-wrap {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 20px; border-top: 1px solid var(--gris-2); background: var(--crema);
+            flex-wrap: wrap; gap: 8px;
+        }
+        .pag-info { font-size: 0.78rem; color: var(--txt-dim); }
+        .pag-btns { display: flex; align-items: center; gap: 6px; }
+        .pag-btn {
+            padding: 5px 12px; border: 1px solid var(--gris-2); border-radius: 7px;
+            background: white; font-family: 'DM Sans', sans-serif; font-size: 0.8rem;
+            color: var(--txt-mid); cursor: pointer; transition: all 0.15s;
+        }
+        .pag-btn:hover:not(:disabled) { border-color: var(--rojo); color: var(--rojo); }
+        .pag-btn:disabled { opacity: 0.35; cursor: default; }
+        .pag-btn.activo { background: var(--rojo); border-color: var(--rojo); color: white; }
+        .pag-pages { display: flex; gap: 4px; }
     </style>
 </head>
 <body>
@@ -386,32 +432,48 @@
             </div>
             <div class="form-group">
                 <label class="form-label">Año <span>*</span></label>
-                <select class="form-select" id="f-ano" multiple size="5" style="height:auto;min-height:120px">
-                    <option value="2020">2020</option>
-                    <option value="2021">2021</option>
-                    <option value="2022">2022</option>
-                    <option value="2023">2023</option>
-                    <option value="2024" selected>2024</option>
-                </select>
-                <div style="font-size:0.7rem;color:var(--txt-dim);margin-top:4px">Ctrl+clic para seleccionar varios</div>
+                <div class="ms-wrap" id="wrap-ano">
+                    <div class="ms-trigger" id="trigger-ano" onclick="toggleMs('ano')">
+                        <span id="label-ano">2024</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    <div class="ms-dropdown" id="dropdown-ano">
+                        <div class="ms-item todos" onclick="toggleTodos('ano')">
+                            <input type="checkbox" id="todos-ano"> <span class="ms-label-txt">Seleccionar todos</span>
+                        </div>
+                        <div class="ms-item" onclick="toggleItem('ano','2020')"><input type="checkbox" value="2020" class="ms-cb-ano"> <span class="ms-label-txt">2020</span></div>
+                        <div class="ms-item" onclick="toggleItem('ano','2021')"><input type="checkbox" value="2021" class="ms-cb-ano"> <span class="ms-label-txt">2021</span></div>
+                        <div class="ms-item" onclick="toggleItem('ano','2022')"><input type="checkbox" value="2022" class="ms-cb-ano"> <span class="ms-label-txt">2022</span></div>
+                        <div class="ms-item" onclick="toggleItem('ano','2023')"><input type="checkbox" value="2023" class="ms-cb-ano"> <span class="ms-label-txt">2023</span></div>
+                        <div class="ms-item" onclick="toggleItem('ano','2024')"><input type="checkbox" value="2024" class="ms-cb-ano" checked> <span class="ms-label-txt">2024</span></div>
+                    </div>
+                </div>
             </div>
             <div class="form-group">
                 <label class="form-label">Mes <span>*</span></label>
-                <select class="form-select" id="f-mes" multiple size="6" style="height:auto;min-height:140px">
-                    <option value="1">Enero</option>
-                    <option value="2">Febrero</option>
-                    <option value="3">Marzo</option>
-                    <option value="4">Abril</option>
-                    <option value="5">Mayo</option>
-                    <option value="6">Junio</option>
-                    <option value="7">Julio</option>
-                    <option value="8">Agosto</option>
-                    <option value="9">Septiembre</option>
-                    <option value="10">Octubre</option>
-                    <option value="11">Noviembre</option>
-                    <option value="12">Diciembre</option>
-                </select>
-                <div style="font-size:0.7rem;color:var(--txt-dim);margin-top:4px">Ctrl+clic para seleccionar varios</div>
+                <div class="ms-wrap" id="wrap-mes">
+                    <div class="ms-trigger" id="trigger-mes" onclick="toggleMs('mes')">
+                        <span id="label-mes">Seleccionar...</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    <div class="ms-dropdown" id="dropdown-mes">
+                        <div class="ms-item todos" onclick="toggleTodos('mes')">
+                            <input type="checkbox" id="todos-mes"> <span class="ms-label-txt">Seleccionar todos</span>
+                        </div>
+                        <div class="ms-item" onclick="toggleItem('mes','1')"><input type="checkbox" value="1" class="ms-cb-mes"> <span class="ms-label-txt">Enero</span></div>
+                        <div class="ms-item" onclick="toggleItem('mes','2')"><input type="checkbox" value="2" class="ms-cb-mes"> <span class="ms-label-txt">Febrero</span></div>
+                        <div class="ms-item" onclick="toggleItem('mes','3')"><input type="checkbox" value="3" class="ms-cb-mes"> <span class="ms-label-txt">Marzo</span></div>
+                        <div class="ms-item" onclick="toggleItem('mes','4')"><input type="checkbox" value="4" class="ms-cb-mes"> <span class="ms-label-txt">Abril</span></div>
+                        <div class="ms-item" onclick="toggleItem('mes','5')"><input type="checkbox" value="5" class="ms-cb-mes"> <span class="ms-label-txt">Mayo</span></div>
+                        <div class="ms-item" onclick="toggleItem('mes','6')"><input type="checkbox" value="6" class="ms-cb-mes"> <span class="ms-label-txt">Junio</span></div>
+                        <div class="ms-item" onclick="toggleItem('mes','7')"><input type="checkbox" value="7" class="ms-cb-mes"> <span class="ms-label-txt">Julio</span></div>
+                        <div class="ms-item" onclick="toggleItem('mes','8')"><input type="checkbox" value="8" class="ms-cb-mes"> <span class="ms-label-txt">Agosto</span></div>
+                        <div class="ms-item" onclick="toggleItem('mes','9')"><input type="checkbox" value="9" class="ms-cb-mes"> <span class="ms-label-txt">Septiembre</span></div>
+                        <div class="ms-item" onclick="toggleItem('mes','10')"><input type="checkbox" value="10" class="ms-cb-mes"> <span class="ms-label-txt">Octubre</span></div>
+                        <div class="ms-item" onclick="toggleItem('mes','11')"><input type="checkbox" value="11" class="ms-cb-mes"> <span class="ms-label-txt">Noviembre</span></div>
+                        <div class="ms-item" onclick="toggleItem('mes','12')"><input type="checkbox" value="12" class="ms-cb-mes"> <span class="ms-label-txt">Diciembre</span></div>
+                    </div>
+                </div>
             </div>
             <div class="form-group">
                 <label class="form-label">Voucher(s)</label>
@@ -484,6 +546,14 @@
                         <tbody id="tabla-body"></tbody>
                         <tfoot id="tabla-foot"></tfoot>
                     </table>
+                </div>
+            </div>
+            <div class="pag-wrap" id="pag-wrap" style="display:none">
+                <div class="pag-info" id="pag-info">—</div>
+                <div class="pag-btns">
+                    <button class="pag-btn" id="pag-prev" onclick="cambiarPag(-1)">&#8249; Anterior</button>
+                    <div class="pag-pages" id="pag-pages"></div>
+                    <button class="pag-btn" id="pag-next" onclick="cambiarPag(1)">Siguiente &#8250;</button>
                 </div>
             </div>
         </div>
@@ -571,15 +641,10 @@ let consultaActual = {};
 // ── Buscar ─────────────────────────────────────────────────────
 async function buscar() {
     const empresa = document.getElementById('f-empresa').value.trim();
-    // Leer múltiples años seleccionados
-    const anoSelect = document.getElementById('f-ano');
-    const anos = Array.from(anoSelect.selectedOptions).map(o => o.value);
-    const ano = anos.join(','); // para validación
-
-    // Leer múltiples meses seleccionados  
-    const mesSelect = document.getElementById('f-mes');
-    const meses = Array.from(mesSelect.selectedOptions).map(o => o.value);
-    const mes = meses.join(','); // para validación
+    const anos  = getSeleccionados('ano');
+    const meses = getSeleccionados('mes');
+    const ano   = anos.join(',');
+    const mes   = meses.join(',');
     const voucher = document.getElementById('f-voucher').value.trim();
     const rut     = document.getElementById('f-rut').value.trim();
 
@@ -642,24 +707,8 @@ function renderTabla(datos, meta) {
     badge.className = 'resultados-badge badge-ok';
     badge.innerText = `${datos.length} registro${datos.length !== 1 ? 's' : ''}`;
 
-    // Tbody
-    const tbody = document.getElementById('tabla-body');
-    tbody.innerHTML = datos.map(r => {
-        const fecha = r['Fecha Asiento']
-            ? new Date(r['Fecha Asiento']).toLocaleDateString('es-CL')
-            : '—';
-        return `<tr>
-            <td class="cuenta">${r['Cuenta Contable'] || '—'}</td>
-            <td>${r['Año'] || '—'}</td>
-            <td>${String(r['Mes'] || '').padStart(2,'0')}</td>
-            <td class="voucher">${r['Voucher'] || '—'}</td>
-            <td>${fecha}</td>
-            <td class="rut">${r['RUT Auxiliar'] || '—'}</td>
-            <td class="num">${formatNum(r['Debe'])}</td>
-            <td class="num">${formatNum(r['Haber'])}</td>
-            <td class="glosa">${r['Glosa Asiento'] || '—'}</td>
-        </tr>`;
-    }).join('');
+        // Renderizar primera página
+    renderPagina(0);
 
     // Totales
     const totalDebe   = datos.reduce((s,r) => s + (r['Debe']   || 0), 0);
@@ -721,9 +770,11 @@ function exportarExcel() {
 // ── Helpers ────────────────────────────────────────────────────
 function limpiar() {
     document.getElementById('f-empresa').value = '';
-    Array.from(document.getElementById('f-ano').options).forEach(o => o.selected = false);
-    document.getElementById('f-ano').options[4].selected = true; // default 2024
-    Array.from(document.getElementById('f-mes').options).forEach(o => o.selected = false);
+    document.querySelectorAll('.ms-cb-ano').forEach(cb => cb.checked = false);
+    document.querySelector('.ms-cb-ano[value="2024"]').checked = true;
+    actualizarLabel('ano'); actualizarTodos('ano');
+    document.querySelectorAll('.ms-cb-mes').forEach(cb => cb.checked = false);
+    actualizarLabel('mes'); actualizarTodos('mes');
     document.getElementById('f-voucher').value = '';
     document.getElementById('f-rut').value     = '';
     datosActuales = [];
@@ -751,6 +802,133 @@ document.addEventListener('keydown', e => {
 
 // Init
 initAuth();
+
+// ══ MULTI-SELECT DROPDOWN ════════════════════════════════════
+const MESES_NOMBRE = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function toggleMs(tipo) {
+    const dropdown = document.getElementById(`dropdown-${tipo}`);
+    const trigger  = document.getElementById(`trigger-${tipo}`);
+    const isOpen   = dropdown.classList.contains('visible');
+    // Cerrar todos
+    document.querySelectorAll('.ms-dropdown').forEach(d => d.classList.remove('visible'));
+    document.querySelectorAll('.ms-trigger').forEach(t => t.classList.remove('abierto'));
+    if (!isOpen) {
+        dropdown.classList.add('visible');
+        trigger.classList.add('abierto');
+    }
+}
+
+function toggleItem(tipo, valor) {
+    const cb = document.querySelector(`.ms-cb-${tipo}[value="${valor}"]`);
+    if (!cb) return;
+    cb.checked = !cb.checked;
+    actualizarLabel(tipo);
+    actualizarTodos(tipo);
+    event.stopPropagation();
+}
+
+function toggleTodos(tipo) {
+    const cbs = document.querySelectorAll(`.ms-cb-${tipo}`);
+    const todosEl = document.getElementById(`todos-${tipo}`);
+    const marcar = !todosEl.checked;
+    todosEl.checked = marcar;
+    cbs.forEach(cb => cb.checked = marcar);
+    actualizarLabel(tipo);
+    event.stopPropagation();
+}
+
+function actualizarTodos(tipo) {
+    const cbs = document.querySelectorAll(`.ms-cb-${tipo}`);
+    const todosEl = document.getElementById(`todos-${tipo}`);
+    todosEl.checked = Array.from(cbs).every(cb => cb.checked);
+}
+
+function actualizarLabel(tipo) {
+    const cbs      = Array.from(document.querySelectorAll(`.ms-cb-${tipo}`)).filter(cb => cb.checked);
+    const labelEl  = document.getElementById(`label-${tipo}`);
+    if (cbs.length === 0) {
+        labelEl.innerText = 'Seleccionar...';
+    } else if (cbs.length === document.querySelectorAll(`.ms-cb-${tipo}`).length) {
+        labelEl.innerText = 'Todos';
+    } else if (tipo === 'mes') {
+        labelEl.innerText = cbs.length === 1
+            ? MESES_NOMBRE[parseInt(cbs[0].value)]
+            : `${cbs.length} meses`;
+    } else {
+        labelEl.innerText = cbs.length === 1 ? cbs[0].value : `${cbs.length} años`;
+    }
+}
+
+function getSeleccionados(tipo) {
+    return Array.from(document.querySelectorAll(`.ms-cb-${tipo}`))
+        .filter(cb => cb.checked)
+        .map(cb => cb.value);
+}
+
+// Cerrar dropdowns al hacer clic fuera
+document.addEventListener('click', e => {
+    if (!e.target.closest('.ms-wrap')) {
+        document.querySelectorAll('.ms-dropdown').forEach(d => d.classList.remove('visible'));
+        document.querySelectorAll('.ms-trigger').forEach(t => t.classList.remove('abierto'));
+    }
+});
+
+// ══ PAGINACIÓN ═══════════════════════════════════════════════
+const PAG_SIZE = 500;
+let pagActual  = 0;
+
+function renderPagina(pag) {
+    pagActual = pag;
+    const total  = datosActuales.length;
+    const inicio = pag * PAG_SIZE;
+    const fin    = Math.min(inicio + PAG_SIZE, total);
+    const pagina = datosActuales.slice(inicio, fin);
+
+    const tbody = document.getElementById('tabla-body');
+    tbody.innerHTML = pagina.map(r => {
+        const fecha = r['Fecha Asiento']
+            ? parseFechaLocal(r['Fecha Asiento']).toLocaleDateString('es-CL')
+            : '—';
+        return `<tr>
+            <td class="cuenta">${r['Cuenta Contable'] || '—'}</td>
+            <td>${r['Año'] || '—'}</td>
+            <td>${String(r['Mes'] || '').padStart(2,'0')}</td>
+            <td class="voucher">${r['Voucher'] || '—'}</td>
+            <td>${fecha}</td>
+            <td class="rut">${r['RUT Auxiliar'] || '—'}</td>
+            <td class="num">${formatNum(r['Debe'])}</td>
+            <td class="num">${formatNum(r['Haber'])}</td>
+            <td class="glosa">${r['Glosa Asiento'] || '—'}</td>
+        </tr>`;
+    }).join('');
+
+    // Info paginación
+    const totalPags = Math.ceil(total / PAG_SIZE);
+    document.getElementById('pag-info').innerText =
+        `Mostrando ${inicio+1}–${fin} de ${total.toLocaleString('es-CL')} registros`;
+    document.getElementById('pag-prev').disabled = pag === 0;
+    document.getElementById('pag-next').disabled = pag >= totalPags - 1;
+
+    // Botones de página (máx 5)
+    const pagesEl = document.getElementById('pag-pages');
+    const startPg = Math.max(0, pag - 2);
+    const endPg   = Math.min(totalPags - 1, startPg + 4);
+    pagesEl.innerHTML = Array.from({length: endPg - startPg + 1}, (_,i) => {
+        const p = startPg + i;
+        return `<button class="pag-btn${p === pag ? ' activo' : ''}" onclick="renderPagina(${p})">${p+1}</button>`;
+    }).join('');
+
+    document.getElementById('pag-wrap').style.display = total > PAG_SIZE ? 'flex' : 'none';
+}
+
+function cambiarPag(dir) {
+    const totalPags = Math.ceil(datosActuales.length / PAG_SIZE);
+    const nueva = Math.max(0, Math.min(pagActual + dir, totalPags - 1));
+    renderPagina(nueva);
+    document.getElementById('resultados-contenido').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 </script>
 </body>
 </html>
