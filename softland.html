@@ -386,14 +386,18 @@
             </div>
             <div class="form-group">
                 <label class="form-label">Año <span>*</span></label>
-                <input class="form-input" id="f-ano" type="number"
-                       min="2000" max="2099"
-                       placeholder="2024">
+                <select class="form-select" id="f-ano" multiple size="5" style="height:auto;min-height:120px">
+                    <option value="2020">2020</option>
+                    <option value="2021">2021</option>
+                    <option value="2022">2022</option>
+                    <option value="2023">2023</option>
+                    <option value="2024" selected>2024</option>
+                </select>
+                <div style="font-size:0.7rem;color:var(--txt-dim);margin-top:4px">Ctrl+clic para seleccionar varios</div>
             </div>
             <div class="form-group">
                 <label class="form-label">Mes <span>*</span></label>
-                <select class="form-select" id="f-mes">
-                    <option value="">Mes…</option>
+                <select class="form-select" id="f-mes" multiple size="6" style="height:auto;min-height:140px">
                     <option value="1">Enero</option>
                     <option value="2">Febrero</option>
                     <option value="3">Marzo</option>
@@ -407,6 +411,7 @@
                     <option value="11">Noviembre</option>
                     <option value="12">Diciembre</option>
                 </select>
+                <div style="font-size:0.7rem;color:var(--txt-dim);margin-top:4px">Ctrl+clic para seleccionar varios</div>
             </div>
             <div class="form-group">
                 <label class="form-label">Voucher(s)</label>
