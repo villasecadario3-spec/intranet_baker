@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Firma — Baker</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --rojo:#C0392B;--rojo-dark:#96281B;
+            --negro:#111010;--negro-3:#242220;--borde-dark:#2E2C2A;
+            --blanco:#FFFFFF;--crema:#F8F6F3;--gris-1:#F0EDE9;--gris-2:#E2DED9;--gris-3:#B5B0AA;
+            --txt:#1C1A18;--txt-mid:#6B6762;--txt-dim:#A09C97;
+            --verde:#27ae60;
+        }
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'DM Sans',sans-serif;background:var(--crema);color:var(--txt);min-height:100vh}
+
+        nav{position:sticky;top:0;z-index:100;background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px solid var(--borde-dark);height:60px;display:flex;align-items:center;padding:0 48px;gap:16px}
+        .nav-logo{text-decoration:none;flex-shrink:0}
+        .nav-logo img{height:26px;width:auto;display:block;background:white;border-radius:6px;padding:4px 10px}
+        .nav-sep{width:1px;height:18px;background:var(--borde-dark)}
+        .nav-back{display:flex;align-items:center;gap:6px;color:var(--gris-3);text-decoration:none;font-size:0.78rem;font-weight:500;transition:color 0.2s}
+        .nav-back:hover{color:white}
+        .nav-back svg{width:14px;height:14px}
+        .nav-title{font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--gris-3);letter-spacing:0.1em;text-transform:uppercase}
+        .nav-spacer{flex:1}
+
+        .page-header{background:var(--negro);padding:40px 48px 36px;border-bottom:1px solid var(--borde-dark);position:relative;overflow:hidden}
+        .page-header::before{content:'';position:absolute;inset:0;background-image:linear-gradient(var(--borde-dark) 1px,transparent 1px),linear-gradient(90deg,var(--borde-dark) 1px,transparent 1px);background-size:40px 40px;opacity:0.3}
+        .page-header::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 50% 100% at 0% 50%,rgba(192,57,43,0.1) 0%,transparent 70%)}
+        .page-header-inner{position:relative;z-index:2}
+        .page-eyebrow{font-size:0.65rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--rojo);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+        .page-eyebrow::before{content:'';width:16px;height:1px;background:var(--rojo)}
+        .page-header h1{font-family:'Playfair Display',serif;font-size:2rem;font-weight:700;color:white;letter-spacing:-0.02em;line-height:1.1}
+        .page-header h1 em{font-style:italic;color:var(--rojo)}
+        .page-header-sub{font-size:0.82rem;color:#6b6762;margin-top:8px;line-height:1.6}
+
+        .main{padding:36px 48px 80px;display:grid;grid-template-columns:400px 1fr;gap:32px;max-width:1200px}
+
+        /* ── FORMULARIO ─────────────────────── */
+        .form-card{background:white;border:1px solid var(--gris-2);border-radius:16px;overflow:hidden;height:fit-content;position:sticky;top:80px}
+        .form-card-header{padding:18px 24px;border-bottom:1px solid var(--gris-2)}
+        .form-card-title{font-family:'Playfair Display',serif;font-size:1rem;font-weight:700;color:var(--txt)}
+        .form-card-sub{font-size:0.75rem;color:var(--txt-dim);margin-top:3px}
+        .form-body{padding:22px 24px;display:flex;flex-direction:column;gap:16px}
+        .form-group{display:flex;flex-direction:column;gap:5px}
+        .form-label{font-size:0.68rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--txt-dim)}
+        .form-label span{color:var(--rojo)}
+        .form-input,.form-select{padding:9px 13px;border:1px solid var(--gris-2);border-radius:8px;background:var(--crema);color:var(--txt);font-family:'DM Sans',sans-serif;font-size:0.88rem;transition:border-color 0.2s,box-shadow 0.2s;width:100%}
+        .form-input:focus,.form-select:focus{outline:none;border-color:var(--rojo);box-shadow:0 0 0 3px rgba(192,57,43,0.08);background:white}
+        .form-input::placeholder{color:var(--txt-dim)}
+        .email-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+        .email-at{font-size:0.82rem;color:var(--txt-mid);white-space:nowrap;padding:9px 4px}
+        .email-domain{padding:9px 13px;border:1px solid var(--gris-2);border-radius:8px;background:var(--crema);color:var(--txt);font-family:'DM Sans',sans-serif;font-size:0.82rem;width:auto}
+        .email-domain:focus{outline:none;border-color:var(--rojo);background:white}
+
+        .sociedad-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+        .soc-btn{padding:10px 8px;border:1px solid var(--gris-2);border-radius:8px;background:var(--crema);cursor:pointer;transition:all 0.15s;text-align:center;font-family:'DM Sans',sans-serif;font-size:0.75rem;font-weight:600;color:var(--txt-mid);letter-spacing:0.04em}
+        .soc-btn:hover{border-color:var(--gris-3);color:var(--txt)}
+        .soc-btn.activo{border-color:var(--rojo);background:rgba(192,57,43,0.06);color:var(--rojo)}
+
+        .dir-toggle{display:flex;gap:8px;margin-bottom:6px}
+        .dir-btn{flex:1;padding:7px;border:1px solid var(--gris-2);border-radius:7px;background:var(--crema);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.75rem;font-weight:600;color:var(--txt-mid);transition:all 0.15s;text-align:center}
+        .dir-btn.activo{border-color:var(--rojo);background:rgba(192,57,43,0.06);color:var(--rojo)}
+
+        .form-footer{padding:0 24px 22px}
+        .btn-generar{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px;background:var(--rojo);border:none;border-radius:9px;color:white;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.9rem;font-weight:600;transition:background 0.2s}
+        .btn-generar:hover{background:var(--rojo-dark)}
+
+        /* ── PREVIEW ────────────────────────── */
+        .preview-area{display:flex;flex-direction:column;gap:20px}
+        .preview-card{background:white;border:1px solid var(--gris-2);border-radius:16px;overflow:hidden}
+        .preview-header{padding:16px 22px;border-bottom:1px solid var(--gris-2);display:flex;align-items:center;justify-content:space-between}
+        .preview-titulo{font-size:0.78rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--txt-mid)}
+        .btn-copiar{display:flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid var(--gris-2);border-radius:7px;background:white;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.78rem;font-weight:600;color:var(--txt-mid);transition:all 0.2s}
+        .btn-copiar:hover{border-color:var(--verde);color:var(--verde)}
+        .btn-copiar.copiado{border-color:var(--verde);color:var(--verde);background:rgba(39,174,96,0.06)}
+        .btn-copiar svg{width:13px;height:13px}
+        .preview-body{padding:24px;background:#f9f9f9;min-height:100px;display:flex;align-items:center;justify-content:center}
+        .preview-placeholder{font-size:0.82rem;color:var(--txt-dim);text-align:center;line-height:1.6}
+        .preview-placeholder svg{width:28px;height:28px;color:var(--gris-2);margin:0 auto 10px;display:block}
+
+        .instrucciones-card{background:white;border:1px solid var(--gris-2);border-radius:16px;padding:22px 24px}
+        .inst-titulo{font-size:0.75rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--txt-mid);margin-bottom:14px}
+        .inst-steps{display:flex;flex-direction:column;gap:12px}
+        .inst-step{display:flex;gap:12px;align-items:flex-start}
+        .inst-n{width:22px;height:22px;border-radius:50%;background:var(--gris-1);border:1px solid var(--gris-2);display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:var(--txt-mid);flex-shrink:0;margin-top:1px}
+        .inst-txt{font-size:0.8rem;color:var(--txt-mid);line-height:1.55}
+        .inst-txt strong{color:var(--txt)}
+        .inst-txt code{font-family:'DM Mono',monospace;background:var(--gris-1);border:1px solid var(--gris-2);border-radius:4px;padding:1px 5px;font-size:0.74rem}
+
+        @media(max-width:900px){
+            .main{grid-template-columns:1fr;padding:24px 16px 60px}
+            .form-card{position:static}
+            nav{padding:0 16px}
+            .page-header{padding:28px 16px 24px}
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <a class="nav-logo" href="index.html">
+        <img src="LOGO_BAKER.png" alt="Baker" onerror="this.outerHTML='<span style=&quot;font-family:serif;font-weight:900;color:white;font-size:1rem&quot;>BAKER</span>'">
+    </a>
+    <div class="nav-sep"></div>
+    <a class="nav-back" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        Inicio
+    </a>
+    <div class="nav-sep"></div>
+    <div class="nav-title">Generador de Firma</div>
+    <div class="nav-spacer"></div>
+</nav>
+
+<div class="page-header">
+    <div class="page-header-inner">
+        <div class="page-eyebrow">Herramienta TI</div>
+        <h1>Firma de<br><em>Correo</em></h1>
+        <div class="page-header-sub">Genera tu firma corporativa en segundos y cópiala directo a Outlook.</div>
+    </div>
+</div>
+
+<div class="main">
+
+    <!-- FORMULARIO -->
+    <div class="form-card">
+        <div class="form-card-header">
+            <div class="form-card-title">Tus datos</div>
+            <div class="form-card-sub">Completa los campos para generar la firma</div>
+        </div>
+        <div class="form-body">
+
+            <!-- Sociedad -->
+            <div class="form-group">
+                <div class="form-label">Sociedad <span>*</span></div>
+                <div class="sociedad-grid">
+                    <button class="soc-btn" data-soc="baker" onclick="selSociedad(this)">Baker Inmobiliaria</button>
+                    <button class="soc-btn" data-soc="romeral" onclick="selSociedad(this)">Romeral Constructora</button>
+                    <button class="soc-btn" data-soc="brotar" onclick="selSociedad(this)">Brotar</button>
+                    <button class="soc-btn" data-soc="baker_romeral" onclick="selSociedad(this)">Baker + Romeral</button>
+                </div>
+            </div>
+
+            <!-- Nombre -->
+            <div class="form-group">
+                <label class="form-label">Nombre completo <span>*</span></label>
+                <input class="form-input" id="f-nombre" type="text" placeholder="Ej: María González">
+            </div>
+
+            <!-- Cargo -->
+            <div class="form-group">
+                <label class="form-label">Cargo <span>*</span></label>
+                <input class="form-input" id="f-cargo" type="text" placeholder="Ej: Jefa de Proyectos">
+            </div>
+
+            <!-- Teléfono -->
+            <div class="form-group">
+                <label class="form-label">Teléfono (opcional)</label>
+                <input class="form-input" id="f-telefono" type="text" placeholder="Ej: 56 9 1234 5678">
+            </div>
+
+            <!-- Email -->
+            <div class="form-group">
+                <label class="form-label">Correo <span>*</span></label>
+                <div style="display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center">
+                    <input class="form-input" id="f-email-usuario" type="text" placeholder="nombre.apellido" style="margin:0">
+                    <span style="font-size:0.88rem;color:var(--txt-mid);padding:0 2px">@</span>
+                    <select class="email-domain" id="f-email-dominio">
+                        <option value="ibaker.cl">ibaker.cl</option>
+                        <option value="cmcromeral.cl">cmcromeral.cl</option>
+                        <option value="epbrotar.cl">epbrotar.cl</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Dirección -->
+            <div class="form-group">
+                <label class="form-label">Dirección <span>*</span></label>
+                <div class="dir-toggle">
+                    <button class="dir-btn activo" id="dir-oficina" onclick="selDireccion('oficina')">Oficina</button>
+                    <button class="dir-btn" id="dir-obra" onclick="selDireccion('obra')">Obra</button>
+                </div>
+                <input class="form-input" id="f-direccion" type="text" value="Av. El Bosque Nte 0177, Las Condes OF 1002" readonly style="background:var(--gris-1);color:var(--txt-mid)">
+            </div>
+
+        </div>
+        <div class="form-footer">
+            <button class="btn-generar" onclick="generarFirma()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                Generar firma
+            </button>
+        </div>
+    </div>
+
+    <!-- PREVIEW + INSTRUCCIONES -->
+    <div class="preview-area">
+
+        <div class="preview-card">
+            <div class="preview-header">
+                <div class="preview-titulo">Vista previa</div>
+                <button class="btn-copiar" id="btn-copiar" onclick="copiarFirma()" style="display:none">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                    Copiar firma
+                </button>
+            </div>
+            <div class="preview-body" id="preview-body">
+                <div class="preview-placeholder">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20"/></svg>
+                    Completa el formulario y haz clic en<br><strong>Generar firma</strong> para ver la vista previa
+                </div>
+            </div>
+        </div>
+
+        <div class="instrucciones-card">
+            <div class="inst-titulo">Cómo agregar la firma en Outlook</div>
+            <div class="inst-steps">
+                <div class="inst-step">
+                    <div class="inst-n">1</div>
+                    <div class="inst-txt">Haz clic en <strong>Copiar firma</strong> arriba para copiar la firma al portapapeles.</div>
+                </div>
+                <div class="inst-step">
+                    <div class="inst-n">2</div>
+                    <div class="inst-txt">Abre <strong>Outlook</strong> → <code>Archivo</code> → <code>Opciones</code> → <code>Correo</code> → <code>Firmas</code>.</div>
+                </div>
+                <div class="inst-step">
+                    <div class="inst-n">3</div>
+                    <div class="inst-txt">Haz clic en <strong>Nueva</strong>, dale un nombre (ej: <em>"Firma Baker"</em>) y pega la firma con <code>Ctrl + V</code>.</div>
+                </div>
+                <div class="inst-step">
+                    <div class="inst-n">4</div>
+                    <div class="inst-txt">En <strong>Mensajes nuevos</strong> y <strong>Respuestas</strong> selecciona tu firma nueva. Haz clic en <strong>Aceptar</strong>.</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- HTML oculto de la firma (para copiar) -->
+<div id="firma-html-container" style="position:absolute;left:-9999px;top:-9999px"></div>
+
+<script>
+let sociedadActual = null;
+let direccionActual = 'oficina';
+
+// Configuración de cada sociedad
+const SOCIEDADES = {
+    baker: {
+        img: 'firma_baker.png',
+        ancho: 130,
+        alto: 39,
+        fondo: '#2d2d2d',
+    },
+    romeral: {
+        img: 'firma_romeral.jpg',
+        ancho: 140,
+        alto: 32,
+        fondo: '#ffffff',
+        borde: true,
+    },
+    brotar: {
+        img: 'firma_brotar.png',
+        ancho: 140,
+        alto: 34,
+        fondo: '#ffffff',
+        borde: true,
+    },
+    baker_romeral: {
+        img: 'firma_romeral_baker.png',
+        ancho: 130,
+        alto: 36,
+        fondo: '#ffffff',
+        borde: true,
+    },
+};
+
+function selSociedad(btn) {
+    document.querySelectorAll('.soc-btn').forEach(b => b.classList.remove('activo'));
+    btn.classList.add('activo');
+    sociedadActual = btn.dataset.soc;
+}
+
+function selDireccion(tipo) {
+    direccionActual = tipo;
+    document.getElementById('dir-oficina').classList.toggle('activo', tipo === 'oficina');
+    document.getElementById('dir-obra').classList.toggle('activo', tipo === 'obra');
+    const input = document.getElementById('f-direccion');
+    if (tipo === 'oficina') {
+        input.value = 'Av. El Bosque Nte 0177, Las Condes OF 1002';
+        input.readOnly = true;
+        input.style.background = 'var(--gris-1)';
+        input.style.color = 'var(--txt-mid)';
+    } else {
+        input.value = '';
+        input.readOnly = false;
+        input.style.background = 'var(--crema)';
+        input.style.color = 'var(--txt)';
+        input.placeholder = 'Ej: Km 5 Ruta 5 Sur, Linares';
+        input.focus();
+    }
+}
+
+function generarFirma() {
+    const nombre    = document.getElementById('f-nombre').value.trim();
+    const cargo     = document.getElementById('f-cargo').value.trim();
+    const telefono  = document.getElementById('f-telefono').value.trim();
+    const emailUser = document.getElementById('f-email-usuario').value.trim();
+    const emailDom  = document.getElementById('f-email-dominio').value;
+    const direccion = document.getElementById('f-direccion').value.trim();
+
+    if (!sociedadActual) { alert('Selecciona una sociedad.'); return; }
+    if (!nombre)         { alert('Ingresa tu nombre.'); return; }
+    if (!cargo)          { alert('Ingresa tu cargo.'); return; }
+    if (!emailUser)      { alert('Ingresa tu correo.'); return; }
+    if (!direccion)      { alert('Ingresa la dirección.'); return; }
+
+    const email = `${emailUser}@${emailDom}`;
+    const soc   = SOCIEDADES[sociedadActual];
+
+    // Íconos base64 pequeños (WhatsApp verde y Pin rojo) como SVG inline
+    const iconoWsp = `<img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" width="14" height="14" style="vertical-align:middle;margin-right:6px">`;
+    const iconoPin = `<img src="https://cdn-icons-png.flaticon.com/512/684/684908.png" width="12" height="14" style="vertical-align:middle;margin-right:6px">`;
+
+    // URL absoluta del logo (debe estar en el mismo repo)
+    const baseURL = window.location.origin + window.location.pathname.replace('firma.html','');
+    const logoURL = `${baseURL}${soc.img}`;
+
+    // Determinar estilo del contenedor del logo según sociedad
+    const logoTd = soc.fondo === '#2d2d2d'
+        ? `background-color:#2d2d2d;padding:20px 24px;vertical-align:middle`
+        : `background-color:#ffffff;padding:20px 24px;vertical-align:middle`;
+
+    // Separador
+    const separadorTd = soc.fondo === '#2d2d2d'
+        ? `width:2px;background-color:#555555;padding:0`
+        : `width:1px;background-color:#cccccc;padding:0`;
+
+    // Triángulo decorativo solo para Baker
+    const trianguloHtml = sociedadActual === 'baker'
+        ? `<td style="width:40px;background:linear-gradient(135deg,transparent 60%,#C0392B 60%);vertical-align:bottom;padding:0"></td>`
+        : '';
+
+    // Construir HTML de la firma (compatible Outlook — solo tablas)
+    const firmaHTML = `
+<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,sans-serif;font-size:13px;color:#333333;border:1px solid #e0e0e0;border-radius:0;max-width:520px">
+  <tr>
+    <td style="${logoTd};width:150px">
+      <img src="${logoURL}" width="${soc.ancho}" height="${soc.alto}" alt="Logo" style="display:block;border:0">
+    </td>
+    <td style="${separadorTd}">&nbsp;</td>
+    <td style="padding:16px 20px;vertical-align:middle;background-color:#ffffff">
+      <table cellpadding="0" cellspacing="0" border="0">
+        <tr><td style="font-size:14px;font-weight:bold;color:#1a1a1a;padding-bottom:2px">${nombre}</td></tr>
+        <tr><td style="font-size:12px;color:#666666;padding-bottom:10px">${cargo}</td></tr>
+        ${telefono ? `
+        <tr>
+          <td style="padding-bottom:6px">
+            <table cellpadding="0" cellspacing="0" border="0"><tr>
+              <td style="vertical-align:middle;padding-right:7px">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" width="14" height="14" style="display:block">
+              </td>
+              <td style="font-size:12px;color:#333333">${telefono}</td>
+            </tr></table>
+          </td>
+        </tr>` : ''}
+        <tr>
+          <td style="padding-bottom:6px">
+            <table cellpadding="0" cellspacing="0" border="0"><tr>
+              <td style="vertical-align:middle;padding-right:7px">
+                <img src="https://cdn-icons-png.flaticon.com/512/732/732200.png" width="14" height="14" style="display:block">
+              </td>
+              <td style="font-size:12px;color:#C0392B">${email}</td>
+            </tr></table>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <table cellpadding="0" cellspacing="0" border="0"><tr>
+              <td style="vertical-align:top;padding-right:7px;padding-top:1px">
+                <img src="https://cdn-icons-png.flaticon.com/512/684/684908.png" width="11" height="14" style="display:block">
+              </td>
+              <td style="font-size:12px;color:#666666;line-height:1.4">${direccion}</td>
+            </tr></table>
+          </td>
+        </tr>
+      </table>
+    </td>
+    ${trianguloHtml}
+  </tr>
+</table>`.trim();
+
+    // Mostrar preview
+    const previewBody = document.getElementById('preview-body');
+    previewBody.style.justifyContent = 'flex-start';
+    previewBody.style.padding = '24px';
+    previewBody.innerHTML = firmaHTML;
+
+    // Guardar HTML para copiar
+    document.getElementById('firma-html-container').innerHTML = firmaHTML;
+
+    // Mostrar botón copiar
+    document.getElementById('btn-copiar').style.display = 'flex';
+    document.getElementById('btn-copiar').classList.remove('copiado');
+    document.getElementById('btn-copiar').innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        Copiar firma`;
+
+    // Scroll al preview
+    previewBody.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function copiarFirma() {
+    const firmaEl = document.getElementById('firma-html-container').firstElementChild;
+    if (!firmaEl) return;
+
+    try {
+        // Copiar como HTML enriquecido (para pegar en Outlook)
+        const htmlString = document.getElementById('firma-html-container').innerHTML;
+        const blob = new Blob([htmlString], { type: 'text/html' });
+        const clipItem = new ClipboardItem({ 'text/html': blob });
+        await navigator.clipboard.write([clipItem]);
+
+        const btn = document.getElementById('btn-copiar');
+        btn.classList.add('copiado');
+        btn.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13"><polyline points="20 6 9 17 4 12"/></svg>
+            ¡Copiada!`;
+        setTimeout(() => {
+            btn.classList.remove('copiado');
+            btn.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                Copiar firma`;
+        }, 3000);
+    } catch(e) {
+        // Fallback: seleccionar el elemento para copiar manualmente
+        const range = document.createRange();
+        range.selectNode(document.getElementById('firma-html-container'));
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+        alert('Presiona Ctrl+C para copiar la firma seleccionada.');
+    }
+}
+</script>
+</body>
+</html>
