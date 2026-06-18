@@ -688,7 +688,8 @@ async function buscar() {
         renderTabla(datosActuales, data);
 
     } catch(err) {
-        mostrarError('No se pudo conectar con la API. Verifica que el servidor esté encendido.');
+        console.error('Error API:', err);
+        mostrarError(`Error de conexión: ${err.message}. Verifica que el servidor y el tunnel estén encendidos.`);
         document.getElementById('estado-inicial').style.display = 'block';
     } finally {
         btn.disabled = false;
@@ -704,12 +705,15 @@ function renderTabla(datos, meta) {
         return;
     }
 
+    // Mostrar contenedor ANTES de renderizar filas
+    document.getElementById('resultados-contenido').style.display = 'block';
+
     // Badge
     const badge = document.getElementById('resultados-badge');
     badge.className = 'resultados-badge badge-ok';
     badge.innerText = `${datos.length} registro${datos.length !== 1 ? 's' : ''}`;
 
-        // Renderizar primera página
+    // Renderizar primera página
     renderPagina(0);
 
     // Totales
@@ -727,6 +731,15 @@ function renderTabla(datos, meta) {
 
     document.getElementById('resultados-contenido').style.display = 'block';
     document.getElementById('btn-excel').disabled = false;
+}
+
+function parseFechaLocal(str) {
+    if (!str) return new Date();
+    const s = str.replace('Z','').split('.')[0];
+    const [fecha, hora] = s.split('T');
+    const [y, m, d] = fecha.split('-').map(Number);
+    const [hh, mm, ss] = (hora || '00:00:00').split(':').map(Number);
+    return new Date(y, m-1, d, hh, mm, ss || 0);
 }
 
 function formatNum(n) {
