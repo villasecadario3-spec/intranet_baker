@@ -468,7 +468,62 @@
         @media(max-width:480px) {
             .modulos-grid { grid-template-columns:1fr; }
         }
-    </style>
+    
+        /* ══ ACCESOS RÁPIDOS ══════════════════════════════════ */
+        .accesos-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            background: var(--color-iron);
+            border: 1px solid var(--color-iron);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            margin-bottom: 60px;
+        }
+        .acceso-card {
+            background: var(--color-slate);
+            padding: 22px 24px;
+            text-decoration: none;
+            display: flex; align-items: center; gap: 16px;
+            transition: background 0.2s;
+            position: relative; overflow: hidden;
+        }
+        .acceso-card::before {
+            content:'';
+            position:absolute; top:0; left:0; right:0; height:1px;
+            background: var(--gradient-gold);
+            opacity:0; transition:opacity 0.25s;
+        }
+        .acceso-card:hover { background: var(--color-graphite); }
+        .acceso-card:hover::before { opacity:1; }
+        .acceso-icon {
+            width:40px; height:40px; border-radius: var(--radius-sm);
+            border: 1px solid var(--color-iron);
+            display:flex; align-items:center; justify-content:center;
+            flex-shrink:0; font-size:1.1rem;
+            background: var(--color-graphite);
+        }
+        .acceso-info { flex:1; min-width:0; }
+        .acceso-nombre {
+            font-size: 14px; font-weight:600;
+            color: var(--color-bone);
+            letter-spacing: -0.007em;
+        }
+        .acceso-desc {
+            font-size: 12px; font-weight:400;
+            color: var(--color-fog); margin-top:2px;
+        }
+        .acceso-arrow {
+            color: var(--color-steel);
+            transition: color 0.2s, transform 0.2s;
+            flex-shrink:0;
+        }
+        .acceso-card:hover .acceso-arrow {
+            color: var(--color-ember-gold);
+            transform: translateX(3px);
+        }
+        @media(max-width:768px) { .accesos-grid { grid-template-columns:1fr; } }
+</style>
 </head>
 <body>
 
@@ -668,6 +723,51 @@
                     <div class="mod-status status-off">Próximamente</div>
                 </div>
             </div>
+
+        </div>
+    </div>
+
+        <!-- Accesos Rápidos -->
+    <div style="margin-bottom:60px">
+        <div class="sec-header">
+            <div class="sec-titulo">Accesos Rápidos</div>
+            <div class="sec-linea"></div>
+            <div class="sec-meta">Sistemas externos</div>
+        </div>
+        <div class="accesos-grid">
+
+            <a class="acceso-card" href="https://iconstruye.com" target="_blank" rel="noopener">
+                <div class="acceso-icon">🏗️</div>
+                <div class="acceso-info">
+                    <div class="acceso-nombre">iConstruye</div>
+                    <div class="acceso-desc">Portal de compras y proveedores</div>
+                </div>
+                <div class="acceso-arrow">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </div>
+            </a>
+
+            <a class="acceso-card" href="https://ibakercl.monday.com" target="_blank" rel="noopener">
+                <div class="acceso-icon">📋</div>
+                <div class="acceso-info">
+                    <div class="acceso-nombre">Monday</div>
+                    <div class="acceso-desc">Gestión de tareas y proyectos</div>
+                </div>
+                <div class="acceso-arrow">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </div>
+            </a>
+
+            <a class="acceso-card" href="https://ibaker.cloudseidor.com" target="_blank" rel="noopener">
+                <div class="acceso-icon">🖥️</div>
+                <div class="acceso-info">
+                    <div class="acceso-nombre">SAP — Escritorio Remoto</div>
+                    <div class="acceso-desc">Acceso remoto al servidor SAP</div>
+                </div>
+                <div class="acceso-arrow">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </div>
+            </a>
 
         </div>
     </div>
