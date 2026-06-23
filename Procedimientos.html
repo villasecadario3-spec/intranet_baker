@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intranet — Inmobiliaria Baker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&family=Inter:wght@300;400;500;600;700&family=Inter+Tight:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="preload" as="image" href="vista-panoramica.jpg">
+    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+    <style>
+        :root {
+            --color-obsidian:   #000000;
+            --color-carbon:     #030304;
+            --color-inkwell:    #08080a;
+            --color-graphite:   #121317;
+            --color-slate:      #1c1d22;
+            --color-iron:       #2e3038;
+            --color-steel:      #464853;
+            --color-fog:        #5e616e;
+            --color-ash:        #777a88;
+            --color-silver:     #9194a1;
+            --color-pearl:      #acafb9;
+            --color-chalk:      #cdcdcd;
+            --color-bone:       #e2e3e9;
+            --color-paper:      #ffffff;
+            --color-ember-gold: #cc9166;
+            --color-molten-gold:#ae9357;
+            --gradient-gold:    linear-gradient(103deg, rgb(174,147,87), rgb(255,240,204) 40%, rgb(174,147,87) 70%, rgba(189,157,79,0));
+            --color-chalk-glow: #fff0cc;
+            --radius-sm:    2px;
+            --radius-lg:    10px;
+            --radius-full:  9999px;
+            --font-display: 'Playfair Display', 'Georgia', serif;
+            --font-ui:      'Inter', system-ui, sans-serif;
+        }
+
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+        html { scroll-behavior:smooth; }
+        body {
+            font-family: var(--font-ui);
+            background: var(--color-obsidian);
+            color: var(--color-bone);
+            min-height: 100vh;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── LOADING ──────────────────────────────────────── */
+        .loading {
+            position: fixed; inset:0; z-index:9999;
+            background: var(--color-obsidian);
+            display: flex; flex-direction:column;
+            align-items:center; justify-content:center; gap:24px;
+            transition: opacity 0.6s, visibility 0.6s;
+        }
+        .loading.oculto { opacity:0; visibility:hidden; pointer-events:none; }
+        .loading-logo img {
+            height: 40px; width:auto;
+            background: white; border-radius: var(--radius-sm);
+            padding: 6px 14px; display:block;
+        }
+        .loading-bar {
+            width: 120px; height: 1px;
+            background: var(--color-iron); overflow:hidden;
+        }
+        .loading-bar-fill {
+            height:100%; background: var(--color-ember-gold);
+            animation: fillBar 1.6s cubic-bezier(.4,0,.2,1) forwards;
+        }
+        @keyframes fillBar { from{width:0} to{width:100%} }
+        .loading-label {
+            font-size: 11px; font-weight:500;
+            letter-spacing: 0.12em; text-transform:uppercase;
+            color: var(--color-ash);
+        }
+
+        /* ── LOGIN BLOCKER ────────────────────────────────── */
+        .login-blocker {
+            position: fixed; inset:0; z-index:500;
+            background: var(--color-obsidian);
+            display: flex; align-items:center; justify-content:center;
+            padding: 20px;
+            opacity:0; pointer-events:none;
+            transition: opacity 0.4s;
+        }
+        .login-blocker.visible { opacity:1; pointer-events:all; }
+        .login-box { max-width:380px; width:100%; }
+        .login-eyebrow {
+            font-size: 11px; font-weight:500;
+            letter-spacing: 0.14em; text-transform:uppercase;
+            color: var(--color-ember-gold);
+            margin-bottom: 32px;
+            display: flex; align-items:center; gap:12px;
+        }
+        .login-eyebrow::before, .login-eyebrow::after {
+            content:''; flex:1; height:1px;
+            background: linear-gradient(90deg, transparent, var(--color-iron));
+        }
+        .login-eyebrow::after {
+            background: linear-gradient(90deg, var(--color-iron), transparent);
+        }
+        .login-wordmark {
+            font-family: var(--font-display);
+            font-size: 48px; font-weight:400;
+            color: var(--color-paper);
+            letter-spacing: -0.025em; line-height:1;
+            margin-bottom: 8px;
+        }
+        .login-wordmark em {
+            font-style: italic;
+            color: var(--color-ember-gold);
+        }
+        .login-sub {
+            font-size: 14px; font-weight:300;
+            color: var(--color-ash); line-height:1.5;
+            margin-bottom: 40px;
+        }
+        .btn-ms-login {
+            display: flex; align-items:center; justify-content:center; gap:10px;
+            width:100%; padding: 10px 20px;
+            background: var(--color-paper); border: none;
+            border-radius: var(--radius-sm);
+            color: var(--color-inkwell); cursor:pointer;
+            font-family: var(--font-ui); font-size:15px; font-weight:500;
+            letter-spacing: -0.007em;
+            transition: background 0.15s;
+            margin-bottom: 14px;
+        }
+        .btn-ms-login:hover { background: var(--color-bone); }
+        .btn-ms-login svg { width:16px; height:16px; }
+        .login-restriccion {
+            font-size: 12px; color: var(--color-fog);
+            text-align:center; letter-spacing:0.01em;
+        }
+
+        /* ── NAV ──────────────────────────────────────────── */
+        nav {
+            position: sticky; top:0; z-index:200;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--color-iron);
+            height: 56px;
+            display: flex; align-items:center;
+            padding: 0 40px; gap:20px;
+        }
+        .nav-logo { text-decoration:none; flex-shrink:0; }
+        .nav-logo img {
+            height:24px; width:auto; display:block;
+            background: white; border-radius: var(--radius-sm);
+            padding: 3px 8px;
+        }
+        .nav-divider { width:1px; height:16px; background:var(--color-iron); }
+        .nav-label {
+            font-size: 12px; font-weight:500;
+            letter-spacing: 0.08em; text-transform:uppercase;
+            color: var(--color-silver);
+        }
+        .nav-spacer { flex:1; }
+        .nav-clock {
+            font-size: 13px; font-weight:400;
+            color: var(--color-ash);
+            font-variant-numeric: tabular-nums;
+        }
+        .btn-nav-login {
+            display: flex; align-items:center; gap:7px;
+            padding: 6px 14px;
+            background: var(--color-paper); border:none;
+            border-radius: var(--radius-sm);
+            color: var(--color-inkwell); cursor:pointer;
+            font-family: var(--font-ui); font-size:13px; font-weight:500;
+            transition: background 0.15s;
+        }
+        .btn-nav-login:hover { background: var(--color-bone); }
+        .btn-nav-login svg { width:13px; height:13px; }
+        .user-chip {
+            display: flex; align-items:center; gap:8px;
+            padding: 4px 12px 4px 4px;
+            background: var(--color-slate);
+            border: 1px solid var(--color-iron);
+            border-radius: var(--radius-full);
+        }
+        .user-av {
+            width:26px; height:26px; border-radius:50%;
+            background: var(--color-ember-gold);
+            display:flex; align-items:center; justify-content:center;
+            font-family: var(--font-display);
+            font-size: 11px; font-weight:500; color: var(--color-inkwell);
+        }
+        .user-nm {
+            font-size: 13px; font-weight:500;
+            color: var(--color-bone);
+            max-width:110px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+        }
+        .btn-out {
+            background:none; border:none; color:var(--color-fog);
+            cursor:pointer; font-size:11px; padding:0; transition:color 0.15s;
+        }
+        .btn-out:hover { color:var(--color-ember-gold); }
+
+        /* ── HERO ─────────────────────────────────────────── */
+        .hero {
+            padding: 80px 40px 72px;
+            position: relative; overflow:hidden;
+            border-bottom: 1px solid var(--color-iron);
+        }
+        .hero-bg {
+            position: absolute; inset:0; z-index:0;
+        }
+        .hero-bg img {
+            width:100%; height:100%;
+            object-fit:cover; object-position:center 40%;
+            opacity: 0.07; display:block;
+        }
+        /* Viñeta sobre la imagen */
+        .hero-bg::after {
+            content:'';
+            position:absolute; inset:0;
+            background: radial-gradient(ellipse 80% 100% at 70% 50%,
+                rgba(204,145,102,0.06) 0%, transparent 65%);
+        }
+        .hero-inner {
+            position:relative; z-index:1;
+            max-width: 1200px;
+        }
+        .hero-eyebrow {
+            font-size: 11px; font-weight:500;
+            letter-spacing: 0.18em; text-transform:uppercase;
+            color: var(--color-ember-gold);
+            margin-bottom: 24px;
+            display:flex; align-items:center; gap:12px;
+        }
+        .hero-eyebrow::before {
+            content:''; width:20px; height:1px;
+            background: var(--color-ember-gold); opacity:0.6;
+        }
+        .hero h1 {
+            font-family: var(--font-display);
+            font-size: clamp(48px, 6vw, 80px);
+            font-weight: 400; line-height:1;
+            letter-spacing: -0.025em;
+            color: var(--color-paper);
+            margin-bottom: 20px;
+        }
+        .hero h1 em {
+            font-style: italic;
+            color: var(--color-ember-gold);
+        }
+        .hero-sub {
+            font-size: 15px; font-weight:300;
+            color: var(--color-ash); line-height:1.55;
+            max-width: 440px; margin-bottom: 36px;
+        }
+        .hero-bienvenida {
+            display:none; align-items:center; gap:10px;
+        }
+        .hero-bienvenida.visible { display:flex; }
+        .hero-av {
+            width:32px; height:32px; border-radius:50%;
+            background: var(--color-ember-gold);
+            display:flex; align-items:center; justify-content:center;
+            font-family: var(--font-display);
+            font-size:12px; font-weight:500; color:var(--color-inkwell);
+        }
+        .hero-hola {
+            font-size: 14px; font-weight:400;
+            color: var(--color-silver);
+        }
+        .hero-hola strong { color: var(--color-bone); font-weight:500; }
+
+        /* ── MAIN ─────────────────────────────────────────── */
+        .main { padding: 56px 40px 100px; max-width:1280px; }
+
+        /* Sección header */
+        .sec-header {
+            display:flex; align-items:center; gap:16px;
+            margin-bottom: 20px;
+        }
+        .sec-titulo {
+            font-size: 12px; font-weight:600;
+            letter-spacing: 0.1em; text-transform:uppercase;
+            color: var(--color-silver); white-space:nowrap;
+        }
+        .sec-linea { flex:1; height:1px; background:var(--color-iron); }
+        .sec-meta {
+            font-size: 11px; color:var(--color-fog);
+            white-space:nowrap; letter-spacing:0.06em;
+        }
+
+        /* ── MÓDULOS ──────────────────────────────────────── */
+        .modulos { margin-bottom: 60px; }
+        .modulos-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            background: var(--color-iron);
+            border: 1px solid var(--color-iron);
+            border-radius: var(--radius-lg);
+            overflow:hidden;
+        }
+
+        .mod-card {
+            background: var(--color-slate);
+            padding: 28px 24px;
+            text-decoration:none;
+            display:flex; flex-direction:column; gap:20px;
+            transition: background 0.2s;
+            position:relative; overflow:hidden;
+            cursor:pointer;
+        }
+        .mod-card::before {
+            content:'';
+            position:absolute; top:0; left:0; right:0; height:1px;
+            background: var(--gradient-gold);
+            opacity:0; transition:opacity 0.25s;
+        }
+        .mod-card:not(.disabled):hover { background: var(--color-graphite); }
+        .mod-card:not(.disabled):hover::before { opacity:1; }
+        .mod-card.disabled { opacity:0.35; cursor:default; pointer-events:none; }
+
+        .mod-num {
+            font-size: 11px; font-weight:500;
+            color: var(--color-fog);
+            font-variant-numeric: tabular-nums;
+            letter-spacing:0.06em;
+        }
+        .mod-icon {
+            width:36px; height:36px;
+            border: 1px solid var(--color-iron);
+            border-radius: var(--radius-sm);
+            display:flex; align-items:center; justify-content:center;
+            background: var(--color-graphite);
+        }
+        .mod-icon.on { border-color: var(--color-ember-gold); background: rgba(204,145,102,0.08); }
+        .mod-icon svg { width:16px; height:16px; color:var(--color-silver); }
+        .mod-icon.on svg { color: var(--color-ember-gold); }
+
+        .mod-body { flex:1; }
+        .mod-nombre {
+            font-size: 15px; font-weight:600;
+            color: var(--color-bone);
+            letter-spacing: -0.007em;
+            margin-bottom: 6px;
+        }
+        .mod-desc {
+            font-size: 13px; font-weight:400;
+            color: var(--color-fog); line-height:1.5;
+        }
+
+        .mod-footer {
+            display:flex; align-items:center; justify-content:space-between;
+        }
+        .mod-status {
+            font-size: 11px; font-weight:500;
+            letter-spacing:0.08em; text-transform:uppercase;
+            padding: 2px 10px; border-radius: var(--radius-full);
+        }
+        .status-on {
+            color: var(--color-ember-gold);
+            border: 1px solid var(--color-ember-gold);
+            background: rgba(204,145,102,0.06);
+        }
+        .status-off {
+            color: var(--color-fog);
+            border: 1px solid var(--color-steel);
+        }
+        .mod-arrow {
+            color: var(--color-steel);
+            transition: color 0.2s, transform 0.2s;
+        }
+        .mod-card:not(.disabled):hover .mod-arrow {
+            color: var(--color-ember-gold);
+            transform: translateX(3px);
+        }
+
+        /* ── NOTICIAS ─────────────────────────────────────── */
+        .noticias-grid {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr 1fr;
+            gap: 1px;
+            background: var(--color-iron);
+            border: 1px solid var(--color-iron);
+            border-radius: var(--radius-lg);
+            overflow:hidden;
+        }
+
+        .not-card {
+            background: var(--color-slate);
+            display:flex; flex-direction:column;
+            transition: background 0.2s;
+        }
+        .not-card:hover { background: var(--color-graphite); }
+
+        .not-visual {
+            height: 140px;
+            background: var(--color-inkwell);
+            display:flex; align-items:center; justify-content:center;
+            font-size: 2rem;
+            position:relative; overflow:hidden;
+        }
+        .not-card.principal .not-visual { height:180px; }
+        .not-visual::before {
+            content:'';
+            position:absolute; inset:0;
+            background: repeating-linear-gradient(
+                45deg, transparent, transparent 24px,
+                rgba(46,48,56,0.4) 24px, rgba(46,48,56,0.4) 25px
+            );
+        }
+        .not-cat {
+            position:absolute; bottom:12px; left:14px; z-index:2;
+            font-size: 10px; font-weight:600;
+            letter-spacing:0.12em; text-transform:uppercase;
+            padding: 2px 8px; border-radius: var(--radius-full);
+            color: var(--color-ember-gold);
+            border: 1px solid var(--color-ember-gold);
+            background: rgba(204,145,102,0.08);
+        }
+
+        .not-body { padding: 20px; flex:1; display:flex; flex-direction:column; gap:8px; }
+        .not-fecha {
+            font-size: 11px; font-weight:500;
+            color: var(--color-fog);
+            letter-spacing:0.08em; text-transform:uppercase;
+            font-variant-numeric: tabular-nums;
+        }
+        .not-titulo {
+            font-family: var(--font-display);
+            font-size: 16px; font-weight:400;
+            color: var(--color-bone); line-height:1.35;
+        }
+        .not-card.principal .not-titulo { font-size:18px; }
+        .not-extracto {
+            font-size: 13px; font-weight:300;
+            color: var(--color-ash); line-height:1.6;
+            margin-top:2px;
+        }
+
+        /* ── FOOTER ───────────────────────────────────────── */
+        footer {
+            border-top: 1px solid var(--color-iron);
+            padding: 18px 40px;
+            display:flex; align-items:center; justify-content:space-between;
+        }
+        .footer-l {
+            font-size: 12px; font-weight:400;
+            color: var(--color-fog);
+        }
+        .footer-r {
+            font-size: 11px; font-weight:400;
+            color: var(--color-steel);
+            font-variant-numeric: tabular-nums;
+        }
+
+        @media(max-width:1024px) {
+            .modulos-grid { grid-template-columns: repeat(2,1fr); }
+            .noticias-grid { grid-template-columns:1fr; }
+        }
+        @media(max-width:768px) {
+            nav { padding:0 20px; }
+            .hero { padding:60px 20px 52px; }
+            .main { padding:40px 20px 60px; }
+            .modulos-grid { grid-template-columns:1fr 1fr; }
+            footer { padding:16px 20px; flex-direction:column; gap:6px; }
+        }
+        @media(max-width:480px) {
+            .modulos-grid { grid-template-columns:1fr; }
+        }
+    
+        /* ══ ACCESOS RÁPIDOS ══════════════════════════════════ */
+        .accesos-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            background: var(--color-iron);
+            border: 1px solid var(--color-iron);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            margin-bottom: 60px;
+        }
+        .acceso-card {
+            background: var(--color-slate);
+            padding: 22px 24px;
+            text-decoration: none;
+            display: flex; align-items: center; gap: 16px;
+            transition: background 0.2s;
+            position: relative; overflow: hidden;
+        }
+        .acceso-card::before {
+            content:'';
+            position:absolute; top:0; left:0; right:0; height:1px;
+            background: var(--gradient-gold);
+            opacity:0; transition:opacity 0.25s;
+        }
+        .acceso-card:hover { background: var(--color-graphite); }
+        .acceso-card:hover::before { opacity:1; }
+        .acceso-icon {
+            width:40px; height:40px; border-radius: var(--radius-sm);
+            border: 1px solid var(--color-iron);
+            display:flex; align-items:center; justify-content:center;
+            flex-shrink:0; font-size:1.1rem;
+            background: var(--color-graphite);
+        }
+        .acceso-info { flex:1; min-width:0; }
+        .acceso-nombre {
+            font-size: 14px; font-weight:600;
+            color: var(--color-bone);
+            letter-spacing: -0.007em;
+        }
+        .acceso-desc {
+            font-size: 12px; font-weight:400;
+            color: var(--color-fog); margin-top:2px;
+        }
+        .acceso-arrow {
+            color: var(--color-steel);
+            transition: color 0.2s, transform 0.2s;
+            flex-shrink:0;
+        }
+        .acceso-card:hover .acceso-arrow {
+            color: var(--color-ember-gold);
+            transform: translateX(3px);
+        }
+        @media(max-width:768px) { .accesos-grid { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading" id="loading">
+    <div class="loading-logo">
+        <img src="LOGO_BAKER.png" alt="Baker"
+             onerror="this.outerHTML='<span style=\'font-family:Georgia,serif;font-size:1.4rem;color:white\'>BAKER</span>'">
+    </div>
+    <div class="loading-bar"><div class="loading-bar-fill"></div></div>
+    <div class="loading-label">Cargando portal</div>
+</div>
+
+<!-- LOGIN BLOCKER -->
+<div class="login-blocker" id="login-blocker">
+    <div class="login-box">
+        <div class="login-eyebrow">Portal Corporativo</div>
+        <div class="login-wordmark">Baker<em>.</em></div>
+        <div class="login-sub">Acceso exclusivo para colaboradores de Inmobiliaria Baker SPA.</div>
+        <button class="btn-ms-login" onclick="loginMicrosoft()">
+            <svg viewBox="0 0 21 21" fill="none">
+                <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+                <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+                <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+            </svg>
+            Ingresar con Microsoft
+        </button>
+        <div class="login-restriccion">Ingresar solo correos corporativos Baker, CMC y Brotar</div>
+    </div>
+</div>
+
+<!-- NAV -->
+<nav>
+    <a class="nav-logo" href="#">
+        <img src="LOGO_BAKER.png" alt="Baker"
+             onerror="this.outerHTML='<span style=\'font-family:Georgia,serif;font-size:0.9rem;color:white;font-weight:500\'>BAKER</span>'">
+    </a>
+    <div class="nav-divider"></div>
+    <div class="nav-label">Intranet</div>
+    <div class="nav-spacer"></div>
+    <div class="nav-clock" id="nav-clock">—</div>
+    <div id="auth-area">
+        <button class="btn-nav-login" onclick="loginMicrosoft()">
+            <svg viewBox="0 0 21 21" fill="none">
+                <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+                <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+                <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+            </svg>
+            Ingresar
+        </button>
+    </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+    <div class="hero-bg">
+        <img src="vista-panoramica.jpg" alt="" fetchpriority="high">
+    </div>
+    <div class="hero-inner">
+        <div class="hero-eyebrow">Portal Interno 2026</div>
+        <h1>Tu espacio<br>de trabajo,<br><em>digital.</em></h1>
+        <p class="hero-sub">Accede a los sistemas, herramientas e información del grupo Baker desde un solo lugar, disponible para todo el equipo.</p>
+        <div class="hero-bienvenida" id="hero-bienvenida">
+            <div class="hero-av" id="hero-av">—</div>
+            <div class="hero-hola">Bienvenido, <strong id="hero-nombre">—</strong></div>
+        </div>
+    </div>
+</section>
+
+<!-- MAIN -->
+<div class="main">
+
+    <!-- Módulos -->
+    <div class="modulos">
+        <div class="sec-header">
+            <div class="sec-titulo">Módulos</div>
+            <div class="sec-linea"></div>
+            <div class="sec-meta">6 activos · 1 próximamente</div>
+        </div>
+        <div class="modulos-grid">
+
+            <a class="mod-card" href="softland.html">
+                <div class="mod-num">01</div>
+                <div class="mod-icon on">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                        <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                    </svg>
+                </div>
+                <div class="mod-body">
+                    <div class="mod-nombre">Consultas Softland</div>
+                    <div class="mod-desc">Asientos contables, vouchers y movimientos de las 5 empresas. Exporta a Excel.</div>
+                </div>
+                <div class="mod-footer">
+                    <div class="mod-status status-on">Activo</div>
+                    <div class="mod-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+                </div>
+            </a>
+
+            <a class="mod-card" href="salas.html">
+                <div class="mod-num">02</div>
+                <div class="mod-icon on">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                </div>
+                <div class="mod-body">
+                    <div class="mod-nombre">Salas de Reunión</div>
+                    <div class="mod-desc">Disponibilidad en tiempo real y agendamiento directo desde Outlook.</div>
+                </div>
+                <div class="mod-footer">
+                    <div class="mod-status status-on">Activo</div>
+                    <div class="mod-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+                </div>
+            </a>
+
+            <a class="mod-card" href="impresoras.html">
+                <div class="mod-num">03</div>
+                <div class="mod-icon on">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+                    </svg>
+                </div>
+                <div class="mod-body">
+                    <div class="mod-nombre">Impresoras</div>
+                    <div class="mod-desc">Instala la RICOH IM 430 o la HP Smart Tank 530 sin necesitar ayuda de TI.</div>
+                </div>
+                <div class="mod-footer">
+                    <div class="mod-status status-on">Activo</div>
+                    <div class="mod-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+                </div>
+            </a>
+
+            <a class="mod-card" href="solicitud-ti.html">
+                <div class="mod-num">04</div>
+                <div class="mod-icon on">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                </div>
+                <div class="mod-body">
+                    <div class="mod-nombre">Solicitudes TI</div>
+                    <div class="mod-desc">Reporta problemas o solicita equipamiento directamente a TI.</div>
+                </div>
+                <div class="mod-footer">
+                    <div class="mod-status status-on">Activo</div>
+                    <div class="mod-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+                </div>
+            </a>
+
+            <a class="mod-card" href="firma.html">
+                <div class="mod-num">05</div>
+                <div class="mod-icon on">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                    </svg>
+                </div>
+                <div class="mod-body">
+                    <div class="mod-nombre">Firma de Correo</div>
+                    <div class="mod-desc">Genera tu firma corporativa para Outlook en segundos, con el logo de tu sociedad.</div>
+                </div>
+                <div class="mod-footer">
+                    <div class="mod-status status-on">Activo</div>
+                    <div class="mod-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+                </div>
+            </a>
+
+            <a class="mod-card" href="procedimientos.html">
+                <div class="mod-num">06</div>
+                <div class="mod-icon on">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                </div>
+                <div class="mod-body">
+                    <div class="mod-nombre">Procedimientos</div>
+                    <div class="mod-desc">Instructivos y documentos internos del grupo Baker desde SharePoint.</div>
+                </div>
+                <div class="mod-footer">
+                    <div class="mod-status status-on">Activo</div>
+                    <div class="mod-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+                </div>
+            </a>
+
+            <div class="mod-card disabled">
+                <div class="mod-num">07</div>
+                <div class="mod-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
+                    </svg>
+                </div>
+                <div class="mod-body">
+                    <div class="mod-nombre">Directorio</div>
+                    <div class="mod-desc">Contactos internos y organigrama de todas las empresas del grupo Baker.</div>
+                </div>
+                <div class="mod-footer">
+                    <div class="mod-status status-off">Próximamente</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+        <!-- Accesos Rápidos -->
+    <div style="margin-bottom:60px">
+        <div class="sec-header">
+            <div class="sec-titulo">Accesos Rápidos</div>
+            <div class="sec-linea"></div>
+            <div class="sec-meta">Sistemas externos</div>
+        </div>
+        <div class="accesos-grid">
+
+            <a class="acceso-card" href="https://iconstruye.com" target="_blank" rel="noopener">
+                <div class="acceso-icon">🏗️</div>
+                <div class="acceso-info">
+                    <div class="acceso-nombre">iConstruye</div>
+                    <div class="acceso-desc">Portal de compras y proveedores</div>
+                </div>
+                <div class="acceso-arrow">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </div>
+            </a>
+
+            <a class="acceso-card" href="https://ibakercl.monday.com" target="_blank" rel="noopener">
+                <div class="acceso-icon">📋</div>
+                <div class="acceso-info">
+                    <div class="acceso-nombre">Monday</div>
+                    <div class="acceso-desc">Gestión de tareas y proyectos</div>
+                </div>
+                <div class="acceso-arrow">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </div>
+            </a>
+
+            <a class="acceso-card" href="https://ibaker.cloudseidor.com" target="_blank" rel="noopener">
+                <div class="acceso-icon">🖥️</div>
+                <div class="acceso-info">
+                    <div class="acceso-nombre">SAP — Escritorio Remoto</div>
+                    <div class="acceso-desc">Acceso remoto al servidor SAP</div>
+                </div>
+                <div class="acceso-arrow">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </div>
+            </a>
+
+        </div>
+    </div>
+
+    <!-- Noticias -->
+    <div>
+        <div class="sec-header">
+            <div class="sec-titulo">Novedades internas</div>
+            <div class="sec-linea"></div>
+            <div class="sec-meta">Junio 2026</div>
+        </div>
+        <div class="noticias-grid">
+
+            <div class="not-card principal">
+                <div class="not-visual">
+                    🏢
+                    <div class="not-cat">Tecnología</div>
+                </div>
+                <div class="not-body">
+                    <div class="not-fecha">08 Jun 2026</div>
+                    <div class="not-titulo">Lanzamiento del portal de intranet Baker</div>
+                    <div class="not-extracto">El grupo Baker cuenta ahora con un portal interno centralizado para acceder a herramientas, sistemas y comunicaciones desde cualquier dispositivo con correo corporativo.</div>
+                </div>
+            </div>
+
+            <div class="not-card">
+                <div class="not-visual" style="font-size:1.8rem">
+                    📊
+                    <div class="not-cat">Sistemas</div>
+                </div>
+                <div class="not-body">
+                    <div class="not-fecha">08 Jun 2026</div>
+                    <div class="not-titulo">Consultas Softland disponibles en línea</div>
+                    <div class="not-extracto">Busca asientos contables y exporta a Excel sin necesitar ayuda de TI.</div>
+                </div>
+            </div>
+
+            <div class="not-card">
+                <div class="not-visual" style="font-size:1.8rem">
+                    🖨️
+                    <div class="not-cat">TI</div>
+                </div>
+                <div class="not-body">
+                    <div class="not-fecha">Jun 2026</div>
+                    <div class="not-titulo">Instalación de impresoras es ahora autoservicio</div>
+                    <div class="not-extracto">Descarga el driver desde el portal sin contactar soporte.</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<!-- FOOTER -->
+<footer>
+    <div class="footer-l">Inmobiliaria Baker SPA — Portal Interno</div>
+    <div class="footer-r">v1.0.0 · 2026</div>
+</footer>
+
+<script>
+const msalConfig = {
+    auth: {
+        clientId:    "d9664e06-7fd2-401d-b27b-97116fed7d9f",
+        authority:   "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
+        redirectUri: window.location.origin,
+    },
+    cache: { cacheLocation: "sessionStorage" }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+const DOMINIOS = ['@ibaker.cl', '@cmcromeral.cl', '@epbrotar.cl'];
+let usuarioActual = null;
+
+async function loginMicrosoft() {
+    try {
+        await msalInstance.initialize();
+        const result = await msalInstance.loginPopup({ scopes: ["User.Read"] });
+        const email = result.account.username || '';
+        if (!DOMINIOS.some(d => email.endsWith(d))) {
+            await msalInstance.logoutPopup({ account: result.account });
+            alert('Acceso restringido. Ingresar solo correos corporativos Baker, CMC y Brotar.');
+            return;
+        }
+        usuarioActual = result.account;
+        actualizarUI();
+    } catch(e) { console.error('Login cancelado', e); }
+}
+
+function logout() {
+    msalInstance.logoutPopup();
+    usuarioActual = null;
+    actualizarUI();
+}
+
+function actualizarUI() {
+    const blocker = document.getElementById('login-blocker');
+    const area    = document.getElementById('auth-area');
+    const bienvenida = document.getElementById('hero-bienvenida');
+
+    if (usuarioActual) {
+        blocker.classList.remove('visible');
+        const nombre = usuarioActual.name || usuarioActual.username;
+        const iniciales = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+        const primerNombre = nombre.split(' ')[0];
+
+        area.innerHTML = `
+            <div class="user-chip">
+                <div class="user-av">${iniciales}</div>
+                <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
+                <button class="btn-out" onclick="logout()">✕</button>
+            </div>`;
+
+        document.getElementById('hero-av').innerText = iniciales;
+        document.getElementById('hero-nombre').innerText = primerNombre;
+        bienvenida.classList.add('visible');
+
+        // Revisar acceso denegado desde Softland
+        checkAccesoDenegado();
+    } else {
+        blocker.classList.add('visible');
+        bienvenida.classList.remove('visible');
+        area.innerHTML = `
+            <button class="btn-nav-login" onclick="loginMicrosoft()">
+                <svg viewBox="0 0 21 21" fill="none" style="width:13px;height:13px">
+                    <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                    <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+                    <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+                    <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+                </svg>
+                Ingresar
+            </button>`;
+    }
+}
+
+async function intentarLoginSilencioso() {
+    try {
+        await msalInstance.initialize();
+        const accounts = msalInstance.getAllAccounts();
+        if (accounts.length > 0) usuarioActual = accounts[0];
+    } catch(e) {}
+}
+
+function checkAccesoDenegado() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('acceso') !== 'denegado') return;
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1410;border:1px solid rgba(204,145,102,0.3);border-radius:var(--radius-lg);padding:12px 18px;display:flex;align-items:center;gap:9px;font-size:13px;color:#cc9166;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,0.5);white-space:nowrap';
+    toast.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> No tienes acceso al módulo de Consultas Softland.';
+    document.body.appendChild(toast);
+    window.history.replaceState({}, '', window.location.pathname);
+    setTimeout(() => toast.remove(), 5000);
+}
+
+function tickClock() {
+    document.getElementById('nav-clock').innerText =
+        new Date().toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' });
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+async function init() {
+    await intentarLoginSilencioso();
+    actualizarUI();
+    setTimeout(() => document.getElementById('loading').classList.add('oculto'), 1600);
+}
+init();
+</script>
+</body>
+</html>
