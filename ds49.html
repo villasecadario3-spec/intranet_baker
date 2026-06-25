@@ -285,10 +285,10 @@
 <script>
 // ── LISTA BLANCA ──────────────────────────────────────────────
 const ACCESO_DS49 = [
+    'dvillaseca@ibaker.cl',
     'cgarces@ibaker.cl',
     'dparedes@epbrotar.cl',
     'dponce@epbrotar.cl',
-    'dvillaseca@ibaker..cl',
     'nvedia@epbrotar.cl',
     'ncaris@epbrotar.cl',
 ];
@@ -312,7 +312,7 @@ async function initAuth() {
             const usuario = accounts[0];
             const email = usuario.username.toLowerCase();
             if (!ACCESO_DS49.includes(email)) {
-                window.location.href = 'index.html?acceso=denegado';
+                window.location.href = 'index.html?acceso=ds49';
                 return;
             }
             const nombre = usuario.name || usuario.username;
