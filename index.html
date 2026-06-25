@@ -650,7 +650,7 @@
                 </div>
                 <div class="mod-body">
                     <div class="mod-nombre">Impresoras</div>
-                    <div class="mod-desc">Instala la RICOH IM 430 o la HP Smart Tank 530.</div>
+                    <div class="mod-desc">Instala la RICOH IM 430 o la HP Smart Tank 530 sin necesitar ayuda de TI.</div>
                 </div>
                 <div class="mod-footer">
                     <div class="mod-status status-on">Activo</div>
@@ -914,10 +914,17 @@ async function intentarLoginSilencioso() {
 
 function checkAccesoDenegado() {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('acceso') !== 'denegado') return;
+    const acceso = params.get('acceso');
+    const mensajes = {
+        'softland': 'No tienes acceso al módulo de Consultas Softland.',
+        'ds49':     'No tienes acceso al módulo de Generador DS49.',
+        'denegado': 'No tienes acceso a este módulo.',
+    };
+    const msg = mensajes[acceso];
+    if (!msg) return;
     const toast = document.createElement('div');
-    toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1410;border:1px solid rgba(204,145,102,0.3);border-radius:var(--radius-lg);padding:12px 18px;display:flex;align-items:center;gap:9px;font-size:13px;color:#cc9166;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,0.5);white-space:nowrap';
-    toast.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> No tienes acceso al módulo de Consultas Softland.';
+    toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#2a1a18;border:1px solid rgba(192,57,43,0.3);border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:9px;font-size:13px;color:#ff8070;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,0.5);white-space:nowrap';
+    toast.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> ' + msg;
     document.body.appendChild(toast);
     window.history.replaceState({}, '', window.location.pathname);
     setTimeout(() => toast.remove(), 5000);
