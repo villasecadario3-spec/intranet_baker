@@ -1,909 +1,844 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador DS49 — Baker</title>
-    <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
-    <style>
-        /* ── INTRANET NAV ───────────────────────── */
-        :root {
-            --rojo:#C0392B;--rojo-dark:#96281B;
-            --negro:#111010;--negro-3:#242220;--borde-dark:#2E2C2A;
-            --blanco:#FFFFFF;--crema:#F8F6F3;--gris-2:#E2DED9;--gris-3:#B5B0AA;
-            --txt:#1C1A18;--txt-mid:#6B6762;--txt-dim:#A09C97;
-        }
-        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-        nav.intranet-nav{position:sticky;top:0;z-index:100;background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px solid var(--borde-dark);height:60px;display:flex;align-items:center;padding:0 48px;gap:16px}
-        .nav-logo{text-decoration:none;flex-shrink:0}
-        .nav-logo img{height:26px;width:auto;display:block;background:white;border-radius:6px;padding:4px 10px}
-        .nav-sep{width:1px;height:18px;background:var(--borde-dark)}
-        .nav-back{display:flex;align-items:center;gap:6px;color:var(--gris-3);text-decoration:none;font-size:0.78rem;font-weight:500;transition:color 0.2s}
-        .nav-back:hover{color:white}
-        .nav-back svg{width:14px;height:14px}
-        .nav-title{font-family:"DM Mono",monospace;font-size:0.72rem;color:var(--gris-3);letter-spacing:0.1em;text-transform:uppercase}
-        .nav-spacer{flex:1}
-        .user-chip{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;background:var(--negro-3);border:1px solid var(--borde-dark);border-radius:100px}
-        .user-av{width:26px;height:26px;border-radius:50%;background:var(--rojo);display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:white}
-        .user-nm{font-size:0.78rem;font-weight:500;color:white;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        /* ── DS49 ESTILOS ORIGINALES ─────────────── */
-        
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg: #F7F6F3; --surface: #FFFFFF; --border: #E2E0DA; --border-strong: #C8C5BC;
-    --text: #1A1916; --text-2: #6B6860; --text-3: #9E9C97;
-    --accent: #C0392B; --accent-light: #FBEAE9; --accent-dark: #96231A;
-    --green: #1A7A4A; --green-light: #E8F5EE;
-    --radius: 10px; --radius-lg: 16px;
-  }
-  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
-  nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 60px; }
-  .nav-brand { display: flex; align-items: center; gap: 14px; }
-  .nav-logo img { height: 32px; display: block; }
-  .nav-divider { width: 1px; height: 24px; background: var(--border-strong); }
-  .nav-title { font-size: 14px; font-weight: 500; color: var(--text-2); }
-  .nav-badge { font-family: 'DM Mono', monospace; font-size: 11px; background: var(--accent-light); color: var(--accent); border: 1px solid #F0C5C2; padding: 3px 8px; border-radius: 99px; font-weight: 500; }
-  main { max-width: 860px; margin: 0 auto; padding: 3rem 2rem; }
-  .hero { text-align: center; margin-bottom: 3rem; }
-  .hero-icon { width: 64px; height: 64px; background: var(--accent-light); border: 1px solid #F0C5C2; border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; }
-  .hero-icon svg { width: 28px; height: 28px; stroke: var(--accent); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-  .hero h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.03em; margin-bottom: 0.5rem; }
-  .hero p { font-size: 15px; color: var(--text-2); max-width: 480px; margin: 0 auto; }
-  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 2rem; }
-  .step { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.1rem; display: flex; align-items: flex-start; gap: 10px; }
-  .step-num { font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; background: var(--bg); border: 1px solid var(--border); color: var(--text-3); width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
-  .step-text strong { display: block; font-size: 13px; font-weight: 500; margin-bottom: 2px; }
-  .step-text span { font-size: 12px; color: var(--text-3); }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 1.5rem; }
-  .card-header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
-  .card-header-icon { width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; }
-  .card-header-icon svg { width: 16px; height: 16px; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; fill: none; }
-  .card-header h2 { font-size: 14px; font-weight: 500; }
-  .card-body { padding: 1.5rem; }
-  .drop-zone { border: 1.5px dashed var(--border-strong); border-radius: var(--radius); padding: 2.5rem 2rem; text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; position: relative; }
-  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: var(--accent-light); }
-  .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-  .drop-icon { width: 44px; height: 44px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; }
-  .drop-icon svg { width: 22px; height: 22px; stroke: var(--text-2); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-  .drop-zone h3 { font-size: 15px; font-weight: 500; margin-bottom: 4px; }
-  .drop-zone p { font-size: 13px; color: var(--text-3); margin-bottom: 1rem; }
-  .drop-tag { display: inline-block; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; background: var(--bg); border: 1px solid var(--border-strong); color: var(--text-2); padding: 3px 10px; border-radius: 6px; }
-  .file-preview { display: none; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; margin-top: 1rem; align-items: center; gap: 12px; }
-  .file-preview.show { display: flex; }
-  .file-preview-icon { width: 36px; height: 36px; background: var(--green-light); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .file-preview-icon svg { width: 18px; height: 18px; stroke: var(--green); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  .file-preview-info { flex: 1; min-width: 0; }
-  .file-preview-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .file-preview-meta { font-size: 12px; color: var(--text-3); margin-top: 1px; }
-  .file-remove { background: none; border: none; cursor: pointer; color: var(--text-3); padding: 4px; border-radius: 6px; display: flex; align-items: center; transition: color 0.1s; }
-  .file-remove:hover { color: var(--accent); }
-  .file-remove svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
-  .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 1rem; }
-  .stat-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; text-align: center; }
-  .stat-value { font-size: 22px; font-weight: 600; font-family: 'DM Mono', monospace; letter-spacing: -0.02em; }
-  .stat-label { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
-  .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .field label { display: block; font-size: 12px; font-weight: 500; color: var(--text-2); margin-bottom: 6px; letter-spacing: 0.02em; text-transform: uppercase; }
-  .field input, .field select { width: 100%; height: 38px; border: 1px solid var(--border); border-radius: 8px; padding: 0 12px; font-size: 13px; font-family: 'DM Sans', sans-serif; background: var(--surface); color: var(--text); transition: border-color 0.15s; outline: none; }
-  .field input:focus, .field select:focus { border-color: var(--accent); }
-  .field-full { grid-column: 1 / -1; }
-  .actions { display: flex; gap: 10px; margin-top: 1.5rem; }
-  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 0 20px; height: 42px; border-radius: 9px; font-size: 14px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; border: 1px solid transparent; transition: opacity 0.15s, transform 0.1s; }
-  .btn:active { transform: scale(0.98); }
-  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent-dark); }
-  .btn-primary:hover { opacity: 0.9; }
-  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
-  .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
-  .btn-secondary:hover { background: var(--bg); }
-  .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
-  .btn-dl { display: none; width: 100%; justify-content: center; background: var(--green); color: #fff; border-color: #155C39; font-size: 15px; height: 48px; border-radius: var(--radius); margin-top: 1rem; }
-  .btn-dl.show { display: inline-flex; }
-  .btn-dl:hover { opacity: 0.9; }
-  .progress-block { display: none; margin-top: 1.5rem; }
-  .progress-block.show { display: block; }
-  .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-  .progress-label { font-size: 13px; font-weight: 500; }
-  .progress-count { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-2); }
-  .progress-bar-track { height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; }
-  .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 99px; width: 0%; transition: width 0.4s ease; }
-  .progress-log { margin-top: 8px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-3); }
-  .alert { display: none; padding: 10px 14px; border-radius: var(--radius); font-size: 13px; margin-top: 1rem; align-items: center; gap: 8px; }
-  .alert.show { display: flex; }
-  .alert-error { background: var(--accent-light); color: var(--accent-dark); border: 1px solid #F0C5C2; }
-  .alert svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; flex-shrink: 0; }
-  footer { text-align: center; padding: 2rem; font-size: 12px; color: var(--text-3); border-top: 1px solid var(--border); margin-top: 1rem; }
-  footer img { height: 18px; vertical-align: middle; margin-right: 6px; opacity: 0.5; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generador de Fichas Sociales DS49</title>
+  
+  <!-- Tailwind CSS para un diseño limpio y moderno -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  
+  <!-- Dependencia oficial de DOCX (v8.5.0) para generar los archivos Word en el navegador -->
+  <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
 
-    </style>
+  <style>
+    /* Estilos personalizados para la barra de progreso y transiciones */
+    .progress-bar {
+      transition: width 0.3s ease-in-out;
+    }
+  </style>
 </head>
-<body>
+<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col font-sans">
 
-<!-- NAV INTRANET -->
-<nav class="intranet-nav">
-    <a class="nav-logo" href="index.html">
-        <img src="LOGO_BAKER.png" alt="Baker" onerror="this.outerHTML='<span style=&quot;font-family:serif;font-weight:900;color:white;font-size:1rem&quot;>BAKER</span>'">
-    </a>
-    <div class="nav-sep"></div>
-    <a class="nav-back" href="index.html">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-        Inicio
-    </a>
-    <div class="nav-sep"></div>
-    <div class="nav-title">Generador DS49</div>
-    <div class="nav-spacer"></div>
-    <div id="auth-area"></div>
-</nav>
-
-<!-- CONTENIDO DS49 -->
-<main>
-
-  <div class="hero">
-    <div class="hero-icon">
-      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-    </div>
-    <h1>Generador de fichas DS49</h1>
-    <p>Sube el Excel con las respuestas del formulario y genera todos los documentos Word listos para entregar al SERVIU.</p>
-  </div>
- 
-  <div class="steps">
-    <div class="step"><div class="step-num">1</div><div class="step-text"><strong>Sube el Excel</strong><span>Planilla exportada de Google Forms</span></div></div>
-    <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Configura el proyecto</strong><span>Nombre, región y entidad</span></div></div>
-    <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Descarga el ZIP</strong><span>Un Word por familia, listo al instante</span></div></div>
-  </div>
- 
-  <div class="card">
-    <div class="card-header">
-      <div class="card-header-icon" style="background:#EAF3DE;"><svg viewBox="0 0 24 24" style="stroke:#3B6D11;"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
-      <h2>Archivo de respuestas</h2>
-    </div>
-    <div class="card-body">
-      <div class="drop-zone" id="dropZone">
-        <input type="file" id="fileInput" accept=".xlsx,.xls">
-        <div class="drop-icon"><svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg></div>
-        <h3>Arrastra el Excel aquí</h3>
-        <p>o haz clic para seleccionar el archivo</p>
-        <span class="drop-tag">.xlsx &nbsp;·&nbsp; .xls</span>
+  <!-- Encabezado Principal -->
+  <header class="bg-blue-700 text-white shadow-md py-6 px-8">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight">Generador Automatizado de Fichas DS49</h1>
+        <p class="text-blue-100 text-sm mt-1">Procesamiento local y masivo de diagnósticos sociohabitacionales en formato Word</p>
       </div>
-      <div class="file-preview" id="filePreview">
-        <div class="file-preview-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
-        <div class="file-preview-info">
-          <div class="file-preview-name" id="previewName">—</div>
-          <div class="file-preview-meta" id="previewMeta">—</div>
-        </div>
-        <button class="file-remove" id="removeFile"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-      </div>
-      <div class="stats-row" id="statsRow" style="display:none;">
-        <div class="stat-card"><div class="stat-value" id="statFamilias">—</div><div class="stat-label">Familias</div></div>
-        <div class="stat-card"><div class="stat-value" id="statColumnas">—</div><div class="stat-label">Columnas</div></div>
-        <div class="stat-card"><div class="stat-value" id="statEstado" style="color:var(--green);">OK</div><div class="stat-label">Estado</div></div>
+      <div class="flex items-center gap-2 bg-blue-800 px-4 py-2 rounded-lg text-xs font-mono border border-blue-600">
+        <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+        Procesamiento 100% Local
       </div>
     </div>
-  </div>
- 
-  <div class="card">
-    <div class="card-header">
-      <div class="card-header-icon" style="background:#E8F0FA;"><svg viewBox="0 0 24 24" style="stroke:#185FA5;"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg></div>
-      <h2>Configuración del proyecto</h2>
-    </div>
-    <div class="card-body">
-      <div class="config-grid">
-        <div class="field"><label>Nombre del proyecto</label>
-          <select id="cfgProyecto">
-            <option value="" disabled selected>Selecciona un proyecto</option>
-            <option value="DS49 Hacienda San Martín 1">DS49 Hacienda San Martín 1</option>
-            <option value="DS49 Hacienda San Martín 2">DS49 Hacienda San Martín 2</option>
-            <option value="DS49 Viñedos de Santa Barbara 1">DS49 Viñedos de Santa Barbara 1</option>
-            <option value="DS49 Viñedos de Santa Barbara 2">DS49 Viñedos de Santa Barbara 2</option>
-            <option value="DS49 Valle Merced 1">DS49 Valle Merced 1</option>
-            <option value="DS49 Valle Merced 2">DS49 Valle Merced 2</option>
-            <option value="DS49 Valle Merced 3">DS49 Valle Merced 3</option>
-          </select>
+  </header>
+
+  <!-- Contenedor de la Aplicación -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+    
+    <!-- Panel de Configuración y Carga (Izquierda) -->
+    <section class="lg:col-span-1 bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col gap-6 h-fit">
+      <div>
+        <h2 class="text-lg font-semibold text-gray-900 border-b pb-2 mb-4">1. Configuración del Proyecto</h2>
+        <label for="cfgProyecto" class="block text-sm font-medium text-gray-700 mb-1">Nombre del Proyecto</label>
+        <input type="text" id="cfgProyecto" placeholder="Ej. Los Aromas II" 
+               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+      </div>
+
+      <div>
+        <h2 class="text-lg font-semibold text-gray-900 border-b pb-2 mb-4">2. Carga de Archivos</h2>
+        
+        <!-- Input de Logo -->
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Logo Institucional (PNG)</label>
+          <div class="flex items-center justify-center w-full">
+            <label class="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition">
+              <div class="flex flex-col items-center justify-center pt-2 pb-3">
+                <svg class="w-6 h-6 mb-1 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 002-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                <p class="text-xs text-gray-500" id="logoName">Seleccionar imagen PNG</p>
+              </div>
+              <input type="file" id="inputLogo" accept="image/png" class="hidden" onchange="handleLogo(this)">
+            </label>
+          </div>
         </div>
-        <div class="field"><label>Nombre del grupo</label><input type="text" id="cfgGrupo" placeholder="Nombre de grupo"></div>
-        <div class="field"><label>Región</label>
-          <select id="cfgRegion">
-            <option value="" disabled selected>Selecciona una región</option>
-            <option value="METROPOLITANA">Región Metropolitana de Santiago</option>
-            <option value="O'HIGGINS">Región del Libertador General Bernardo O'Higgins</option>
-          </select>
-        </div>
-        <div class="field"><label>Provincia</label>
-          <select id="cfgProvincia">
-            <option value="" disabled selected>Selecciona una provincia</option>
-            <optgroup label="Región del Libertador General Bernardo O'Higgins (VI)">
-              <option value="CACHAPOAL">Cachapoal</option>
-              <option value="COLCHAGUA">Colchagua</option>
-              <option value="CARDENAL CARO">Cardenal Caro</option>
-            </optgroup>
-            <optgroup label="Región Metropolitana de Santiago">
-              <option value="SANTIAGO">Santiago</option>
-              <option value="CORDILLERA">Cordillera</option>
-              <option value="CHACABUCO">Chacabuco</option>
-              <option value="MAIPO">Maipo</option>
-              <option value="MELIPILLA">Melipilla</option>
-              <option value="TALAGANTE">Talagante</option>
-            </optgroup>
-          </select>
-        </div>
-        <div class="field"><label>Comuna</label>
-          <select id="cfgComuna">
-            <option value="" disabled selected>Selecciona una comuna</option>
-            <option value="RENGO">Rengo</option>
-            <option value="MELIPILLA">Melipilla</option>
-          </select>
-        </div>
-        <div class="field"><label>N° familias postulantes</label><input type="text" id="cfgFamilias" placeholder="Ej: 289"></div>
-        <div class="field field-full"><label>Entidad patrocinante</label>
-          <select id="cfgEntidad">
-            <option value="ENTIDAD PATROCINANTE BROTAR" selected>Entidad Patrocinante Brotar</option>
-          </select>
+
+        <!-- Input de Excel/JSON Data -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Datos de los Postulantes (JSON)</label>
+          <div class="flex items-center justify-center w-full">
+            <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition">
+              <div class="flex flex-col items-center justify-center pt-4 pb-5">
+                <svg class="w-8 h-8 mb-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                <p class="text-xs text-gray-500" id="jsonName">Arrastra o selecciona tu archivo .json</p>
+              </div>
+              <input type="file" id="inputJson" accept=".json" class="hidden" onchange="handleJson(this)">
+            </label>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
- 
-  <div class="actions">
-    <button class="btn btn-primary" id="btnGenerar" disabled>
-      <svg viewBox="0 0 24 24"><polyline points="13 2 13 9 20 9"/><path d="M11 2H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-8"/></svg>
-      Generar fichas
-    </button>
-    <button class="btn btn-secondary" id="btnReset" disabled>
-      <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
-      Reiniciar
-    </button>
-  </div>
- 
-  <div class="progress-block" id="progressBlock">
-    <div class="progress-header">
-      <span class="progress-label" id="progressLabel">Generando fichas...</span>
-      <span class="progress-count" id="progressCount">0 / 0</span>
-    </div>
-    <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill"></div></div>
-    <div class="progress-log" id="progressLog"></div>
-  </div>
- 
-  <div class="alert alert-error" id="alertError">
-    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-    <span id="alertErrorMsg">Error desconocido</span>
-  </div>
- 
-  <button class="btn btn-dl" id="btnDescargar">
-    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-    Descargar ZIP con todas las fichas
-  </button>
 
-</main>
+      <!-- Botón de Acción Principal -->
+      <button onclick="procesarFichas()" id="btnProcesar" disabled
+              class="w-full mt-2 bg-gray-400 text-white font-medium py-2.5 px-4 rounded-lg cursor-not-allowed transition flex items-center justify-center gap-2 shadow-sm">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+        Procesar Informes
+      </button>
+    </section>
 
-<script>
-// ── LISTA BLANCA ──────────────────────────────────────────────
-const ACCESO_DS49 = [
-    'dvillaseca@ibaker.cl',
-    'cgarces@ibaker.cl',
-    'dparedes@epbrotar.cl',
-    'dponce@epbrotar.cl',
-    'nvedia@epbrotar.cl',
-    'ncaris@epbrotar.cl',
-];
+    <!-- Monitor de Progreso y Descarga (Derecha) -->
+    <section class="lg:col-span-2 flex flex-col gap-6">
+      
+      <!-- Card de Estado de Carga -->
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 grid grid-cols-2 gap-4">
+        <div class="p-4 bg-gray-50 rounded-lg border border-gray-100 flex flex-col justify-center">
+          <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado de Datos</span>
+          <span id="lblStatusDatos" class="text-sm font-medium text-red-600 mt-1 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-red-500"></span> Sin cargar
+          </span>
+        </div>
+        <div class="p-4 bg-gray-50 rounded-lg border border-gray-100 flex flex-col justify-center">
+          <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Registros Encontrados</span>
+          <span id="lblTotalRegistros" class="text-2xl font-bold text-gray-900 mt-0.5">0</span>
+        </div>
+      </div>
 
-// ── MSAL ─────────────────────────────────────────────────────
-const msalConfig = {
-    auth: {
-        clientId: "d9664e06-7fd2-401d-b27b-97116fed7d9f",
-        authority: "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
-        redirectUri: window.location.origin,
-    },
-    cache: { cacheLocation: "sessionStorage" }
-};
-const msalInstance = new msal.PublicClientApplication(msalConfig);
+      <!-- Card de Progreso en Tiempo Real -->
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex-1 flex flex-col justify-between min-h-[300px]">
+        <div>
+          <h2 class="text-lg font-semibold text-gray-900 border-b pb-2 mb-4">Progreso del Procesamiento</h2>
+          
+          <div id="panelProgreso" class="hidden space-y-4">
+            <div class="flex justify-between text-sm text-gray-600">
+              <span id="lblProgresoTexto">Generando documentos de Word...</span>
+              <span id="lblProgresoPorcentaje" class="font-semibold text-blue-600">0%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-3.5 overflow-hidden">
+              <div id="barProgreso" class="progress-bar bg-blue-600 h-full w-0"></div>
+            </div>
+          </div>
 
-async function initAuth() {
-    try {
-        await msalInstance.initialize();
-        const accounts = msalInstance.getAllAccounts();
-        if (accounts.length > 0) {
-            const usuario = accounts[0];
-            const email = usuario.username.toLowerCase();
-            if (!ACCESO_DS49.includes(email)) {
-                window.location.href = 'index.html?acceso=ds49';
-                return;
-            }
-            const nombre = usuario.name || usuario.username;
-            const iniciales = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
-            document.getElementById('auth-area').innerHTML = `
-                <div class="user-chip">
-                    <div class="user-av">${iniciales}</div>
-                    <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
-                </div>`;
-        } else {
-            window.location.href = 'index.html';
-        }
-    } catch(e) { window.location.href = 'index.html'; }
-}
+          <!-- Estado de Espera Inicial -->
+          <div id="estadoVacio" class="flex flex-col items-center justify-center py-12 text-center text-gray-400">
+            <svg class="w-16 h-16 stroke-current mb-3 opacity-60" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"></path></svg>
+            <p class="text-sm">Configura el proyecto y carga los archivos requeridos para iniciar el compilador.</p>
+          </div>
+        </div>
 
-initAuth();
+        <!-- Bloque de Descarga -->
+        <div id="panelDescarga" class="hidden border-t pt-4 mt-6">
+          <div class="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="bg-green-100 p-2 rounded-lg text-green-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+              </div>
+              <div>
+                <h4 class="text-sm font-semibold text-green-900">¡Procesamiento Exitoso!</h4>
+                <p class="text-xs text-green-700">Todas las fichas han sido empaquetadas en un único archivo ZIP comprimido.</p>
+              </div>
+            </div>
+            <button onclick="descargarZip()" 
+                    class="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-lg shadow transition flex items-center gap-2 whitespace-nowrap">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              Descargar .ZIP
+            </button>
+          </div>
+        </div>
 
-// ── IMAGEN LOGO SERVIU (base64) ───────────────────────────────
-const SERVIU_B64 = '/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCADhARMDASIAAhEBAxEB/8QAHQABAAIDAQEBAQAAAAAAAAAAAAUHAQQGCAMCCf/EAD4QAAEDBAAEAwYEBQIEBwAAAAECAwQABQYRBxIhMRNBURQiNGFxcggyQoEVFiNSkSShFyUzghhDYpOiscH/xAAcAQEAAQUBAQAAAAAAAAAAAAAACAECAwQFBgf/xAA6EQABAwMCBAMECAUFAQAAAAABAAIRAwQhEjEFBkFRE2FxIjVyoRQWMjZCgcHRFWLh8PEjM1KRsVP/2gAMAwEAAhEDEQA/AKIrNKV9lXgkpSsURZrFfaDFfnTWIcVtTr8hxLTSEjZUpR0APqTXoGN+G32GNb3MhygRpL7zaHWWooW2Coj3efn5vlzcugfl1rSu+IW9pHiugnZbFC2qV/sDZUBb4Uy4TGocCK9KkvK5WmmUFa1n0AHUmpTIcQyrHoyJN8x26W1hxXKlyTGUhJV6bI1uv6K2ez2y122PbrdCYixWEhLbbSAkADt0FR3EHF4eYYlOx2cotszEhJcSNqbIIIUn5jXSvMfWxxqD/ThvzXX/AIKNJ9rK/m/Wa9M3f8LjbDRahZFKefUlRQ6uOkN83kkpCt/VW/2rzaqHKFwVAEd1UpLha8IIPPzg65dd978q9LZ8St7yfCdMbrk17SrQjWN18KV+nW3GnFNuoUhaeikqGiPqK/NbwMrWSsGs1g1VFN2P4VX3Vv1oWP4VX3Vvmvh/MXvOt6qYXIv3etPgH6rZgQJ89akQYUmUpI5lBlpSyB6nQrXUlaVFJQoKB0QR1Feosdm3C68MrHG4U3qzQZ8dsCdEeSgOrUB7wIUD13vqR1B71zfDKVlcz8RDX86RUx7m3AcbKEoCUlIT0I10O/UVom2AgTv/ANLUZzZWLa7zTaPDDjpLiH47iNj3BKoHSv7TQBR7JNeiuLl44tWGBd5kydZxY3H3GG0IS2p3wlqISNa3vl71K2452jgZhysBRzTT8QOVo7b2rv4nTvrt1p9GbqIzjyVrua67benWLacPdpB1mBiTJ04Xl/rvWjunnqvTnEO+WrHOJODT5Iit34p8K8COBoJcSlJ5teiiSPkPpUJkWC+0/igiMqj/AOgklF0UR+UpSNqB+q06I9DR1rGAesLJbc4B4D61LS0sc8Z3LTBAx+YK8/aO9aNNH0r1Bw7vycj/ABIZLIRoxo1tXFYGv0ocbBP7q5j+9chwySn/AICcQlaGw8vXT/0Jp9Gb0Pf5Kg5srCRUogEeH1/+n5dFRw2RsClXZ+HBIOGcQtgHVs6f+27VJ1gfT0ta7uvQ2PEjc3dxblseGWie8iUpSlYl1kpSlESlKURKUpREpSlEXLUpSpFKCCwa9I/hjw/AbjaXpN1eg3S+yI7qDbhJStZaV5chA5VADuFbGzsjy83V0vDFWTN5zbH8QjvSLw08FsIQnYPqFeXLrYO/KubxS3dXt3Na/T1/ytuzqCnVBLZVg8Y+H8ThpkUfI7LeGI7iJjUuJa5Gi+173MNcpUFJSU62f96saP8AigxxyIiXMx27puCGSjwGnUGO4TynZJII0R0906BNW3luCQ83xtTGQh6NIlRQHmEPl5ph4p/MgK6ApV2KeXeuuwa4LH8KxFyU7aLVbcbmWiyAQnlSrel2Y/KA5nCtRUnQ0QB6nm8hXjxf29zRAu2lzm9RjH9/5Xc+j1aNQmiQAVZOLZpCyjCWcmsK2nmlNhTrS16LSgAVIUfIj17efbrX5m5YLdhMzJbi0tIbSHWI5TyrWVAeG1obPOSpKfqagbHYYWKrmSsPgNW8ykgvxnZZaiFeh/USgeJynproB0P71INe2v3mDcMggtOPQ0rDAjSg80hZ176kqCCFa2kaB0CetcZ7aWslg9n5+i32ufpzv8lz2dcUMqsfDaRk68Bm29YQB/q5TRDJWQlClJSrmI2R00D/APdV/wDhUiYZfblNvrz0iXnBUuS+5MQPCQpa1bU0ARzHrs76jfTVW7xLxtjiXiUjGHZ8i3gvNuF1pKVDadqCVDeiPlvvo1O8O8Rg4fiEDH4nI4iK3pbwbCFOq81KA8zW4LujTs3MYIe49J285mfRa5oVHVw4mWgfNUjx5xi25xxjsOGtiFbZJtzs2VKYaSp50jfK1vp/aogqOve3r1oni/w7ncPryzFefMqJISSy8W+QhQ/MhQ6jY2OxIIINe07zgES5503lZluxJLMdmOgMBO1pQ+l48xI372uQjfVJNVh+LqxKnY7LmLMRtMVluYxyq/rLWhwNOcw1+XleR590iunwnizmVqVEH2YgjzJWpe2QLH1CMryJWDShr3i86pux/Cq+6t81oWP4VX3Vv18P5i951vVTB5F+71p8AVq43G4P+Fa7m5lV8s8+MlCpLPs6lc6062UqSk62fn/iumZ4tY3P43xMkkl6FZ4UFyKh5xpSluE794pTsjZPT/fVUJqlc0XBaIAAWWtytQuHOfWqvcSC0SRgO3jH/sq28uicIbnJut1Yzm8LlyXHZLbBhLCC4olQTso6DZ1X1ufEiBD4YYXb7Hcnhd7RJS7KYSlaE6HMdFWtKB2PWqfpQ3ByQIlXDlmi5rGVqrnhhkAxGxEYAxBVk8d73iWUXiHkeOzSZkllKZ8ZTC0FCwBpXMQAfQ69BVmQOMGFjEYl1ly3VZXFtC4iG/Ac95wgfq5ddSkHe/M15qpqqtuXNcXAbqyvynaXFtSt6j3EU5gyJg/hONlZ34ecvsuK5vcLrkc5UZmRBW2HPCW4VOKcQrskE+Rr9cI84sFqtmQYrlIkIs162TIYSSplRBBOtE9teR0R2qr6Va24c0ADp+q2Lrly1ualV7yZqBux20bEeauprKuH2BYTfLVhtznX25XlosrdeYU0hpBSUjukdgo9t7PpVKilKtqVC+PJbnDOFU7DW4OLnPMlzjkxgbQMJSlKxLqJSlKKqUpSiolKUoqpSlKIuWrBrNYNSKUEF2XDbhvkmcX2Fb4MRyPGlJU6ZryCGktIVyrWP7tEgaHmfrr29ww4d45w/s4hWWMC8sD2iW6AXnj8z5D0A6CvNP4c+J2VR7pYsPteMQblFYUtt55qOr2lMda+ZRK+bQCVK31Gj279a9H5FxAscHN4GEJkJcu89l1YAdASypKdoSs72CvyA9PpXg+P1ryrW8F2G7wO3cr0nDWUGU/EG/n+iiuN/Fm18N7eyQhm43R5Wm4Ae5FcvmtRAPKB8x1qC4CZu7xAsF5u0yxRYdxbfDPiR1H/AFA/MkbVs7T9ddfKvHmVxr1EyKcxkKJSLol5XtIkkqc5vUk9/r516k/CLLtMzh0IbDbKrlb57q5CNgrCVpIS4B9CUb79D5dKuvuE0bOwD2+04kZ/voqW96+vc6Tgdl22bzbiLPNt8iBOtSHGSoXQLadjNoHVXiEKCkbTsbI8+m9VMN3t66T1G12G4OwzpQnOOtNR3EnqC2eYlYI69Br1IrYutrtl/bbgXFKJMVC21PRFEFDp10DifMAg+6emz1B0K0sZhQ7NZm7dFV4UXkSqOwVdGyonmSjf6eg93y667158ubo2yunpdq8lDXvNLpiGKuz4uOuXV9Mh/wAZpUpKHEnx+n6SFDkU2U668uvSrMsMiXKs0KRcIfsUxxhCn4/OF+EsgFSeYdDo7G6p/iXliOHGHzbs6I5uM1xpEOC8N+06bSlRUnvyp6n6geoqzsIya35ZjUG+2lRVEkoJBWkpUCDojR9CDVa1F3gipowSc/oraVQF5bOY2Uw9JaadS04sJUtXKgE9VH5f7/4qpvxP2qKrBpV250NyvAdjkr6lxrwHV+Gnfb30oWdd/DHpU3x0tVwXj8PKbGlxV1x2SJraW1BKnGSOV9AJ6DbZV/ioj8Qzka68FX7s4QnwoxlteGrmTzONKZ1vzH9c/wCKraMIqU3tO5j5pXdLHtI6Lw1Q0oa+sLxam7H8Kr7q3/MVoWP4VX3Vvmvh/MPvOt8SmDyNnl21+D916iu1lsybEty52zH1WNjHGXXEIjJ9tRJXsJWCkbCT2367+dV9kfCG22jHZS3Ly8i6RoQlqW6tlMd3fUtJTzeJzAeZGjquJTxDyv2pyT7chSnLem2rSphBSphOyEka15nr3r8Ts8v9wiNxrkuHK5GgwH3IbRkBsfpDvLzD67rUdWou3C41nwPjVq7/AEawiQSAf0I9Z7yOy7rIOFuM2LFp8+fcruX40JDzMkBpMaW4se6lsH3jokbrobjidui5GzkL8htVqtOOtTVtqt7K1rCuYJHLrkKhrfMQa5rNuJGK360zue3S5kqRDTHitS4jO4SwAC4HwS4r6f5rj2+JOWokh/29pf8AokwFNLjoU2thO9JUkjR7nqaqalFhgKyhw7jl9S11XEOBIOrGCBgY9RMR2wu5vGAWu73mff7hephtrtkbvLK2oraHfDJALZQnSQddNjX71xnEjEIFgl2R2yzJEmDeYiJEcSUpS43s60rXQ1qTOIOUy3pjj05siXB9gcQlhCUJYH6EpA0kfSou95DdryxbWJ8gOItrAjxQlASUIB3rp3+tYaj6TgYGV3OG8P4tb1GGrVGgCIxEacdBkGFcNuw3G8dgZhY0Oyp98i2MOSFvtIDCFLCVAt/qBGx1qKyjhDbbHjktx28Pi6w4IlqWtbQjvHWy2hPN4nNrsSNHVcbM4k5ZLhyo0iVGWZcURJD3sbYedaA0EqXy8x1r1rWuedZDcrf7JcXIco+AI/tDsNpUjwx2T4pTzf71kNWiRELmUuE8dZV1+MAXEE5mYAE7bb481OcbIsaNxbdjxo7TLPJE/poQEp6tIJ6D1qWzmDbI34h2YQYTFhl6IkIYZRpJU0jXukcpHMdn964DJcnu+RTY066OMOyY6EoS6lhCFKCda5iB7xGh3qXuPEjJLhJEuWm1OywUESTbWPGBRrlPPy83TQ86x+JTJJPeV0f4bxCnRotaAS2m5h9rqYg7Gdla2U47ibGJy4t/VKbQrKXWBJhR2w6SregemggbPQD6VAweC8SM7c3L1cpK48e4exMeyqaQojlCvEWXCBoBQ90de9cUjihl4LnPLhvBcszCl6E0sB86PONpOiNdNdq042fZK0JyHpMea1Pke1SGpkVt9tTv94SoEA66dKyOrUXGSFzbfgvHrek5lKqBOd/TbGP1XUz+H2MWGwTbvfr1PfaYui7c1/D0NqDp5OdC9k6A0Fb7+VSeY4PhpyTHLNYYl+L02A1JebYShaltqSo83vHoskDf6QKre65VernZ3LRKfaMNyaZym0MpQPGKSnY0Og0T07VKxuJeWR1QFtyovjQGQww8qG0pzwwkpCFKKdqTonoatFSltGFuO4bxnD/Gl41Y1QMj2TAHeV20vg3b3LnaXId0lsWuVFfkyQ/4bj7SWSOYJLZKFE7GvT/apJWGY/lGF4hb8fefjQnZUxx2XJZR7R4beyoHl6K7ED6iq3TxKy1t6A5HmR4ybeHBHaYiNttpSv8AMkpA0QfQ1hXEjLA5blMS40QW11bsVEaI20hBWNK91KQCDs7B9au8WgJgLVfwnmCpoL6olskGdjDhnGTkZ8l2OP8ACvHcjctFys93uSLNcHH2FiQ2gSGnG0lW+nQpOvTYqs8oYs0a7uMWJ6a9EbASVykpSsrHRXRPTXpU43xKy1mTDejS40VMLxCwzHiNttIKxpSuRIAJPrXIuLU46txfVS1FSj8zWGq6mRDQu7wiz4nSrF95UlsYEz1O+BJiMr80pStdejXLVu2O0XO+XJq22eBInzHTpDLCCtR+eh5DzPYVo1ZfBzOMUxJqSzd7DP8AbZiXWDeYMsofjMuICfcR22Ds73upA3dWpSpF1Juo9lBWixr3gPMBb/Ahd5xniZcsVmxHYM+5W6TAWlw8i2HPDLiFfuUgD7t1vSOCk96xKlQr+ublyGo0l61KRyON+LshPOVbUsdCToAddmpKx2/EYORL4pK4kfzEzAkj2hM+yPOvFxaClHMkqG9DsrYAKR9K7/hlxix/Ls+jY+1aHY7shGk3d9TTUiQpvZShaW0gcut6TzHtrrvdeYurq5FR1a3bsBqxGR0zmI/NdejRpFop1D1xnv6Kc4eYTd42GLb4rS7fdURUHTS4iX3W2k/pU91KwQDpOt+h3rS0YxhEvImIFjwqBaHlNc7ji7p7HOba2NLQ02VL7f3cnbrXWOR8p8aamBMS9Kic3gmXD5EOlZAbBWCOYN6cUoJ1vnGtHoORsmcZ+9lMq0XXh6mQYinuW6witDLvhgqCUeIg/mOkb5h+b5V58VK1bW9pHeAYH/WF0y2nT0gj5StRi35Lbr9couF5xcsmucWe2H7TdJqfDjxlDmJKlbUroQAtOiD69a+Mu35TJnwIeZ5pOxGTIuAYgW+1y0FMqOlAJ95HKoK2FbWrps9AOgrpbfclR89tJunDmNa7revFDdzZXHdWAlPMQpaBzdE6Hoa/V+uAk8SZkOJw5i3i8WqOy+Li94DZCFflKHFjmHULHTsQav8AEfq2G0zie3pE+UqzQ2N+u2f8qPv2L4RCyU2+84hDvayx4kdxd29puDw/USy6oKOtnqkq+Q8hKY5h9qx2Ab3w6bkckhvxWbc7JcbYcVyucoV4m1I0Vn3enXuN61E5RnWdRrzb4to4b8rkxhlTlwkrUtqMpailSXC2jrynzCu2jXVtMZi37I9cpscPuuobfZhxCtvo4SpSSVcyErbSlPvHoevyrDVNVrGhzsHpM/LosjBTLjAz6Qq2YmcT1Rp718zCNZrzcVyzEsK4iJDfK02VFIJVtAUEqIOyNaPnquZ4hZs7k34e8bx2yCRPuV2lNwloEdLanPCAUsNoR2SF+GkdOwP1rreLHFjH8GzVNglWly6vBhTjtwS4249DU4nlIbStJA2ASUkgde2jVc5BCwq+T4vEWLn8fF4TTyIzKYVhcZeS+lPNsIQogq13WDy9hXWtaZJZWqU4G7SBiegwJ7b5WlWeAHMY6ehz88qlsisV4x25rtl8t0m3zEAKLTyOU6PYj1HzFR1WlxfzrEsmtke22y1XOdOgoSy1frjLJfeRzrWvmbHTqpRI676+WtVVvlXs7OrVq0g6q3Sf7/vK4VZjGPhhkKbsfwqvurfGiobOhvrWhY/hVfdW+a+M8w+863xKXnIwnl20H8i9E3w32Pk2N4tjN2GP2WTa2VRHmoPjNyXl9Dz6B6/XoNbPeoC08P8AEo1nhzMnlOPPz5suO9IS+pvwfCdKOZCEoVzKJG9Ejoa5DHbjxVi42P4G5kItASShTTa1ISnz5Fa6Doe1auM3fiNGtq12KXePZJckoKmwVpW+QSQNg++ep6da1PFaSC5pXGbwi6pMc2jcsbBAJBgk5+06JB6wZyF3FrwXB2UYmxMYn3BWQSZEUSm5PhpRyL5UOBHL13sdCelfeLw1wu1WmG9fZTjwnTJDKpAkKQY6W1lKeVCUK51dBsHXc6qs2rpmbvhqRIuLhsDinQeUkw1FXvKJ10JUPPzFbJyXPsYK2F3K52728e1FC+nic+/6gBHTfqNVaKlMZLVs1OE8SedFO7yTkajO5OMYgEbCMdl00jD8ci2PGm4tum3e6X6S+y04JngtgNPBPMAUn8yT59u9dnj2D2C1Xyw3mDHESbEv6YD7Tc1UltXuEklSkJ0oHpobHSqKev15ebgNu3KQoW9alxDz9WVKUFKKT32SAanDlOf5ItXLdbpOMMiWQ2f+iW9kOdO2t96NrU+jVfd8D4m5ntXMD2tUudGSYHaIgbDK6DEWtfiPYQ43r/nTnuqT5bVVkZTamMysqbWqW5LbbyX2aRMlxgw9GSpWg2z0IWnrrZI8unp5+lZHfJOQpyB65vquqVJUmUDpYIGgenyrbv2a5ZfUsout+myUMrDjaS5yhKx2VpOuo9e9UZXY0EETJV99y5eXNejWpvDSxrRPYicjGd+485Vj3/BcFRdoNshvPx5YvjMB1gPrcLzClhJWSpACF9T0GxWqjGcHMLMLh/BbiWccdQylo3DrIPilBUVcnu76dAK4W451l9xEQTb/ADX/AGN1L7HMoe64n8qvmR6ndR4v95Ee4sC4PeFc1hc1G+jygebav360NanOGq6jwHigbFW4PT8Tv+QJ6DcSB27q2JnDqwx7q5dI1qW/YVWyNOKZVxLPs5d3pBUlClL7eQrOR8PcPxxOV3GTHuE+JaEQnI7CZXhlYf6FKlcp6AkHevKq2hZxl0J9L0W/zGlpjojDSunhI/KnXbps68xute4ZXkdwjzI828SpDc1LaZIcXvxQ2do5j3OjQ1qUYasbeBcY8Qarn2cAw50kAifzgHI3lXViGNWDGMoiQYdtmyJkrH3pi7gp/bY52z7gRy6I+e6grHw5xqU7YbE/GnuTLxZv4iboh/8Apx1lJIRycuiBrqSd/Sq7hZ1mEO2NWyNkM5uG0goQ0F7ASQRy9f09e3avlFzLKotiVY49+mt24pKPAS5oBJ7pB7gH0B1VfHpRGlWDl7izXue2vkxmXZiYJ9J+zsoN1HhvLb5kq5VEbT2Oj3r80FK0l7sAgZSlKUVUpSlEXLVis0qRSggny3X7jPvxZDciM84y82oKbcbUUqSR2II6g1+KVSAVWSphOV5QmWxL/mO7mRHUVMuGY4VNk99Enpvz9akrvxGzu72xNtuOV3SRFGwWy+RzA9wojqofI7rlaVhNtRJBLBjyCvFV4xJU3bctyW33G13CPepvj2oj2IrdK0sjp7qUnYCTrRHYjpX1u+a5TdL9Pvki9zETrgnkkrZdLYWj+zSdDl+Vc/Sq/R6M6tIn0TxXxErqLDxDzew25y32nJ7lFirSE+El3YSAd+7vfJ/26rQkZXlD81+Y7kV2VIfAS657WsKWB2BIPUD0qGpVBbUQSQwSfJPFqERqK+syVJmynJUyQ9JkOHmcddWVLUfUk9TXx661vpWaVmAAEBWSSsUNZrBqqopux/Cq+6pAa5hvtvrUfY/hVfdW/Xw/mH3nW+JTB5GE8u2g/k/delJbGWSuIuGXHHHpQxVEGOVKac1GQ2nfihz9PNr1+Wu1cjiGUuzOL0DHYBjIsbWRSZbPgp14pUVcpJ31AHbWuhqo2rhcGopitTpTcc92kvKCD+29VrsOOsOpdZdW24k7SpCiCPoRWgbnIhYqPKYbTeyo4H2S1sCO/tOzk5XoBL+JKs3FL+AxLo1OS0v2wy3EKbWfFX+QJ6gb338tVLpxOz3nJCtFohPy0YzHkRW5RccjocUpW9o5uYj0A3qvNaZMlPjcsh4eN/1dLP8AU+71/euhxXNLnYW5zJYj3Ficwlh5EsrJCEnYCVJUFJ6+hq9ty0mHBaV5ypdMY59tVJd6mdmg5ny/RXHCxrH7znd7h27FIMeRbbW37OiXEcbjqfKvfWprfOpPoQO37V8ocaxPZrktnj41HtzcawLUVJYdjrW6lPvKAKt8hJPcdQB+9cvcVr5InTH5Vutj7EuI1DVGKFpShpskpCVJUFg7PU83WoHLcvu+SXZFxkrTFU3FTEbbjFSUpaTvSdkknue5PernXFMCQtahy3xOq/RXdDdIAOomDjzzmfIdyrlRYcScvn8q/wArW1Lb+Li5GWnmD6XuXuDvQHTsB3rmsqsNtXwcj3W1WKPblRmY6ZipsJaJDq1f+Y08TyuJPoB0B8u1VP7dN8UO+2SfECPDCvFVvl/t3vt8qy/PnPx0xn5sl1lH5W1ulSU/QHoKxG4aQfZXXoct3VKox/0gmCCZnMTPXrj0haorNKVqL2SUpSiJSlKIlKUoiUpSiJSlKIuWpSlSKUEEpSlESlKURKUpREpSlESlKURKwazWDRFN2P4VX3Vv1oWP4VX3Vv18P5i951vVTC5F+71p8ASlKVxV61KUpREpSlESlKURKUpREpSlESlKURKUpREpSlESlKURctSlKkUoIJSlKIlKUoiUpSiJSlKIlKUoiVg1msGiKbsfwqvurfrQsfwqvurfr4fzF7zreqmFyL93rT4AlKUrir1qUpSiJSlKIlKUoiUpSiJSlKIlKUoiUpSiJSlKIlKUoi5alKVIpQQSlKURKUpREpSlESlKURKUpRErBrNYNEU3Y/hVfdW/WhY/hVfdW/Xw/mL3nW9VMLkX7vWnwBKUpXFXrUpSlESlKURKUpREpSlESlKURKUpREpSlESlKURKUpRFy1KUqRSgglKUoiUpSiJSlKIlKUoiUpSiJWDWawaIpux/Cq+6t+tCx/Cq+6t+vh/MXvOt6qYXIv3etPgCUpSuKvWpSlKIlKUoiUpSiJSlKIlKUoiUpSiJSlKIlKUoiUpSiLlqUpUilBBKUpREpSlESlKURKUpREpSlESsGs1g0RTdj+FV91b9aFj+FV91b9fD+Yvedb1UwuRfu9afAEpSlcVetSlKURKUpREpSlESlKURKUpREpSlESlKURKUpREpSlEXLUpSpFKCCUpSiJSlKIlKUoiUpSiJSlKIlYNZrBoim7H8Kr7q360LH8Kr7qkWht1A9VCvh/MPvOt8SmDyO7Ty7an+T91+aV6i4y4njkrhpdW7VaIca6WZDEhS2GUoUUkDeyO/ulfT5A1iJh2OW7gjPtztshu3qLZfa5Dy2kl1C3EqWBzdxrRA+QFaRszMT0WlT56t30G1fCMl+mJ2GPa9MheXqVbTuNqk8G8bMaZbHY8+6IYLqYRTIbcWogpUsq94JJ8gK+3/AASa/j8rGxmtuN9baLzEIR1/1Ea2CVb0k+ehvQ61iNs/ouszmmxaHeMdMFw2Jw0wScY/NU/SrZx6wOtcEMlmNv2t1UeQUSm3IRVIZUFAaQ7zAAHv2NR2QcMYOO2GPLv2WMxLhJh+1MREwnHELGthHig8vMe3+PWqG3fEhZKfMlmajqbzBDtIgEkwAZgDG/8AVVvSrhm8PsGZ4Q2vIVZOliVKkKBmKjOqS4oBf9AIH5dEfmPfl+dR1h4RiXbLO/d8ni2mZe089tiKjLcLiSAUlSgdI3sd/Wqm2qK1nNXDixz3OLQHFuWnJG8Y279usKr6VZVh4Rzpov8A/Er3Ctf8CkhqWt1JUgI1srBHy7DXX5VK47jkWPw8zhdovFpu0eINKdcgK8Qo5QQptZV7uyVDz/LRtu874S45msqYPhHUQWjYx7URmI6yqgpVm2fhQ07brM5fcrhWaffADbYa2VOKdCtcvMQQE72P8+tcLlNiuGNZBLsdzQlMuKvlXynYVsbBHyIIIrG6k9gkhdC04xZ3lU0qL5cPI7AwSCcEA4xKjKVcOHcMYdnvWMyspyODCuE91t9i1LjqdLiNj3VKHRJPzGvKvpl/D05HxTyxxiRFstktJS5KkFolDYKAQEoT3PQ9B/8AorJ9GfE9VzPrVY+Oac+wGk6sx9oNgYznqJVNUrs+IOBOYxbLdeoV1Zu9nuIIjym2lNHmHcKQeorjBWF7CwwV3LO9o3tIVqDpb+2+DslKUq1bSUpSiLlqUpUilBBKUpREpSlESlKURKUpREpSlESsGs1g0RTdj+FV91SUcpEhsrPKkLGzrehuo2x/Cq+6pqzNQ37vDZuDrjUNx9CX3Ea5kIJAURvpsCviHMHvSt8Sl9yWQ3lq2J20fur7t/FzFFcSL/JnvPqx+4QGWEaYUStSB12nWx+ZQ/atFHFbHZLnEAynn2kXeOI9sQGidpS0pCd/27JB69t1xXEjhsca4h23G7fJelxrmGjGdWBznnVykdOhII39CKnJ/C2yQ+IM+wpVkU+3wIaVvvw2UuLQ+oApSQE6CeXdagfXmIGCuH/D+ANptqBzjrYCPRpbnbBJAHmtG0ZpYo3C/HLA686J0C+Jmvp8IkBoOb2D2J15VODiNjH/AIgxmXtL/wDCRE8LxPAVzc3hcv5e/eqkuFivEC3RrlLtsliFKOo762yEOfQ+ddVhHD6ZNvhjZNZ8gjxPZC+kwo3M4dkcp0QfdPXr8qxtq1SQ0DaF2LrhXCaVKpXfUMODwYIn2iNUDuPkpa05rYo3DHMrC486Jt1ml6KkNEhSeYHqfLtU1bM8xS1cPZtml365ZMiRC8GNbZkED2Vwp7+IfIHtrt01VW2jFb/fJcpqw2afPRHWUqLbRPKN9OY9gflXzaxrIHbrItTdmnKnxklb0cMnxEJHckd9VaK1QdPJZqvBOF1S4OqxkPIlsjAHaRsO3qu+tGR4TdeDsLEcjnXGBKtktySyY7PP45VzkDetD8+uvpXT2/ipZrpitniyspuuNXG2sJYdMeAh9MkJAAUNg8p6fLv51T97xLJ7Lb27hdrFPhRXCAl15kpTs9h8j9am+HfDu+5NdrYt+0XNuyyngh2a01oJT5qBII/fWquZVqyGgLWvuD8HNF1xUrezqc4e00gE/aABBBntldTB4gWFOL59Bk3C4SZV6V/o3JLI8R0cmtr5Byg1A8Pcqs9m4c5hZJzriJl0YSiKlLZUFEA9yO371pZJgF1RnV4x/GLdcbq1b3eQrS3zKAI6cxAAHnXN36yXewzBDvNukwJBTzBD7ZSSPUeoq11So10kbYW3a8N4XcUTRp1P9zS+JE4AjHTAE4VuNZngGRN4pdsknXO33THG20KYaj+IiV4fKRpQ/Lsp8/X96rriblH83ZzOyBpksNPKSGUK7hCUgJ38+m6iHbHeG7I3e3LbJTbXF8iZRQfDKuvTf7GsXKzXW2xIkufb5EZiYjnjuOI0HU+qfUdRVr6r3iCFtcO4RYWdfXSfJy0AkECTJA/rJVxTc5wDI7ljOUXmfdLfdbOhpD0NqN4iXSkg7CuwG9/PXlX3tXFuxRs1y0LkzWbTfFIVHmsMguR1hHLzFCh1HbyPbt1qh6VX6U/otc8n2LmljnOIiAJHsjVqxjv3lWLxXyiHeLXBt0PLrrkAZdU4tUmGiO0jY0OUAA77730quhSlYXvLzJXd4fYU7CgKNPYenX0AHySlKVYt5KUpRFy1KUqRSgglKUoiUpSiJSlKIlKUoiUpSiJWDWawaIpux/Cq+6t+tCx/Cq+6pAAqUEgbJOhXw/mH3nW+JTC5Gj6u2k/8P3XqzCRa8sxrDc4nyGUv4/HeTISpQ2pSElI7/QK/xXB/h9v0i78XMiuMmSpKJ0SQ+pCnDy7K08v10DoegqqclxfIcauzFnvMNUSXIbS6014yFcyVEpB2kkdwe/pXxyfH71i11/hl6imHL8NLnIHUr91XY7SSPKtN1d2CW7brm0OXLV1OtTZcB3jA6OsN1ajGc5O6urhhHjcQuFTWKy5KUybLd2nTzq0fZlL2dH7fEH7D1rfwrKDe/wASN1W3KCbcxCdiMIC9IKG9AfI9eY/vVH4lit8yVu4uWdtC029jx5PM6EaR16jffsagQpQOwSD6g1T6QQGmP6rL9V6FWrc021gZBAbH2C+CTv1jGy9KcO1xrnwll2q0R35lyZujq5UWHcUw31grUQrnPca106dvlUpj1zkSuNKVXK1ItMxnHlIWDMQ+tfv+6VLT05u9eWG3XGl8zbi0K9UnRoVuFRUVq5j3O+poLvbGysqcla31T4uHzEgyJifxRH5K9MRu8u58GuILd4nvTUsyEqaS+6VlI5gTy76+QrtbjFvd0z7Db9jM1JxFmM0HPAmJbaR36FGxsnYGtHtryrzNjVnuGQXqPZrYEKlSiQ2lbgQkkJKjsnoOgNfO7RZ1puMq0ynCl2K8pt1CHNpCknR1rofrRtyQ0SEuOVqb7h7aVYBxk6S2QA5oaTEjOMFegmbFGumcZ9c2JlzlTo8tIbtdvuAiqkDQ94q31A2f8H1qB/EsULxXDFLaDUlLDjbzapQkONkBAKFOfqIOxv13VIIedQsrQ6tKiO4UQTX5UpSvzKJ+pq19wHNLY3W3Z8rVLe8pXDq0hkQIj8OnvHntPmrr4LD+c+GGQ8PXH20y0LRLgBzQ7n3tfQj/AOVc9+Ii7sy83RY4Kv8Al9jjIhMoHYKA98/50P8AtrSwviBbsYtbBi4hbnb5GSsMXNbitgq3oqR2URv18q4ifLkT5z82W4XX33C44s91KJ2TVKlUeEGjdXcO4PWbxerdvbppyS0GPtOgFwg7EDrnK+NKClaq9glKUoiUpSiJSlKIuWpSlSKUEEpSlESlKURKUpREpSlESlKURKwazWDRFN2P4VX3VJMdH2/uFRtj+FV91b5r4fzDjidb4lMDkhurly1H8n7q7/xKMPPcWMbdZbUtt6BGS2pI2FkPLOh/kf5rsb5ZbNf/AMQtwhXqAzOjt46F+E55KBHUHuDonr86qCzcYs1tdri29D8KSiInkYckxUuONjyAUfSoe08QMnt2UzcmRNS/c5rSmnnX0c+0q10A8uw16VqePT1T3IXIHLvEzQbSw3w2Oa0hxk6iDO2MBW3wTv0K8z8wnsY7b7bGZsqW/YooKUOBJcO1Hvsg6J+VQV0ttozTg/8AzTCxm32q7Q7m3EbbhpKW5KVKSkJI/wC//aq6wnNb9hz0t2xvMtLlpSh4uNBe0g711rdyfiRk9/iRIj78aJGiPB9pmGwGUeIOoUQO5FW+Owsh3/izu5bvKV8attAbLSDqOzRBBHXV5lXhjuJWy5T5WLZJjmFQXPYC6mPb3lKnMK6aUrY159999d64mEnHsZ4KWDKHMUtN0uL8xxla5SCdp2rvo9ToaG+1c4ONGZiWJqf4UmYWw05JEFHiuoA6JUruR56rlpuWXiZiEPFXnGjbYbpeaSG9KCjvez59zV7q9KMb+i17TlziusCu6GFzSQHnYBwMdcyOqu6541isTjPi7LOOW9UHIbfzPxHEczbStFXOgeR6AenetDEYGEt5Rllkbg2NORfxVxq2M3VtRjFsK0G067HfT17d6rOTxIyeRf7NfHHY3tlna8GIQyOUJ1rqPPoa+to4m5DbZkyY1HtLz8qYqatx+Elakun9SSe1U8enP59lV3LnE/BjVLtAH2zuHE5npEA91YWJYxbxcuITuU4pahKtMZEpqG0CGW1JSpYCSDvlVyjfqDWbxdMaY4UWTiAnAbAbg/PVCUz4agyEjxPe5Qep/pjvvWzVat8R8pTIv0hcpp12/NeFOUtoHadFOk/26BqMlZVd5OFxMRdW0bXEkmU0kI0sLPNvavT31dKt8dgEDz6LYHLl9UqB9V34mTDnAaQ2HAepV9TeHWI3Li9ZdWpuNAlWc3B6E2dNrcBAA0PL3uoHfVckuPYM74c5TdRjFvsE6wqC47sRJQFo6/01jzPT/JHauJk8TMsfvtrvYmNNTLYx7PHU20APD80qHnuv1lPE3KMhsztnlLhRYb7niPtw4yWvGVve1a79etVNekZgfJYqHAOLsdS1PnTpzqPsw4k4/FqEDK4sUoKVor6ElKUoqpSlKIlKUoi5XzrNKVIpQQSlKURKUpREpSlESlKURKUpRErBpSiKasXwqvvNSBpSvh/MPvOt6qYfIn3etPhCedDSlcUL1ixQ0pTqiVkUpVE6LB8qelKVUonrTypSioErIpSnVOqedKUqpQJSlKoqpSlKIlKUoi//2Q==';
+      </div>
+    </section>
+  </main>
 
-// ── DOCX BROWSER: destructurar desde CDN ─────────────────────
-// Destructurar docx desde CDN
-const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, WidthType, BorderStyle, ShadingType, VerticalAlign, ImageRun, PageOrientation, SectionType, Footer, Header } = docx;
+  <!-- Pie de página integrado -->
+  <footer class="bg-gray-100 border-t border-gray-200 py-4 text-center text-xs text-gray-500">
+    Generador DS49 — Diseñado para el procesamiento automatizado y local de fichas familiares de vivienda.
+  </footer>
 
+  <!-- LÓGICA CORE EN JAVASCRIPT INTEGRADA -->
+  <script>
+    // Inicialización de desestructuración global de componentes de la librería DOCX
+    const { 
+      Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, 
+      WidthType, BorderStyle, AlignmentType, ImageRun, HeadingLevel, 
+      Header, Footer, PageNumber, NumberFormat, SectionType 
+    } = docx;
 
-// ── CÓDIGO FRONTEND ORIGINAL (UI, Excel, ZIP) ────────────────
+    // Variables de estado del aplicativo
+    let rawJsonData = null;
+    let logoBuffer = null;
+    let zipBlob = null;
 
-const dropZone = document.getElementById('dropZone');
-const fileInput = document.getElementById('fileInput');
-const filePreview = document.getElementById('filePreview');
-const statsRow = document.getElementById('statsRow');
-const btnGenerar = document.getElementById('btnGenerar');
-const btnReset = document.getElementById('btnReset');
-const btnDescargar = document.getElementById('btnDescargar');
-const progressBlock = document.getElementById('progressBlock');
-const progressFill = document.getElementById('progressFill');
-const progressCount = document.getElementById('progressCount');
-const progressLabel = document.getElementById('progressLabel');
-const progressLog = document.getElementById('progressLog');
-const alertError = document.getElementById('alertError');
- 
-let excelBase64 = null;
-let zipBlob = null;
-let totalRows = 0;
- 
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
-fileInput.addEventListener('change', () => { if(fileInput.files[0]) handleFile(fileInput.files[0]); });
-document.getElementById('removeFile').addEventListener('click', resetFile);
-btnReset.addEventListener('click', () => resetAll());
-btnDescargar.addEventListener('click', () => descargarZip());
-btnGenerar.addEventListener('click', () => generarFichas());
- 
-function handleFile(file) {
-  if(!file.name.match(/\.xlsx?$/i)) { showError('Solo se aceptan archivos .xlsx o .xls'); return; }
-  hideError();
-  // Leer metadatos con XLSX
-  const metaReader = new FileReader();
-  metaReader.onload = e => {
-    try {
-      const wb = XLSX.read(e.target.result, {type:'array'});
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-      totalRows = data.length - 1;
-      if(totalRows < 1) { showError('El archivo no tiene filas de datos'); return; }
-      document.getElementById('previewName').textContent = file.name;
-      document.getElementById('previewMeta').textContent = `${totalRows} familias · ${data[0]?.length || 0} columnas · ${(file.size/1024).toFixed(0)} KB`;
-      filePreview.classList.add('show');
-      dropZone.style.display = 'none';
-      document.getElementById('statFamilias').textContent = totalRows;
-      document.getElementById('statColumnas').textContent = data[0]?.length || 0;
-      statsRow.style.display = 'grid';
-      btnGenerar.disabled = false;
-      btnReset.disabled = false;
-    } catch(err) { showError('No se pudo leer el archivo: ' + err.message); }
-  };
-  metaReader.readAsArrayBuffer(file);
- 
-  // Convertir a base64 de forma segura (sin stack overflow)
-  const b64Reader = new FileReader();
-  b64Reader.onload = e => {
-    excelBase64 = e.target.result.split(',')[1];
-  };
-  b64Reader.readAsDataURL(file);
-}
- 
-function resetFile() {
-  excelBase64 = null; totalRows = 0;
-  filePreview.classList.remove('show');
-  dropZone.style.display = '';
-  statsRow.style.display = 'none';
-  fileInput.value = '';
-  btnGenerar.disabled = true;
-  hideError();
-}
- 
-function resetAll() {
-  resetFile(); zipBlob = null;
-  progressBlock.classList.remove('show');
-  btnDescargar.classList.remove('show');
-  btnReset.disabled = true;
-  progressFill.style.width = '0%';
-  progressLog.textContent = '';
-}
- 
-function showError(msg) { document.getElementById('alertErrorMsg').textContent = msg; alertError.classList.add('show'); }
-function hideError() { alertError.classList.remove('show'); }
- 
-function cfg() {
-  return {
-    nombreProyecto: document.getElementById('cfgProyecto').value,
-    nombreGrupo: document.getElementById('cfgGrupo').value,
-    region: document.getElementById('cfgRegion').value,
-    provincia: document.getElementById('cfgProvincia').value,
-    comuna: document.getElementById('cfgComuna').value,
-    nFamilias: document.getElementById('cfgFamilias').value,
-    entidad: document.getElementById('cfgEntidad').value,
-  };
-}
- 
-async function generarFichas() {
-  if(!excelBase64) return;
-  hideError();
-  btnGenerar.disabled = true;
-  btnDescargar.classList.remove('show');
-  zipBlob = null;
-  progressBlock.classList.add('show');
-  progressFill.style.width = '0%';
-  progressCount.textContent = `0 / ${totalRows}`;
-  progressLabel.textContent = 'Generando fichas en el navegador, favor esperar...';
-  progressLog.textContent = '';
+    // Diccionarios e Índices Estáticos para Mapeo del Formulario Completo
+    const MAPA_INDICES = {
+      RUN: 1, DV: 2, NOM: 3, APP: 4, APM: 5, EC: 6, SX: 7, FN: 8, ED: 9, 
+      PAI: 10, TEL: 11, COR: 12, CALLE: 13, NUM: 14, BLOCK: 15, DEP: 16, 
+      VIV: 17, COM: 18, RSH: 19, CALI: 20, TRAB: 21, COM_EST: 22, JEF: 23, 
+      NIV_ED: 24, EST_CIV: 25, DIS_CRON: 26, CRED_DIS: 27, S_SALUD: 28, 
+      ETNIA: 29, MIGRA: 30, EMB: 31, BOM: 32, FF_AA: 33, EX_PRIS: 34, 
+      S_RENA: 35, RE_REG: 36, P_VIV: 37, S_TEN: 38, COMP: 39, AGUA: 40, 
+      S_EXC: 41, ELEC: 42, RE_RES: 43, CAL_INT: 44, CAL_EXT: 45, RE_LUM: 46, 
+      HA_URB: 47, EQUIP: 48, MA_ORG: 49, MA_SEG: 50, COH_SOC: 51, EXP_HAB: 52, 
+      EXP_BAR: 53, AT_EST: 54, AT_EQUIP: 55, AT_DIS: 56, AT_MED: 57, AT_SEG: 58,
+      C_DORM: 59, C_CAMAS: 60
+    };
 
-  try {
-    const config = cfg();
-    const allDocxFiles = [];
+    const EQUPRI = {
+      SALA: 61, MULTI: 62, AREA_V: 63, JUEGOS: 64, CANCHA: 65, PLAZA: 66, 
+      SEDE: 67, PARQUE: 68, HUERTO: 69, C_DEP: 70
+    };
 
-    // Leer Excel
-    const excelBuf = Uint8Array.from(atob(excelBase64), c => c.charCodeAt(0));
-    const wb = XLSX.read(excelBuf, { type: 'array' });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-    const allRows = data.slice(1)
-      .map(r => r.map(v => v === null || v === undefined ? '' : String(v).trim()))
-      .filter(r => (r[1]||'').trim() !== '' || (r[2]||'').trim() !== '' || (r[4]||'').trim() !== '');
+    const EQUSR = {
+      SALA: 71, MULTI: 72, AREA_V: 73, JUEGOS: 74, CANCHA: 75, PLAZA: 76, 
+      SEDE: 77, PARQUE: 78, HUERTO: 79, C_DEP: 80
+    };
 
-    const total = allRows.length;
-    const logoBytes = Uint8Array.from(atob(SERVIU_B64), c => c.charCodeAt(0));
-
-    for (let i = 0; i < total; i++) {
-      const row = allRows[i];
-      const folio = i + 1;
-      const nombreSafe = normStr(val(row[1]));
-      const apellidoSafe = normStr(val(row[2]));
-      const rutSafe = (val(row[4]) || `sin_rut_${folio}`).replace(/[^a-zA-Z0-9]/g, '');
-      const filename = `${folio}.FichaDiagnostica_${nombreSafe}_${apellidoSafe}_${rutSafe}.docx`;
-
-      progressLabel.textContent = `Generando ficha ${folio} de ${total}...`;
-      progressCount.textContent = `${folio} / ${total}`;
-      const pct = Math.round((folio / total) * 85);
-      progressFill.style.width = pct + '%';
-      progressLog.textContent = filename;
-
-      const doc = buildDoc(row, config, folio, logoBytes);
-      const blob = await Packer.toBlob(doc);
-      const arrayBuffer = await blob.arrayBuffer();
-      allDocxFiles.push({ name: filename, data: new Uint8Array(arrayBuffer) });
-
-      // Liberar CPU cada 5 fichas
-      if (i % 5 === 4) await new Promise(r => setTimeout(r, 10));
+    // Controladores de eventos para carga de archivos de entrada
+    function handleLogo(input) {
+      if (!input.files || !input.files[0]) return;
+      const file = input.files[0];
+      document.getElementById('logoName').innerText = file.name;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        logoBuffer = new Uint8Array(e.target.result);
+        validarEstadoCarga();
+      };
+      reader.readAsArrayBuffer(file);
     }
 
-    progressFill.style.width = '95%';
-    progressLabel.textContent = 'Empaquetando ZIP...';
-    await new Promise(r => setTimeout(r, 50));
+    function handleJson(input) {
+      if (!input.files || !input.files[0]) return;
+      const file = input.files[0];
+      document.getElementById('jsonName').innerText = file.name;
 
-    const finalZip = buildZipStore(allDocxFiles);
-    zipBlob = new Blob([finalZip], { type: 'application/zip' });
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          rawJsonData = JSON.parse(e.target.result);
+          document.getElementById('lblTotalRegistros').innerText = Array.isArray(rawJsonData) ? rawJsonData.length : 0;
+          document.getElementById('lblStatusDatos').innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500"></span> Listo`;
+          document.getElementById('lblStatusDatos').className = "text-sm font-medium text-green-600 mt-1 flex items-center gap-1.5";
+          validarEstadoCarga();
+        } catch(err) {
+          alert("Error de sintaxis: El archivo JSON cargado es inválido.");
+          console.error(err);
+        }
+      };
+      reader.readAsText(file);
+    }
 
-    progressFill.style.width = '100%';
-    progressCount.textContent = `${total} / ${total}`;
-    progressLabel.textContent = `✓ ${total} fichas listas — ${(zipBlob.size/1024/1024).toFixed(1)} MB`;
-    progressLog.textContent = '';
-    btnDescargar.classList.add('show');
+    function validarEstadoCarga() {
+      const btn = document.getElementById('btnProcesar');
+      if (rawJsonData && logoBuffer) {
+        btn.disabled = false;
+        btn.className = "w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg cursor-pointer transition flex items-center justify-center gap-2 shadow-sm";
+      }
+    }
 
-  } catch(err) {
-    console.error('DS49 Error:', err);
-    showError('Error al generar fichas: ' + err.message + (err.stack ? ' | ' + err.stack.split('\n')[1] : ''));
-    progressLabel.textContent = 'Error al procesar';
-  } finally {
-    btnGenerar.disabled = false;
-  }
-}
+    // Funciones utilitarias para la construcción estructural de tablas nativas en DOCX
+    const bNone = { style: BorderStyle.NONE, size: 0, color: "auto" };
+    const bThin = { style: BorderStyle.SINGLE, size: 4, color: "D3D3D3" };
+    const bordersForm = { top: bThin, bottom: bThin, left: bThin, right: bThin };
+    const cellP = { top: 70, bottom: 70, left: 100, right: 100 };
 
-function normStr(s) {
-  return (s||'').trim().normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/[ñÑ]/g, 'n').replace(/[^a-zA-Z0-9 ]/g, '').trim();
-}
+    function landscapeProps(type = SectionType.NEXT_PAGE) {
+      return {
+        type: type,
+        size: { width: 16838, height: 11906 },
+        margins: { top: 1140, bottom: 1140, left: 1140, right: 1140 }
+      };
+    }
 
+    function portraitProps() {
+      return {
+        type: SectionType.NEXT_PAGE,
+        size: { width: 11906, height: 16838 },
+        margins: { top: 1140, bottom: 1140, left: 1140, right: 1140 }
+      };
+    }
 
-// ── CÓDIGO DE GENERACIÓN DE DOCUMENTOS ───────────────────────
+    function val(v) { return v !== undefined && v !== null ? String(v).trim() : ''; }
 
-function val(v) {
-  if (!v) return '';
-  const s = String(v).trim();
-  return (s === 'nan' || s === 'NaN') ? '' : s;
-}
-function capitalize(s) { if (!s) return ''; return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase(); }
-function xFor(expected, actual) { return actual === expected ? 'X' : ''; }
-function xOrEmpty(v) { const s = val(v); return (s === 'X' || s === 'x') ? 'X' : ''; }
-function siNo(v) { return val(v).toLowerCase() === 'si' || val(v).toLowerCase() === 'sí' ? 'SI' : 'NO'; }
- 
-// ─── Bordes ───────────────────────────────────────────────────────────────────
-const BD = { style: BorderStyle.SINGLE, size: 6, color: '000000' };
-const BORDERS = { top: BD, bottom: BD, left: BD, right: BD };
-const NB = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
-const NO_BORDERS = { top: NB, bottom: NB, left: NB, right: NB };
-const MARGIN = 720;
-const CONTENT_L = 18720 - MARGIN * 2;
-const CONTENT_P = 12240 - MARGIN * 2;
- 
-function cell(text, opts = {}) {
-  const { bold=false, width=1000, borders=BORDERS, shade=null, colspan=1, align=AlignmentType.LEFT, fontSize=18, vAlign=VerticalAlign.CENTER, italic=false } = opts;
-  return new TableCell({
-    columnSpan: colspan, width: { size: width, type: WidthType.DXA }, borders,
-    verticalAlign: vAlign,
-    shading: shade ? { fill: shade, type: ShadingType.CLEAR } : undefined,
-    margins: { top: 60, bottom: 60, left: 100, right: 100 },
-    children: [new Paragraph({ alignment: align, children: [new TextRun({ text: String(text || ''), bold, italic, size: fontSize, font: 'Arial' })] })]
-  });
-}
-function hCell(text, opts = {}) { return cell(text, { bold: true, shade: 'D9D9D9', ...opts }); }
-function p(text, opts = {}) {
-  const { bold=false, size=20, align=AlignmentType.LEFT, before=80, italic=false } = opts;
-  return new Paragraph({ alignment: align, spacing: { before, after: 0 }, children: [new TextRun({ text: String(text||''), bold, italic, size, font: 'Arial' })] });
-}
-function sp(before = 120) { return new Paragraph({ spacing: { before, after: 0 }, children: [] }); }
- 
-function makeHeader(logoBuffer) {
-  return { default: new Header({ children: [new Paragraph({ children: [new ImageRun({ data: logoBuffer, type: 'jpg', transformation: { width: 100, height: 82 } })] })] }) };
-}
-function makeFooter() {
-  return { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'Formatos 2025 SERVIU REGION OHIGGINS res. Ex N°195 del 05.02.2025', size: 16, font: 'Calibri' })] })] }) };
-}
-function landscapeProps(type = SectionType.NEXT_PAGE) {
-  return { type, page: { size: { width: 12240, height: 18720, orientation: PageOrientation.LANDSCAPE }, margin: { top: MARGIN, right: MARGIN, bottom: MARGIN, left: MARGIN } } };
-}
-function portraitProps(type = SectionType.NEXT_PAGE) {
-  return { type, page: { size: { width: 12240, height: 18720 }, margin: { top: MARGIN, right: MARGIN, bottom: MARGIN, left: MARGIN } } };
-}
- 
-function extractMembers(row) {
-  const members = [{
-    nombre: val(row[1]), apellido1: val(row[2]), apellido2: val(row[3]),
-    rut: val(row[4]), estadoCivil: val(row[5]), genero: val(row[6]),
-    parentesco: 'Postulante', edad: val(row[7]), adultoMayor: val(row[8]),
-    estudios: val(row[9]), situacionLaboral: val(row[10]),
-    puebloOriginario: val(row[13]), nacionalidad: val(row[14]),
-    enfermedad: val(row[16]), enfermedadCual: val(row[17]),
-    discapacidad: val(row[18]), discapacidadCual: val(row[20]), valech: val(row[22]),
-  }];
-  [24, 48, 72, 96, 120, 144].forEach(b => {
-    const nombre = val(row[b]), ap1 = val(row[b + 1]);
-    if (!nombre && !ap1) return;
-    members.push({
-      nombre, apellido1: ap1, apellido2: val(row[b + 2]),
-      rut: val(row[b + 3]), estadoCivil: val(row[b + 4]), genero: val(row[b + 5]),
-      parentesco: val(row[b + 6]), edad: val(row[b + 7]), adultoMayor: val(row[b + 8]),
-      estudios: val(row[b + 9]), situacionLaboral: val(row[b + 10]),
-      puebloOriginario: val(row[b + 13]), nacionalidad: val(row[b + 14]),
-      enfermedad: val(row[b + 16]), enfermedadCual: val(row[b + 17]),
-      discapacidad: val(row[b + 18]), discapacidadCual: val(row[b + 20]), valech: val(row[b + 22]),
-    });
-  });
-  return members;
-}
- 
-function buildDoc(row, pd, folio, logoBuffer) {
-  const members = extractMembers(row);
-  const W_L = CONTENT_L;
- 
-  // ── Encabezado ──
-  const logoW = Math.round(W_L * 0.08), tituloW = Math.round(W_L * 0.52), folioW = W_L - logoW - tituloW;
-  const fW2 = Math.round(folioW * 0.45);
- 
-  const headerTable = new Table({
-    width: { size: W_L, type: WidthType.DXA }, columnWidths: [logoW, tituloW, folioW],
-    rows: [new TableRow({ children: [
-      new TableCell({ width: { size: logoW, type: WidthType.DXA }, borders: NO_BORDERS, margins: { top: 0, bottom: 0, left: 0, right: 0 }, children: [new Paragraph({ children: [] })] }),
-      new TableCell({ width: { size: tituloW, type: WidthType.DXA }, borders: NO_BORDERS, verticalAlign: VerticalAlign.CENTER, margins: { top: 40, bottom: 40, left: 100, right: 40 }, children: [
-        sp(40),
-        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'FICHA DIAGNÓSTICA FAMILIA POSTULANTE', bold: true, size: 24, font: 'Arial' })] }),
-        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'D.S. N° 49, V. y U., DE 2011', bold: true, size: 20, font: 'Arial' })] }),
-      ]}),
-      new TableCell({ width: { size: folioW, type: WidthType.DXA }, borders: NO_BORDERS, verticalAlign: VerticalAlign.BOTTOM, margins: { top: 40, bottom: 40, left: 80, right: 80 }, children: [
-        new Table({ width: { size: folioW - 160, type: WidthType.DXA }, columnWidths: [fW2, folioW - 160 - fW2],
-          rows: [new TableRow({ children: [
-            new TableCell({ width: { size: fW2, type: WidthType.DXA }, borders: BORDERS, shading: { fill: 'D9D9D9', type: ShadingType.CLEAR }, margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ children: [new TextRun({ text: 'N° Folio Ficha', bold: true, size: 18, font: 'Arial' })] })] }),
-            new TableCell({ width: { size: folioW - 160 - fW2, type: WidthType.DXA }, borders: BORDERS, margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ children: [new TextRun({ text: String(folio), size: 18, font: 'Arial' })] })] }),
-          ]})]
+    function cell(txt, opts = {}) {
+      return new TableCell({
+        width: { size: opts.width || 2000, type: WidthType.DXA },
+        borders: opts.borders || bordersForm,
+        margins: cellP,
+        shading: opts.bg ? { fill: opts.bg } : undefined,
+        children: [new Paragraph({
+          alignment: opts.align || AlignmentType.LEFT,
+          children: [new TextRun({ 
+            text: txt, 
+            bold: !!opts.bold, 
+            size: opts.fontSize || 14, 
+            font: "Calibri", 
+            color: opts.color || "000000" 
+          })]
+        })]
+      });
+    }
+
+    function hCell(txt, opts = {}) {
+      return cell(txt, { 
+        bg: opts.bg || "1F4E78", 
+        color: opts.color || "FFFFFF", 
+        bold: true, 
+        align: opts.align || AlignmentType.CENTER, 
+        width: opts.width, 
+        borders: opts.borders,
+        fontSize: opts.fontSize
+      });
+    }
+
+    function p(txt, opts = {}) {
+      return new Paragraph({
+        alignment: opts.align || AlignmentType.LEFT,
+        spacing: { before: opts.before || 0, after: opts.after || 0 },
+        children: [new TextRun({ text: txt, bold: !!opts.bold, size: opts.size || 18, font: "Calibri" })]
+      });
+    }
+
+    function sp(v) { return new Paragraph({ spacing: { before: v } }); }
+
+    function parseUsr(str) {
+      const s = String(str).toLowerCase();
+      return {
+        n: s.includes('niñ'),
+        j: s.includes('jóv') || s.includes('jov'),
+        m: s.includes('muj'),
+        h: s.includes('hom'),
+        a: s.includes('adul') || s.includes('may')
+      };
+    }
+
+    function makeHeader(logo) {
+      return {
+        default: new Header({
+          children: [
+            new Table({
+              width: { size: 100, type: WidthType.PERCENTAGE },
+              borders: { top: bNone, bottom: bNone, left: bNone, right: bNone },
+              rows: [
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      width: { size: 20, type: WidthType.PERCENTAGE },
+                      borders: { top: bNone, bottom: bNone, left: bNone, right: bNone },
+                      children: [new Paragraph({
+                        children: [new ImageRun({ data: logo, transformation: { width: 55, height: 55 } })]
+                      })]
+                    }),
+                    new TableCell({
+                      width: { size: 80, type: WidthType.PERCENTAGE },
+                      borders: { top: bNone, bottom: bNone, left: bNone, right: bNone },
+                      children: [
+                        new Paragraph({
+                          alignment: AlignmentType.RIGHT,
+                          children: [new TextRun({ text: "DIAGNÓSTICO SOCIOHABITACIONAL DS49", bold: true, size: 16, font: "Calibri", color: "1F4E78" })]
+                        }),
+                        new Paragraph({
+                          alignment: AlignmentType.RIGHT,
+                          children: [new TextRun({ text: "Ficha de Caracterización Familiar e Individual", size: 13, font: "Calibri", color: "595959" })]
+                        })
+                      ]
+                    })
+                  ]
+                })
+              ]
+            })
+          ]
         })
-      ]})
-    ]})]
-  });
- 
-  // ── Sección I ──
-  const LEFT_W = 7479, RIGHT_W = W_L - LEFT_W;
-  const cws = [2943, 709, 1418, 708, 1701];
-  const v4 = cws[1] + cws[2] + cws[3] + cws[4];
- 
-  function hcL(txt) {
-    return new TableCell({ width: { size: cws[0], type: WidthType.DXA }, borders: BORDERS, shading: { fill: 'D9D9D9', type: ShadingType.CLEAR }, margins: { top: 60, bottom: 60, left: 100, right: 100 },
-      children: [new Paragraph({ children: [new TextRun({ text: txt, bold: true, size: 18, font: 'Arial' })] })]
-    });
-  }
-  function vcL(txt, w) {
-    return new TableCell({ width: { size: w, type: WidthType.DXA }, borders: BORDERS, margins: { top: 60, bottom: 60, left: 100, right: 100 },
-      children: [new Paragraph({ children: [new TextRun({ text: String(txt || ''), size: 18, font: 'Arial' })] })]
-    });
-  }
-  function vcL4(txt) {
-    return new TableCell({ columnSpan: 4, width: { size: v4, type: WidthType.DXA }, borders: BORDERS, margins: { top: 60, bottom: 60, left: 100, right: 100 },
-      children: [new Paragraph({ children: [new TextRun({ text: String(txt || ''), size: 18, font: 'Arial' })] })]
-    });
-  }
- 
-  const leftTable = new Table({ width: { size: LEFT_W, type: WidthType.DXA }, columnWidths: cws,
-    rows: [
-      new TableRow({ children: [
-        new TableCell({ width: { size: cws[0], type: WidthType.DXA }, borders: BORDERS, shading: { fill: 'D9D9D9', type: ShadingType.CLEAR }, margins: { top: 60, bottom: 60, left: 100, right: 100 }, children: [
-          new Paragraph({ children: [new TextRun({ text: 'Tipología de Proyecto (*)', bold: true, size: 18, font: 'Arial' })] }),
-          new Paragraph({ children: [new TextRun({ text: '(encerrar en un círculo,', size: 16, font: 'Arial' })] }),
-          new Paragraph({ children: [new TextRun({ text: 'la tipología que corresponda)', size: 16, font: 'Arial' })] }),
-        ]}),
-        vcL('CNT', cws[1]), vcL('', cws[2]), vcL('MP', cws[3]), vcL('', cws[4]),
-      ]}),
-      new TableRow({ children: [hcL('Nombre del Proyecto'), vcL4(pd.nombreProyecto)] }),
-      new TableRow({ children: [hcL('Nombre del Grupo'), vcL4(pd.nombreGrupo)] }),
-      new TableRow({ children: [hcL('N° de Familias Postulantes'), vcL4(pd.nFamilias)] }),
-      new TableRow({ children: [hcL('Entidad Patrocinante'), vcL4(pd.entidad)] }),
-      new TableRow({ children: [hcL('Región'), vcL4(pd.region)] }),
-      new TableRow({ children: [hcL('Provincia'), vcL4(pd.provincia)] }),
-      new TableRow({ children: [hcL('Comuna'), vcL4(pd.comuna)] }),
-    ]
-  });
- 
-  const rightCell = new TableCell({ width: { size: RIGHT_W, type: WidthType.DXA }, borders: NO_BORDERS, verticalAlign: VerticalAlign.TOP, margins: { top: 60, bottom: 60, left: 300, right: 60 },
-    children: [new Table({ width: { size: RIGHT_W - 360, type: WidthType.DXA }, columnWidths: [RIGHT_W - 360],
-      rows: [new TableRow({ children: [new TableCell({ width: { size: RIGHT_W - 360, type: WidthType.DXA }, borders: BORDERS, margins: { top: 100, bottom: 100, left: 150, right: 150 },
-        children: [new Paragraph({ children: [new TextRun({ text: '(*) CNT: Construcción en Nuevos Terrenos; MP: Megaproyecto;', size: 18, font: 'Arial' })] })]
-      })] })]
-    })]
-  });
- 
-  const secITable = new Table({ width: { size: W_L, type: WidthType.DXA }, columnWidths: [LEFT_W, RIGHT_W],
-    rows: [new TableRow({ children: [
-      new TableCell({ width: { size: LEFT_W, type: WidthType.DXA }, borders: NO_BORDERS, margins: { top: 0, bottom: 0, left: 0, right: 0 }, children: [leftTable] }),
-      rightCell,
-    ]})]
-  });
- 
-  // ── Sección II ──
-  const cwBase = [390,1155,1140,990,990,825,1080,1080,585,840,1140,1155,1245,960,630,705,765,615,960];
-  const baseSum = cwBase.reduce((a,b)=>a+b,0);
-  const ff = W_L / baseSum;
-  const adjF = cwBase.map(w => Math.round(w * ff));
-  adjF[adjF.length-1] += W_L - adjF.reduce((a,b)=>a+b,0);
- 
-  function famCell(txt, w, opts = {}) {
-    const { bold=false, shade=null, colspan=1 } = opts;
-    return new TableCell({ columnSpan: colspan, width: { size: w, type: WidthType.DXA }, borders: BORDERS,
-      shading: shade ? { fill: shade, type: ShadingType.CLEAR } : undefined,
-      margins: { top: 40, bottom: 40, left: 60, right: 60 },
-      children: [new Paragraph({ children: [new TextRun({ text: String(txt||''), bold, size: 16, font: 'Arial' })] })]
-    });
-  }
-  function fhc(txt, w, cs=1) { return famCell(txt, w, { bold: true, shade: 'D9D9D9', colspan: cs }); }
- 
-  const header1 = new TableRow({ children: [
-    fhc('N°',adjF[0]), fhc('Nombre',adjF[1]), fhc('Primer Apellido',adjF[2]), fhc('Segundo Apellido',adjF[3]),
-    fhc('RUT',adjF[4]), fhc('Estado civil',adjF[5]), fhc('Género',adjF[6]), fhc('Parentesco',adjF[7]),
-    fhc('Edad',adjF[8]), fhc('Ad. Mayor',adjF[9]), fhc('Estudios',adjF[10]), fhc('Sit. Laboral',adjF[11]),
-    fhc('Ascend. Indígena', adjF[12]+adjF[13], 2), fhc('Extranjero', adjF[14]+adjF[15], 2),
-    fhc('Enf. Cat.', adjF[16]+adjF[17], 2), fhc('Valech', adjF[18]),
-  ]});
-  const header2 = new TableRow({ children: [
-    famCell('',adjF[0]),famCell('',adjF[1]),famCell('',adjF[2]),famCell('',adjF[3]),famCell('',adjF[4]),
-    famCell('',adjF[5]),famCell('',adjF[6]),famCell('',adjF[7]),famCell('',adjF[8]),famCell('',adjF[9]),
-    famCell('',adjF[10]),famCell('',adjF[11]),
-    fhc('CUAL',adjF[12]), fhc('Nac.',adjF[13]),
-    fhc('SI/NO',adjF[14]), fhc('CUAL',adjF[15]),
-    fhc('SI/NO',adjF[16]), fhc('CUAL',adjF[17]),
-    fhc('Valech',adjF[18]),
-  ]});
- 
-  const dataRows = [];
-  for (let i = 0; i < 7; i++) {
-    const m = members[i] || {};
-    const has = !!(m.nombre || m.apellido1);
-    const enfSN = has ? (val(m.enfermedad).toLowerCase()==='si'?'SI':'NO') : '';
-    const valech = has ? val(m.valech).toUpperCase() : '';
-    const esExtranjero = has && val(m.nacionalidad) && !val(m.nacionalidad).toLowerCase().startsWith('chilen') ? 'SI' : (has?'NO':'');
-    dataRows.push(new TableRow({ children: [
-      famCell(String(i+1),adjF[0]), famCell(capitalize(val(m.nombre)),adjF[1]),
-      famCell(capitalize(val(m.apellido1)),adjF[2]), famCell(capitalize(val(m.apellido2)),adjF[3]),
-      famCell(val(m.rut),adjF[4]), famCell(val(m.estadoCivil),adjF[5]),
-      famCell(val(m.genero),adjF[6]), famCell(val(m.parentesco),adjF[7]),
-      famCell(val(m.edad),adjF[8]), famCell(has?val(m.adultoMayor).toUpperCase():'',adjF[9]),
-      famCell(val(m.estudios),adjF[10]), famCell(val(m.situacionLaboral),adjF[11]),
-      famCell(val(m.puebloOriginario),adjF[12]), famCell(capitalize(val(m.nacionalidad)),adjF[13]),
-      famCell(esExtranjero,adjF[14]), famCell(val(m.discapacidadCual),adjF[15]),
-      famCell(enfSN,adjF[16]), famCell(val(m.enfermedadCual),adjF[17]),
-      famCell(valech,adjF[18]),
-    ]}));
-  }
- 
-  const secIITable = new Table({ width: { size: W_L, type: WidthType.DXA }, columnWidths: adjF,
-    rows: [header1, header2, ...dataRows]
-  });
- 
-  // ── Sección III ──
-  const sitHab=val(row[167]),tipoViv=val(row[173]),sistAgua=val(row[179]),servHig=val(row[184]);
- 
-  function optRow(label, cols) {
-    const lW = Math.round(W_L*0.18), rem = W_L-lW, cW = Math.floor(rem/(cols.length*2));
-    const cells = [hCell(label, { width: lW, fontSize: 16 })];
-    cols.forEach(c => { cells.push(cell(c.label,{width:cW,fontSize:16})); cells.push(cell(c.x,{width:cW,align:AlignmentType.CENTER,bold:true,fontSize:16})); });
-    return new TableRow({ children: cells });
-  }
- 
-  const secIIITable = new Table({ width: { size: W_L, type: WidthType.DXA }, rows: [
-    optRow('1.1.- Situación Habitacional:',[{label:'Allegado/a',x:xFor('Allegado/a',sitHab)},{label:'Arrendatario/a',x:xFor('Arrendatario/a',sitHab)},{label:'En Situación de calle',x:xFor('En situación de calle',sitHab)},{label:'En Campamento',x:xFor('En campamento',sitHab)},{label:'Otra:',x:!['Allegado/a','Arrendatario/a','En situación de calle','En campamento'].includes(sitHab)&&sitHab?sitHab:''}]),
-    optRow('1.2.- Tipo Vivienda:',[{label:'Departamento',x:xFor('Departamento',tipoViv)},{label:'Casa',x:xFor('Casa',tipoViv)},{label:'Mediagua',x:xFor('Mediagua',tipoViv)},{label:'Choza',x:xFor('Choza',tipoViv)},{label:'Otra:',x:!['Departamento','Casa','Mediagua','Choza'].includes(tipoViv)&&tipoViv?tipoViv:''}]),
-    optRow('1.3.- Tipo de Sistema Agua:',[{label:'Con llave dentro',x:xFor('Con llave de agua dentro de la vivienda',sistAgua)},{label:'Con llave fuera',x:xFor('Con llave de agua fuera de vivienda',sistAgua)},{label:'No tiene/acarrea',x:xFor('No tiene o la acarrea',sistAgua)},{label:'Otra:',x:!['Con llave de agua dentro de la vivienda','Con llave de agua fuera de vivienda','No tiene o la acarrea'].includes(sistAgua)&&sistAgua?sistAgua:''}]),
-    optRow('1.4.- Tipo Serv. Higiénico:',[{label:'WC alcantarillado',x:xFor('WC conectado al alcantarillado',servHig)},{label:'Letrina/pozo negro',x:xFor('Letrina o pozo negro',servHig)},{label:'No posee',x:xFor('No posee servicio higiénico',servHig)},{label:'Otra:',x:!['WC conectado al alcantarillado','Letrina o pozo negro','No posee servicio higiénico'].includes(servHig)&&servHig?servHig:''}]),
-  ]});
- 
-  const c1d=Math.round(W_L*0.35),c2d=W_L-c1d;
-  const distribTable = new Table({ width:{size:W_L,type:WidthType.DXA}, columnWidths:[c1d,c2d], rows:[
-    new TableRow({children:[hCell('2.1.- N° de Dormitorios',{width:c1d}),cell(val(row[189]),{width:c2d})]}),
-    new TableRow({children:[hCell('2.2.- N° de Camas',{width:c1d}),cell(val(row[190]),{width:c2d})]}),
-    new TableRow({children:[hCell('2.3.- Posee Calefont',{width:c1d}),cell(val(row[191]).toLowerCase()==='si'?'SI':'NO',{width:c2d})]}),
-  ]});
- 
-  // ── Sección IV ──
-  const cSI=800,cNO=800,cStmt=W_L-cSI-cNO;
-  const pregs=[
-    {text:'1.- Los problemas los solucionamos conversando y llegando a acuerdos.',r:val(row[192])},
-    {text:'2.- La mayor parte de las personas del barrio cumplimos las reglas que acordamos.',r:val(row[195])},
-    {text:'3.- Es de mi interés conocer y compartir con las personas del barrio.',r:val(row[198])},
-    {text:'4.- Existen varias organizaciones comunitarias en el barrio.',r:val(row[201])},
-    {text:'5.- Las personas del barrio siempre están dispuestas a colaborar si alguien tiene problemas.',r:val(row[204])},
-  ];
-  const secIVTable = new Table({ width:{size:W_L,type:WidthType.DXA}, columnWidths:[cStmt,cSI,cNO], rows:[
-    new TableRow({children:[hCell('Afirmación',{width:cStmt}),hCell('SI',{width:cSI,align:AlignmentType.CENTER}),hCell('NO',{width:cNO,align:AlignmentType.CENTER})]}),
-    ...pregs.map(pg=>new TableRow({children:[
-      cell(pg.text,{width:cStmt,fontSize:18}),
-      cell(pg.r.toLowerCase()==='si'||pg.r.toLowerCase()==='sí'?'X':'',{width:cSI,align:AlignmentType.CENTER,bold:true}),
-      cell(pg.r.toLowerCase()==='no'?'X':'',{width:cNO,align:AlignmentType.CENTER,bold:true}),
-    ]}))
-  ]});
- 
-  // ── Sección V ──
-  const ATRIB=[
-    {l:'Con espacios suficientes',c:211},{l:'Con buena iluminación',c:212},{l:'Con buena ventilación',c:213},
-    {l:'Segura',c:214},{l:'Sólida',c:215},{l:'Una bonita fachada',c:216},{l:'Con jardín',c:217},
-    {l:'Cercanía con servicios básicos',c:218},{l:'Un bonito barrio',c:219},{l:'Una vivienda ampliable',c:220},
-    {l:'El equipamiento urbano del barrio (plazas, juegos, etc.)',c:221},{l:'Otros: (cuáles?)',c:222},
-  ];
-  const EQUIP=[
-    {l:'Áreas verdes adicionales',c:228},{l:'Plaza Activa (Máquinas de ejercicio)',c:229},
-    {l:'Contenedores de basura diferenciado por tipo de desecho',c:230},{l:'Huertos Urbanos',c:231},
-    {l:'Multicancha',c:232},{l:'Ciclo vías',c:233},{l:'Estacionamientos de Bicicletas',c:234},
-    {l:'Escenario o anfiteatro',c:235},{l:'Estacionamientos de Automóviles',c:236},
-    {l:'Juegos infantiles',c:237},{l:'Juegos de mesa',c:238},{l:'Luminarias',c:239},
-    {l:'Mesa de ping-pong',c:240},{l:'Sala multiuso',c:241},{l:'Canil para mascotas',c:242},
-    {l:'Otros. ¿Cuál/es?',c:243},
-  ];
-  const EQUSR={228:244,229:245,230:246,231:247,232:248,233:249,234:250,235:251,236:252,237:253,238:254,239:255,240:256,241:257,242:260,243:261};
- 
-  const cX=1200,cL=W_L-cX;
-  const atribTable = new Table({width:{size:W_L,type:WidthType.DXA},columnWidths:[cL,cX],rows:[
-    new TableRow({children:[hCell('Atributos de la vivienda y el barrio',{width:cL}),hCell('X',{width:cX,align:AlignmentType.CENTER})]}),
-    ...ATRIB.map(a=>new TableRow({children:[cell(a.l,{width:cL,fontSize:18}),cell(xOrEmpty(val(row[a.c])),{width:cX,align:AlignmentType.CENTER,bold:true})]}))
-  ]});
- 
-  const equipTable = new Table({width:{size:W_L,type:WidthType.DXA},columnWidths:[cL,cX],rows:[
-    new TableRow({children:[hCell('Equipamiento comunitario',{width:cL}),hCell('X',{width:cX,align:AlignmentType.CENTER})]}),
-    ...EQUIP.map(e=>new TableRow({children:[cell(e.l,{width:cL,fontSize:18}),cell(xOrEmpty(val(row[e.c])),{width:cX,align:AlignmentType.CENTER,bold:true})]}))
-  ]});
- 
-  function parseUsr(s){if(!s)return{n:false,j:false,m:false,h:false,a:false};const lo=s.toLowerCase();return{n:lo.includes('niñ')||lo.includes('nin'),j:lo.includes('jóven')||lo.includes('joven'),m:lo.includes('mujer'),h:lo.includes('hombre'),a:lo.includes('mayor')};}
-  const cE=Math.round(W_L*0.30),cU=Math.floor((W_L-cE)/5),adjU=[cE,cU,cU,cU,cU,W_L-cE-cU*4];
-  const allEquip=[...EQUIP,{l:'Bibliotecas',c:null},{l:'Infocentro',c:null},{l:'Otros',c:null}];
-  const usrTable = new Table({width:{size:W_L,type:WidthType.DXA},columnWidths:adjU,rows:[
-    new TableRow({children:[hCell('Equipamiento',{width:adjU[0],fontSize:16}),hCell('Niñas/niños',{width:adjU[1],align:AlignmentType.CENTER,fontSize:16}),hCell('Jóvenes',{width:adjU[2],align:AlignmentType.CENTER,fontSize:16}),hCell('Mujeres',{width:adjU[3],align:AlignmentType.CENTER,fontSize:16}),hCell('Hombres',{width:adjU[4],align:AlignmentType.CENTER,fontSize:16}),hCell('Ad. Mayores',{width:adjU[5],align:AlignmentType.CENTER,fontSize:16})]}),
-    ...allEquip.map(e=>{const usrRaw=e.c&&EQUSR[e.c]?val(row[EQUSR[e.c]]):'';const u=parseUsr(usrRaw);return new TableRow({children:[cell(e.l,{width:adjU[0],fontSize:16}),cell(u.n?'X':'',{width:adjU[1],align:AlignmentType.CENTER,bold:true}),cell(u.j?'X':'',{width:adjU[2],align:AlignmentType.CENTER,bold:true}),cell(u.m?'X':'',{width:adjU[3],align:AlignmentType.CENTER,bold:true}),cell(u.h?'X':'',{width:adjU[4],align:AlignmentType.CENTER,bold:true}),cell(u.a?'X':'',{width:adjU[5],align:AlignmentType.CENTER,bold:true})]});})
-  ]});
- 
-  // ── Sección VI ──
-  const TEMAS=[
-    {a:'Vivienda y Barrio',t:'Ampliación de la vivienda',c:266},{a:'',t:'Cuidado del medio ambiente y reciclaje',c:267},
-    {a:'',t:'Cuidado y mantención de la vivienda',c:268},{a:'',t:'Mejoramiento de la vivienda y el entorno',c:269},
-    {a:'Seguridad emergencias',t:'Recomendaciones para emergencias y catástrofes naturales',c:270},
-    {a:'',t:'Recomendaciones para la seguridad en el hogar',c:271},
-    {a:'Seguridad Ciudadana',t:'Organización vecinal para la seguridad en el barrio',c:272},
-    {a:'',t:'Red Institucional que aborda temas de seguridad',c:273},
-    {a:'Salud',t:'Alcoholismo y/o drogadicción',c:274},{a:'',t:'Alimentación saludable',c:275},
-    {a:'',t:'Red asistencial de salud en el territorio',c:276},{a:'',t:'Salud mental',c:277},
-    {a:'',t:'Sexualidad y salud reproductiva',c:278},{a:'',t:'Tipos de previsión en salud (FONASA – ISAPRE)',c:279},
-    {a:'Educación y Cultura',t:'Formación y Capacitación Laboral',c:280},{a:'',t:'Nivelación de Estudios',c:281},
-    {a:'',t:'Oferta cultural existente en el territorio',c:282},{a:'',t:'Organización vecinal para el desarrollo cultural',c:283},
-    {a:'',t:'Pueblos originarios',c:284},{a:'',t:'Personas Inmigrantes',c:285},
-    {a:'Familia',t:'Divorcio y separaciones de hecho',c:286},{a:'',t:'Ley de herencia',c:287},
-    {a:'',t:'Patrimonio reservado de la mujer casada (art. 150 código civil).',c:288},
-    {a:'',t:'Pensión alimenticia',c:289},{a:'',t:'Violencia intrafamiliar',c:290},
-    {a:'Participación Comunitaria',t:'Capacitación en elaboración de proyectos',c:291},
-    {a:'',t:'Convivencia vecinal',c:292},{a:'',t:'Ley de copropiedad y comité de administración',c:293},
-    {a:'',t:'Roles y funciones directiva y tipos de liderazgo',c:294},{a:'',t:'Tipos de organización y su legislación',c:295},
-    {a:'Adulto Mayor',t:'Características de esta etapa de vida',c:296},
-    {a:'',t:'Recomendaciones para un envejecimiento activo',c:297},
-    {a:'',t:'Recomendaciones para familias que asumen cuidados de adulto mayor no Valente',c:298},
-    {a:'',t:'Red social especializada en Adulto Mayor',c:299},
-    {a:'Mujeres',t:'Fortalecimiento de liderazgo',c:300},{a:'',t:'Violencia hacia la mujer',c:301},
-    {a:'Otros',t:'',c:302},
-  ];
-  const cA=Math.round(W_L*0.22),cT=W_L-cA-cX;
-  const temasTable = new Table({width:{size:W_L,type:WidthType.DXA},columnWidths:[cA,cT,cX],rows:[
-    new TableRow({children:[hCell('Áreas',{width:cA}),hCell('Temas',{width:cT}),hCell('X',{width:cX,align:AlignmentType.CENTER})]}),
-    ...TEMAS.map(t=>new TableRow({children:[cell(t.a,{width:cA,fontSize:16,bold:!!t.a}),cell(t.t,{width:cT,fontSize:16}),cell(xOrEmpty(val(row[t.c])),{width:cX,align:AlignmentType.CENTER,bold:true})]}))
-  ]});
- 
-  // ── Secciones ──
-  const notas = [
-    p('(*) Estado civil (Casado, Viudo, Soltero, Divorciado, igualmente marcar la condición de separado de hecho, si corresp.)',{size:16}),
-    p('(*) Parentesco con Postulante (Hijo/a; cónyuge; conviviente; padre; madre; tío/a; sobrino/a; nieto/a; otros)',{size:16}),
-    p('(*) Edad (N° de años; para niños menores de 1 año, indicar N° de meses)',{size:16}),
-    p('(*) Situación Laboral (Dependiente-Independiente-Cesante-Jubilado o Pensionado-Trabajo dentro del Hogar-Estudiante)',{size:16}),
-    p('(*) Ascendencia indígena (SI/NO). Al marcar SI, identificar Pueblo Indígena.',{size:16}),
-    p('(*) Persona Extranjera (SI/NO). Al marcar SI, identificar nacionalidad.',{size:16}),
-    p('(*) Discapacidad: mencionar cual, según credencial de discapacidad.',{size:16}),
-  ];
- 
-  const firmas = [
-    sp(300), p('NOMBRE Y FIRMA PERSONA POSTULANTE',{bold:true}), sp(700),
-    new Paragraph({border:{bottom:{style:BorderStyle.SINGLE,size:6,color:'000000',space:1}},children:[]}),
-    sp(40), p('RUT:',{bold:true}), sp(500),
-    p('NOMBRE Y FIRMA PROFESIONAL RESPONSABLE PAS – E. P.',{bold:true}), sp(700),
-    new Paragraph({border:{bottom:{style:BorderStyle.SINGLE,size:6,color:'000000',space:1}},children:[]}),
-    sp(40), p('RUT:',{bold:true}), sp(200), p('TIMBRE',{bold:true}),
-  ];
- 
-  const hf = { headers: makeHeader(logoBuffer), footers: makeFooter() };
- 
-  return new Document({
-    styles: { default: { document: { run: { font: 'Arial', size: 20 } } } },
-    sections: [
-      { properties: landscapeProps(SectionType.NEXT_PAGE), ...hf, children: [
-        headerTable, sp(100),
-        p('I.- IDENTIFICACIÓN COMITÉ POSTULANTE Y PROYECTO',{bold:true}), sp(60),
-        secITable, sp(120),
-        p('II.- IDENTIFICACIÓN GRUPO FAMILIAR POSTULANTE: Información sobre el/la postulante y su grupo familiar.',{bold:true}), sp(60),
-        secIITable, sp(40), ...notas, sp(120),
-        p('III.- SITUACIÓN HABITACIONAL Y DEL BARRIO ACTUAL',{bold:true}), sp(60),
-        p('1.- Situación Habitacional Actual (Marque con una X)',{bold:true}), sp(60),
-        secIIITable, sp(100),
-        p('2.- Distribución de la vivienda actual',{bold:true}), sp(60),
-        distribTable, sp(120),
-        p('IV.- Convivencia Comunitaria en su actual lugar de residencia.',{bold:true}),
-        p('Favor conteste qué tan de acuerdo se encuentra usted con las siguientes afirmaciones (marcar con un X):',{italic:true,size:18}), sp(60),
-        secIVTable,
-      ]},
-      { properties: landscapeProps(SectionType.NEXT_PAGE), ...hf, children: [
-        p('V.- DE LA VIVIENDA Y DEL EQUIPAMIENTO COMUNITARIO DEL PROYECTO HABITACIONAL',{bold:true}), sp(80),
-        p('1.- Respecto a la futura Vivienda y Barrio, indique con una X los 3 atributos más valorados:',{bold:true}), sp(60),
-        atribTable, sp(100),
-        p('2.- ¿Qué Equipamiento Comunitario Adicional le gustaría que fuera parte del Proyecto Habitacional? Marque con una X sus 4 preferencias:',{bold:true}), sp(60),
-        equipTable, sp(100),
-        p('2.1.- Según su opinión, ¿quiénes serían las personas que más ocuparían ese equipamiento?',{bold:true}), sp(60),
-        usrTable,
-      ]},
-      { properties: landscapeProps(SectionType.NEXT_PAGE), ...hf, children: [
-        p('VI.- NECESIDADES E INTERESES DEL GRUPO POSTULANTE',{bold:true}),
-        p('Queremos conocer sus intereses. Favor elija un máximo de 3 temas en total:',{italic:true,size:18}), sp(80),
-        temasTable,
-      ]},
-      { properties: portraitProps(SectionType.NEXT_PAGE), ...hf, children: firmas },
-    ]
-  });
-}
+      };
+    }
 
-</script>
+    function makeFooter() {
+      return {
+        default: new Footer({
+          children: [new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({ text: "Página ", size: 14, font: "Calibri", color: "7F7F7F" }),
+              new TextRun({ children: [PageNumber.CURRENT], size: 14, font: "Calibri", color: "7F7F7F" }),
+              new TextRun({ text: " de ", size: 14, font: "Calibri", color: "7F7F7F" }),
+              new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 14, font: "Calibri", color: "7F7F7F" })
+            ]
+          })]
+        })
+      };
+    }
+
+    // Motor Principal de Compilación y Generación
+    async function procesarFichas() {
+      if (!rawJsonData || !logoBuffer) return;
+
+      const items = Array.isArray(rawJsonData) ? rawJsonData : [rawJsonData];
+      const total = items.length;
+      if (total === 0) return alert("El dataset JSON no contiene registros válidos.");
+
+      document.getElementById('estadoVacio').classList.add('hidden');
+      document.getElementById('panelDescarga').classList.add('hidden');
+      const panelProgreso = document.getElementById('panelProgreso');
+      const barProgreso = document.getElementById('barProgreso');
+      const lblTexto = document.getElementById('lblProgresoTexto');
+      const lblPorcentaje = document.getElementById('lblProgresoPorcentaje');
+      
+      panelProgreso.classList.remove('hidden');
+
+      const filesCollection = [];
+      const prjName = document.getElementById('cfgProyecto').value.trim() || 'Proyecto';
+
+      for (let i = 0; i < total; i++) {
+        const row = items[i];
+        const runPostulante = val(row[MAPA_INDICES.RUN]) || `SIN_RUT_${i+1}`;
+        const nombrePostulante = `${val(row[MAPA_INDICES.NOM])} ${val(row[MAPA_INDICES.APP])}`.trim() || 'POSTULANTE';
+
+        lblTexto.innerText = `Generando documento (${i + 1}/${total}): ${nombrePostulante}`;
+        const pct = Math.round(((i) / total) * 90);
+        barProgreso.style.width = `${pct}%`;
+        lblPorcentaje.innerText = `${pct}%`;
+
+        await new Promise(r => setTimeout(r, 15));
+
+        try {
+          const doc = generarEstructuraDocumento(row, prjName);
+          const buffer = await Packer.toUint8Array(doc);
+          const safeName = `${runPostulante}_Ficha_DS49.docx`.replace(/[/\\?%*:|"<>\s]/g, '_');
+          filesCollection.push({ name: safeName, data: buffer });
+        } catch (err) {
+          console.error(`Fallo crítico al compilar registro en índice ${i}:`, err);
+        }
+      }
+
+      lblTexto.innerText = "Empaquetando lote de archivos en ZIP corporativo...";
+      barProgreso.style.width = "95%";
+      lblPorcentaje.innerText = "95%";
+      await new Promise(r => setTimeout(r, 50));
+
+      try {
+        const zipData = buildZipStore(filesCollection);
+        zipBlob = new Blob([zipData], { type: 'application/zip' });
+
+        barProgreso.style.width = "100%";
+        lblPorcentaje.innerText = "100%";
+        lblTexto.innerText = "¡Proceso finalizado con éxito!";
+        
+        document.getElementById('panelDescarga').classList.remove('hidden');
+      } catch (err) {
+        alert("Ocurrió un error inesperado al estructurar el paquete de descarga .ZIP");
+        console.error(err);
+      }
+    }
+
+    // Constructor del Documento Estructurado basado en las especificaciones del Serviu
+    function generarEstructuraDocumento(row, nomProyecto) {
+      const uI = MAPA_INDICES;
+
+      // Anchos calculados dinámicamente para alineaciones milimétricas en Word (Sección Horizontal)
+      const wL = [1800, 2400, 1800, 2400, 1800, 2400, 1840]; 
+      const totalW_L = wL.reduce((a,b)=>a+b,0);
+
+      const headerTable = new Table({
+        width: { size: totalW_L, type: WidthType.DXA },
+        rows: [new TableRow({
+          children: [
+            hCell('INFORME DIAGNÓSTICO SOCIOHABITACIONAL - PROGRAMA DS49', { width: totalW_L, fontSize: 18 })
+          ]
+        })]
+      });
+
+      const secITable = new Table({
+        width: { size: totalW_L, type: WidthType.DXA },
+        rows: [
+          new TableRow({
+            children: [
+              hCell('Nombre del Proyecto', { width: wL[0] + wL[1] + wL[2], fontSize: 16 }),
+              hCell('Comuna', { width: wL[3] + wL[4], fontSize: 16 }),
+              hCell('Región', { width: wL[5] + wL[6], fontSize: 16 })
+            ]
+          }),
+          new TableRow({
+            children: [
+              cell(nomProyecto, { width: wL[0] + wL[1] + wL[2], bold: true, fontSize: 16 }),
+              cell(val(row[uI.COM]), { width: wL[3] + wL[4], fontSize: 16 }),
+              cell('Metropolitana', { width: wL[5] + wL[6], fontSize: 16 })
+            ]
+          })
+        ]
+      });
+
+      const secIITable = new Table({
+        width: { size: totalW_L, type: WidthType.DXA },
+        rows: [
+          new TableRow({
+            children: [
+              hCell('Apellido Paterno', { width: wL[0], fontSize: 14 }),
+              hCell('Apellido Materno', { width: wL[1], fontSize: 14 }),
+              hCell('Nombres', { width: wL[2] + wL[3], fontSize: 14 }),
+              hCell('RUT / RUN', { width: wL[4], fontSize: 14 }),
+              hCell('Estado Civil', { width: wL[5], fontSize: 14 }),
+              hCell('Sexo', { width: wL[6], fontSize: 14 })
+            ]
+          }),
+          new TableRow({
+            children: [
+              cell(val(row[uI.APP]), { width: wL[0], fontSize: 14 }),
+              cell(val(row[uI.APM]), { width: wL[1], fontSize: 14 }),
+              cell(val(row[uI.NOM]), { width: wL[2] + wL[3], bold: true, fontSize: 14 }),
+              cell(`${val(row[uI.RUN])}-${val(row[uI.DV])}`, { width: wL[4], fontSize: 14 }),
+              cell(val(row[uI.EC]), { width: wL[5], fontSize: 14 }),
+              cell(val(row[uI.SX]), { width: wL[6], fontSize: 14 })
+            ]
+          }),
+          new TableRow({
+            children: [
+              hCell('Fecha Nacimiento', { width: wL[0], fontSize: 14 }),
+              hCell('Edad', { width: wL[1], fontSize: 14 }),
+              hCell('Nacionalidad', { width: wL[2], fontSize: 14 }),
+              hCell('Teléfono', { width: wL[3], fontSize: 14 }),
+              hCell('Correo Electrónico', { width: wL[4] + wL[5], fontSize: 14 }),
+              hCell('% RSH', { width: wL[6], fontSize: 14 })
+            ]
+          }),
+          new TableRow({
+            children: [
+              cell(val(row[uI.FN]), { width: wL[0], fontSize: 14 }),
+              cell(val(row[uI.ED]), { width: wL[1], fontSize: 14 }),
+              cell(val(row[uI.PAI]), { width: wL[2], fontSize: 14 }),
+              cell(val(row[uI.TEL]), { width: wL[3], fontSize: 14 }),
+              cell(val(row[uI.COR]), { width: wL[4] + wL[5], fontSize: 14 }),
+              cell(val(row[uI.RSH]), { width: wL[6], bold: true, fontSize: 14 })
+            ]
+          }),
+          new TableRow({
+            children: [
+              hCell('Dirección Actual', { width: wL[0] + wL[1] + wL[2], fontSize: 14 }),
+              hCell('N°', { width: wL[3], fontSize: 14 }),
+              hCell('Block', { width: wL[4], fontSize: 14 }),
+              hCell('Depto', { width: wL[5], fontSize: 14 }),
+              hCell('Calificación', { width: wL[6], fontSize: 14 })
+            ]
+          }),
+          new TableRow({
+            children: [
+              cell(`${val(row[uI.CALLE])}`, { width: wL[0] + wL[1] + wL[2], fontSize: 14 }),
+              cell(val(row[uI.NUM]), { width: wL[3], fontSize: 14 }),
+              cell(val(row[uI.BLOCK]), { width: wL[4], fontSize: 14 }),
+              cell(val(row[uI.DEP]), { width: wL[5], fontSize: 14 }),
+              cell(val(row[uI.CALI]), { width: wL[6], fontSize: 14 })
+            ]
+          }),
+          new TableRow({
+            children: [
+              hCell('Situación Laboral', { width: wL[0] + wL[1], fontSize: 14 }),
+              hCell('Jefatura de Hogar', { width: wL[2], fontSize: 14 }),
+              hCell('Nivel Educativo', { width: wL[3] + wL[4], fontSize: 14 }),
+              hCell('Previsión Salud', { width: wL[5] + wL[6], fontSize: 14 })
+            ]
+          }),
+          new TableRow({
+            children: [
+              cell(val(row[uI.TRAB]), { width: wL[0] + wL[1], fontSize: 14 }),
+              cell(val(row[uI.JEF]), { width: wL[2], fontSize: 14 }),
+              cell(val(row[uI.NIV_ED]), { width: wL[3] + wL[4], fontSize: 14 }),
+              cell(val(row[uI.S_SALUD]), { width: wL[5] + wL[6], fontSize: 14 })
+            ]
+          }),
+          new TableRow({
+            children: [
+              hCell('Pertenencia Etnia', { width: wL[0], fontSize: 14 }),
+              hCell('Discapacidad / Enf. Crónica', { width: wL[1] + wL[2], fontSize: 14 }),
+              hCell('Credencial Discapacidad', { width: wL[3], fontSize: 14 }),
+              hCell('Condición Migrante', { width: wL[4], fontSize: 14 }),
+              hCell('Embarazo', { width: wL[5], fontSize: 14 }),
+              hCell('Bombero(a)', { width: wL[6], fontSize: 14 })
+            ]
+          }),
+          new TableRow({
+            children: [
+              cell(val(row[uI.ETNIA]), { width: wL[0], fontSize: 14 }),
+              cell(val(row[uI.DIS_CRON]), { width: wL[1] + wL[2], fontSize: 14 }),
+              cell(val(row[uI.CRED_DIS]), { width: wL[3], fontSize: 14 }),
+              cell(val(row[uI.MIGRA]), { width: wL[4], fontSize: 14 }),
+              cell(val(row[uI.EMB]), { width: wL[5], fontSize: 14 }),
+              cell(val(row[uI.BOM]), { width: wL[6], fontSize: 14 })
+            ]
+          })
+        ]
+      });
+
+      // Anchos para Sección Vertical (Orientación Portrait)
+      const wP = [2300, 2500, 2300, 2526];
+      const totalW_P = wP.reduce((a,b)=>a+b,0);
+
+      const secIIITable = new Table({
+        width: { size: totalW_P, type: WidthType.DXA },
+        rows: [
+          new TableRow({
+            children: [
+              hCell('Tipo de Vivienda', { width: wP[0], fontSize: 16 }),
+              hCell('Tenencia de la Vivienda', { width: wP[1], fontSize: 16 }),
+              hCell('Abastecimiento de Agua', { width: wP[2], fontSize: 16 }),
+              hCell('Sistema de Excretas', { width: wP[3], fontSize: 16 })
+            ]
+          }),
+          new TableRow({
+            children: [
+              cell(val(row[uI.VIV]), { width: wP[0], fontSize: 16 }),
+              cell(val(row[uI.S_TEN]), { width: wP[1], fontSize: 16 }),
+              cell(val(row[uI.AGUA]), { width: wP[2], fontSize: 16 }),
+              cell(val(row[uI.S_EXC]), { width: wP[3], fontSize: 16 })
+            ]
+          }),
+          new TableRow({
+            children: [
+              hCell('Suministro Eléctrico', { width: wP[0], fontSize: 16 }),
+              hCell('Eliminación de Residuos', { width: wP[1], fontSize: 16 }),
+              hCell('Estado Calidad Interna', { width: wP[2], fontSize: 16 }),
+              hCell('Estado Calidad Externa', { width: wP[3], fontSize: 16 })
+            ]
+          }),
+          new TableRow({
+            children: [
+              cell(val(row[uI.ELEC]), { width: wP[0], fontSize: 16 }),
+              cell(val(row[uI.RE_RES]), { width: wP[1], fontSize: 16 }),
+              cell(val(row[uI.CAL_INT]), { width: wP[2], fontSize: 16 }),
+              cell(val(row[uI.CAL_EXT]), { width: wP[3], fontSize: 16 })
+            ]
+          })
+        ]
+      });
+
+      const distribTable = new Table({
+        width: { size: totalW_P, type: WidthType.DXA },
+        rows: [
+          new TableRow({
+            children: [
+              hCell('Cantidad de Dormitorios', { width: wP[0] + wP[1], fontSize: 16 }),
+              hCell('Cantidad de Camas Disponibles', { width: wP[2] + wP[3], fontSize: 16 })
+            ]
+          }),
+          new TableRow({
+            children: [
+              cell(val(row[uI.C_DORM]), { width: wP[0] + wP[1], align: AlignmentType.CENTER, fontSize: 16 }),
+              cell(val(row[uI.C_CAMAS]), { width: wP[2] + wP[3], align: AlignmentType.CENTER, fontSize: 16 })
+            ]
+          })
+        ]
+      });
+
+      const secIVTable = new Table({
+        width: { size: totalW_P, type: WidthType.DXA },
+        rows: [
+          new TableRow({
+            children: [
+              hCell('Organizaciones a las que pertenece', { width: wP[0] + wP[1], fontSize: 16 }),
+              hCell('Redes de Apoyo en el Barrio', { width: wP[2] + wP[3], fontSize: 16 })
+            ]
+          }),
+          new TableRow({
+            children: [
+              cell(val(row[uI.MA_ORG]), { width: wP[0] + wP[1], fontSize: 16 }),
+              cell(val(row[uI.HA_URB]), { width: wP[2] + wP[3], fontSize: 16 })
+            ]
+          }),
+          new TableRow({
+            children: [
+              hCell('Nivel de Cohesión Social', { width: wP[0] + wP[1], fontSize: 16 }),
+              hCell('Percepción Seguridad del Entorno', { width: wP[2] + wP[3], fontSize: 16 })
+            ]
+          }),
+          new TableRow({
+            children: [
+              cell(val(row[uI.COH_SOC]), { width: wP[0] + wP[1], fontSize: 16 }),
+              cell(val(row[uI.MA_SEG]), { width: wP[2] + wP[3], fontSize: 16 })
+            ]
+          })
+        ]
+      });
+
+      const atribTable = new Table({
+        width: { size: totalW_P, type: WidthType.DXA },
+        rows: [
+          new TableRow({
+            children: [
+              hCell('Atributo Priorizado', { width: wP[0] + wP[1], fontSize: 16 }),
+              hCell('Grado de Relevancia o Expectativa', { width: wP[2] + wP[3], fontSize: 16 })
+            ]
+          }),
+          new TableRow({ children: [cell('Estética e Infraestructura del Proyecto', { width: wP[0] + wP[1], fontSize: 16 }), cell(val(row[uI.AT_EST]), { width: wP[2] + wP[3], fontSize: 16 })] }),
+          new TableRow({ children: [cell('Disponibilidad de Equipamiento Comunitario', { width: wP[0] + wP[1], fontSize: 16 }), cell(val(row[uI.AT_EQUIP]), { width: wP[2] + wP[3], fontSize: 16 })] }),
+          new TableRow({ children: [cell('Diseño Universal y Accesibilidad Ampliada', { width: wP[0] + wP[1], fontSize: 16 }), cell(val(row[uI.AT_DIS]), { width: wP[2] + wP[3], fontSize: 16 })] }),
+          new TableRow({ children: [cell('Proximidad a Servicios de Salud y Conectividad', { width: wP[0] + wP[1], fontSize: 16 }), cell(val(row[uI.AT_MED]), { width: wP[2] + wP[3], fontSize: 16 })] }),
+          new TableRow({ children: [cell('Sistemas Integrados de Seguridad y Vigilancia', { width: wP[0] + wP[1], fontSize: 16 }), cell(val(row[uI.AT_SEG]), { width: wP[2] + wP[3], fontSize: 16 })] })
+        ]
+      });
+
+      const adjW = [5626, 4000];
+      const allEquip = [
+        { l: 'Sala multiuso de escala comunitaria', c: 'SALA' },
+        { l: 'Áreas verdes públicas y paisajismo', c: 'AREA_V' },
+        { l: 'Zonas de juegos infantiles integrados', c: 'JUEGOS' },
+        { l: 'Cancha deportiva de uso múltiple', c: 'CANCHA' },
+        { l: 'Plazas activas y paseos peatonales', c: 'PLAZA' },
+        { l: 'Sede social o comunitario principal', c: 'SEDE' },
+        { l: 'Parques urbanos de escala barrial', c: 'PARQUE' },
+        { l: 'Huertos comunitarios y zonas sustentables', c: 'HUERTO' },
+        { l: 'Centro deportivo complementario', c: 'C_DEP' }
+      ];
+
+      const equipTable = new Table({
+        width: { size: totalW_P, type: WidthType.DXA },
+        rows: [
+          new TableRow({
+            children: [
+              hCell('Tipología de Equipamiento Evaluado', { width: adjW[0], fontSize: 16 }),
+              hCell('Nivel de Prioridad Asignado', { width: adjW[1], fontSize: 16 })
+            ]
+          }),
+          ...allEquip.map(e => new TableRow({
+            children: [
+              cell(e.l, { width: adjW[0], fontSize: 16 }),
+              cell(val(row[EQUPRI[e.c]]), { width: adjW[1], align: AlignmentType.CENTER, bold: true, fontSize: 16 })
+            ]
+          }))
+        ]
+      });
+
+      const adjU = [4000, 1126, 1126, 1126, 1126, 1122];
+      const usrTable = new Table({
+        width: { size: totalW_P, type: WidthType.DXA },
+        rows: [
+          new TableRow({
+            children: [
+              hCell('Equipamiento', { width: adjU[0], fontSize: 16 }),
+              hCell('Niños', { width: adjU[1], align: AlignmentType.CENTER, fontSize: 16 }),
+              hCell('Jóvenes', { width: adjU[2], align: AlignmentType.CENTER, fontSize: 16 }),
+              hCell('Mujeres', { width: adjU[3], align: AlignmentType.CENTER, fontSize: 16 }),
+              hCell('Hombres', { width: adjU[4], align: AlignmentType.CENTER, fontSize: 16 }),
+              hCell('Adulto Mayor', { width: adjU[5], align: AlignmentType.CENTER, fontSize: 16 })
+            ]
+          }),
+          ...allEquip.map(e => {
+            const rawVal = e.c ? val(row[EQUSR[e.c]]) : '';
+            const u = parseUsr(rawVal);
+            return new TableRow({
+              children: [
+                cell(e.l, { width: adjU[0], fontSize: 16 }),
+                cell(u.n ? 'X' : '', { width: adjU[1], align: AlignmentType.CENTER, bold: true, fontSize: 16 }),
+                cell(u.j ? 'X' : '', { width: adjU[2], align: AlignmentType.CENTER, bold: true, fontSize: 16 }),
+                cell(u.m ? 'X' : '', { width: adjU[3], align: AlignmentType.CENTER, bold: true, fontSize: 16 }),
+                cell(u.h ? 'X' : '', { width: adjU[4], align: AlignmentType.CENTER, bold: true, fontSize: 16 }),
+                cell(u.a ? 'X' : '', { width: adjU[5], align: AlignmentType.CENTER, bold: true, fontSize: 16 })
+              ]
+            });
+          })
+        ]
+      });
+
+      return new Document({
+        sections: [
+          {
+            properties: landscapeProps(SectionType.CONTINUOUS),
+            headers: makeHeader(logoBuffer),
+            footers: makeFooter(),
+            children: [
+              headerTable, sp(120),
+              p('I.- IDENTIFICACIÓN DEL PROYECTO', { bold: true }), sp(60), secITable, sp(120),
+              p('II.- IDENTIFICACIÓN DEL GRUPO FAMILIAR', { bold: true }), sp(60), secIITable,
+            ]
+          },
+          {
+            properties: portraitProps(),
+            headers: makeHeader(logoBuffer),
+            footers: makeFooter(),
+            children: [
+              p('III.- CARACTERÍSTICAS HABITACIONALES Y URBANAS DE LA VIVIENDA ACTUAL', { bold: true }), sp(60), secIIITable, sp(120),
+              p('2.- DISTRIBUCIÓN DE DORMITORIOS Y CAMAS', { bold: true }), sp(60), distribTable, sp(120),
+              p('IV.- CAPITAL SOCIAL, REDES COMPARTIDAS Y CONVIVENCIA COMUNITARIA', { bold: true }), sp(60), secIVTable, sp(120),
+              p('V.- EXPECTATIVAS FRENTE AL PROYECTO HABITACIONAL Y COMUNITARIO', { bold: true }), sp(60), atribTable, sp(120),
+              p('EQUIPAMIENTO COMUNITARIO PRIORIZADO', { bold: true }), sp(60), equipTable, sp(120),
+              p('PRINCIPALES USUARIOS DEL EQUIPAMIENTO', { bold: true }), sp(60), usrTable,
+            ]
+          }
+        ]
+      });
+    }
+
+    // Compresor de Estructura de Almacenamiento ZIP Estándar (Modo "STORE" sin compresión pesada DEFLATE)
+    function buildZipStore(files) {
+      let localHeaders = [];
+      let centralDirectory = [];
+      let offset = 0;
+      const table = new Uint32Array(256);
+      
+      for (let i = 0; i < 256; i++) {
+        let c = i;
+        for (let j = 0; j < 8; j++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+        table[i] = c;
+      }
+      
+      function crc32(data) {
+        let crc = 0xFFFFFFFF;
+        for (let i = 0; i < data.length; i++) crc = (crc >>> 8) ^ table[(crc ^ data[i]) & 0xFF];
+        return (crc ^ 0xFFFFFFFF) >>> 0;
+      }
+      
+      function concat(arrays) {
+        let total = arrays.reduce((acc, v) => acc + v.length, 0);
+        let res = new Uint8Array(total);
+        let off = 0;
+        for (let arr of arrays) { res.set(arr, off); off += arr.length; }
+        return res;
+      }
+
+      for (let file of files) {
+        let nameBytes = new TextEncoder().encode(file.name);
+        let data = file.data;
+        let crc = crc32(data);
+        
+        let lh = new Uint8Array(30 + nameBytes.length);
+        lh.set([0x50, 0x4b, 0x03, 0x04, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        let dv = new DataView(lh.buffer);
+        dv.setUint32(14, crc, true);
+        dv.setUint32(18, data.length, true);
+        dv.setUint32(22, data.length, true);
+        dv.setUint16(26, nameBytes.length, true);
+        lh.set(nameBytes, 30);
+        localHeaders.push(lh, data);
+        
+        let cd = new Uint8Array(46 + nameBytes.length);
+        cd.set([0x50, 0x4b, 0x01, 0x02, 10, 0, 10, 0, 0, 0, 0, 0, 0, 0]);
+        let cdv = new DataView(cd.buffer);
+        cdv.setUint32(16, crc, true);
+        cdv.setUint32(20, data.length, true);
+        cdv.setUint32(24, data.length, true);
+        cdv.setUint16(28, nameBytes.length, true);
+        cdv.setUint32(42, offset, true);
+        cd.set(nameBytes, 46);
+        centralDirectory.push(cd);
+        
+        offset += lh.length + data.length;
+      }
+
+      let lhBuf = concat(localHeaders), cdBuf = concat(centralDirectory);
+      let eocd = new Uint8Array(22);
+      eocd.set([0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0]);
+      let eocdv = new DataView(eocd.buffer);
+      eocdv.setUint16(8, files.length, true);
+      eocdv.setUint16(10, files.length, true);
+      eocdv.setUint32(12, cdBuf.length, true);
+      eocdv.setUint32(16, lhBuf.length, true);
+      
+      return concat([lhBuf, cdBuf, eocd]);
+    }
+
+    function descargarZip() {
+      if (!zipBlob) return;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(zipBlob);
+      a.download = `Fichas_DS49_${document.getElementById('cfgProyecto').value || 'Proyecto'}.zip`;
+      a.click();
+    }
+  </script>
 </body>
 </html>
