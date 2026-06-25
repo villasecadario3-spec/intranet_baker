@@ -11,19 +11,16 @@
     <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
     <style>
         :root {
-            --rojo:#C0392B;--rojo-dark:#96281B;--rojo-light:rgba(192,57,43,0.08);
-            --negro:#111010;--negro-3:#242220;--borde-dark:#2E2C2A;
-            --blanco:#FFFFFF;--crema:#F8F6F3;--gris-1:#F0EDE9;--gris-2:#E2DED9;--gris-3:#B5B0AA;
+            --rojo:#C0392B;--negro:#111010;--negro-3:#242220;--borde-dark:#2E2C2A;
+            --crema:#F8F6F3;--gris-1:#F0EDE9;--gris-2:#E2DED9;--gris-3:#B5B0AA;
             --txt:#1C1A18;--txt-mid:#6B6762;--txt-dim:#A09C97;
-            --verde:#27ae60;--azul:#2980B9;
         }
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-        html{scroll-behavior:smooth}
         body{font-family:'DM Sans',sans-serif;background:var(--crema);color:var(--txt);min-height:100vh}
 
         nav{position:sticky;top:0;z-index:100;background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px solid var(--borde-dark);height:60px;display:flex;align-items:center;padding:0 48px;gap:16px}
-        .nav-logo{text-decoration:none;flex-shrink:0}
-        .nav-logo img{height:26px;width:auto;display:block;background:white;border-radius:6px;padding:4px 10px}
+        .nav-logo{text-decoration:none}
+        .nav-logo img{height:26px;background:white;border-radius:6px;padding:4px 10px;display:block}
         .nav-sep{width:1px;height:18px;background:var(--borde-dark)}
         .nav-back{display:flex;align-items:center;gap:6px;color:var(--gris-3);text-decoration:none;font-size:0.78rem;font-weight:500;transition:color 0.2s}
         .nav-back:hover{color:white}
@@ -31,8 +28,8 @@
         .nav-title{font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--gris-3);letter-spacing:0.1em;text-transform:uppercase}
         .nav-spacer{flex:1}
         .user-chip{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;background:var(--negro-3);border:1px solid var(--borde-dark);border-radius:100px}
-        .user-av{width:26px;height:26px;border-radius:50%;background:var(--rojo);display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:0.72rem;font-weight:700;color:white}
-        .user-nm{font-size:0.78rem;font-weight:500;color:white;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .user-av{width:26px;height:26px;border-radius:50%;background:var(--rojo);display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:white}
+        .user-nm{font-size:0.78rem;font-weight:500;color:white;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
         .page-header{background:var(--negro);padding:40px 48px 36px;border-bottom:1px solid var(--borde-dark);position:relative;overflow:hidden}
         .page-header::before{content:'';position:absolute;inset:0;background-image:linear-gradient(var(--borde-dark) 1px,transparent 1px),linear-gradient(90deg,var(--borde-dark) 1px,transparent 1px);background-size:40px 40px;opacity:0.3}
@@ -42,75 +39,43 @@
         .page-eyebrow::before{content:'';width:16px;height:1px;background:var(--rojo)}
         .page-header h1{font-family:'Playfair Display',serif;font-size:2rem;font-weight:700;color:white;letter-spacing:-0.02em;line-height:1.1}
         .page-header h1 em{font-style:italic;color:var(--rojo)}
-        .page-header-sub{font-size:0.82rem;color:#6b6762;margin-top:8px;line-height:1.6}
+        .page-header-sub{font-size:0.82rem;color:#6b6762;margin-top:8px}
 
-        .main{padding:36px 48px 80px;max-width:1100px}
+        .main{padding:36px 48px 80px;max-width:900px}
 
-        /* ── TOOLBAR ─────────────────────────────────── */
-        .toolbar{display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap}
-        .search-wrap{flex:1;min-width:200px;position:relative}
+        .search-wrap{position:relative;margin-bottom:28px}
         .search-wrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--txt-dim)}
-        .search-input{width:100%;padding:9px 14px 9px 36px;border:1px solid var(--gris-2);border-radius:9px;background:white;color:var(--txt);font-family:'DM Sans',sans-serif;font-size:0.88rem;transition:border-color 0.2s}
+        .search-input{width:100%;padding:10px 14px 10px 38px;border:1px solid var(--gris-2);border-radius:10px;background:white;color:var(--txt);font-family:'DM Sans',sans-serif;font-size:0.88rem;transition:border-color 0.2s}
         .search-input:focus{outline:none;border-color:var(--rojo)}
         .search-input::placeholder{color:var(--txt-dim)}
-        .btn-refresh{display:flex;align-items:center;gap:6px;padding:8px 16px;border:1px solid var(--gris-2);border-radius:9px;background:white;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:500;color:var(--txt-mid);transition:all 0.2s}
-        .btn-refresh:hover{border-color:var(--gris-3);color:var(--txt)}
-        .btn-refresh svg{width:13px;height:13px}
 
-        /* ── BREADCRUMB ──────────────────────────────── */
-        .breadcrumb{display:flex;align-items:center;gap:6px;margin-bottom:16px;flex-wrap:wrap}
-        .bc-item{font-size:0.8rem;color:var(--txt-mid);cursor:pointer;transition:color 0.15s;white-space:nowrap}
-        .bc-item:hover{color:var(--rojo)}
-        .bc-item.activo{color:var(--txt);font-weight:500;cursor:default}
-        .bc-sep{font-size:0.8rem;color:var(--txt-dim)}
+        .doc-list{display:flex;flex-direction:column;gap:10px}
+        .doc-card{background:white;border:1px solid var(--gris-2);border-radius:12px;padding:18px 20px;display:flex;align-items:center;gap:16px;transition:all 0.15s}
+        .doc-card:hover{border-color:var(--rojo);box-shadow:0 4px 16px rgba(192,57,43,0.08)}
+        .doc-icon{width:44px;height:44px;border-radius:8px;background:rgba(192,57,43,0.08);border:1px solid rgba(192,57,43,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .doc-icon svg{width:22px;height:22px;color:var(--rojo)}
+        .doc-info{flex:1;min-width:0}
+        .doc-nombre{font-size:0.9rem;font-weight:600;color:var(--txt)}
+        .doc-meta{font-size:0.74rem;color:var(--txt-dim);margin-top:3px}
+        .doc-acciones{display:flex;gap:8px;flex-shrink:0}
+        .btn-doc{display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.8rem;font-weight:500;cursor:pointer;text-decoration:none;transition:all 0.15s;border:1px solid}
+        .btn-ver{background:var(--rojo);border-color:var(--rojo);color:white}
+        .btn-ver:hover{background:var(--rojo-dark,#96281B);border-color:var(--rojo-dark,#96281B)}
+        .btn-dl{background:white;border-color:var(--gris-2);color:var(--txt-mid)}
+        .btn-dl:hover{border-color:var(--gris-3);color:var(--txt)}
+        .btn-doc svg{width:13px;height:13px}
 
-        /* ── GRID DE ARCHIVOS ────────────────────────── */
-        .archivos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
-
-        .archivo-card{background:white;border:1px solid var(--gris-2);border-radius:12px;padding:18px 16px;display:flex;flex-direction:column;gap:12px;cursor:pointer;transition:all 0.15s;text-decoration:none}
-        .archivo-card:hover{border-color:var(--rojo);box-shadow:0 4px 16px rgba(192,57,43,0.08);transform:translateY(-1px)}
-
-        .archivo-icon{width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0}
-        .archivo-icon.carpeta{background:rgba(41,128,185,0.1);border:1px solid rgba(41,128,185,0.2)}
-        .archivo-icon.pdf{background:rgba(192,57,43,0.08);border:1px solid rgba(192,57,43,0.15)}
-        .archivo-icon.word{background:rgba(41,128,185,0.08);border:1px solid rgba(41,128,185,0.15)}
-        .archivo-icon.excel{background:rgba(39,174,96,0.08);border:1px solid rgba(39,174,96,0.15)}
-        .archivo-icon.ppt{background:rgba(230,126,34,0.08);border:1px solid rgba(230,126,34,0.15)}
-        .archivo-icon.otro{background:var(--gris-1);border:1px solid var(--gris-2)}
-
-        .archivo-info{flex:1}
-        .archivo-nombre{font-size:0.85rem;font-weight:600;color:var(--txt);line-height:1.3;word-break:break-word}
-        .archivo-meta{font-size:0.72rem;color:var(--txt-dim);margin-top:4px}
-
-        .archivo-footer{display:flex;align-items:center;justify-content:space-between}
-        .archivo-tipo{font-size:0.65rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:var(--gris-1);color:var(--txt-dim)}
-        .archivo-accion{display:flex;gap:6px}
-        .btn-accion{width:28px;height:28px;border:1px solid var(--gris-2);border-radius:6px;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;text-decoration:none}
-        .btn-accion:hover{border-color:var(--rojo);color:var(--rojo)}
-        .btn-accion svg{width:13px;height:13px;pointer-events:none}
-
-        /* ── ESTADO ──────────────────────────────────── */
-        .estado{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center;gap:12px}
-        .estado svg{width:40px;height:40px;color:var(--gris-2)}
-        .estado-titulo{font-size:1rem;font-weight:600;color:var(--txt-mid)}
-        .estado-sub{font-size:0.82rem;color:var(--txt-dim);line-height:1.6;max-width:360px}
-
-        .spinner-wrap{display:flex;align-items:center;justify-content:center;padding:60px}
-        .spinner{width:28px;height:28px;border:3px solid var(--gris-2);border-top-color:var(--rojo);border-radius:50%;animation:spin 0.7s linear infinite}
-        @keyframes spin{to{transform:rotate(360deg)}}
-
-        /* ── TOAST ───────────────────────────────────── */
-        .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);padding:12px 18px;border-radius:10px;display:flex;align-items:center;gap:9px;font-size:0.82rem;font-weight:500;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.12);white-space:nowrap}
-        .toast.ok{background:#1a4a2a;border:1px solid rgba(39,174,96,0.3);color:#5dde90}
-        .toast.err{background:#2a1a18;border:1px solid rgba(192,57,43,0.3);color:#ff8070}
+        .empty{display:flex;flex-direction:column;align-items:center;padding:60px 20px;text-align:center;gap:10px;color:var(--txt-dim)}
+        .empty svg{width:36px;height:36px;opacity:0.4}
 
         @media(max-width:768px){
             nav{padding:0 16px}.nav-title{display:none}
             .page-header{padding:28px 16px 24px}
             .main{padding:24px 16px 60px}
-            .archivos-grid{grid-template-columns:1fr 1fr}
+            .doc-card{flex-wrap:wrap}
+            .doc-acciones{width:100%}
+            .btn-doc{flex:1;justify-content:center}
         }
-        @media(max-width:480px){.archivos-grid{grid-template-columns:1fr}}
     </style>
 </head>
 <body>
@@ -134,290 +99,103 @@
     <div class="page-header-inner">
         <div class="page-eyebrow">Documentación Interna</div>
         <h1>Procedimientos<br>e <em>Instructivos</em></h1>
-        <div class="page-header-sub">Documentos internos del grupo Baker. Haz clic para abrir o descargar.</div>
+        <div class="page-header-sub">Documentos internos del grupo Baker.</div>
     </div>
 </div>
 
 <div class="main">
-
-    <div class="toolbar">
-        <div class="search-wrap">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input class="search-input" id="search-input" type="text" placeholder="Buscar documentos…" oninput="filtrarArchivos()">
-        </div>
-        <button class="btn-refresh" onclick="cargarArchivos()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-            Actualizar
-        </button>
+    <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input class="search-input" id="search" type="text" placeholder="Buscar documentos…" oninput="filtrar()">
     </div>
-
-    <div class="breadcrumb" id="breadcrumb"></div>
-
-    <div id="contenido">
-        <div class="spinner-wrap"><div class="spinner"></div></div>
-    </div>
-
+    <div class="doc-list" id="doc-list"></div>
 </div>
 
 <script>
-// ── CONFIG ───────────────────────────────────────────────────
-// Site: ibaker.sharepoint.com/sites/intranet
-// Folder ID del link compartido
-const SITE_HOSTNAME  = 'ibaker.sharepoint.com';
-const SITE_PATH      = '/sites/intranet';
-const FOLDER_ID_B64  = 'IgDkF46VmfdRRLz3voImU-WkASWqP_uGX9Eg5W_AL1AZyvk';
+// ── DOCUMENTOS ────────────────────────────────────────────────
+// Para agregar un nuevo documento, añade un objeto a este array:
+// { nombre, archivo, tipo, fecha }
+const DOCUMENTOS = [
+    {
+        nombre: 'Procedimientos Fondo por Rendir y Fijo 2026',
+        archivo: 'docs/PROCEDIMIENTOS_FONDO_POR_RENDIR_Y_FIJO_2026.pdf',
+        tipo: 'PDF',
+        fecha: '2026'
+    },
+];
 
 // ── MSAL ─────────────────────────────────────────────────────
 const msalConfig = {
     auth: {
-        clientId:    "d9664e06-7fd2-401d-b27b-97116fed7d9f",
-        authority:   "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
+        clientId: "9a56ab1c-d3c4-4460-9892-1d4da768ecfb",
+        authority: "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
         redirectUri: window.location.origin,
     },
     cache: { cacheLocation: "sessionStorage" }
 };
 const msalInstance = new msal.PublicClientApplication(msalConfig);
-const SCOPES = ["User.Read", "Files.Read.All", "Sites.Read.All"];
-let usuarioActual = null;
-let tokenActual   = null;
-
-async function getToken() {
-    if (!usuarioActual) return null;
-    try {
-        await msalInstance.initialize();
-        const r = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: usuarioActual });
-        tokenActual = r.accessToken; return tokenActual;
-    } catch(e) {
-        const r = await msalInstance.acquireTokenPopup({ scopes: SCOPES });
-        tokenActual = r.accessToken; return tokenActual;
-    }
-}
 
 async function initAuth() {
     try {
         await msalInstance.initialize();
         const accounts = msalInstance.getAllAccounts();
         if (accounts.length > 0) {
-            usuarioActual = accounts[0];
-            renderUserChip();
-            cargarArchivos();
+            const usuario = accounts[0];
+            const nombre = usuario.name || usuario.username;
+            const iniciales = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+            document.getElementById('auth-area').innerHTML = `
+                <div class="user-chip">
+                    <div class="user-av">${iniciales}</div>
+                    <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
+                </div>`;
+            renderDocs(DOCUMENTOS);
         } else {
             window.location.href = 'index.html';
         }
     } catch(e) { window.location.href = 'index.html'; }
 }
 
-function renderUserChip() {
-    if (!usuarioActual) return;
-    const nombre = usuarioActual.name || usuarioActual.username;
-    const iniciales = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
-    document.getElementById('auth-area').innerHTML = `
-        <div class="user-chip">
-            <div class="user-av">${iniciales}</div>
-            <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
-        </div>`;
-}
-
-// ── NAVEGACIÓN ───────────────────────────────────────────────
-let historial = []; // [{id, nombre}]
-let archivosActuales = [];
-let siteId = null;
-let driveId = null;
-let rootItemId = null;
-
-async function obtenerSiteYDrive() {
-    if (siteId && driveId) return true;
-    const token = await getToken();
-    if (!token) return false;
-    try {
-        // Obtener site ID
-        const rSite = await fetch(
-            `https://graph.microsoft.com/v1.0/sites/${SITE_HOSTNAME}:${SITE_PATH}`,
-            { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const dSite = await rSite.json();
-        if (!dSite.id) throw new Error('No se pudo obtener el site');
-        siteId = dSite.id;
-
-        // Obtener drive
-        const rDrive = await fetch(
-            `https://graph.microsoft.com/v1.0/sites/${siteId}/drive`,
-            { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const dDrive = await rDrive.json();
-        driveId = dDrive.id;
-        return true;
-    } catch(e) {
-        console.error('Error obteniendo site/drive:', e);
-        return false;
-    }
-}
-
-async function cargarArchivos(itemId = null, nombre = null) {
-    document.getElementById('contenido').innerHTML = '<div class="spinner-wrap"><div class="spinner"></div></div>';
-
-    const ok = await obtenerSiteYDrive();
-    if (!ok) {
-        mostrarError('No se pudo conectar con SharePoint. Verifica los permisos de la aplicación en Azure AD (necesita Sites.Read.All).');
-        return;
-    }
-
-    const token = await getToken();
-    if (!token) return;
-
-    try {
-        let url;
-        if (!itemId) {
-            // Primera carga: usar el folder compartido via sharing link
-            // Decodificar el folder ID del link de SharePoint
-            const encoded = btoa('u!' + FOLDER_ID_B64).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
-            url = `https://graph.microsoft.com/v1.0/shares/u!${btoa('https://ibaker.sharepoint.com/:f:/s/intranet/IgDkF46VmfdRRLz3voImU-WkASWqP_uGX9Eg5W_AL1AZyvk').replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'')}/driveItem/children`;
-            // Alternativa más directa: usar drives con el path
-            url = `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/root/children`;
-            historial = [{ id: null, nombre: 'Inicio' }];
-        } else {
-            url = `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/items/${itemId}/children`;
-            if (nombre && !historial.find(h => h.id === itemId)) {
-                historial.push({ id: itemId, nombre });
-            }
-        }
-
-        url += '?$orderby=name asc&$top=200';
-
-        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-        const data = await res.json();
-
-        if (!res.ok) throw new Error(data.error?.message || 'Error al cargar archivos');
-
-        archivosActuales = data.value || [];
-        renderBreadcrumb();
-        renderArchivos(archivosActuales);
-
-    } catch(e) {
-        console.error('Error Graph:', e);
-        mostrarError(`Error: ${e.message}`);
-    }
-}
-
-function renderBreadcrumb() {
-    const bc = document.getElementById('breadcrumb');
-    bc.innerHTML = historial.map((h, i) => {
-        const esActivo = i === historial.length - 1;
-        return `
-            <span class="bc-item ${esActivo ? 'activo' : ''}"
-                  onclick="${esActivo ? '' : `navegarBreadcrumb(${i})`}">
-                ${h.nombre}
-            </span>
-            ${!esActivo ? '<span class="bc-sep">/</span>' : ''}
-        `;
-    }).join('');
-}
-
-function navegarBreadcrumb(idx) {
-    const destino = historial[idx];
-    historial = historial.slice(0, idx + 1);
-    cargarArchivos(destino.id, destino.nombre);
-}
-
-function renderArchivos(items) {
-    const query = document.getElementById('search-input').value.toLowerCase();
+function renderDocs(docs) {
+    const query = document.getElementById('search').value.toLowerCase();
     const filtrados = query
-        ? items.filter(i => i.name.toLowerCase().includes(query))
-        : items;
+        ? docs.filter(d => d.nombre.toLowerCase().includes(query))
+        : docs;
+
+    const lista = document.getElementById('doc-list');
 
     if (filtrados.length === 0) {
-        document.getElementById('contenido').innerHTML = `
-            <div class="estado">
+        lista.innerHTML = `
+            <div class="empty">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                <div class="estado-titulo">${query ? 'Sin resultados' : 'Carpeta vacía'}</div>
-                <div class="estado-sub">${query ? `No se encontraron documentos con "${query}"` : 'No hay documentos en esta carpeta.'}</div>
+                <div>No se encontraron documentos</div>
             </div>`;
         return;
     }
 
-    // Carpetas primero, luego archivos
-    const carpetas = filtrados.filter(i => i.folder);
-    const archivos = filtrados.filter(i => !i.folder);
-    const ordenados = [...carpetas, ...archivos];
-
-    document.getElementById('contenido').innerHTML = `
-        <div class="archivos-grid">
-            ${ordenados.map(item => renderItemCard(item)).join('')}
-        </div>`;
-}
-
-function renderItemCard(item) {
-    const esCarpeta = !!item.folder;
-    const ext = esCarpeta ? '' : (item.name.split('.').pop() || '').toLowerCase();
-    const { icono, clase, etiqueta } = getIconoTipo(esCarpeta, ext);
-    const fecha = item.lastModifiedDateTime
-        ? new Date(item.lastModifiedDateTime).toLocaleDateString('es-CL', { day:'numeric', month:'short', year:'numeric' })
-        : '';
-    const tamanio = item.size ? formatSize(item.size) : '';
-
-    const accionHTML = esCarpeta ? '' : `
-        <a class="btn-accion" href="${item.webUrl}" target="_blank" rel="noopener" title="Abrir en SharePoint" onclick="event.stopPropagation()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        </a>
-        <a class="btn-accion" href="${item['@microsoft.graph.downloadUrl'] || item.webUrl}" target="_blank" rel="noopener" title="Descargar" onclick="event.stopPropagation()" download>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        </a>`;
-
-    const onclick = esCarpeta
-        ? `onclick="cargarArchivos('${item.id}', '${item.name.replace(/'/g,"\\'")}')"`
-        : `onclick="window.open('${item.webUrl}','_blank')"`;
-
-    return `
-        <div class="archivo-card" ${onclick}>
-            <div style="display:flex;align-items:flex-start;gap:12px">
-                <div class="archivo-icon ${clase}">${icono}</div>
-                <div class="archivo-info">
-                    <div class="archivo-nombre">${item.name}</div>
-                    <div class="archivo-meta">${[fecha, tamanio].filter(Boolean).join(' · ')}</div>
-                </div>
+    lista.innerHTML = filtrados.map(doc => `
+        <div class="doc-card">
+            <div class="doc-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             </div>
-            <div class="archivo-footer">
-                <div class="archivo-tipo">${etiqueta}</div>
-                <div class="archivo-accion">${accionHTML}</div>
+            <div class="doc-info">
+                <div class="doc-nombre">${doc.nombre}</div>
+                <div class="doc-meta">${doc.tipo} · ${doc.fecha}</div>
             </div>
-        </div>`;
+            <div class="doc-acciones">
+                <a class="btn-doc btn-ver" href="${doc.archivo}" target="_blank">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    Ver
+                </a>
+                <a class="btn-doc btn-dl" href="${doc.archivo}" download>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Descargar
+                </a>
+            </div>
+        </div>
+    `).join('');
 }
 
-function getIconoTipo(esCarpeta, ext) {
-    if (esCarpeta) return { icono: '📁', clase: 'carpeta', etiqueta: 'Carpeta' };
-    const map = {
-        pdf:  { icono: '📄', clase: 'pdf',   etiqueta: 'PDF' },
-        docx: { icono: '📝', clase: 'word',  etiqueta: 'Word' },
-        doc:  { icono: '📝', clase: 'word',  etiqueta: 'Word' },
-        xlsx: { icono: '📊', clase: 'excel', etiqueta: 'Excel' },
-        xls:  { icono: '📊', clase: 'excel', etiqueta: 'Excel' },
-        pptx: { icono: '📑', clase: 'ppt',   etiqueta: 'PowerPoint' },
-        ppt:  { icono: '📑', clase: 'ppt',   etiqueta: 'PowerPoint' },
-        png:  { icono: '🖼️', clase: 'otro',  etiqueta: 'Imagen' },
-        jpg:  { icono: '🖼️', clase: 'otro',  etiqueta: 'Imagen' },
-        mp4:  { icono: '🎥', clase: 'otro',  etiqueta: 'Video' },
-    };
-    return map[ext] || { icono: '📎', clase: 'otro', etiqueta: ext.toUpperCase() || 'Archivo' };
-}
-
-function formatSize(bytes) {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024*1024) return `${(bytes/1024).toFixed(0)} KB`;
-    return `${(bytes/1024/1024).toFixed(1)} MB`;
-}
-
-function filtrarArchivos() {
-    renderArchivos(archivosActuales);
-}
-
-function mostrarError(msg) {
-    document.getElementById('contenido').innerHTML = `
-        <div class="estado">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            <div class="estado-titulo">Error al cargar documentos</div>
-            <div class="estado-sub">${msg}</div>
-        </div>`;
-}
+function filtrar() { renderDocs(DOCUMENTOS); }
 
 initAuth();
 </script>
