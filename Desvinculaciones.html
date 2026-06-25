@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desvinculaciones — Baker</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+    <style>
+        :root {
+            --rojo:#C0392B;--negro:#111010;--negro-3:#242220;--borde-dark:#2E2C2A;
+            --crema:#F8F6F3;--gris-1:#F0EDE9;--gris-2:#E2DED9;--gris-3:#B5B0AA;
+            --txt:#1C1A18;--txt-mid:#6B6762;--txt-dim:#A09C97;
+            --naranja:#E67E22;
+        }
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'DM Sans',sans-serif;background:var(--crema);color:var(--txt);min-height:100vh}
+
+        nav{position:sticky;top:0;z-index:100;background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px solid var(--borde-dark);height:60px;display:flex;align-items:center;padding:0 48px;gap:16px}
+        .nav-logo{text-decoration:none}
+        .nav-logo img{height:26px;background:white;border-radius:6px;padding:4px 10px;display:block}
+        .nav-sep{width:1px;height:18px;background:var(--borde-dark)}
+        .nav-back{display:flex;align-items:center;gap:6px;color:var(--gris-3);text-decoration:none;font-size:0.78rem;font-weight:500;transition:color 0.2s}
+        .nav-back:hover{color:white}
+        .nav-back svg{width:14px;height:14px}
+        .nav-title{font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--gris-3);letter-spacing:0.1em;text-transform:uppercase}
+        .nav-spacer{flex:1}
+        .user-chip{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;background:var(--negro-3);border:1px solid var(--borde-dark);border-radius:100px}
+        .user-av{width:26px;height:26px;border-radius:50%;background:var(--rojo);display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:white}
+        .user-nm{font-size:0.78rem;font-weight:500;color:white;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+        .page-header{background:var(--negro);padding:40px 48px 36px;border-bottom:1px solid var(--borde-dark);position:relative;overflow:hidden}
+        .page-header::before{content:'';position:absolute;inset:0;background-image:linear-gradient(var(--borde-dark) 1px,transparent 1px),linear-gradient(90deg,var(--borde-dark) 1px,transparent 1px);background-size:40px 40px;opacity:0.3}
+        .page-header::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 50% 100% at 0% 50%,rgba(192,57,43,0.08) 0%,transparent 70%)}
+        .page-header-inner{position:relative;z-index:2}
+        .page-eyebrow{font-size:0.65rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--rojo);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+        .page-eyebrow::before{content:'';width:16px;height:1px;background:var(--rojo)}
+        .page-header h1{font-family:'Playfair Display',serif;font-size:2rem;font-weight:700;color:white;letter-spacing:-0.02em;line-height:1.1}
+        .page-header-sub{font-size:0.82rem;color:#6b6762;margin-top:8px;line-height:1.6}
+
+        .main{padding:40px 48px 80px;max-width:680px}
+
+        /* ── ALERTA ─────────────────────────────────────── */
+        .alerta{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;background:#fef9ec;border:1px solid #f0c040;border-radius:10px;margin-bottom:28px}
+        .alerta svg{width:18px;height:18px;color:#d4a00a;flex-shrink:0;margin-top:1px}
+        .alerta-txt{font-size:0.82rem;color:#7a5f00;line-height:1.5}
+        .alerta-txt strong{font-weight:600}
+
+        /* ── CARD FORMULARIO ─────────────────────────────── */
+        .form-card{background:white;border:1px solid var(--gris-2);border-radius:16px;overflow:hidden}
+        .form-card-header{padding:20px 24px;border-bottom:1px solid var(--gris-2);display:flex;align-items:center;gap:12px}
+        .form-card-icon{width:36px;height:36px;border-radius:8px;background:rgba(192,57,43,0.08);border:1px solid rgba(192,57,43,0.15);display:flex;align-items:center;justify-content:center}
+        .form-card-icon svg{width:18px;height:18px;color:var(--rojo)}
+        .form-card-titulo{font-size:0.95rem;font-weight:600;color:var(--txt)}
+        .form-card-sub{font-size:0.78rem;color:var(--txt-dim);margin-top:2px}
+        .form-card-body{padding:24px}
+
+        .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+        .form-grid.full{grid-template-columns:1fr}
+        .form-group{display:flex;flex-direction:column;gap:6px}
+        .form-group.span2{grid-column:span 2}
+        .form-label{font-size:0.72rem;font-weight:600;color:var(--txt-mid);letter-spacing:0.06em;text-transform:uppercase}
+        .form-label span{color:var(--rojo)}
+        .form-input,.form-select,.form-textarea{
+            padding:9px 12px;border:1px solid var(--gris-2);border-radius:8px;
+            background:var(--crema);color:var(--txt);
+            font-family:'DM Sans',sans-serif;font-size:0.88rem;
+            transition:border-color 0.2s;width:100%
+        }
+        .form-input:focus,.form-select:focus,.form-textarea:focus{outline:none;border-color:var(--rojo);background:white}
+        .form-textarea{resize:vertical;min-height:80px;line-height:1.5}
+        .form-hint{font-size:0.7rem;color:var(--txt-dim);margin-top:3px}
+
+        .form-divider{height:1px;background:var(--gris-1);margin:20px 0}
+
+        .btn-enviar{width:100%;padding:12px;background:var(--rojo);color:white;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:0.92rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.2s;margin-top:20px}
+        .btn-enviar:hover{background:#a93226}
+        .btn-enviar:disabled{opacity:0.5;cursor:not-allowed}
+        .btn-enviar svg{width:16px;height:16px}
+
+        /* ── ESTADOS ─────────────────────────────────────── */
+        .estado-exito{display:none;flex-direction:column;align-items:center;padding:40px 24px;text-align:center;gap:14px}
+        .estado-exito svg{width:48px;height:48px;color:#27ae60}
+        .estado-exito-titulo{font-family:'Playfair Display',serif;font-size:1.2rem;color:var(--txt)}
+        .estado-exito-sub{font-size:0.85rem;color:var(--txt-mid);line-height:1.6;max-width:360px}
+        .btn-nuevo{padding:10px 20px;border:1px solid var(--gris-2);border-radius:8px;background:white;font-family:'DM Sans',sans-serif;font-size:0.85rem;font-weight:500;color:var(--txt-mid);cursor:pointer;transition:all 0.2s}
+        .btn-nuevo:hover{border-color:var(--rojo);color:var(--rojo)}
+
+        .error-msg{display:none;align-items:center;gap:8px;padding:10px 14px;background:#fdf2f2;border:1px solid rgba(192,57,43,0.2);border-radius:8px;font-size:0.82rem;color:var(--rojo);margin-top:12px}
+        .error-msg svg{width:14px;height:14px;flex-shrink:0}
+
+        .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,0.4);border-top-color:white;border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0}
+        @keyframes spin{to{transform:rotate(360deg)}}
+
+        @media(max-width:768px){
+            nav{padding:0 16px}.nav-title{display:none}
+            .page-header{padding:28px 16px 24px}
+            .main{padding:24px 16px 60px}
+            .form-grid{grid-template-columns:1fr}
+            .form-group.span2{grid-column:span 1}
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <a class="nav-logo" href="index.html">
+        <img src="LOGO_BAKER.png" alt="Baker" onerror="this.outerHTML='<span style=&quot;font-family:serif;font-weight:900;color:white;font-size:1rem&quot;>BAKER</span>'">
+    </a>
+    <div class="nav-sep"></div>
+    <a class="nav-back" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        Inicio
+    </a>
+    <div class="nav-sep"></div>
+    <div class="nav-title">Desvinculaciones</div>
+    <div class="nav-spacer"></div>
+    <div id="auth-area"></div>
+</nav>
+
+<div class="page-header">
+    <div class="page-header-inner">
+        <div class="page-eyebrow">Recursos Humanos</div>
+        <h1>Registro de<br><em>Desvinculaciones</em></h1>
+        <div class="page-header-sub">Completa el formulario para notificar una desvinculación. Se enviará un aviso a TI para bloquear el acceso del colaborador.</div>
+    </div>
+</div>
+
+<div class="main">
+
+    <div class="alerta">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <div class="alerta-txt"><strong>Aviso:</strong> Al enviar este formulario se notificará automáticamente a TI para proceder con el bloqueo manual de la cuenta. El proceso puede tardar hasta 24 horas hábiles.</div>
+    </div>
+
+    <div class="form-card">
+        <div class="form-card-header">
+            <div class="form-card-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <div>
+                <div class="form-card-titulo">Datos del colaborador desvinculado</div>
+                <div class="form-card-sub">Todos los campos marcados con * son obligatorios</div>
+            </div>
+        </div>
+        <div class="form-card-body">
+
+            <div id="form-contenido">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Nombre <span>*</span></label>
+                        <input class="form-input" id="f-nombre" type="text" placeholder="Ej: Juan">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Apellido <span>*</span></label>
+                        <input class="form-input" id="f-apellido" type="text" placeholder="Ej: Pérez">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">RUT <span>*</span></label>
+                        <input class="form-input" id="f-rut" type="text" placeholder="Ej: 12.345.678-9">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Cargo</label>
+                        <input class="form-input" id="f-cargo" type="text" placeholder="Ej: Ejecutivo de Ventas">
+                    </div>
+                    <div class="form-group span2">
+                        <label class="form-label">Correo institucional <span>*</span></label>
+                        <input class="form-input" id="f-correo" type="email" placeholder="Ej: jperez@ibaker.cl">
+                        <div class="form-hint">Este es el correo que se bloqueará</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Empresa <span>*</span></label>
+                        <select class="form-select" id="f-empresa">
+                            <option value="">Seleccionar...</option>
+                            <option>Inmobiliaria Baker</option>
+                            <option>Romeral Constructora</option>
+                            <option>Brotar EP</option>
+                            <option>Baker Dos</option>
+                            <option>Baker Cuatro</option>
+                            <option>Baker Cinco</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Fecha de desvinculación <span>*</span></label>
+                        <input class="form-input" id="f-fecha" type="date">
+                    </div>
+                </div>
+
+                <div class="form-divider"></div>
+
+                <div class="form-grid full">
+                    <div class="form-group">
+                        <label class="form-label">Motivo de desvinculación</label>
+                        <select class="form-select" id="f-motivo">
+                            <option value="">Seleccionar...</option>
+                            <option>Renuncia voluntaria</option>
+                            <option>Término de contrato</option>
+                            <option>Necesidades de la empresa</option>
+                            <option>Mutuo acuerdo</option>
+                            <option>Otro</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Observaciones</label>
+                        <textarea class="form-textarea" id="f-obs" placeholder="Información adicional relevante para el proceso..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Solicitado por <span>*</span></label>
+                        <input class="form-input" id="f-solicitante" type="text" readonly style="background:#f0ede9;color:var(--txt-mid)">
+                        <div class="form-hint">Autocompletado desde tu sesión</div>
+                    </div>
+                </div>
+
+                <div class="error-msg" id="error-msg">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <span id="error-txt">Error</span>
+                </div>
+
+                <button class="btn-enviar" id="btn-enviar" onclick="enviarFormulario()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    Enviar solicitud de desvinculación
+                </button>
+            </div>
+
+            <div class="estado-exito" id="estado-exito">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                <div class="estado-exito-titulo">Solicitud enviada</div>
+                <div class="estado-exito-sub" id="exito-msg">Se ha notificado a TI para proceder con el bloqueo de la cuenta.</div>
+                <button class="btn-nuevo" onclick="resetFormulario()">Registrar otra desvinculación</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+// ── ACCESO ────────────────────────────────────────────────────
+const ACCESO_DESVINCULACIONES = [
+    'dvillaseca@ibaker.cl',
+    // Agrega aquí los correos de RRHH que pueden usar este módulo
+];
+
+// ── EMAILJS CONFIG ────────────────────────────────────────────
+// Pasos para configurar EmailJS (gratis, 200 emails/mes):
+// 1. Crear cuenta en https://www.emailjs.com
+// 2. Conectar tu cuenta de Gmail o Outlook como servicio
+// 3. Crear una plantilla de email
+// 4. Reemplazar los valores de abajo con tus IDs reales
+const EMAILJS_SERVICE_ID  = 'TU_SERVICE_ID';   // ← reemplazar
+const EMAILJS_TEMPLATE_ID = 'TU_TEMPLATE_ID';  // ← reemplazar
+const EMAILJS_PUBLIC_KEY  = 'TU_PUBLIC_KEY';   // ← reemplazar
+const EMAIL_DESTINO       = 'dvillaseca@ibaker.cl';
+
+// ── MSAL ─────────────────────────────────────────────────────
+const msalConfig = {
+    auth: {
+        clientId: "9a56ab1c-d3c4-4460-9892-1d4da768ecfb",
+        authority: "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
+        redirectUri: window.location.origin,
+    },
+    cache: { cacheLocation: "sessionStorage" }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+let usuarioActual = null;
+
+async function initAuth() {
+    try {
+        await msalInstance.initialize();
+        const accounts = msalInstance.getAllAccounts();
+        if (accounts.length > 0) {
+            usuarioActual = accounts[0];
+            const email = usuarioActual.username.toLowerCase();
+            if (!ACCESO_DESVINCULACIONES.includes(email)) {
+                window.location.href = 'index.html?acceso=denegado';
+                return;
+            }
+            const nombre = usuarioActual.name || usuarioActual.username;
+            const iniciales = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+            document.getElementById('auth-area').innerHTML = `
+                <div class="user-chip">
+                    <div class="user-av">${iniciales}</div>
+                    <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
+                </div>`;
+            // Autocompletar solicitante
+            document.getElementById('f-solicitante').value = nombre + ' (' + email + ')';
+            // Fecha de hoy por defecto
+            document.getElementById('f-fecha').value = new Date().toISOString().split('T')[0];
+        } else {
+            window.location.href = 'index.html';
+        }
+    } catch(e) { window.location.href = 'index.html'; }
+}
+
+// ── ENVÍO ─────────────────────────────────────────────────────
+async function enviarFormulario() {
+    const nombre   = document.getElementById('f-nombre').value.trim();
+    const apellido = document.getElementById('f-apellido').value.trim();
+    const rut      = document.getElementById('f-rut').value.trim();
+    const correo   = document.getElementById('f-correo').value.trim();
+    const empresa  = document.getElementById('f-empresa').value;
+    const fecha    = document.getElementById('f-fecha').value;
+    const cargo    = document.getElementById('f-cargo').value.trim();
+    const motivo   = document.getElementById('f-motivo').value;
+    const obs      = document.getElementById('f-obs').value.trim();
+    const solicitante = document.getElementById('f-solicitante').value;
+
+    // Validaciones
+    if (!nombre || !apellido || !rut || !correo || !empresa || !fecha) {
+        mostrarError('Por favor completa todos los campos obligatorios (*).');
+        return;
+    }
+    if (!correo.includes('@')) {
+        mostrarError('El correo institucional no es válido.');
+        return;
+    }
+
+    const btn = document.getElementById('btn-enviar');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Enviando...';
+    ocultarError();
+
+    const fechaFormateada = new Date(fecha + 'T12:00:00').toLocaleDateString('es-CL', {
+        day: 'numeric', month: 'long', year: 'numeric'
+    });
+
+    // Parámetros del template EmailJS
+    const templateParams = {
+        to_email:          EMAIL_DESTINO,
+        nombre_completo:   `${nombre} ${apellido}`,
+        rut:               rut,
+        correo_bloquear:   correo,
+        cargo:             cargo || 'No especificado',
+        empresa:           empresa,
+        fecha_desvinc:     fechaFormateada,
+        motivo:            motivo || 'No especificado',
+        observaciones:     obs || 'Sin observaciones',
+        solicitado_por:    solicitante,
+        fecha_solicitud:   new Date().toLocaleString('es-CL'),
+    };
+
+    try {
+        // Cargar EmailJS dinámicamente
+        if (!window.emailjs) {
+            await cargarScript('https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js');
+            emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+        }
+
+        await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
+
+        // Éxito
+        document.getElementById('form-contenido').style.display = 'none';
+        document.getElementById('exito-msg').textContent =
+            `Se ha notificado a TI para bloquear el acceso de ${nombre} ${apellido} (${correo}). El proceso se realizará a la brevedad.`;
+        document.getElementById('estado-exito').style.display = 'flex';
+
+    } catch(err) {
+        console.error('EmailJS error:', err);
+        mostrarError('Error al enviar el correo. Verifica la configuración de EmailJS o contacta a TI directamente.');
+        btn.disabled = false;
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Enviar solicitud de desvinculación';
+    }
+}
+
+function resetFormulario() {
+    document.getElementById('estado-exito').style.display = 'none';
+    document.getElementById('form-contenido').style.display = 'block';
+    document.getElementById('f-nombre').value = '';
+    document.getElementById('f-apellido').value = '';
+    document.getElementById('f-rut').value = '';
+    document.getElementById('f-correo').value = '';
+    document.getElementById('f-cargo').value = '';
+    document.getElementById('f-empresa').value = '';
+    document.getElementById('f-motivo').value = '';
+    document.getElementById('f-obs').value = '';
+    document.getElementById('f-fecha').value = new Date().toISOString().split('T')[0];
+    const btn = document.getElementById('btn-enviar');
+    btn.disabled = false;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Enviar solicitud de desvinculación';
+}
+
+function mostrarError(msg) {
+    const el = document.getElementById('error-msg');
+    document.getElementById('error-txt').textContent = msg;
+    el.style.display = 'flex';
+}
+function ocultarError() {
+    document.getElementById('error-msg').style.display = 'none';
+}
+
+function cargarScript(src) {
+    return new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = src; s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+    });
+}
+
+initAuth();
+</script>
+</body>
+</html>
