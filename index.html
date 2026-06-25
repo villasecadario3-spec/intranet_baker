@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&family=Inter:wght@300;400;500;600;700&family=Inter+Tight:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="preload" as="image" href="vista-panoramica.jpg">
+    <link rel="preload" as="image" href="vista-panoramica.jpg" fetchpriority="high">
     <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
     <style>
         :root {
@@ -530,7 +530,7 @@
 <!-- LOADING -->
 <div class="loading" id="loading">
     <div class="loading-logo">
-        <img src="LOGO_BAKER.png" alt="Baker"
+        <img src="LOGO_BAKER.png" alt="Baker" loading="eager" fetchpriority="high"
              onerror="this.outerHTML='<span style=\'font-family:Georgia,serif;font-size:1.4rem;color:white\'>BAKER</span>'">
     </div>
     <div class="loading-bar"><div class="loading-bar-fill"></div></div>
@@ -616,7 +616,7 @@
                 </div>
                 <div class="mod-body">
                     <div class="mod-nombre">Consultas Softland</div>
-                    <div class="mod-desc">Asientos contables, vouchers y movimientos de las 5 empresas. Exporta a Excel.</div>
+                    <div class="mod-desc">Consulta asientos contables de todas las empresas del grupo. Filtra por año, mes, voucher o RUT auxiliar y exporta a Excel.</div>
                 </div>
                 <div class="mod-footer">
                     <div class="mod-status status-on">Activo</div>
@@ -633,7 +633,7 @@
                 </div>
                 <div class="mod-body">
                     <div class="mod-nombre">Salas de Reunión</div>
-                    <div class="mod-desc">Disponibilidad en tiempo real y agendamiento directo desde Outlook.</div>
+                    <div class="mod-desc">Reserva salas de reunión del edificio. Consulta disponibilidad en tiempo real y agenda directamente desde el portal.</div>
                 </div>
                 <div class="mod-footer">
                     <div class="mod-status status-on">Activo</div>
@@ -650,7 +650,7 @@
                 </div>
                 <div class="mod-body">
                     <div class="mod-nombre">Impresoras</div>
-                    <div class="mod-desc">Instala la RICOH IM 430 o la HP Smart Tank 530 sin necesitar ayuda de TI.</div>
+                    <div class="mod-desc">Descarga los drivers e instaladores de las impresoras RICOH y HP de la oficina sin necesidad de contactar soporte TI.</div>
                 </div>
                 <div class="mod-footer">
                     <div class="mod-status status-on">Activo</div>
@@ -667,7 +667,7 @@
                 </div>
                 <div class="mod-body">
                     <div class="mod-nombre">Solicitudes TI</div>
-                    <div class="mod-desc">Reporta problemas o solicita equipamiento directamente a TI.</div>
+                    <div class="mod-desc">Envía requerimientos, incidencias y solicitudes al equipo de TI. Cada solicitud queda registrada automáticamente en Monday.</div>
                 </div>
                 <div class="mod-footer">
                     <div class="mod-status status-on">Activo</div>
@@ -684,7 +684,7 @@
                 </div>
                 <div class="mod-body">
                     <div class="mod-nombre">Firma de Correo</div>
-                    <div class="mod-desc">Genera tu firma corporativa para Outlook en segundos, con el logo de tu sociedad.</div>
+                    <div class="mod-desc">Genera tu firma de correo corporativa con los datos actualizados. Disponible para las cuatro sociedades del grupo Baker..</div>
                 </div>
                 <div class="mod-footer">
                     <div class="mod-status status-on">Activo</div>
@@ -701,7 +701,7 @@
                 </div>
                 <div class="mod-body">
                     <div class="mod-nombre">Procedimientos</div>
-                    <div class="mod-desc">Instructivos y documentos internos del grupo Baker desde SharePoint.</div>
+                    <div class="mod-desc">Accede a los procedimientos e instructivos internos del grupo Baker. Documentos disponibles para descarga directa.</div>
                 </div>
                 <div class="mod-footer">
                     <div class="mod-status status-on">Activo</div>
@@ -718,7 +718,7 @@
                 </div>
                 <div class="mod-body">
                     <div class="mod-nombre">Generador DS49</div>
-                    <div class="mod-desc">Genera fichas diagnósticas DS49 desde el Excel de Google Forms. Solo Brotar.</div>
+                    <div class="mod-desc">Genera fichas diagnósticas DS49 para postulaciones SERVIU desde el Excel de Google Forms. Acceso restringido a equipo Brotar.</div>
                 </div>
                 <div class="mod-footer">
                     <div class="mod-status status-on">Activo</div>
@@ -739,7 +739,7 @@
         <div class="accesos-grid">
 
             <a class="acceso-card" href="https://iconstruye.com" target="_blank" rel="noopener">
-                <div class="acceso-icon">🏗️</div>
+                <div class="acceso-icon" style="font-family:'DM Mono',monospace;font-size:0.75rem;font-weight:700;color:#cc9166;letter-spacing:0.05em">IC</div>
                 <div class="acceso-info">
                     <div class="acceso-nombre">iConstruye</div>
                     <div class="acceso-desc">Portal de compras y proveedores</div>
@@ -763,8 +763,8 @@
             <a class="acceso-card" href="https://ibaker.cloudseidor.com" target="_blank" rel="noopener">
                 <div class="acceso-icon">🖥️</div>
                 <div class="acceso-info">
-                    <div class="acceso-nombre">SAP — Escritorio Remoto</div>
-                    <div class="acceso-desc">Acceso remoto al servidor SAP</div>
+                    <div class="acceso-nombre">SAP Business One</div>
+                    <div class="acceso-desc">Acceso a SAP cliente web</div>
                 </div>
                 <div class="acceso-arrow">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -789,33 +789,33 @@
                     <div class="not-cat">Tecnología</div>
                 </div>
                 <div class="not-body">
-                    <div class="not-fecha">08 Jun 2026</div>
-                    <div class="not-titulo">Lanzamiento del portal de intranet Baker</div>
-                    <div class="not-extracto">El grupo Baker cuenta ahora con un portal interno centralizado para acceder a herramientas, sistemas y comunicaciones desde cualquier dispositivo con correo corporativo.</div>
+                    <div class="not-fecha">Jun 2026</div>
+                    <div class="not-titulo">Nuevo módulo: Procedimientos e Instructivos</div>
+                    <div class="not-extracto">Ya está disponible el módulo de documentos internos. Encuentra instructivos y procedimientos del grupo Baker disponibles para descarga directa desde la intranet.</div>
                 </div>
             </div>
 
             <div class="not-card">
                 <div class="not-visual" style="font-size:1.8rem">
-                    📊
-                    <div class="not-cat">Sistemas</div>
-                </div>
-                <div class="not-body">
-                    <div class="not-fecha">08 Jun 2026</div>
-                    <div class="not-titulo">Consultas Softland disponibles en línea</div>
-                    <div class="not-extracto">Busca asientos contables y exporta a Excel sin necesitar ayuda de TI.</div>
-                </div>
-            </div>
-
-            <div class="not-card">
-                <div class="not-visual" style="font-size:1.8rem">
-                    🖨️
-                    <div class="not-cat">TI</div>
+                    📄
+                    <div class="not-cat">Documentos</div>
                 </div>
                 <div class="not-body">
                     <div class="not-fecha">Jun 2026</div>
-                    <div class="not-titulo">Instalación de impresoras es ahora autoservicio</div>
-                    <div class="not-extracto">Descarga el driver desde el portal sin contactar soporte.</div>
+                    <div class="not-titulo">Generador DS49 integrado</div>
+                    <div class="not-extracto">El sistema de generación de fichas DS49 de Brotar ahora está disponible directamente en la intranet.</div>
+                </div>
+            </div>
+
+            <div class="not-card">
+                <div class="not-visual" style="font-size:1.8rem">
+                    ✍️
+                    <div class="not-cat">Comunicaciones</div>
+                </div>
+                <div class="not-body">
+                    <div class="not-fecha">Jun 2026</div>
+                    <div class="not-titulo">Generador de firmas corporativas actualizado</div>
+                    <div class="not-extracto">Nueva imagen corporativa de Baker Inmobiliaria disponible en el generador de firmas de correo.</div>
                 </div>
             </div>
 
@@ -833,7 +833,7 @@
 <script>
 const msalConfig = {
     auth: {
-        clientId:    "d9664e06-7fd2-401d-b27b-97116fed7d9f",
+        clientId:    "9a56ab1c-d3c4-4460-9892-1d4da768ecfb",
         authority:   "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
         redirectUri: window.location.origin,
     },
