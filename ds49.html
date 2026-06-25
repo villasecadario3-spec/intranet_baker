@@ -477,8 +477,9 @@ async function generarFichas() {
       progressLog.textContent = filename;
 
       const doc = buildDoc(row, config, folio, logoBytes);
-      const buffer = await Packer.toBuffer(doc);
-      allDocxFiles.push({ name: filename, data: new Uint8Array(buffer) });
+      const blob = await Packer.toBlob(doc);
+      const arrayBuffer = await blob.arrayBuffer();
+      allDocxFiles.push({ name: filename, data: new Uint8Array(arrayBuffer) });
 
       // Liberar CPU cada 5 fichas
       if (i % 5 === 4) await new Promise(r => setTimeout(r, 10));
