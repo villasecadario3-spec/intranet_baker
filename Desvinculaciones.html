@@ -133,7 +133,7 @@
 
     <div class="alerta">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        <div class="alerta-txt"><strong>Aviso:</strong> Al enviar este formulario se notificará automáticamente a TI para proceder con el bloqueo manual de la cuenta. El proceso puede tardar hasta 24 horas hábiles.</div>
+        <div class="alerta-txt"><strong>Aviso:</strong> Al enviar este formulario se procesará automáticamente el bloqueo del desvinculado en iConstruye, correo institucional, OneDrive y se procesará el respaldo de su información.</div>
     </div>
 
     <div class="form-card">
@@ -159,10 +159,6 @@
                         <input class="form-input" id="f-apellido" type="text" placeholder="Ej: Pérez">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">RUT <span>*</span></label>
-                        <input class="form-input" id="f-rut" type="text" placeholder="Ej: 12.345.678-9">
-                    </div>
-                    <div class="form-group">
                         <label class="form-label">Cargo</label>
                         <input class="form-input" id="f-cargo" type="text" placeholder="Ej: Ejecutivo de Ventas">
                     </div>
@@ -175,12 +171,9 @@
                         <label class="form-label">Empresa <span>*</span></label>
                         <select class="form-select" id="f-empresa">
                             <option value="">Seleccionar...</option>
-                            <option>Inmobiliaria Baker</option>
-                            <option>Romeral Constructora</option>
-                            <option>Brotar EP</option>
-                            <option>Baker Dos</option>
-                            <option>Baker Cuatro</option>
-                            <option>Baker Cinco</option>
+                            <option>Baker</option>
+                            <option>Romeral</option>
+                            <option>Brotar</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -193,19 +186,9 @@
 
                 <div class="form-grid full">
                     <div class="form-group">
-                        <label class="form-label">Motivo de desvinculación</label>
-                        <select class="form-select" id="f-motivo">
-                            <option value="">Seleccionar...</option>
-                            <option>Renuncia voluntaria</option>
-                            <option>Término de contrato</option>
-                            <option>Necesidades de la empresa</option>
-                            <option>Mutuo acuerdo</option>
-                            <option>Otro</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Observaciones</label>
-                        <textarea class="form-textarea" id="f-obs" placeholder="Información adicional relevante para el proceso..."></textarea>
+                        <label class="form-label">Reemplazo en iConstruye <span style="color:var(--txt-dim);font-weight:400;text-transform:none;letter-spacing:0">(opcional)</span></label>
+                        <input class="form-input" id="f-reemplazo" type="text" placeholder="Nombre del reemplazante en caso de aprobación de compras en iConstruye">
+                        <div class="form-hint">Solo si la persona tenía rol de aprobador en iConstruye</div>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Solicitado por <span>*</span></label>
@@ -298,17 +281,14 @@ async function initAuth() {
 async function enviarFormulario() {
     const nombre   = document.getElementById('f-nombre').value.trim();
     const apellido = document.getElementById('f-apellido').value.trim();
-    const rut      = document.getElementById('f-rut').value.trim();
     const correo   = document.getElementById('f-correo').value.trim();
     const empresa  = document.getElementById('f-empresa').value;
     const fecha    = document.getElementById('f-fecha').value;
     const cargo    = document.getElementById('f-cargo').value.trim();
-    const motivo   = document.getElementById('f-motivo').value;
-    const obs      = document.getElementById('f-obs').value.trim();
     const solicitante = document.getElementById('f-solicitante').value;
 
     // Validaciones
-    if (!nombre || !apellido || !rut || !correo || !empresa || !fecha) {
+    if (!nombre || !apellido || !correo || !empresa || !fecha) {
         mostrarError('Por favor completa todos los campos obligatorios (*).');
         return;
     }
@@ -330,13 +310,11 @@ async function enviarFormulario() {
     const templateParams = {
         to_email:          EMAIL_DESTINO,
         nombre_completo:   `${nombre} ${apellido}`,
-        rut:               rut,
         correo_bloquear:   correo,
         cargo:             cargo || 'No especificado',
         empresa:           empresa,
         fecha_desvinc:     fechaFormateada,
-        motivo:            motivo || 'No especificado',
-        observaciones:     obs || 'Sin observaciones',
+        reemplazo:         document.getElementById('f-reemplazo').value.trim() || 'No aplica',
         solicitado_por:    solicitante,
         fecha_solicitud:   new Date().toLocaleString('es-CL'),
     };
@@ -369,12 +347,10 @@ function resetFormulario() {
     document.getElementById('form-contenido').style.display = 'block';
     document.getElementById('f-nombre').value = '';
     document.getElementById('f-apellido').value = '';
-    document.getElementById('f-rut').value = '';
     document.getElementById('f-correo').value = '';
     document.getElementById('f-cargo').value = '';
     document.getElementById('f-empresa').value = '';
-    document.getElementById('f-motivo').value = '';
-    document.getElementById('f-obs').value = '';
+    document.getElementById('f-reemplazo').value = '';
     document.getElementById('f-fecha').value = new Date().toISOString().split('T')[0];
     const btn = document.getElementById('btn-enviar');
     btn.disabled = false;
