@@ -1,844 +1,328 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Generador de Fichas Sociales DS49</title>
-  
-  <!-- Tailwind CSS para un diseño limpio y moderno -->
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-  
-  <!-- Dependencia oficial de DOCX (v8.5.0) para generar los archivos Word en el navegador -->
-  <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
-
-  <style>
-    /* Estilos personalizados para la barra de progreso y transiciones */
-    .progress-bar {
-      transition: width 0.3s ease-in-out;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador DS49 — Baker</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+    <style>
+        /* ── INTRANET NAV ───────────────────────── */
+        :root {
+            --rojo:#C0392B;--rojo-dark:#96281B;
+            --negro:#111010;--negro-3:#242220;--borde-dark:#2E2C2A;
+            --blanco:#FFFFFF;--crema:#F8F6F3;--gris-2:#E2DED9;--gris-3:#B5B0AA;
+            --txt:#1C1A18;--txt-mid:#6B6762;--txt-dim:#A09C97;
+        }
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+        nav.intranet-nav{position:sticky;top:0;z-index:100;background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px solid var(--borde-dark);height:60px;display:flex;align-items:center;padding:0 48px;gap:16px}
+        .nav-logo{text-decoration:none;flex-shrink:0}
+        .nav-logo img{height:26px;width:auto;display:block;background:white;border-radius:6px;padding:4px 10px}
+        .nav-sep{width:1px;height:18px;background:var(--borde-dark)}
+        .nav-back{display:flex;align-items:center;gap:6px;color:var(--gris-3);text-decoration:none;font-size:0.78rem;font-weight:500;transition:color 0.2s}
+        .nav-back:hover{color:white}
+        .nav-back svg{width:14px;height:14px}
+        .nav-title{font-family:"DM Mono",monospace;font-size:0.72rem;color:var(--gris-3);letter-spacing:0.1em;text-transform:uppercase}
+        .nav-spacer{flex:1}
+        .user-chip{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;background:var(--negro-3);border:1px solid var(--borde-dark);border-radius:100px}
+        .user-av{width:26px;height:26px;border-radius:50%;background:var(--rojo);display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:white}
+        .user-nm{font-size:0.78rem;font-weight:500;color:white;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        
+        /* ── DS49 ESTILOS ORIGINALES ─────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #F7F6F3; --surface: #FFFFFF; --border: #E2E0DA; --border-strong: #C8C5BC;
+            --text: #1A1916; --text-2: #6B6860; --text-3: #9E9C97;
+            --accent: #C0392B; --accent-light: #FBEAE9; --accent-dark: #96231A;
+            --green: #1A7A4A; --green-light: #E8F5EE;
+            --radius: 10px; --radius-lg: 16px;
+        }
+        body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        main { max-width: 860px; margin: 0 auto; padding: 3rem 2rem; }
+        .hero { text-align: center; margin-bottom: 3rem; }
+        .hero-icon { width: 64px; height: 64px; background: var(--accent-light); border: 1px solid #F0C5C2; border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; }
+        .hero-icon svg { width: 28px; height: 28px; stroke: var(--accent); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+        .hero h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.03em; margin-bottom: 0.5rem; }
+        .hero p { font-size: 15px; color: var(--text-2); max-width: 480px; margin: 0 auto; }
+        .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 2rem; }
+        .step { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.1rem; display: flex; align-items: flex-start; gap: 10px; }
+        .step-num { font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; background: var(--bg); border: 1px solid var(--border); color: var(--text-3); width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+        .step-text strong { display: block; font-size: 13px; font-weight: 500; margin-bottom: 2px; }
+        .step-text span { font-size: 12px; color: var(--text-3); }
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 1.5rem; }
+        .card-header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+        .card-header-icon { width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; }
+        .card-header-icon svg { width: 16px; height: 16px; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+        .card-header h2 { font-size: 14px; font-weight: 500; }
+        .card-body { padding: 1.5rem; }
+        .drop-zone { border: 1.5px dashed var(--border-strong); border-radius: var(--radius); padding: 2.5rem 2rem; text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; position: relative; }
+        .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: var(--accent-light); }
+        .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+        .drop-icon { width: 44px; height: 44px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; }
+        .drop-icon svg { width: 22px; height: 22px; stroke: var(--text-2); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+        .drop-zone h3 { font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+        .drop-zone p { font-size: 13px; color: var(--text-3); margin-bottom: 1rem; }
+        .drop-tag { display: inline-block; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; background: var(--bg); border: 1px solid var(--border-strong); color: var(--text-2); padding: 3px 10px; border-radius: 6px; }
+        .file-preview { display: none; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; margin-top: 1rem; align-items: center; gap: 12px; }
+        .file-preview.show { display: flex; }
+        .file-preview-icon { width: 36px; height: 36px; background: var(--green-light); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .file-preview-icon svg { width: 18px; height: 18px; stroke: var(--green); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+        .file-preview-info { flex: 1; min-width: 0; }
+        .file-preview-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-preview-meta { font-size: 12px; color: var(--text-3); margin-top: 1px; }
+        .file-remove { background: none; border: none; cursor: pointer; color: var(--text-3); padding: 4px; border-radius: 6px; display: flex; align-items: center; transition: color 0.1s; }
+        .file-remove:hover { color: var(--accent); }
+        .file-remove svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+        .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 1rem; }
+        .stat-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; text-align: center; }
+        .stat-value { font-size: 22px; font-weight: 600; font-family: 'DM Mono', monospace; letter-spacing: -0.02em; }
+        .stat-label { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+        .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .field label { display: block; font-size: 12px; font-weight: 500; color: var(--text-2); margin-bottom: 6px; letter-spacing: 0.02em; text-transform: uppercase; }
+        .field input, .field select { width: 100%; height: 38px; border: 1px solid var(--border); border-radius: 8px; padding: 0 12px; font-size: 13px; font-family: 'DM Sans', sans-serif; background: var(--surface); color: var(--text); transition: border-color 0.15s; outline: none; }
+        .field input:focus, .field select:focus { border-color: var(--accent); }
+        .field-full { grid-column: 1 / -1; }
+        .actions { display: flex; gap: 10px; margin-top: 1.5rem; }
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 0 20px; height: 42px; border-radius: 9px; font-size: 14px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; border: 1px solid transparent; transition: opacity 0.15s, transform 0.1s; }
+        .btn:active { transform: scale(0.98); }
+        .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent-dark); }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
+        .btn-secondary:hover { background: var(--bg); }
+        .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+        .btn-dl { display: none; width: 100%; justify-content: center; background: var(--green); color: #fff; border-color: #155C39; font-size: 15px; height: 48px; border-radius: var(--radius); margin-top: 1rem; }
+        .btn-dl.show { display: inline-flex; }
+        .btn-dl:hover { opacity: 0.9; }
+        .progress-block { display: none; margin-top: 1.5rem; }
+        .progress-block.show { display: block; }
+        .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .progress-label { font-size: 13px; font-weight: 500; }
+        .progress-count { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-2); }
+        .progress-bar-track { height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; }
+        .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 99px; width: 0%; transition: width 0.4s ease; }
+        .progress-log { margin-top: 8px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-3); }
+        .alert { display: none; padding: 10px 14px; border-radius: var(--radius); font-size: 13px; margin-top: 1rem; align-items: center; gap: 8px; }
+        .alert.show { display: flex; }
+        .alert-error { background: var(--accent-light); color: var(--accent-dark); border: 1px solid #F0C5C2; }
+        .alert svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; flex-shrink: 0; }
+        footer { text-align: center; padding: 2rem; font-size: 12px; color: var(--text-3); border-top: 1px solid var(--border); margin-top: 1rem; }
+    </style>
 </head>
-<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col font-sans">
+<body>
 
-  <!-- Encabezado Principal -->
-  <header class="bg-blue-700 text-white shadow-md py-6 px-8">
-    <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-      <div>
-        <h1 class="text-2xl font-bold tracking-tight">Generador Automatizado de Fichas DS49</h1>
-        <p class="text-blue-100 text-sm mt-1">Procesamiento local y masivo de diagnósticos sociohabitacionales en formato Word</p>
+<nav class="intranet-nav">
+    <a class="nav-logo" href="index.html">
+        <img src="LOGO_BAKER.png" alt="Baker" onerror="this.outerHTML='<span style=&quot;font-family:serif;font-weight:900;color:white;font-size:1rem&quot;>BAKER</span>'">
+    </a>
+    <div class="nav-sep"></div>
+    <a class="nav-back" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        Inicio
+    </a>
+    <div class="nav-sep"></div>
+    <div class="nav-title">Generador DS49</div>
+    <div class="nav-spacer"></div>
+    <div id="auth-area"></div>
+</nav>
+
+<main>
+  <div class="hero">
+    <div class="hero-icon">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    </div>
+    <h1>Generador de fichas DS49</h1>
+    <p>Sube el Excel con las respuestas del formulario y genera todos los documentos Word listos para entregar al SERVIU.</p>
+  </div>
+ 
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-text"><strong>Sube el Excel</strong><span>Planilla exportada de Google Forms</span></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Configura el proyecto</strong><span>Nombre, región y entidad</span></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Descarga el ZIP</strong><span>Un Word por familia, listo al instante</span></div></div>
+  </div>
+ 
+  <div class="card">
+    <div class="card-header">
+      <div class="card-header-icon" style="background:#EAF3DE;"><svg viewBox="0 0 24 24" style="stroke:#3B6D11;"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+      <h2>Archivo de respuestas</h2>
+    </div>
+    <div class="card-body">
+      <div class="drop-zone" id="dropZone">
+        <input type="file" id="fileInput" accept=".xlsx,.xls">
+        <div class="drop-icon"><svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg></div>
+        <h3>Arrastra el Excel aquí</h3>
+        <p>o haz clic para seleccionar el archivo</p>
+        <span class="drop-tag">.xlsx &nbsp;·&nbsp; .xls</span>
       </div>
-      <div class="flex items-center gap-2 bg-blue-800 px-4 py-2 rounded-lg text-xs font-mono border border-blue-600">
-        <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-        Procesamiento 100% Local
+      <div class="file-preview" id="filePreview">
+        <div class="file-preview-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+        <div class="file-preview-info">
+          <div class="file-preview-name" id="previewName">—</div>
+          <div class="file-preview-meta" id="previewMeta">—</div>
+        </div>
+        <button class="file-remove" id="removeFile"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="stats-row" id="statsRow" style="display:none;">
+        <div class="stat-card"><div class="stat-value" id="statFamilias">—</div><div class="stat-label">Familias</div></div>
+        <div class="stat-card"><div class="stat-value" id="statColumnas">—</div><div class="stat-label">Columnas</div></div>
+        <div class="stat-card"><div class="stat-value" id="statEstado" style="color:var(--green);">OK</div><div class="stat-label">Estado</div></div>
       </div>
     </div>
-  </header>
-
-  <!-- Contenedor de la Aplicación -->
-  <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-    
-    <!-- Panel de Configuración y Carga (Izquierda) -->
-    <section class="lg:col-span-1 bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col gap-6 h-fit">
-      <div>
-        <h2 class="text-lg font-semibold text-gray-900 border-b pb-2 mb-4">1. Configuración del Proyecto</h2>
-        <label for="cfgProyecto" class="block text-sm font-medium text-gray-700 mb-1">Nombre del Proyecto</label>
-        <input type="text" id="cfgProyecto" placeholder="Ej. Los Aromas II" 
-               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-      </div>
-
-      <div>
-        <h2 class="text-lg font-semibold text-gray-900 border-b pb-2 mb-4">2. Carga de Archivos</h2>
-        
-        <!-- Input de Logo -->
-        <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Logo Institucional (PNG)</label>
-          <div class="flex items-center justify-center w-full">
-            <label class="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition">
-              <div class="flex flex-col items-center justify-center pt-2 pb-3">
-                <svg class="w-6 h-6 mb-1 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 002-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                <p class="text-xs text-gray-500" id="logoName">Seleccionar imagen PNG</p>
-              </div>
-              <input type="file" id="inputLogo" accept="image/png" class="hidden" onchange="handleLogo(this)">
-            </label>
-          </div>
+  </div>
+ 
+  <div class="card">
+    <div class="card-header">
+      <div class="card-header-icon" style="background:#E8F0FA;"><svg viewBox="0 0 24 24" style="stroke:#185FA5;"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg></div>
+      <h2>Configuración del proyecto</h2>
+    </div>
+    <div class="card-body">
+      <div class="config-grid">
+        <div class="field"><label>Nombre del proyecto</label>
+          <select id="cfgProyecto">
+            <option value="" disabled selected>Selecciona un proyecto</option>
+            <option value="DS49 Hacienda San Martín 1">DS49 Hacienda San Martín 1</option>
+            <option value="DS49 Hacienda San Martín 2">DS49 Hacienda San Martín 2</option>
+            <option value="DS49 Viñedos de Santa Barbara 1">DS49 Viñedos de Santa Barbara 1</option>
+            <option value="DS49 Viñedos de Santa Barbara 2">DS49 Viñedos de Santa Barbara 2</option>
+            <option value="DS49 Valle Merced 1">DS49 Valle Merced 1</option>
+            <option value="DS49 Valle Merced 2">DS49 Valle Merced 2</option>
+            <option value="DS49 Valle Merced 3">DS49 Valle Merced 3</option>
+          </select>
         </div>
-
-        <!-- Input de Excel/JSON Data -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Datos de los Postulantes (JSON)</label>
-          <div class="flex items-center justify-center w-full">
-            <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition">
-              <div class="flex flex-col items-center justify-center pt-4 pb-5">
-                <svg class="w-8 h-8 mb-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                <p class="text-xs text-gray-500" id="jsonName">Arrastra o selecciona tu archivo .json</p>
-              </div>
-              <input type="file" id="inputJson" accept=".json" class="hidden" onchange="handleJson(this)">
-            </label>
-          </div>
+        <div class="field"><label>Nombre del grupo</label><input type="text" id="cfgGrupo" placeholder="Nombre de grupo"></div>
+        <div class="field"><label>Región</label>
+          <select id="cfgRegion">
+            <option value="" disabled selected>Selecciona una región</option>
+            <option value="METROPOLITANA">Región Metropolitana de Santiago</option>
+            <option value="O'HIGGINS">Región del Libertador General Bernardo O'Higgins</option>
+          </select>
         </div>
-      </div>
-
-      <!-- Botón de Acción Principal -->
-      <button onclick="procesarFichas()" id="btnProcesar" disabled
-              class="w-full mt-2 bg-gray-400 text-white font-medium py-2.5 px-4 rounded-lg cursor-not-allowed transition flex items-center justify-center gap-2 shadow-sm">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
-        Procesar Informes
-      </button>
-    </section>
-
-    <!-- Monitor de Progreso y Descarga (Derecha) -->
-    <section class="lg:col-span-2 flex flex-col gap-6">
-      
-      <!-- Card de Estado de Carga -->
-      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 grid grid-cols-2 gap-4">
-        <div class="p-4 bg-gray-50 rounded-lg border border-gray-100 flex flex-col justify-center">
-          <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado de Datos</span>
-          <span id="lblStatusDatos" class="text-sm font-medium text-red-600 mt-1 flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-red-500"></span> Sin cargar
-          </span>
+        <div class="field"><label>Provincia</label>
+          <select id="cfgProvincia">
+            <option value="" disabled selected>Selecciona una provincia</option>
+            <optgroup label="Región del Libertador General Bernardo O'Higgins (VI)">
+              <option value="CACHAPOAL">Cachapoal</option>
+              <option value="COLCHAGUA">Colchagua</option>
+              <option value="CARDENAL CARO">Cardenal Caro</option>
+            </optgroup>
+            <optgroup label="Región Metropolitana de Santiago">
+              <option value="SANTIAGO">Santiago</option>
+              <option value="CORDILLERA">Cordillera</option>
+              <option value="CHACABUCO">Chacabuco</option>
+              <option value="MAIPO">Maipo</option>
+              <option value="MELIPILLA">Melipilla</option>
+              <option value="TALAGANTE">Talagante</option>
+            </optgroup>
+          </select>
         </div>
-        <div class="p-4 bg-gray-50 rounded-lg border border-gray-100 flex flex-col justify-center">
-          <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Registros Encontrados</span>
-          <span id="lblTotalRegistros" class="text-2xl font-bold text-gray-900 mt-0.5">0</span>
+        <div class="field"><label>Comuna</label>
+          <select id="cfgComuna">
+            <option value="" disabled selected>Selecciona una comuna</option>
+            <option value="RENGO">Rengo</option>
+            <option value="MELIPILLA">Melipilla</option>
+          </select>
+        </div>
+        <div class="field"><label>N° familias postulantes</label><input type="text" id="cfgFamilias" placeholder="Ej: 289"></div>
+        <div class="field field-full"><label>Entidad patrocinante</label>
+          <select id="cfgEntidad">
+            <option value="ENTIDAD PATROCINANTE BROTAR" selected>Entidad Patrocinante Brotar</option>
+          </select>
         </div>
       </div>
+    </div>
+  </div>
+ 
+  <div class="actions">
+    <button class="btn btn-primary" id="btnGenerar" disabled>
+      <svg viewBox="0 0 24 24"><polyline points="13 2 13 9 20 9"/><path d="M11 2H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-8"/></svg>
+      Generar fichas
+    </button>
+    <button class="btn btn-secondary" id="btnReset" disabled>
+      <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+      Reiniciar
+    </button>
+  </div>
+ 
+  <div class="progress-block" id="progressBlock">
+    <div class="progress-header">
+      <span class="progress-label" id="progressLabel">Generando fichas...</span>
+      <span class="progress-count" id="progressCount">0 / 0</span>
+    </div>
+    <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill"></div></div>
+    <div class="progress-log" id="progressLog"></div>
+  </div>
+ 
+  <div class="alert alert-error" id="alertError">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span id="alertErrorMsg">Error desconocido</span>
+  </div>
+ 
+  <button class="btn btn-dl" id="btnDescargar">
+    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Descargar ZIP con todas las fichas
+  </button>
+</main>
 
-      <!-- Card de Progreso en Tiempo Real -->
-      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex-1 flex flex-col justify-between min-h-[300px]">
-        <div>
-          <h2 class="text-lg font-semibold text-gray-900 border-b pb-2 mb-4">Progreso del Procesamiento</h2>
-          
-          <div id="panelProgreso" class="hidden space-y-4">
-            <div class="flex justify-between text-sm text-gray-600">
-              <span id="lblProgresoTexto">Generando documentos de Word...</span>
-              <span id="lblProgresoPorcentaje" class="font-semibold text-blue-600">0%</span>
-            </div>
-            <div class="w-full bg-gray-200 rounded-full h-3.5 overflow-hidden">
-              <div id="barProgreso" class="progress-bar bg-blue-600 h-full w-0"></div>
-            </div>
-          </div>
+<footer>
+    <span>EP Brotar — Inmobiliaria Baker</span>
+</footer>
 
-          <!-- Estado de Espera Inicial -->
-          <div id="estadoVacio" class="flex flex-col items-center justify-center py-12 text-center text-gray-400">
-            <svg class="w-16 h-16 stroke-current mb-3 opacity-60" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"></path></svg>
-            <p class="text-sm">Configura el proyecto y carga los archivos requeridos para iniciar el compilador.</p>
-          </div>
-        </div>
+<script>
+// ── LISTA BLANCA ──────────────────────────────────────────────
+const ACCESO_DS49 = [
+    'dvillaseca@ibaker.cl',
+    'cgarces@ibaker.cl',
+    'dparedes@epbrotar.cl',
+    'dponce@epbrotar.cl',
+    'nvedia@epbrotar.cl',
+    'ncaris@epbrotar.cl',
+];
 
-        <!-- Bloque de Descarga -->
-        <div id="panelDescarga" class="hidden border-t pt-4 mt-6">
-          <div class="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <div class="bg-green-100 p-2 rounded-lg text-green-700">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-              </div>
-              <div>
-                <h4 class="text-sm font-semibold text-green-900">¡Procesamiento Exitoso!</h4>
-                <p class="text-xs text-green-700">Todas las fichas han sido empaquetadas en un único archivo ZIP comprimido.</p>
-              </div>
-            </div>
-            <button onclick="descargarZip()" 
-                    class="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-lg shadow transition flex items-center gap-2 whitespace-nowrap">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-              Descargar .ZIP
-            </button>
-          </div>
-        </div>
+// ── MSAL ─────────────────────────────────────────────────────
+const msalConfig = {
+    auth: {
+        clientId: "d9664e06-7fd2-401d-b27b-97116fed7d9f",
+        authority: "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
+        redirectUri: window.location.origin,
+    },
+    cache: { cacheLocation: "sessionStorage" }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
 
-      </div>
-    </section>
-  </main>
-
-  <!-- Pie de página integrado -->
-  <footer class="bg-gray-100 border-t border-gray-200 py-4 text-center text-xs text-gray-500">
-    Generador DS49 — Diseñado para el procesamiento automatizado y local de fichas familiares de vivienda.
-  </footer>
-
-  <!-- LÓGICA CORE EN JAVASCRIPT INTEGRADA -->
-  <script>
-    // Inicialización de desestructuración global de componentes de la librería DOCX
-    const { 
-      Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, 
-      WidthType, BorderStyle, AlignmentType, ImageRun, HeadingLevel, 
-      Header, Footer, PageNumber, NumberFormat, SectionType 
-    } = docx;
-
-    // Variables de estado del aplicativo
-    let rawJsonData = null;
-    let logoBuffer = null;
-    let zipBlob = null;
-
-    // Diccionarios e Índices Estáticos para Mapeo del Formulario Completo
-    const MAPA_INDICES = {
-      RUN: 1, DV: 2, NOM: 3, APP: 4, APM: 5, EC: 6, SX: 7, FN: 8, ED: 9, 
-      PAI: 10, TEL: 11, COR: 12, CALLE: 13, NUM: 14, BLOCK: 15, DEP: 16, 
-      VIV: 17, COM: 18, RSH: 19, CALI: 20, TRAB: 21, COM_EST: 22, JEF: 23, 
-      NIV_ED: 24, EST_CIV: 25, DIS_CRON: 26, CRED_DIS: 27, S_SALUD: 28, 
-      ETNIA: 29, MIGRA: 30, EMB: 31, BOM: 32, FF_AA: 33, EX_PRIS: 34, 
-      S_RENA: 35, RE_REG: 36, P_VIV: 37, S_TEN: 38, COMP: 39, AGUA: 40, 
-      S_EXC: 41, ELEC: 42, RE_RES: 43, CAL_INT: 44, CAL_EXT: 45, RE_LUM: 46, 
-      HA_URB: 47, EQUIP: 48, MA_ORG: 49, MA_SEG: 50, COH_SOC: 51, EXP_HAB: 52, 
-      EXP_BAR: 53, AT_EST: 54, AT_EQUIP: 55, AT_DIS: 56, AT_MED: 57, AT_SEG: 58,
-      C_DORM: 59, C_CAMAS: 60
-    };
-
-    const EQUPRI = {
-      SALA: 61, MULTI: 62, AREA_V: 63, JUEGOS: 64, CANCHA: 65, PLAZA: 66, 
-      SEDE: 67, PARQUE: 68, HUERTO: 69, C_DEP: 70
-    };
-
-    const EQUSR = {
-      SALA: 71, MULTI: 72, AREA_V: 73, JUEGOS: 74, CANCHA: 75, PLAZA: 76, 
-      SEDE: 77, PARQUE: 78, HUERTO: 79, C_DEP: 80
-    };
-
-    // Controladores de eventos para carga de archivos de entrada
-    function handleLogo(input) {
-      if (!input.files || !input.files[0]) return;
-      const file = input.files[0];
-      document.getElementById('logoName').innerText = file.name;
-      
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        logoBuffer = new Uint8Array(e.target.result);
-        validarEstadoCarga();
-      };
-      reader.readAsArrayBuffer(file);
-    }
-
-    function handleJson(input) {
-      if (!input.files || !input.files[0]) return;
-      const file = input.files[0];
-      document.getElementById('jsonName').innerText = file.name;
-
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        try {
-          rawJsonData = JSON.parse(e.target.result);
-          document.getElementById('lblTotalRegistros').innerText = Array.isArray(rawJsonData) ? rawJsonData.length : 0;
-          document.getElementById('lblStatusDatos').innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500"></span> Listo`;
-          document.getElementById('lblStatusDatos').className = "text-sm font-medium text-green-600 mt-1 flex items-center gap-1.5";
-          validarEstadoCarga();
-        } catch(err) {
-          alert("Error de sintaxis: El archivo JSON cargado es inválido.");
-          console.error(err);
+async function initAuth() {
+    try {
+        await msalInstance.initialize();
+        const accounts = msalInstance.getAllAccounts();
+        if (accounts.length > 0) {
+            const usuario = accounts[0];
+            const email = usuario.username.toLowerCase();
+            if (!ACCESO_DS49.includes(email)) {
+                window.location.href = 'index.html?acceso=ds49';
+                return;
+            }
+            const nombre = usuario.name || usuario.username;
+            const iniciales = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+            document.getElementById('auth-area').innerHTML = `
+                <div class="user-chip">
+                    <div class="user-av">${iniciales}</div>
+                    <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
+                </div>`;
+        } else {
+            window.location.href = 'index.html';
         }
-      };
-      reader.readAsText(file);
-    }
+    } catch(e) { window.location.href = 'index.html'; }
+}
 
-    function validarEstadoCarga() {
-      const btn = document.getElementById('btnProcesar');
-      if (rawJsonData && logoBuffer) {
-        btn.disabled = false;
-        btn.className = "w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg cursor-pointer transition flex items-center justify-center gap-2 shadow-sm";
-      }
-    }
+initAuth();
 
-    // Funciones utilitarias para la construcción estructural de tablas nativas en DOCX
-    const bNone = { style: BorderStyle.NONE, size: 0, color: "auto" };
-    const bThin = { style: BorderStyle.SINGLE, size: 4, color: "D3D3D3" };
-    const bordersForm = { top: bThin, bottom: bThin, left: bThin, right: bThin };
-    const cellP = { top: 70, bottom: 70, left: 100, right: 100 };
-
-    function landscapeProps(type = SectionType.NEXT_PAGE) {
-      return {
-        type: type,
-        size: { width: 16838, height: 11906 },
-        margins: { top: 1140, bottom: 1140, left: 1140, right: 1140 }
-      };
-    }
-
-    function portraitProps() {
-      return {
-        type: SectionType.NEXT_PAGE,
-        size: { width: 11906, height: 16838 },
-        margins: { top: 1140, bottom: 1140, left: 1140, right: 1140 }
-      };
-    }
-
-    function val(v) { return v !== undefined && v !== null ? String(v).trim() : ''; }
-
-    function cell(txt, opts = {}) {
-      return new TableCell({
-        width: { size: opts.width || 2000, type: WidthType.DXA },
-        borders: opts.borders || bordersForm,
-        margins: cellP,
-        shading: opts.bg ? { fill: opts.bg } : undefined,
-        children: [new Paragraph({
-          alignment: opts.align || AlignmentType.LEFT,
-          children: [new TextRun({ 
-            text: txt, 
-            bold: !!opts.bold, 
-            size: opts.fontSize || 14, 
-            font: "Calibri", 
-            color: opts.color || "000000" 
-          })]
-        })]
-      });
-    }
-
-    function hCell(txt, opts = {}) {
-      return cell(txt, { 
-        bg: opts.bg || "1F4E78", 
-        color: opts.color || "FFFFFF", 
-        bold: true, 
-        align: opts.align || AlignmentType.CENTER, 
-        width: opts.width, 
-        borders: opts.borders,
-        fontSize: opts.fontSize
-      });
-    }
-
-    function p(txt, opts = {}) {
-      return new Paragraph({
-        alignment: opts.align || AlignmentType.LEFT,
-        spacing: { before: opts.before || 0, after: opts.after || 0 },
-        children: [new TextRun({ text: txt, bold: !!opts.bold, size: opts.size || 18, font: "Calibri" })]
-      });
-    }
-
-    function sp(v) { return new Paragraph({ spacing: { before: v } }); }
-
-    function parseUsr(str) {
-      const s = String(str).toLowerCase();
-      return {
-        n: s.includes('niñ'),
-        j: s.includes('jóv') || s.includes('jov'),
-        m: s.includes('muj'),
-        h: s.includes('hom'),
-        a: s.includes('adul') || s.includes('may')
-      };
-    }
-
-    function makeHeader(logo) {
-      return {
-        default: new Header({
-          children: [
-            new Table({
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              borders: { top: bNone, bottom: bNone, left: bNone, right: bNone },
-              rows: [
-                new TableRow({
-                  children: [
-                    new TableCell({
-                      width: { size: 20, type: WidthType.PERCENTAGE },
-                      borders: { top: bNone, bottom: bNone, left: bNone, right: bNone },
-                      children: [new Paragraph({
-                        children: [new ImageRun({ data: logo, transformation: { width: 55, height: 55 } })]
-                      })]
-                    }),
-                    new TableCell({
-                      width: { size: 80, type: WidthType.PERCENTAGE },
-                      borders: { top: bNone, bottom: bNone, left: bNone, right: bNone },
-                      children: [
-                        new Paragraph({
-                          alignment: AlignmentType.RIGHT,
-                          children: [new TextRun({ text: "DIAGNÓSTICO SOCIOHABITACIONAL DS49", bold: true, size: 16, font: "Calibri", color: "1F4E78" })]
-                        }),
-                        new Paragraph({
-                          alignment: AlignmentType.RIGHT,
-                          children: [new TextRun({ text: "Ficha de Caracterización Familiar e Individual", size: 13, font: "Calibri", color: "595959" })]
-                        })
-                      ]
-                    })
-                  ]
-                })
-              ]
-            })
-          ]
-        })
-      };
-    }
-
-    function makeFooter() {
-      return {
-        default: new Footer({
-          children: [new Paragraph({
-            alignment: AlignmentType.CENTER,
-            children: [
-              new TextRun({ text: "Página ", size: 14, font: "Calibri", color: "7F7F7F" }),
-              new TextRun({ children: [PageNumber.CURRENT], size: 14, font: "Calibri", color: "7F7F7F" }),
-              new TextRun({ text: " de ", size: 14, font: "Calibri", color: "7F7F7F" }),
-              new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 14, font: "Calibri", color: "7F7F7F" })
-            ]
-          })]
-        })
-      };
-    }
-
-    // Motor Principal de Compilación y Generación
-    async function procesarFichas() {
-      if (!rawJsonData || !logoBuffer) return;
-
-      const items = Array.isArray(rawJsonData) ? rawJsonData : [rawJsonData];
-      const total = items.length;
-      if (total === 0) return alert("El dataset JSON no contiene registros válidos.");
-
-      document.getElementById('estadoVacio').classList.add('hidden');
-      document.getElementById('panelDescarga').classList.add('hidden');
-      const panelProgreso = document.getElementById('panelProgreso');
-      const barProgreso = document.getElementById('barProgreso');
-      const lblTexto = document.getElementById('lblProgresoTexto');
-      const lblPorcentaje = document.getElementById('lblProgresoPorcentaje');
-      
-      panelProgreso.classList.remove('hidden');
-
-      const filesCollection = [];
-      const prjName = document.getElementById('cfgProyecto').value.trim() || 'Proyecto';
-
-      for (let i = 0; i < total; i++) {
-        const row = items[i];
-        const runPostulante = val(row[MAPA_INDICES.RUN]) || `SIN_RUT_${i+1}`;
-        const nombrePostulante = `${val(row[MAPA_INDICES.NOM])} ${val(row[MAPA_INDICES.APP])}`.trim() || 'POSTULANTE';
-
-        lblTexto.innerText = `Generando documento (${i + 1}/${total}): ${nombrePostulante}`;
-        const pct = Math.round(((i) / total) * 90);
-        barProgreso.style.width = `${pct}%`;
-        lblPorcentaje.innerText = `${pct}%`;
-
-        await new Promise(r => setTimeout(r, 15));
-
-        try {
-          const doc = generarEstructuraDocumento(row, prjName);
-          const buffer = await Packer.toUint8Array(doc);
-          const safeName = `${runPostulante}_Ficha_DS49.docx`.replace(/[/\\?%*:|"<>\s]/g, '_');
-          filesCollection.push({ name: safeName, data: buffer });
-        } catch (err) {
-          console.error(`Fallo crítico al compilar registro en índice ${i}:`, err);
-        }
-      }
-
-      lblTexto.innerText = "Empaquetando lote de archivos en ZIP corporativo...";
-      barProgreso.style.width = "95%";
-      lblPorcentaje.innerText = "95%";
-      await new Promise(r => setTimeout(r, 50));
-
-      try {
-        const zipData = buildZipStore(filesCollection);
-        zipBlob = new Blob([zipData], { type: 'application/zip' });
-
-        barProgreso.style.width = "100%";
-        lblPorcentaje.innerText = "100%";
-        lblTexto.innerText = "¡Proceso finalizado con éxito!";
-        
-        document.getElementById('panelDescarga').classList.remove('hidden');
-      } catch (err) {
-        alert("Ocurrió un error inesperado al estructurar el paquete de descarga .ZIP");
-        console.error(err);
-      }
-    }
-
-    // Constructor del Documento Estructurado basado en las especificaciones del Serviu
-    function generarEstructuraDocumento(row, nomProyecto) {
-      const uI = MAPA_INDICES;
-
-      // Anchos calculados dinámicamente para alineaciones milimétricas en Word (Sección Horizontal)
-      const wL = [1800, 2400, 1800, 2400, 1800, 2400, 1840]; 
-      const totalW_L = wL.reduce((a,b)=>a+b,0);
-
-      const headerTable = new Table({
-        width: { size: totalW_L, type: WidthType.DXA },
-        rows: [new TableRow({
-          children: [
-            hCell('INFORME DIAGNÓSTICO SOCIOHABITACIONAL - PROGRAMA DS49', { width: totalW_L, fontSize: 18 })
-          ]
-        })]
-      });
-
-      const secITable = new Table({
-        width: { size: totalW_L, type: WidthType.DXA },
-        rows: [
-          new TableRow({
-            children: [
-              hCell('Nombre del Proyecto', { width: wL[0] + wL[1] + wL[2], fontSize: 16 }),
-              hCell('Comuna', { width: wL[3] + wL[4], fontSize: 16 }),
-              hCell('Región', { width: wL[5] + wL[6], fontSize: 16 })
-            ]
-          }),
-          new TableRow({
-            children: [
-              cell(nomProyecto, { width: wL[0] + wL[1] + wL[2], bold: true, fontSize: 16 }),
-              cell(val(row[uI.COM]), { width: wL[3] + wL[4], fontSize: 16 }),
-              cell('Metropolitana', { width: wL[5] + wL[6], fontSize: 16 })
-            ]
-          })
-        ]
-      });
-
-      const secIITable = new Table({
-        width: { size: totalW_L, type: WidthType.DXA },
-        rows: [
-          new TableRow({
-            children: [
-              hCell('Apellido Paterno', { width: wL[0], fontSize: 14 }),
-              hCell('Apellido Materno', { width: wL[1], fontSize: 14 }),
-              hCell('Nombres', { width: wL[2] + wL[3], fontSize: 14 }),
-              hCell('RUT / RUN', { width: wL[4], fontSize: 14 }),
-              hCell('Estado Civil', { width: wL[5], fontSize: 14 }),
-              hCell('Sexo', { width: wL[6], fontSize: 14 })
-            ]
-          }),
-          new TableRow({
-            children: [
-              cell(val(row[uI.APP]), { width: wL[0], fontSize: 14 }),
-              cell(val(row[uI.APM]), { width: wL[1], fontSize: 14 }),
-              cell(val(row[uI.NOM]), { width: wL[2] + wL[3], bold: true, fontSize: 14 }),
-              cell(`${val(row[uI.RUN])}-${val(row[uI.DV])}`, { width: wL[4], fontSize: 14 }),
-              cell(val(row[uI.EC]), { width: wL[5], fontSize: 14 }),
-              cell(val(row[uI.SX]), { width: wL[6], fontSize: 14 })
-            ]
-          }),
-          new TableRow({
-            children: [
-              hCell('Fecha Nacimiento', { width: wL[0], fontSize: 14 }),
-              hCell('Edad', { width: wL[1], fontSize: 14 }),
-              hCell('Nacionalidad', { width: wL[2], fontSize: 14 }),
-              hCell('Teléfono', { width: wL[3], fontSize: 14 }),
-              hCell('Correo Electrónico', { width: wL[4] + wL[5], fontSize: 14 }),
-              hCell('% RSH', { width: wL[6], fontSize: 14 })
-            ]
-          }),
-          new TableRow({
-            children: [
-              cell(val(row[uI.FN]), { width: wL[0], fontSize: 14 }),
-              cell(val(row[uI.ED]), { width: wL[1], fontSize: 14 }),
-              cell(val(row[uI.PAI]), { width: wL[2], fontSize: 14 }),
-              cell(val(row[uI.TEL]), { width: wL[3], fontSize: 14 }),
-              cell(val(row[uI.COR]), { width: wL[4] + wL[5], fontSize: 14 }),
-              cell(val(row[uI.RSH]), { width: wL[6], bold: true, fontSize: 14 })
-            ]
-          }),
-          new TableRow({
-            children: [
-              hCell('Dirección Actual', { width: wL[0] + wL[1] + wL[2], fontSize: 14 }),
-              hCell('N°', { width: wL[3], fontSize: 14 }),
-              hCell('Block', { width: wL[4], fontSize: 14 }),
-              hCell('Depto', { width: wL[5], fontSize: 14 }),
-              hCell('Calificación', { width: wL[6], fontSize: 14 })
-            ]
-          }),
-          new TableRow({
-            children: [
-              cell(`${val(row[uI.CALLE])}`, { width: wL[0] + wL[1] + wL[2], fontSize: 14 }),
-              cell(val(row[uI.NUM]), { width: wL[3], fontSize: 14 }),
-              cell(val(row[uI.BLOCK]), { width: wL[4], fontSize: 14 }),
-              cell(val(row[uI.DEP]), { width: wL[5], fontSize: 14 }),
-              cell(val(row[uI.CALI]), { width: wL[6], fontSize: 14 })
-            ]
-          }),
-          new TableRow({
-            children: [
-              hCell('Situación Laboral', { width: wL[0] + wL[1], fontSize: 14 }),
-              hCell('Jefatura de Hogar', { width: wL[2], fontSize: 14 }),
-              hCell('Nivel Educativo', { width: wL[3] + wL[4], fontSize: 14 }),
-              hCell('Previsión Salud', { width: wL[5] + wL[6], fontSize: 14 })
-            ]
-          }),
-          new TableRow({
-            children: [
-              cell(val(row[uI.TRAB]), { width: wL[0] + wL[1], fontSize: 14 }),
-              cell(val(row[uI.JEF]), { width: wL[2], fontSize: 14 }),
-              cell(val(row[uI.NIV_ED]), { width: wL[3] + wL[4], fontSize: 14 }),
-              cell(val(row[uI.S_SALUD]), { width: wL[5] + wL[6], fontSize: 14 })
-            ]
-          }),
-          new TableRow({
-            children: [
-              hCell('Pertenencia Etnia', { width: wL[0], fontSize: 14 }),
-              hCell('Discapacidad / Enf. Crónica', { width: wL[1] + wL[2], fontSize: 14 }),
-              hCell('Credencial Discapacidad', { width: wL[3], fontSize: 14 }),
-              hCell('Condición Migrante', { width: wL[4], fontSize: 14 }),
-              hCell('Embarazo', { width: wL[5], fontSize: 14 }),
-              hCell('Bombero(a)', { width: wL[6], fontSize: 14 })
-            ]
-          }),
-          new TableRow({
-            children: [
-              cell(val(row[uI.ETNIA]), { width: wL[0], fontSize: 14 }),
-              cell(val(row[uI.DIS_CRON]), { width: wL[1] + wL[2], fontSize: 14 }),
-              cell(val(row[uI.CRED_DIS]), { width: wL[3], fontSize: 14 }),
-              cell(val(row[uI.MIGRA]), { width: wL[4], fontSize: 14 }),
-              cell(val(row[uI.EMB]), { width: wL[5], fontSize: 14 }),
-              cell(val(row[uI.BOM]), { width: wL[6], fontSize: 14 })
-            ]
-          })
-        ]
-      });
-
-      // Anchos para Sección Vertical (Orientación Portrait)
-      const wP = [2300, 2500, 2300, 2526];
-      const totalW_P = wP.reduce((a,b)=>a+b,0);
-
-      const secIIITable = new Table({
-        width: { size: totalW_P, type: WidthType.DXA },
-        rows: [
-          new TableRow({
-            children: [
-              hCell('Tipo de Vivienda', { width: wP[0], fontSize: 16 }),
-              hCell('Tenencia de la Vivienda', { width: wP[1], fontSize: 16 }),
-              hCell('Abastecimiento de Agua', { width: wP[2], fontSize: 16 }),
-              hCell('Sistema de Excretas', { width: wP[3], fontSize: 16 })
-            ]
-          }),
-          new TableRow({
-            children: [
-              cell(val(row[uI.VIV]), { width: wP[0], fontSize: 16 }),
-              cell(val(row[uI.S_TEN]), { width: wP[1], fontSize: 16 }),
-              cell(val(row[uI.AGUA]), { width: wP[2], fontSize: 16 }),
-              cell(val(row[uI.S_EXC]), { width: wP[3], fontSize: 16 })
-            ]
-          }),
-          new TableRow({
-            children: [
-              hCell('Suministro Eléctrico', { width: wP[0], fontSize: 16 }),
-              hCell('Eliminación de Residuos', { width: wP[1], fontSize: 16 }),
-              hCell('Estado Calidad Interna', { width: wP[2], fontSize: 16 }),
-              hCell('Estado Calidad Externa', { width: wP[3], fontSize: 16 })
-            ]
-          }),
-          new TableRow({
-            children: [
-              cell(val(row[uI.ELEC]), { width: wP[0], fontSize: 16 }),
-              cell(val(row[uI.RE_RES]), { width: wP[1], fontSize: 16 }),
-              cell(val(row[uI.CAL_INT]), { width: wP[2], fontSize: 16 }),
-              cell(val(row[uI.CAL_EXT]), { width: wP[3], fontSize: 16 })
-            ]
-          })
-        ]
-      });
-
-      const distribTable = new Table({
-        width: { size: totalW_P, type: WidthType.DXA },
-        rows: [
-          new TableRow({
-            children: [
-              hCell('Cantidad de Dormitorios', { width: wP[0] + wP[1], fontSize: 16 }),
-              hCell('Cantidad de Camas Disponibles', { width: wP[2] + wP[3], fontSize: 16 })
-            ]
-          }),
-          new TableRow({
-            children: [
-              cell(val(row[uI.C_DORM]), { width: wP[0] + wP[1], align: AlignmentType.CENTER, fontSize: 16 }),
-              cell(val(row[uI.C_CAMAS]), { width: wP[2] + wP[3], align: AlignmentType.CENTER, fontSize: 16 })
-            ]
-          })
-        ]
-      });
-
-      const secIVTable = new Table({
-        width: { size: totalW_P, type: WidthType.DXA },
-        rows: [
-          new TableRow({
-            children: [
-              hCell('Organizaciones a las que pertenece', { width: wP[0] + wP[1], fontSize: 16 }),
-              hCell('Redes de Apoyo en el Barrio', { width: wP[2] + wP[3], fontSize: 16 })
-            ]
-          }),
-          new TableRow({
-            children: [
-              cell(val(row[uI.MA_ORG]), { width: wP[0] + wP[1], fontSize: 16 }),
-              cell(val(row[uI.HA_URB]), { width: wP[2] + wP[3], fontSize: 16 })
-            ]
-          }),
-          new TableRow({
-            children: [
-              hCell('Nivel de Cohesión Social', { width: wP[0] + wP[1], fontSize: 16 }),
-              hCell('Percepción Seguridad del Entorno', { width: wP[2] + wP[3], fontSize: 16 })
-            ]
-          }),
-          new TableRow({
-            children: [
-              cell(val(row[uI.COH_SOC]), { width: wP[0] + wP[1], fontSize: 16 }),
-              cell(val(row[uI.MA_SEG]), { width: wP[2] + wP[3], fontSize: 16 })
-            ]
-          })
-        ]
-      });
-
-      const atribTable = new Table({
-        width: { size: totalW_P, type: WidthType.DXA },
-        rows: [
-          new TableRow({
-            children: [
-              hCell('Atributo Priorizado', { width: wP[0] + wP[1], fontSize: 16 }),
-              hCell('Grado de Relevancia o Expectativa', { width: wP[2] + wP[3], fontSize: 16 })
-            ]
-          }),
-          new TableRow({ children: [cell('Estética e Infraestructura del Proyecto', { width: wP[0] + wP[1], fontSize: 16 }), cell(val(row[uI.AT_EST]), { width: wP[2] + wP[3], fontSize: 16 })] }),
-          new TableRow({ children: [cell('Disponibilidad de Equipamiento Comunitario', { width: wP[0] + wP[1], fontSize: 16 }), cell(val(row[uI.AT_EQUIP]), { width: wP[2] + wP[3], fontSize: 16 })] }),
-          new TableRow({ children: [cell('Diseño Universal y Accesibilidad Ampliada', { width: wP[0] + wP[1], fontSize: 16 }), cell(val(row[uI.AT_DIS]), { width: wP[2] + wP[3], fontSize: 16 })] }),
-          new TableRow({ children: [cell('Proximidad a Servicios de Salud y Conectividad', { width: wP[0] + wP[1], fontSize: 16 }), cell(val(row[uI.AT_MED]), { width: wP[2] + wP[3], fontSize: 16 })] }),
-          new TableRow({ children: [cell('Sistemas Integrados de Seguridad y Vigilancia', { width: wP[0] + wP[1], fontSize: 16 }), cell(val(row[uI.AT_SEG]), { width: wP[2] + wP[3], fontSize: 16 })] })
-        ]
-      });
-
-      const adjW = [5626, 4000];
-      const allEquip = [
-        { l: 'Sala multiuso de escala comunitaria', c: 'SALA' },
-        { l: 'Áreas verdes públicas y paisajismo', c: 'AREA_V' },
-        { l: 'Zonas de juegos infantiles integrados', c: 'JUEGOS' },
-        { l: 'Cancha deportiva de uso múltiple', c: 'CANCHA' },
-        { l: 'Plazas activas y paseos peatonales', c: 'PLAZA' },
-        { l: 'Sede social o comunitario principal', c: 'SEDE' },
-        { l: 'Parques urbanos de escala barrial', c: 'PARQUE' },
-        { l: 'Huertos comunitarios y zonas sustentables', c: 'HUERTO' },
-        { l: 'Centro deportivo complementario', c: 'C_DEP' }
-      ];
-
-      const equipTable = new Table({
-        width: { size: totalW_P, type: WidthType.DXA },
-        rows: [
-          new TableRow({
-            children: [
-              hCell('Tipología de Equipamiento Evaluado', { width: adjW[0], fontSize: 16 }),
-              hCell('Nivel de Prioridad Asignado', { width: adjW[1], fontSize: 16 })
-            ]
-          }),
-          ...allEquip.map(e => new TableRow({
-            children: [
-              cell(e.l, { width: adjW[0], fontSize: 16 }),
-              cell(val(row[EQUPRI[e.c]]), { width: adjW[1], align: AlignmentType.CENTER, bold: true, fontSize: 16 })
-            ]
-          }))
-        ]
-      });
-
-      const adjU = [4000, 1126, 1126, 1126, 1126, 1122];
-      const usrTable = new Table({
-        width: { size: totalW_P, type: WidthType.DXA },
-        rows: [
-          new TableRow({
-            children: [
-              hCell('Equipamiento', { width: adjU[0], fontSize: 16 }),
-              hCell('Niños', { width: adjU[1], align: AlignmentType.CENTER, fontSize: 16 }),
-              hCell('Jóvenes', { width: adjU[2], align: AlignmentType.CENTER, fontSize: 16 }),
-              hCell('Mujeres', { width: adjU[3], align: AlignmentType.CENTER, fontSize: 16 }),
-              hCell('Hombres', { width: adjU[4], align: AlignmentType.CENTER, fontSize: 16 }),
-              hCell('Adulto Mayor', { width: adjU[5], align: AlignmentType.CENTER, fontSize: 16 })
-            ]
-          }),
-          ...allEquip.map(e => {
-            const rawVal = e.c ? val(row[EQUSR[e.c]]) : '';
-            const u = parseUsr(rawVal);
-            return new TableRow({
-              children: [
-                cell(e.l, { width: adjU[0], fontSize: 16 }),
-                cell(u.n ? 'X' : '', { width: adjU[1], align: AlignmentType.CENTER, bold: true, fontSize: 16 }),
-                cell(u.j ? 'X' : '', { width: adjU[2], align: AlignmentType.CENTER, bold: true, fontSize: 16 }),
-                cell(u.m ? 'X' : '', { width: adjU[3], align: AlignmentType.CENTER, bold: true, fontSize: 16 }),
-                cell(u.h ? 'X' : '', { width: adjU[4], align: AlignmentType.CENTER, bold: true, fontSize: 16 }),
-                cell(u.a ? 'X' : '', { width: adjU[5], align: AlignmentType.CENTER, bold: true, fontSize: 16 })
-              ]
-            });
-          })
-        ]
-      });
-
-      return new Document({
-        sections: [
-          {
-            properties: landscapeProps(SectionType.CONTINUOUS),
-            headers: makeHeader(logoBuffer),
-            footers: makeFooter(),
-            children: [
-              headerTable, sp(120),
-              p('I.- IDENTIFICACIÓN DEL PROYECTO', { bold: true }), sp(60), secITable, sp(120),
-              p('II.- IDENTIFICACIÓN DEL GRUPO FAMILIAR', { bold: true }), sp(60), secIITable,
-            ]
-          },
-          {
-            properties: portraitProps(),
-            headers: makeHeader(logoBuffer),
-            footers: makeFooter(),
-            children: [
-              p('III.- CARACTERÍSTICAS HABITACIONALES Y URBANAS DE LA VIVIENDA ACTUAL', { bold: true }), sp(60), secIIITable, sp(120),
-              p('2.- DISTRIBUCIÓN DE DORMITORIOS Y CAMAS', { bold: true }), sp(60), distribTable, sp(120),
-              p('IV.- CAPITAL SOCIAL, REDES COMPARTIDAS Y CONVIVENCIA COMUNITARIA', { bold: true }), sp(60), secIVTable, sp(120),
-              p('V.- EXPECTATIVAS FRENTE AL PROYECTO HABITACIONAL Y COMUNITARIO', { bold: true }), sp(60), atribTable, sp(120),
-              p('EQUIPAMIENTO COMUNITARIO PRIORIZADO', { bold: true }), sp(60), equipTable, sp(120),
-              p('PRINCIPALES USUARIOS DEL EQUIPAMIENTO', { bold: true }), sp(60), usrTable,
-            ]
-          }
-        ]
-      });
-    }
-
-    // Compresor de Estructura de Almacenamiento ZIP Estándar (Modo "STORE" sin compresión pesada DEFLATE)
-    function buildZipStore(files) {
-      let localHeaders = [];
-      let centralDirectory = [];
-      let offset = 0;
-      const table = new Uint32Array(256);
-      
-      for (let i = 0; i < 256; i++) {
-        let c = i;
-        for (let j = 0; j < 8; j++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
-        table[i] = c;
-      }
-      
-      function crc32(data) {
-        let crc = 0xFFFFFFFF;
-        for (let i = 0; i < data.length; i++) crc = (crc >>> 8) ^ table[(crc ^ data[i]) & 0xFF];
-        return (crc ^ 0xFFFFFFFF) >>> 0;
-      }
-      
-      function concat(arrays) {
-        let total = arrays.reduce((acc, v) => acc + v.length, 0);
-        let res = new Uint8Array(total);
-        let off = 0;
-        for (let arr of arrays) { res.set(arr, off); off += arr.length; }
-        return res;
-      }
-
-      for (let file of files) {
-        let nameBytes = new TextEncoder().encode(file.name);
-        let data = file.data;
-        let crc = crc32(data);
-        
-        let lh = new Uint8Array(30 + nameBytes.length);
-        lh.set([0x50, 0x4b, 0x03, 0x04, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-        let dv = new DataView(lh.buffer);
-        dv.setUint32(14, crc, true);
-        dv.setUint32(18, data.length, true);
-        dv.setUint32(22, data.length, true);
-        dv.setUint16(26, nameBytes.length, true);
-        lh.set(nameBytes, 30);
-        localHeaders.push(lh, data);
-        
-        let cd = new Uint8Array(46 + nameBytes.length);
-        cd.set([0x50, 0x4b, 0x01, 0x02, 10, 0, 10, 0, 0, 0, 0, 0, 0, 0]);
-        let cdv = new DataView(cd.buffer);
-        cdv.setUint32(16, crc, true);
-        cdv.setUint32(20, data.length, true);
-        cdv.setUint32(24, data.length, true);
-        cdv.setUint16(28, nameBytes.length, true);
-        cdv.setUint32(42, offset, true);
-        cd.set(nameBytes, 46);
-        centralDirectory.push(cd);
-        
-        offset += lh.length + data.length;
-      }
-
-      let lhBuf = concat(localHeaders), cdBuf = concat(centralDirectory);
-      let eocd = new Uint8Array(22);
-      eocd.set([0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0]);
-      let eocdv = new DataView(eocd.buffer);
-      eocdv.setUint16(8, files.length, true);
-      eocdv.setUint16(10, files.length, true);
-      eocdv.setUint32(12, cdBuf.length, true);
-      eocdv.setUint32(16, lhBuf.length, true);
-      
-      return concat([lhBuf, cdBuf, eocd]);
-    }
-
-    function descargarZip() {
-      if (!zipBlob) return;
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(zipBlob);
-      a.download = `Fichas_DS49_${document.getElementById('cfgProyecto').value || 'Proyecto'}.zip`;
-      a.click();
-    }
-  </script>
+// Aquí irá el bloque de la lógica interna de JavaScript (procesamiento de Excel, generación del Word con docx y empaquetado del archivo ZIP) sin afectar nada de lo anterior.
+</script>
 </body>
 </html>
