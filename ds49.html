@@ -476,8 +476,8 @@ async function generarFichas() {
       progressFill.style.width = pct + '%';
       progressLog.textContent = filename;
 
-      const doc = buildDoc(row, config, folio, logoBytes.buffer);
-      const buffer = await docx.Packer.toBuffer(doc);
+      const doc = buildDoc(row, config, folio, logoBytes);
+      const buffer = await Packer.toBuffer(doc);
       allDocxFiles.push({ name: filename, data: new Uint8Array(buffer) });
 
       // Liberar CPU cada 5 fichas
@@ -498,7 +498,8 @@ async function generarFichas() {
     btnDescargar.classList.add('show');
 
   } catch(err) {
-    showError('Error al generar fichas: ' + err.message);
+    console.error('DS49 Error:', err);
+    showError('Error al generar fichas: ' + err.message + (err.stack ? ' | ' + err.stack.split('\n')[1] : ''));
     progressLabel.textContent = 'Error al procesar';
   } finally {
     btnGenerar.disabled = false;
@@ -550,7 +551,7 @@ function p(text, opts = {}) {
 function sp(before = 120) { return new Paragraph({ spacing: { before, after: 0 }, children: [] }); }
  
 function makeHeader(logoBuffer) {
-  return { default: new Header({ children: [new Paragraph({ children: [new ImageRun({ data: logoBuffer, type: 'png', transformation: { width: 100, height: 82 } })] })] }) };
+  return { default: new Header({ children: [new Paragraph({ children: [new ImageRun({ data: logoBuffer, type: 'jpg', transformation: { width: 100, height: 82 } })] })] }) };
 }
 function makeFooter() {
   return { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'Formatos 2025 SERVIU REGION OHIGGINS res. Ex N°195 del 05.02.2025', size: 16, font: 'Calibri' })] })] }) };
