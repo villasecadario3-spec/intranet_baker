@@ -363,9 +363,9 @@ dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-ove
 dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
 fileInput.addEventListener('change', () => { if(fileInput.files[0]) handleFile(fileInput.files[0]); });
 document.getElementById('removeFile').addEventListener('click', resetFile);
-btnReset.addEventListener('click', resetAll);
-btnDescargar.addEventListener('click', descargarZip);
-btnGenerar.addEventListener('click', generarFichas);
+btnReset.addEventListener('click', () => resetAll());
+btnDescargar.addEventListener('click', () => descargarZip());
+btnGenerar.addEventListener('click', () => generarFichas());
  
 function handleFile(file) {
   if(!file.name.match(/\.xlsx?$/i)) { showError('Solo se aceptan archivos .xlsx o .xls'); return; }
