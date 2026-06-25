@@ -606,7 +606,7 @@ async function initAuth() {
             usuarioActual = accounts[0];
             const email = usuarioActual.username.toLowerCase();
             if (!ACCESO_SOFTLAND.includes(email)) {
-                window.location.href = 'index.html?acceso=denegado';
+                window.location.href = 'index.html?acceso=softland';
                 return;
             }
             renderUserChip();
