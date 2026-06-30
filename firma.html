@@ -467,6 +467,7 @@ async function descargarJPG() {
 // ── CONTROL DE ACCESO Y "1 FIRMA POR PERSONA" ─────────────────
 let emailSesion = null;
 const ADMIN_OVERRIDE = 'dvillaseca@ibaker.cl'; // único correo que puede regenerar sin límite
+const API_FIRMAS = 'https://api.ibaker.cl';
 
 const msalConfig = {
     auth: {
@@ -514,12 +515,14 @@ async function verificarLimiteFirma() {
     if (emailSesion === ADMIN_OVERRIDE) return; // admin sin límite
 
     try {
-        const result = await window.storage.get(`firma_generada:${emailSesion}`, true);
-        if (result && result.value) {
-            mostrarBloqueo(JSON.parse(result.value));
+        const res = await fetch(`${API_FIRMAS}/firmas/check?email=${encodeURIComponent(emailSesion)}`);
+        const data = await res.json();
+        if (data.bloqueado) {
+            mostrarBloqueo(data.datos);
         }
     } catch(e) {
-        // Key no existe todavía — el usuario puede generar su firma
+        console.error('Error verificando límite de firma:', e);
+        // Si la API no responde, dejamos pasar para no bloquear el trabajo de nadie
     }
 }
 
@@ -541,11 +544,11 @@ function mostrarBloqueo(datos) {
 async function registrarFirmaGenerada(sociedad) {
     if (emailSesion === ADMIN_OVERRIDE) return; // admin no queda registrado
     try {
-        await window.storage.set(`firma_generada:${emailSesion}`, JSON.stringify({
-            email: emailSesion,
-            sociedad: sociedad,
-            fecha: new Date().toISOString()
-        }), true);
+        await fetch(`${API_FIRMAS}/firmas/registrar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: emailSesion, sociedad })
+        });
     } catch(e) {
         console.error('Error registrando firma:', e);
     }
