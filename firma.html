@@ -313,17 +313,14 @@ function generarFirma() {
     const nombre    = document.getElementById('f-nombre').value.trim();
     const cargo     = document.getElementById('f-cargo').value.trim();
     const telefono  = document.getElementById('f-telefono').value.trim();
-    const emailUser = document.getElementById('f-email-usuario').value.trim();
-    const emailDom  = document.getElementById('f-email-dominio').value;
     const direccion = document.getElementById('f-direccion').value.trim();
 
     if (!sociedadActual) { alert('Selecciona una sociedad.'); return; }
     if (!nombre)         { alert('Ingresa tu nombre.'); return; }
     if (!cargo)          { alert('Ingresa tu cargo.'); return; }
-    if (!emailUser)      { alert('Ingresa tu correo.'); return; }
-    if (!direccion)      { alert('Ingresa la dirección.'); return; }
+    if (!emailSesion)    { alert('No se pudo obtener tu correo de sesión. Recarga la página.'); return; }
 
-    const email = `${emailUser}@${emailDom}`;
+    const email = emailSesion;
     const soc   = SOCIEDADES[sociedadActual];
 
     const filaTel = telefono ? `
