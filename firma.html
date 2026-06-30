@@ -7,7 +7,8 @@
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,700;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,700;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
             --rojo:#C0392B;--rojo-dark:#96281B;
@@ -99,6 +100,14 @@
             nav{padding:0 16px}
             .page-header{padding:28px 16px 24px}
         }
+            .user-chip{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:100px}
+        .user-av{width:26px;height:26px;border-radius:50%;background:var(--rojo,#C0392B);display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:white}
+        .user-nm{font-size:0.78rem;font-weight:500;color:white;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .bloqueo-card{background:white;border:1px solid #f0c040;border-radius:16px;padding:32px 28px;text-align:center;max-width:480px;margin:60px auto}
+        .bloqueo-icon{width:48px;height:48px;color:#d4a00a;margin:0 auto 16px}
+        .bloqueo-titulo{font-family:'Playfair Display',serif;font-size:1.3rem;margin-bottom:10px;color:#1C1A18}
+        .bloqueo-txt{font-size:0.88rem;color:#6B6762;line-height:1.6}
+        .bloqueo-txt strong{color:#1C1A18}
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -116,13 +125,14 @@
     <div class="nav-sep"></div>
     <div class="nav-title">Generador de Firma</div>
     <div class="nav-spacer"></div>
+    <div id="auth-area"></div>
 </nav>
 
 <div class="page-header">
     <div class="page-header-inner">
         <div class="page-eyebrow">Herramienta TI</div>
         <h1>Firma de<br><em>Correo</em></h1>
-        <div class="page-header-sub">Genera tu firma corporativa en segundos y cópiala directo a Outlook.</div>
+        <div class="page-header-sub">Genera tu firma corporativa en segundos y descárgala para configurarla en Outlook.</div>
     </div>
 </div>
 
@@ -165,18 +175,11 @@
                 <input class="form-input" id="f-telefono" type="text" placeholder="Ej: 56 9 1234 5678">
             </div>
 
-            <!-- Email -->
+            <!-- Email (autocompletado desde sesión, no editable) -->
             <div class="form-group">
                 <label class="form-label">Correo <span>*</span></label>
-                <div style="display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center">
-                    <input class="form-input" id="f-email-usuario" type="text" placeholder="nombre.apellido" style="margin:0">
-                    <span style="font-size:0.88rem;color:var(--txt-mid);padding:0 2px">@</span>
-                    <select class="email-domain" id="f-email-dominio">
-                        <option value="ibaker.cl">ibaker.cl</option>
-                        <option value="cmcromeral.cl">cmcromeral.cl</option>
-                        <option value="epbrotar.cl">epbrotar.cl</option>
-                    </select>
-                </div>
+                <input class="form-input" id="f-email-completo" type="text" readonly style="background:#f0ede9;color:var(--txt-mid)">
+                <div class="form-hint" style="font-size:0.7rem;color:var(--txt-dim);margin-top:3px">Autocompletado desde tu sesión Microsoft</div>
             </div>
 
             <!-- Dirección -->
@@ -204,11 +207,7 @@
         <div class="preview-card">
             <div class="preview-header">
                 <div class="preview-titulo">Vista previa</div>
-                <div id="btn-area" style="display:none;gap:8px;display:none">
-                    <button class="btn-copiar" id="btn-copiar" onclick="copiarFirma()">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-                        Copiar firma
-                    </button>
+                <div id="btn-area" style="display:none;gap:8px">
                     <button class="btn-copiar" id="btn-jpg" onclick="descargarJPG()" style="border-color:var(--rojo);color:var(--rojo)">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         Descargar JPG
@@ -224,11 +223,11 @@
         </div>
 
         <div class="instrucciones-card">
-            <div class="inst-titulo">Cómo agregar la firma en Outlook</div>
+            <div class="inst-titulo">Cómo configurar la firma en Outlook</div>
             <div class="inst-steps">
                 <div class="inst-step">
                     <div class="inst-n">1</div>
-                    <div class="inst-txt">Haz clic en <strong>Copiar firma</strong> arriba para copiar la firma al portapapeles.</div>
+                    <div class="inst-txt">Haz clic en <strong>Descargar JPG</strong> arriba para guardar la imagen de tu firma.</div>
                 </div>
                 <div class="inst-step">
                     <div class="inst-n">2</div>
@@ -236,10 +235,14 @@
                 </div>
                 <div class="inst-step">
                     <div class="inst-n">3</div>
-                    <div class="inst-txt">Haz clic en <strong>Nueva</strong>, dale un nombre (ej: <em>"Firma Baker"</em>) y pega la firma con <code>Ctrl + V</code>.</div>
+                    <div class="inst-txt">Haz clic en <strong>Nueva</strong>, dale un nombre (ej: <em>"Firma Baker"</em>) y en el editor de firma haz clic en el ícono de <strong>Imagen</strong>.</div>
                 </div>
                 <div class="inst-step">
                     <div class="inst-n">4</div>
+                    <div class="inst-txt">Selecciona el archivo JPG que descargaste e insértalo en la firma.</div>
+                </div>
+                <div class="inst-step">
+                    <div class="inst-n">5</div>
                     <div class="inst-txt">En <strong>Mensajes nuevos</strong> y <strong>Respuestas</strong> selecciona tu firma nueva. Haz clic en <strong>Aceptar</strong>.</div>
                 </div>
             </div>
@@ -451,14 +454,107 @@ async function descargarJPG() {
         link.download = `firma_${sociedadActual || 'baker'}.jpg`;
         link.href = canvas.toDataURL('image/jpeg', 0.95);
         link.click();
+
+        // Registrar que esta persona ya generó su firma (1 vez por correo)
+        await registrarFirmaGenerada(sociedadActual);
+
     } catch(e) {
         console.error(e);
-        alert('No se pudo generar el JPG. Intenta con el botón Copiar firma.');
+        alert('No se pudo generar el JPG. Intenta nuevamente.');
     } finally {
         btn.innerHTML = originalHTML;
         btn.disabled = false;
     }
 }
+
+// ── CONTROL DE ACCESO Y "1 FIRMA POR PERSONA" ─────────────────
+let emailSesion = null;
+const ADMIN_OVERRIDE = 'dvillaseca@ibaker.cl'; // único correo que puede regenerar sin límite
+
+const msalConfig = {
+    auth: {
+        clientId: "9a56ab1c-d3c4-4460-9892-1d4da768ecfb",
+        authority: "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
+        redirectUri: window.location.origin,
+    },
+    cache: { cacheLocation: "sessionStorage" }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+async function initAuth() {
+    try {
+        await msalInstance.initialize();
+        const accounts = msalInstance.getAllAccounts();
+        if (accounts.length === 0) {
+            window.location.href = 'index.html';
+            return;
+        }
+        const usuario = accounts[0];
+        emailSesion = usuario.username.toLowerCase();
+
+        const nombre = usuario.name || usuario.username;
+        const iniciales = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+        document.getElementById('auth-area').innerHTML = `
+            <div class="user-chip">
+                <div class="user-av">${iniciales}</div>
+                <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
+            </div>`;
+
+        // Autocompletar campo de correo (solo lectura)
+        const campoEmail = document.getElementById('f-email-completo');
+        if (campoEmail) campoEmail.value = emailSesion;
+
+        // Verificar si ya generó una firma antes
+        await verificarLimiteFirma();
+
+    } catch(e) {
+        console.error('Error auth firma:', e);
+        window.location.href = 'index.html';
+    }
+}
+
+async function verificarLimiteFirma() {
+    if (emailSesion === ADMIN_OVERRIDE) return; // admin sin límite
+
+    try {
+        const result = await window.storage.get(`firma_generada:${emailSesion}`, true);
+        if (result && result.value) {
+            mostrarBloqueo(JSON.parse(result.value));
+        }
+    } catch(e) {
+        // Key no existe todavía — el usuario puede generar su firma
+    }
+}
+
+function mostrarBloqueo(datos) {
+    const main = document.querySelector('.main');
+    if (!main) return;
+    const fecha = datos.fecha ? new Date(datos.fecha).toLocaleDateString('es-CL', { day:'numeric', month:'long', year:'numeric' }) : '';
+    main.innerHTML = `
+        <div class="bloqueo-card">
+            <svg class="bloqueo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div class="bloqueo-titulo">Ya generaste tu firma</div>
+            <div class="bloqueo-txt">
+                Tu firma corporativa ya fue generada el <strong>${fecha}</strong> para la sociedad <strong>${datos.sociedad || ''}</strong>.<br><br>
+                Por seguridad, cada persona puede generar su firma una sola vez. Si necesitas corregir algún dato, contacta a TI (<strong>dvillaseca@ibaker.cl</strong>) para solicitar una regeneración.
+            </div>
+        </div>`;
+}
+
+async function registrarFirmaGenerada(sociedad) {
+    if (emailSesion === ADMIN_OVERRIDE) return; // admin no queda registrado
+    try {
+        await window.storage.set(`firma_generada:${emailSesion}`, JSON.stringify({
+            email: emailSesion,
+            sociedad: sociedad,
+            fecha: new Date().toISOString()
+        }), true);
+    } catch(e) {
+        console.error('Error registrando firma:', e);
+    }
+}
+
+initAuth();
 </script>
 </body>
 </html>
