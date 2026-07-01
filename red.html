@@ -47,7 +47,7 @@
         .main{padding:32px 48px 80px;max-width:1100px}
 
         /* ── RESUMEN STATS ─────────────────────────────── */
-        .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px}
+        .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:28px}
         .stat-card{background:white;border:1px solid var(--gris-2);border-radius:12px;padding:18px 20px}
         .stat-label{font-size:0.68rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--txt-dim);margin-bottom:8px}
         .stat-val{font-size:1.8rem;font-weight:700;color:var(--txt);font-family:'DM Mono',monospace;line-height:1}
@@ -76,17 +76,22 @@
         .disp-status.alerting{color:var(--amarillo);background:rgba(243,156,18,0.08);border:1px solid rgba(243,156,18,0.2)}
 
         /* ── ESTADO GENERAL ────────────────────────────── */
-        .estado-general{background:white;border:1px solid var(--gris-2);border-radius:12px;padding:20px 24px;margin-bottom:28px;display:flex;align-items:center;gap:16px}
-        .estado-icono{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-        .estado-icono.ok{background:rgba(39,174,96,0.08);border:1px solid rgba(39,174,96,0.2)}
-        .estado-icono.warn{background:rgba(243,156,18,0.08);border:1px solid rgba(243,156,18,0.2)}
-        .estado-icono.err{background:rgba(192,57,43,0.08);border:1px solid rgba(192,57,43,0.2)}
-        .estado-icono svg{width:22px;height:22px}
-        .estado-icono.ok svg{color:var(--verde)}
-        .estado-icono.warn svg{color:var(--amarillo)}
-        .estado-icono.err svg{color:var(--rojo)}
-        .estado-txt-titulo{font-size:0.95rem;font-weight:600;color:var(--txt)}
-        .estado-txt-sub{font-size:0.8rem;color:var(--txt-mid);margin-top:2px}
+        .estado-general{background:white;border:1px solid var(--gris-2);border-radius:16px;padding:28px 32px;margin-bottom:28px;display:flex;align-items:center;gap:32px}
+        .estado-donut-wrap{position:relative;flex-shrink:0;width:120px;height:120px}
+        .estado-donut-wrap svg{width:120px;height:120px;transform:rotate(-90deg)}
+        .estado-donut-bg{fill:none;stroke:var(--gris-1);stroke-width:10}
+        .estado-donut-fill{fill:none;stroke-width:10;stroke-linecap:round;transition:stroke-dasharray 0.8s ease,stroke 0.4s}
+        .estado-donut-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+        .estado-donut-num{font-size:1.8rem;font-weight:700;font-family:'DM Mono',monospace;line-height:1}
+        .estado-donut-sub{font-size:0.62rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--txt-dim);margin-top:2px}
+        .estado-info{flex:1}
+        .estado-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:100px;font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px}
+        .estado-badge.ok{background:rgba(39,174,96,0.1);color:var(--verde);border:1px solid rgba(39,174,96,0.25)}
+        .estado-badge.warn{background:rgba(243,156,18,0.1);color:var(--amarillo);border:1px solid rgba(243,156,18,0.25)}
+        .estado-badge.err{background:rgba(192,57,43,0.1);color:var(--rojo);border:1px solid rgba(192,57,43,0.2)}
+        .estado-badge-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+        .estado-txt-titulo{font-family:'Playfair Display',serif;font-size:1.4rem;color:var(--txt);line-height:1.2;margin-bottom:6px}
+        .estado-txt-sub{font-size:0.82rem;color:var(--txt-mid);line-height:1.5}
 
         /* ── LOADING / ERROR ───────────────────────────── */
         .loading-wrap{display:flex;align-items:center;justify-content:center;padding:60px;gap:12px;color:var(--txt-dim)}
@@ -244,18 +249,33 @@ function renderDatos(d) {
     }
 
     document.getElementById('contenido').innerHTML = `
-        <!-- Estado general -->
+        <!-- Estado general visual -->
         <div class="estado-general">
-            <div class="estado-icono ${estadoClase}">${estadoIcono}</div>
-            <div style="flex:1">
+            <div class="estado-donut-wrap">
+                <svg viewBox="0 0 36 36">
+                    <circle class="estado-donut-bg" cx="18" cy="18" r="15.9"/>
+                    <circle class="estado-donut-fill"
+                        cx="18" cy="18" r="15.9"
+                        stroke="${malos === 0 ? 'var(--verde)' : malos < total ? 'var(--amarillo)' : 'var(--rojo)'}"
+                        stroke-dasharray="${Math.round((online/total)*100)} 100"/>
+                </svg>
+                <div class="estado-donut-label">
+                    <div class="estado-donut-num" style="color:${malos === 0 ? 'var(--verde)' : malos < total ? 'var(--amarillo)' : 'var(--rojo)'}">${online}/${total}</div>
+                    <div class="estado-donut-sub">Online</div>
+                </div>
+            </div>
+            <div class="estado-info">
+                <div class="estado-badge ${estadoClase}">
+                    <div class="estado-badge-dot"></div>
+                    ${malos === 0 ? 'Excelente' : malos < total ? 'Bueno' : 'Malo'}
+                </div>
                 <div class="estado-txt-titulo">${estadoTxt}</div>
                 <div class="estado-txt-sub">${estadoSub}</div>
             </div>
-            ${mostrarAlerta ? `
             <button class="btn-alerta" onclick="enviarAlerta(${malos}, ${total})">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.63A2 2 0 012 .18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92z"/></svg>
                 Notificar a TI
-            </button>` : ''}
+            </button>
         </div>
 
         <!-- Stats -->
@@ -274,11 +294,6 @@ function renderDatos(d) {
                 <div class="stat-label">Switches</div>
                 <div class="stat-val">${switches.length}</div>
                 <div class="stat-sub">MS120-8LP</div>
-            </div>
-            <div class="stat-card ${d.clientesActivos !== null ? 'azul' : ''}">
-                <div class="stat-label">Clientes activos</div>
-                <div class="stat-val">${d.clientesActivos !== null ? d.clientesActivos : '—'}</div>
-                <div class="stat-sub">Últimos 5 min</div>
             </div>
         </div>
 
