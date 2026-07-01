@@ -954,10 +954,26 @@ function tickClock() {
 setInterval(tickClock, 1000);
 tickClock();
 
+function precargarImagen(src) {
+    return new Promise(resolve => {
+        const img = new Image();
+        img.onload = resolve;
+        img.onerror = resolve; // si falla igual ocultamos el loading
+        img.src = src;
+    });
+}
+
 async function init() {
-    await intentarLoginSilencioso();
+    // Precargar las imágenes críticas en paralelo con el login silencioso
+    const [_auth, _logo, _bg] = await Promise.all([
+        intentarLoginSilencioso(),
+        precargarImagen('LOGO_BAKER.png'),
+        precargarImagen('vista-panoramica.jpg'),
+    ]);
     actualizarUI();
-    setTimeout(() => document.getElementById('loading').classList.add('oculto'), 1600);
+    // Esperar mínimo 800ms para que la barra de loading se vea completa
+    await new Promise(r => setTimeout(r, 800));
+    document.getElementById('loading').classList.add('oculto');
 }
 init();
 </script>
