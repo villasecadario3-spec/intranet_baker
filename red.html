@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estado de Red — Baker</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+    <style>
+        :root {
+            --rojo:#C0392B;--negro:#111010;--negro-3:#242220;--borde-dark:#2E2C2A;
+            --crema:#F8F6F3;--gris-1:#F0EDE9;--gris-2:#E2DED9;--gris-3:#B5B0AA;
+            --txt:#1C1A18;--txt-mid:#6B6762;--txt-dim:#A09C97;
+            --verde:#27ae60;--amarillo:#f39c12;--azul:#2980b9;
+        }
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'DM Sans',sans-serif;background:var(--crema);color:var(--txt);min-height:100vh}
+
+        nav{position:sticky;top:0;z-index:100;background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px solid var(--borde-dark);height:60px;display:flex;align-items:center;padding:0 48px;gap:16px}
+        .nav-logo{text-decoration:none}.nav-logo img{height:26px;background:white;border-radius:6px;padding:4px 10px;display:block}
+        .nav-sep{width:1px;height:18px;background:var(--borde-dark)}
+        .nav-back{display:flex;align-items:center;gap:6px;color:var(--gris-3);text-decoration:none;font-size:0.78rem;font-weight:500;transition:color 0.2s}
+        .nav-back:hover{color:white}.nav-back svg{width:14px;height:14px}
+        .nav-title{font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--gris-3);letter-spacing:0.1em;text-transform:uppercase}
+        .nav-spacer{flex:1}
+        .user-chip{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;background:var(--negro-3);border:1px solid var(--borde-dark);border-radius:100px}
+        .user-av{width:26px;height:26px;border-radius:50%;background:var(--rojo);display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:white}
+        .user-nm{font-size:0.78rem;font-weight:500;color:white;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+        .page-header{background:var(--negro);padding:36px 48px 32px;border-bottom:1px solid var(--borde-dark);position:relative;overflow:hidden}
+        .page-header::before{content:'';position:absolute;inset:0;background-image:linear-gradient(var(--borde-dark) 1px,transparent 1px),linear-gradient(90deg,var(--borde-dark) 1px,transparent 1px);background-size:40px 40px;opacity:0.3}
+        .page-header::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 50% 100% at 0% 50%,rgba(39,174,96,0.06) 0%,transparent 70%)}
+        .page-header-inner{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+        .page-eyebrow{font-size:0.65rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:#27ae60;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+        .page-eyebrow::before{content:'';width:16px;height:1px;background:#27ae60}
+        .page-header h1{font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:700;color:white;letter-spacing:-0.02em;line-height:1.1}
+        .page-header h1 em{font-style:italic;color:#27ae60}
+        .last-update{font-size:0.72rem;color:var(--gris-3);display:flex;align-items:center;gap:6px}
+        .last-update svg{width:12px;height:12px}
+        .btn-refresh{display:flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid var(--borde-dark);border-radius:8px;background:var(--negro-3);color:var(--gris-3);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.8rem;transition:all 0.2s}
+        .btn-refresh:hover{border-color:var(--verde,#27ae60);color:white}
+        .btn-refresh svg{width:13px;height:13px}
+
+        .main{padding:32px 48px 80px;max-width:1100px}
+
+        /* ── RESUMEN STATS ─────────────────────────────── */
+        .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px}
+        .stat-card{background:white;border:1px solid var(--gris-2);border-radius:12px;padding:18px 20px}
+        .stat-label{font-size:0.68rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--txt-dim);margin-bottom:8px}
+        .stat-val{font-size:1.8rem;font-weight:700;color:var(--txt);font-family:'DM Mono',monospace;line-height:1}
+        .stat-sub{font-size:0.75rem;color:var(--txt-dim);margin-top:4px}
+        .stat-card.verde .stat-val{color:var(--verde)}
+        .stat-card.rojo .stat-val{color:var(--rojo)}
+        .stat-card.azul .stat-val{color:var(--azul)}
+
+        /* ── DISPOSITIVOS ──────────────────────────────── */
+        .sec-titulo{font-size:0.72rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--txt-mid);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+        .sec-titulo::after{content:'';flex:1;height:1px;background:var(--gris-2)}
+
+        .dispositivos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:28px}
+        .disp-card{background:white;border:1px solid var(--gris-2);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px}
+        .disp-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+        .disp-dot.online{background:var(--verde);box-shadow:0 0 6px rgba(39,174,96,0.5)}
+        .disp-dot.offline{background:var(--rojo);box-shadow:0 0 6px rgba(192,57,43,0.5)}
+        .disp-dot.alerting{background:var(--amarillo);box-shadow:0 0 6px rgba(243,156,18,0.5)}
+        .disp-info{flex:1;min-width:0}
+        .disp-nombre{font-size:0.82rem;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .disp-modelo{font-size:0.7rem;color:var(--txt-dim);font-family:'DM Mono',monospace}
+        .disp-ip{font-size:0.68rem;color:var(--txt-dim);margin-top:2px}
+        .disp-status{font-size:0.65rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;padding:2px 7px;border-radius:100px}
+        .disp-status.online{color:var(--verde);background:rgba(39,174,96,0.08);border:1px solid rgba(39,174,96,0.2)}
+        .disp-status.offline{color:var(--rojo);background:rgba(192,57,43,0.08);border:1px solid rgba(192,57,43,0.2)}
+        .disp-status.alerting{color:var(--amarillo);background:rgba(243,156,18,0.08);border:1px solid rgba(243,156,18,0.2)}
+
+        /* ── ESTADO GENERAL ────────────────────────────── */
+        .estado-general{background:white;border:1px solid var(--gris-2);border-radius:12px;padding:20px 24px;margin-bottom:28px;display:flex;align-items:center;gap:16px}
+        .estado-icono{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .estado-icono.ok{background:rgba(39,174,96,0.08);border:1px solid rgba(39,174,96,0.2)}
+        .estado-icono.warn{background:rgba(243,156,18,0.08);border:1px solid rgba(243,156,18,0.2)}
+        .estado-icono.err{background:rgba(192,57,43,0.08);border:1px solid rgba(192,57,43,0.2)}
+        .estado-icono svg{width:22px;height:22px}
+        .estado-icono.ok svg{color:var(--verde)}
+        .estado-icono.warn svg{color:var(--amarillo)}
+        .estado-icono.err svg{color:var(--rojo)}
+        .estado-txt-titulo{font-size:0.95rem;font-weight:600;color:var(--txt)}
+        .estado-txt-sub{font-size:0.8rem;color:var(--txt-mid);margin-top:2px}
+
+        /* ── LOADING / ERROR ───────────────────────────── */
+        .loading-wrap{display:flex;align-items:center;justify-content:center;padding:60px;gap:12px;color:var(--txt-dim)}
+        .spinner{width:20px;height:20px;border:2px solid var(--gris-2);border-top-color:var(--verde);border-radius:50%;animation:spin 0.7s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .error-wrap{background:white;border:1px solid rgba(192,57,43,0.2);border-radius:12px;padding:24px;text-align:center;color:var(--rojo);font-size:0.85rem}
+        .btn-alerta{display:flex;align-items:center;gap:7px;padding:9px 16px;background:var(--rojo);color:white;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:background 0.2s;flex-shrink:0}
+        .btn-alerta:hover{background:#a93226}
+
+        @media(max-width:900px){.stats-grid{grid-template-columns:1fr 1fr}}
+        @media(max-width:768px){nav{padding:0 16px}.nav-title{display:none}.page-header{padding:24px 16px 20px}.main{padding:20px 16px 60px}.stats-grid{grid-template-columns:1fr 1fr}}
+        @media(max-width:480px){.stats-grid{grid-template-columns:1fr}}
+    </style>
+</head>
+<body>
+
+<nav>
+    <a class="nav-logo" href="index.html">
+        <img src="LOGO_BAKER.png" alt="Baker" onerror="this.outerHTML='<span style=&quot;font-family:serif;font-weight:900;color:white;font-size:1rem&quot;>BAKER</span>'">
+    </a>
+    <div class="nav-sep"></div>
+    <a class="nav-back" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        Inicio
+    </a>
+    <div class="nav-sep"></div>
+    <div class="nav-title">Estado de Red</div>
+    <div class="nav-spacer"></div>
+    <div id="auth-area"></div>
+</nav>
+
+<div class="page-header">
+    <div class="page-header-inner">
+        <div>
+            <div class="page-eyebrow">Infraestructura TI</div>
+            <h1>Estado de <em>Red</em></h1>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+            <div class="last-update" id="last-update">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span>—</span>
+            </div>
+            <button class="btn-refresh" onclick="cargarDatos()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                Actualizar
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="main">
+    <div id="contenido">
+        <div class="loading-wrap">
+            <div class="spinner"></div>
+            <span>Consultando infraestructura Meraki…</span>
+        </div>
+    </div>
+</div>
+
+<script>
+const API = 'https://api.ibaker.cl';
+
+// ── MSAL ─────────────────────────────────────────────────────
+const msalConfig = {
+    auth: {
+        clientId: "9a56ab1c-d3c4-4460-9892-1d4da768ecfb",
+        authority: "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
+        redirectUri: window.location.origin,
+    },
+    cache: { cacheLocation: "sessionStorage" }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+async function initAuth() {
+    try {
+        await msalInstance.initialize();
+        const accounts = msalInstance.getAllAccounts();
+        if (accounts.length > 0) {
+            const usuario = accounts[0];
+            const nombre = usuario.name || usuario.username;
+            const iniciales = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+            document.getElementById('auth-area').innerHTML = `
+                <div class="user-chip">
+                    <div class="user-av">${iniciales}</div>
+                    <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
+                </div>`;
+            cargarDatos();
+        } else {
+            window.location.href = 'index.html';
+        }
+    } catch(e) { window.location.href = 'index.html'; }
+}
+
+// ── CARGA DE DATOS ────────────────────────────────────────────
+async function cargarDatos() {
+    document.getElementById('contenido').innerHTML = `
+        <div class="loading-wrap">
+            <div class="spinner"></div>
+            <span>Consultando infraestructura Meraki…</span>
+        </div>`;
+    try {
+        const res = await fetch(`${API}/meraki/status`);
+        if (!res.ok) throw new Error(`Error ${res.status}`);
+        const d = await res.json();
+        renderDatos(d);
+
+        // Actualizar timestamp
+        const hora = new Date(d.timestamp).toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+        document.getElementById('last-update').innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Actualizado ${hora}</span>`;
+
+    } catch(e) {
+        document.getElementById('contenido').innerHTML = `
+            <div class="error-wrap">
+                <strong>No se pudo conectar con la API de Meraki</strong><br>
+                ${e.message} — Verifica que el servidor Node.js esté corriendo.
+            </div>`;
+    }
+}
+
+function estadoLabel(s) {
+    if (s === 'online')   return { txt: 'Excelente', cls: 'online' };
+    if (s === 'alerting') return { txt: 'Malo',      cls: 'alerting' };
+    return                       { txt: 'Malo',      cls: 'offline' };
+}
+
+function renderDatos(d) {
+    const disps    = d.dispositivos || [];
+    const aps      = disps.filter(x => x.model && x.model.startsWith('MR'));
+    const switches = disps.filter(x => x.model && x.model.startsWith('MS'));
+    const online   = disps.filter(x => x.status === 'online').length;
+    const malos    = disps.filter(x => x.status !== 'online').length;
+    const total    = disps.length;
+
+    // Estado general simplificado
+    let estadoClase, estadoIcono, estadoTxt, estadoSub, mostrarAlerta = false;
+    if (malos === 0) {
+        estadoClase = 'ok';
+        estadoIcono = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
+        estadoTxt   = 'Red en estado Excelente';
+        estadoSub   = `Todos los ${total} dispositivos operando correctamente`;
+    } else if (malos < total) {
+        estadoClase = 'warn';
+        estadoIcono = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+        estadoTxt   = `Red en estado Bueno — ${malos} dispositivo${malos>1?'s':''} con problemas`;
+        estadoSub   = 'Algunos dispositivos requieren atención';
+        mostrarAlerta = true;
+    } else {
+        estadoClase = 'err';
+        estadoIcono = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+        estadoTxt   = 'Red en estado Malo';
+        estadoSub   = 'Todos los dispositivos presentan problemas';
+        mostrarAlerta = true;
+    }
+
+    document.getElementById('contenido').innerHTML = `
+        <!-- Estado general -->
+        <div class="estado-general">
+            <div class="estado-icono ${estadoClase}">${estadoIcono}</div>
+            <div style="flex:1">
+                <div class="estado-txt-titulo">${estadoTxt}</div>
+                <div class="estado-txt-sub">${estadoSub}</div>
+            </div>
+            ${mostrarAlerta ? `
+            <button class="btn-alerta" onclick="enviarAlerta(${malos}, ${total})">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.63A2 2 0 012 .18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92z"/></svg>
+                Notificar a TI
+            </button>` : ''}
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card verde">
+                <div class="stat-label">Online</div>
+                <div class="stat-val">${online}</div>
+                <div class="stat-sub">de ${total} dispositivos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Access Points</div>
+                <div class="stat-val">${aps.length}</div>
+                <div class="stat-sub">MR36 Meraki</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Switches</div>
+                <div class="stat-val">${switches.length}</div>
+                <div class="stat-sub">MS120-8LP</div>
+            </div>
+            <div class="stat-card ${d.clientesActivos !== null ? 'azul' : ''}">
+                <div class="stat-label">Clientes activos</div>
+                <div class="stat-val">${d.clientesActivos !== null ? d.clientesActivos : '—'}</div>
+                <div class="stat-sub">Últimos 5 min</div>
+            </div>
+        </div>
+
+        <!-- APs -->
+        <div class="sec-titulo">Access Points</div>
+        <div class="dispositivos-grid">
+            ${aps.map((ap, i) => {
+                const est = estadoLabel(ap.status);
+                return `
+                <div class="disp-card">
+                    <div class="disp-dot ${est.cls}"></div>
+                    <div class="disp-info">
+                        <div class="disp-nombre">Punto de Acceso ${i + 1}</div>
+                        <div class="disp-modelo">${ap.model}</div>
+                        <div class="disp-ip">${ap.lanIp}</div>
+                    </div>
+                    <div class="disp-status ${est.cls}">${est.txt}</div>
+                </div>`;
+            }).join('')}
+        </div>
+
+        <!-- Switches -->
+        <div class="sec-titulo">Switches</div>
+        <div class="dispositivos-grid">
+            ${switches.map((sw, i) => {
+                const est = estadoLabel(sw.status);
+                return `
+                <div class="disp-card">
+                    <div class="disp-dot ${est.cls}"></div>
+                    <div class="disp-info">
+                        <div class="disp-nombre">Switch Principal${switches.length > 1 ? ' ' + (i+1) : ''}</div>
+                        <div class="disp-modelo">${sw.model}</div>
+                        <div class="disp-ip">${sw.lanIp}</div>
+                    </div>
+                    <div class="disp-status ${est.cls}">${est.txt}</div>
+                </div>`;
+            }).join('')}
+        </div>
+
+        <div style="font-size:0.72rem;color:var(--txt-dim);text-align:right;margin-top:8px">
+            Organización: ${d.org?.name || '—'} · Red: ${d.red?.name || '—'}
+        </div>
+    `;
+}
+
+function enviarAlerta(malos, total) {
+    const ahora = new Date().toLocaleString('es-CL');
+    const asunto = encodeURIComponent('⚠️ Alerta de Red — Problemas detectados en infraestructura Baker');
+    const cuerpo = encodeURIComponent(
+        `Estimado equipo de TI,
+
+` +
+        `Se ha detectado un problema en la red de la oficina Baker.
+
+` +
+        `Detalle:
+` +
+        `• Dispositivos con problemas: ${malos} de ${total}
+` +
+        `• Fecha y hora: ${ahora}
+` +
+        `• Sistema: Módulo Estado de Red — Intranet Baker
+
+` +
+        `Por favor revisar la infraestructura Meraki a la brevedad.
+
+` +
+        `Este mensaje fue generado automáticamente desde la Intranet Baker.`
+    );
+    window.location.href = `mailto:informatica@ibaker.cl?subject=${asunto}&body=${cuerpo}`;
+}
+
+// Auto-refresh cada 2 minutos
+setInterval(cargarDatos, 120000);
+
+initAuth();
+</script>
+</body>
+</html>
