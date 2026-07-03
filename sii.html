@@ -14,8 +14,7 @@
             --rojo:#C0392B;--negro:#111010;--negro-3:#242220;--borde-dark:#2E2C2A;
             --crema:#F8F6F3;--gris-1:#F0EDE9;--gris-2:#E2DED9;--gris-3:#B5B0AA;
             --txt:#1C1A18;--txt-mid:#6B6762;--txt-dim:#A09C97;
-            --azul:#1a5276;--azul-light:#2e86c1;
-            --verde:#27ae60;--amarillo:#f39c12;
+            --azul:#2e86c1;--verde:#27ae60;
         }
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
         body{font-family:'DM Sans',sans-serif;background:var(--crema);color:var(--txt);min-height:100vh}
@@ -35,19 +34,19 @@
         .page-header::before{content:'';position:absolute;inset:0;background-image:linear-gradient(var(--borde-dark) 1px,transparent 1px),linear-gradient(90deg,var(--borde-dark) 1px,transparent 1px);background-size:40px 40px;opacity:0.3}
         .page-header::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 50% 100% at 0% 50%,rgba(46,134,193,0.07) 0%,transparent 70%)}
         .page-header-inner{position:relative;z-index:2}
-        .page-eyebrow{font-size:0.65rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:#2e86c1;margin-bottom:10px;display:flex;align-items:center;gap:8px}
-        .page-eyebrow::before{content:'';width:16px;height:1px;background:#2e86c1}
+        .page-eyebrow{font-size:0.65rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--azul);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+        .page-eyebrow::before{content:'';width:16px;height:1px;background:var(--azul)}
         .page-header h1{font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:700;color:white;letter-spacing:-0.02em;line-height:1.1}
-        .page-header h1 em{font-style:italic;color:#2e86c1}
+        .page-header h1 em{font-style:italic;color:var(--azul)}
         .page-header-sub{font-size:0.82rem;color:#6b6762;margin-top:8px}
 
-        .main{padding:36px 48px 80px;max-width:760px}
+        .main{padding:36px 48px 80px;max-width:680px}
 
-        /* ── FORMULARIO ─────────────────────────── */
-        .form-card{background:white;border:1px solid var(--gris-2);border-radius:16px;overflow:hidden;margin-bottom:24px}
+        /* ── FORM ───────────────────────────── */
+        .form-card{background:white;border:1px solid var(--gris-2);border-radius:16px;overflow:visible;margin-bottom:20px}
         .form-card-header{padding:18px 24px;border-bottom:1px solid var(--gris-2);display:flex;align-items:center;gap:12px}
         .form-card-icon{width:36px;height:36px;border-radius:8px;background:rgba(46,134,193,0.08);border:1px solid rgba(46,134,193,0.2);display:flex;align-items:center;justify-content:center}
-        .form-card-icon svg{width:18px;height:18px;color:#2e86c1}
+        .form-card-icon svg{width:18px;height:18px;color:var(--azul)}
         .form-card-titulo{font-size:0.92rem;font-weight:600;color:var(--txt)}
         .form-card-sub{font-size:0.76rem;color:var(--txt-dim);margin-top:2px}
         .form-card-body{padding:24px}
@@ -56,65 +55,42 @@
         .form-group{display:flex;flex-direction:column;gap:6px}
         .form-label{font-size:0.72rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--txt-mid)}
         .form-input{padding:10px 14px;border:1px solid var(--gris-2);border-radius:9px;background:var(--crema);color:var(--txt);font-family:'DM Sans',sans-serif;font-size:0.92rem;transition:border-color 0.2s;width:100%}
-        .form-input:focus{outline:none;border-color:var(--azul-light);background:white}
+        .form-input:focus{outline:none;border-color:var(--azul);background:white}
         .form-input::placeholder{color:var(--txt-dim)}
         .dv-sep{font-size:1.2rem;color:var(--txt-dim);padding-bottom:10px;font-weight:300}
         .dv-input{width:52px;text-align:center;font-family:'DM Mono',monospace;font-size:1rem}
-        .form-hint{font-size:0.7rem;color:var(--txt-dim);margin-top:4px}
 
-        .btn-consultar{width:100%;padding:12px;background:var(--azul-light);color:white;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:0.92rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 0.2s;margin-top:20px}
-        .btn-consultar:hover:not(:disabled){background:#1a6fa3}
-        .btn-consultar:disabled{opacity:0.6;cursor:not-allowed}
+        .btn-consultar{width:100%;padding:12px;background:var(--azul);color:white;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:0.92rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 0.2s;margin-top:20px}
+        .btn-consultar:hover{background:#1a6fa3}
         .btn-consultar svg{width:16px;height:16px}
-        .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,0.4);border-top-color:white;border-radius:50%;animation:spin 0.7s linear infinite}
-        @keyframes spin{to{transform:rotate(360deg)}}
 
-        /* ── RESULTADO ──────────────────────────── */
-        .resultado-card{background:white;border:1px solid var(--gris-2);border-radius:16px;overflow:hidden;margin-bottom:24px}
-        .resultado-header{padding:16px 24px;border-bottom:1px solid var(--gris-2);display:flex;align-items:center;justify-content:space-between}
-        .resultado-titulo{font-size:0.9rem;font-weight:600;color:var(--txt)}
-        .resultado-rut{font-family:'DM Mono',monospace;font-size:0.8rem;color:var(--txt-dim)}
+        /* ── BANNER POST-CLICK ──────────────── */
+        .banner{display:none;align-items:center;gap:14px;padding:16px 20px;background:#f0f9f4;border:1px solid rgba(39,174,96,0.3);border-radius:12px;margin-top:16px}
+        .banner.visible{display:flex}
+        .banner-icon{width:40px;height:40px;border-radius:8px;background:rgba(39,174,96,0.12);border:1px solid rgba(39,174,96,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .banner-icon svg{width:20px;height:20px;color:var(--verde)}
+        .banner-info{flex:1}
+        .banner-titulo{font-size:0.88rem;font-weight:600;color:#1a5e33;margin-bottom:4px}
+        .banner-rut{font-family:'DM Mono',monospace;font-size:1.1rem;font-weight:700;color:#1a4a2a;background:#d5f0e0;padding:4px 12px;border-radius:6px;display:inline-block;margin-bottom:6px}
+        .banner-sub{font-size:0.76rem;color:#2d7a4f;line-height:1.4}
+        .btn-copiar{padding:6px 14px;border:1px solid var(--verde);border-radius:7px;background:white;color:var(--verde);font-family:'DM Sans',sans-serif;font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.15s;white-space:nowrap;flex-shrink:0}
+        .btn-copiar:hover{background:var(--verde);color:white}
+        .btn-copiar.copiado{background:var(--verde);color:white}
 
-        .estado-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:100px;font-size:0.75rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase}
-        .estado-badge.activo{background:rgba(39,174,96,0.1);color:var(--verde);border:1px solid rgba(39,174,96,0.25)}
-        .estado-badge.inactivo{background:rgba(192,57,43,0.08);color:var(--rojo);border:1px solid rgba(192,57,43,0.2)}
-        .estado-badge.alerta{background:rgba(243,156,18,0.1);color:var(--amarillo);border:1px solid rgba(243,156,18,0.25)}
-        .estado-dot{width:7px;height:7px;border-radius:50%;background:currentColor}
-
-        .datos-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--gris-1)}
-        .dato-item{background:white;padding:16px 20px}
-        .dato-label{font-size:0.68rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--txt-dim);margin-bottom:5px}
-        .dato-val{font-size:0.88rem;font-weight:500;color:var(--txt);line-height:1.4}
-        .dato-val.mono{font-family:'DM Mono',monospace}
-
-        .actividades-list{padding:16px 20px;background:white}
-        .actividad-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--gris-1)}
-        .actividad-item:last-child{border-bottom:none}
-        .actividad-codigo{font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--txt-dim);flex-shrink:0;padding-top:2px;min-width:50px}
-        .actividad-nombre{font-size:0.82rem;color:var(--txt)}
-
-        .observaciones{padding:16px 20px;background:#fef9ec;border-top:1px solid #f0e68c}
-        .obs-titulo{font-size:0.72rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#856404;margin-bottom:8px}
-        .obs-item{font-size:0.82rem;color:#664d03;line-height:1.5;margin-bottom:4px}
-
-        .error-box{background:#fdf2f2;border:1px solid rgba(192,57,43,0.2);border-radius:10px;padding:16px 20px;display:flex;align-items:flex-start;gap:10px;color:var(--rojo);font-size:0.85rem}
-        .error-box svg{width:16px;height:16px;flex-shrink:0;margin-top:1px}
-
-        /* ── HISTORIAL ──────────────────────────── */
-        .historial-titulo{font-size:0.72rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--txt-mid);margin-bottom:12px;display:flex;align-items:center;gap:10px}
+        /* ── HISTORIAL ──────────────────────── */
+        .historial-titulo{font-size:0.72rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--txt-mid);margin:24px 0 12px;display:flex;align-items:center;gap:10px}
         .historial-titulo::after{content:'';flex:1;height:1px;background:var(--gris-2)}
         .hist-item{background:white;border:1px solid var(--gris-2);border-radius:9px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;transition:border-color 0.15s;margin-bottom:8px}
-        .hist-item:hover{border-color:var(--azul-light)}
-        .hist-rut{font-family:'DM Mono',monospace;font-size:0.85rem;font-weight:500}
-        .hist-nombre{font-size:0.78rem;color:var(--txt-dim)}
-        .hist-btn{font-size:0.72rem;color:var(--azul-light);font-weight:500;white-space:nowrap}
+        .hist-item:hover{border-color:var(--azul)}
+        .hist-rut{font-family:'DM Mono',monospace;font-size:0.85rem;font-weight:500;color:var(--txt)}
+        .hist-hora{font-size:0.72rem;color:var(--txt-dim)}
+        .hist-btn{font-size:0.72rem;color:var(--azul);font-weight:500}
 
         @media(max-width:768px){
             nav{padding:0 16px}.nav-title{display:none}
             .page-header{padding:24px 16px 20px}
             .main{padding:20px 16px 60px}
-            .datos-grid{grid-template-columns:1fr}
-            .rut-row{grid-template-columns:1fr auto auto}
+            .banner{flex-wrap:wrap}
         }
     </style>
 </head>
@@ -139,12 +115,11 @@
     <div class="page-header-inner">
         <div class="page-eyebrow">Tributario</div>
         <h1>Consulta <em>SII</em></h1>
-        <div class="page-header-sub">Verifica la situación tributaria de proveedores y sociedades directo desde el SII.</div>
+        <div class="page-header-sub">Verifica la situación tributaria de proveedores y sociedades directamente en el SII.</div>
     </div>
 </div>
 
 <div class="main">
-
     <div class="form-card">
         <div class="form-card-header">
             <div class="form-card-icon">
@@ -162,34 +137,47 @@
                     <input class="form-input" id="f-rut" type="text" placeholder="Ej: 76354771"
                         oninput="limpiarRut(this); calcularDV()"
                         onkeydown="if(event.key==='Enter') consultar()">
-                    <div class="form-hint">Solo números, sin puntos ni guión</div>
                 </div>
                 <div class="dv-sep">–</div>
                 <div class="form-group">
                     <label class="form-label">DV</label>
-                    <input class="form-input dv-input" id="f-dv" type="text" placeholder="K" maxlength="1" readonly
-                        style="background:#f0ede9;color:var(--txt-mid)">
+                    <input class="form-input dv-input" id="f-dv" type="text" placeholder="K"
+                        maxlength="1" readonly style="background:#f0ede9;color:var(--txt-mid)">
                 </div>
             </div>
-            <button class="btn-consultar" id="btn-consultar" onclick="consultar()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-                Consultar situación tributaria
+
+            <button class="btn-consultar" onclick="consultar()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                Abrir en SII
             </button>
+
+            <!-- Banner post-click con RUT copiado -->
+            <div class="banner" id="banner">
+                <div class="banner-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                </div>
+                <div class="banner-info">
+                    <div class="banner-titulo">El SII se abrió en una nueva pestaña</div>
+                    <div class="banner-rut" id="banner-rut"></div>
+                    <div class="banner-sub">
+                        Pega el RUT con <strong>Ctrl+V</strong> en el campo del SII, resuelve el CAPTCHA y consulta.
+                    </div>
+                </div>
+                <button class="btn-copiar" id="btn-copiar" onclick="copiarRut()">
+                    📋 Copiar RUT
+                </button>
+            </div>
         </div>
     </div>
 
-    <div id="resultado-wrap"></div>
-
+    <!-- Historial -->
     <div id="historial-wrap" style="display:none">
         <div class="historial-titulo">Consultas recientes</div>
         <div id="historial-lista"></div>
     </div>
-
 </div>
 
 <script>
-const API = 'https://api.ibaker.cl';
-
 // ── MSAL ─────────────────────────────────────────────────────
 const msalConfig = {
     auth: {
@@ -200,6 +188,7 @@ const msalConfig = {
     cache: { cacheLocation: "sessionStorage" }
 };
 const msalInstance = new msal.PublicClientApplication(msalConfig);
+let rutActual = '';
 
 async function initAuth() {
     try {
@@ -221,165 +210,85 @@ async function initAuth() {
     } catch(e) { window.location.href = 'index.html'; }
 }
 
-// ── CÁLCULO DV ───────────────────────────────────────────────
+// ── DV ───────────────────────────────────────────────────────
 function limpiarRut(input) {
     input.value = input.value.replace(/[^0-9]/g, '');
 }
 
 function calcularDV() {
     const rut = document.getElementById('f-rut').value.trim();
-    const dvInput = document.getElementById('f-dv');
-    if (!rut || rut.length < 7) { dvInput.value = ''; return; }
-    let suma = 0, multiplo = 2;
+    const dvEl = document.getElementById('f-dv');
+    if (!rut || rut.length < 7) { dvEl.value = ''; return; }
+    let suma = 0, m = 2;
     for (let i = rut.length - 1; i >= 0; i--) {
-        suma += parseInt(rut[i]) * multiplo;
-        multiplo = multiplo < 7 ? multiplo + 1 : 2;
+        suma += parseInt(rut[i]) * m;
+        m = m < 7 ? m + 1 : 2;
     }
     const res = 11 - (suma % 11);
-    dvInput.value = res === 11 ? '0' : res === 10 ? 'K' : String(res);
+    dvEl.value = res === 11 ? '0' : res === 10 ? 'K' : String(res);
 }
 
 // ── CONSULTAR ────────────────────────────────────────────────
-async function consultar() {
+function consultar() {
     const rut = document.getElementById('f-rut').value.trim();
     const dv  = document.getElementById('f-dv').value.trim();
     if (!rut || rut.length < 7) { alert('Ingresa un RUT válido.'); return; }
 
-    const btn = document.getElementById('btn-consultar');
-    btn.disabled = true;
-    btn.innerHTML = '<div class="spinner"></div> Consultando SII...';
+    rutActual = `${formatRut(rut)}-${dv}`;
 
-    const rutCompleto = `${rut}-${dv}`;
-    document.getElementById('resultado-wrap').innerHTML = '';
+    // Copiar automáticamente al portapapeles
+    navigator.clipboard.writeText(rutActual).catch(() => {});
 
-    try {
-        const res = await fetch(`${API}/sii/contribuyente/${encodeURIComponent(rutCompleto)}`);
-        const data = await res.json();
+    // Abrir SII
+    window.open('https://www2.sii.cl/stc/noauthz', '_blank');
 
-        if (!res.ok) {
-            mostrarError(data.error || `Error ${res.status}`);
-        } else {
-            renderResultado(rutCompleto, data);
-            guardarHistorial(rut, dv, data);
-            renderHistorial();
-        }
-    } catch(e) {
-        mostrarError('No se pudo conectar con la API. Verifica que el servidor esté encendido.');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> Consultar situación tributaria';
-    }
+    // Mostrar banner
+    document.getElementById('banner-rut').textContent = rutActual;
+    document.getElementById('banner').classList.add('visible');
+    document.getElementById('btn-copiar').textContent = '✓ Copiado automáticamente';
+    document.getElementById('btn-copiar').classList.add('copiado');
+    setTimeout(() => {
+        document.getElementById('btn-copiar').textContent = '📋 Copiar RUT';
+        document.getElementById('btn-copiar').classList.remove('copiado');
+    }, 3000);
+
+    // Guardar historial
+    guardarHistorial(rut, dv);
+    renderHistorial();
 }
 
-function renderResultado(rut, d) {
-    // Determinar estado
-    const activo = d.contribuyente?.activo ?? d.activo ?? null;
-    const estadoCls = activo === true ? 'activo' : activo === false ? 'inactivo' : 'alerta';
-    const estadoTxt = activo === true ? 'Activo' : activo === false ? 'Inactivo' : 'Sin información';
-
-    const nombre      = d.contribuyente?.razon_social || d.razon_social || d.nombre || '—';
-    const giro        = d.contribuyente?.giro || d.giro || '—';
-    const inicio      = d.contribuyente?.fecha_inicio_actividades || d.fecha_inicio || '—';
-    const comuna      = d.contribuyente?.comuna || d.comuna || '—';
-    const region      = d.contribuyente?.region || d.region || '—';
-    const actividades = d.contribuyente?.actividades || d.actividades || [];
-    const obs         = d.observaciones || d.situacion?.observaciones || [];
-
-    let html = `
-    <div class="resultado-card">
-        <div class="resultado-header">
-            <div>
-                <div class="resultado-titulo">${nombre}</div>
-                <div class="resultado-rut">${rut}</div>
-            </div>
-            <div class="estado-badge ${estadoCls}">
-                <div class="estado-dot"></div>
-                ${estadoTxt}
-            </div>
-        </div>
-        <div class="datos-grid">
-            <div class="dato-item">
-                <div class="dato-label">Giro principal</div>
-                <div class="dato-val">${giro}</div>
-            </div>
-            <div class="dato-item">
-                <div class="dato-label">Inicio de actividades</div>
-                <div class="dato-val mono">${inicio}</div>
-            </div>
-            <div class="dato-item">
-                <div class="dato-label">Comuna</div>
-                <div class="dato-val">${comuna}</div>
-            </div>
-            <div class="dato-item">
-                <div class="dato-label">Región</div>
-                <div class="dato-val">${region}</div>
-            </div>
-        </div>`;
-
-    if (actividades.length > 0) {
-        html += `
-        <div style="padding:12px 20px 4px;border-top:1px solid var(--gris-1)">
-            <div class="dato-label" style="margin-bottom:8px">Actividades económicas</div>
-        </div>
-        <div class="actividades-list">
-            ${actividades.map(a => `
-            <div class="actividad-item">
-                <div class="actividad-codigo">${a.codigo || ''}</div>
-                <div class="actividad-nombre">${a.nombre || a.descripcion || a}</div>
-            </div>`).join('')}
-        </div>`;
-    }
-
-    if (obs && obs.length > 0) {
-        html += `
-        <div class="observaciones">
-            <div class="obs-titulo">⚠️ Observaciones SII</div>
-            ${obs.map(o => `<div class="obs-item">• ${o}</div>`).join('')}
-        </div>`;
-    }
-
-    html += `</div>`;
-
-    // Si no sabemos parsear la respuesta, mostrar raw
-    if (nombre === '—' && giro === '—') {
-        html = `<div class="resultado-card"><div style="padding:20px"><pre style="font-size:0.75rem;overflow:auto;color:var(--txt-mid)">${JSON.stringify(d, null, 2)}</pre></div></div>`;
-    }
-
-    document.getElementById('resultado-wrap').innerHTML = html;
-}
-
-function mostrarError(msg) {
-    document.getElementById('resultado-wrap').innerHTML = `
-        <div class="error-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            ${msg}
-        </div>`;
+function copiarRut() {
+    navigator.clipboard.writeText(rutActual).then(() => {
+        const btn = document.getElementById('btn-copiar');
+        btn.textContent = '✓ Copiado';
+        btn.classList.add('copiado');
+        setTimeout(() => {
+            btn.textContent = '📋 Copiar RUT';
+            btn.classList.remove('copiado');
+        }, 2000);
+    });
 }
 
 // ── HISTORIAL ────────────────────────────────────────────────
-function guardarHistorial(rut, dv, data) {
-    const nombre = data?.contribuyente?.razon_social || data?.razon_social || data?.nombre || '';
+function guardarHistorial(rut, dv) {
     let lista = JSON.parse(sessionStorage.getItem('sii_historial') || '[]');
     lista = lista.filter(x => x.rut !== rut);
-    lista.unshift({ rut, dv, nombre, hora: new Date().toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' }) });
-    lista = lista.slice(0, 5);
-    sessionStorage.setItem('sii_historial', JSON.stringify(lista));
+    lista.unshift({ rut, dv, hora: new Date().toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' }) });
+    sessionStorage.setItem('sii_historial', JSON.stringify(lista.slice(0, 5)));
 }
 
 function renderHistorial() {
     const lista = JSON.parse(sessionStorage.getItem('sii_historial') || '[]');
     const wrap = document.getElementById('historial-wrap');
-    const listaEl = document.getElementById('historial-lista');
     if (lista.length === 0) { wrap.style.display = 'none'; return; }
     wrap.style.display = 'block';
-    listaEl.innerHTML = lista.map(item => `
+    document.getElementById('historial-lista').innerHTML = lista.map(item => `
         <div class="hist-item" onclick="cargarRut('${item.rut}','${item.dv}')">
             <div>
                 <div class="hist-rut">${formatRut(item.rut)}-${item.dv}</div>
-                ${item.nombre ? `<div class="hist-nombre">${item.nombre}</div>` : ''}
             </div>
             <div style="display:flex;align-items:center;gap:12px">
-                <span style="font-size:0.72rem;color:var(--txt-dim)">${item.hora}</span>
+                <span class="hist-hora">${item.hora}</span>
                 <span class="hist-btn">Consultar →</span>
             </div>
         </div>`).join('');
