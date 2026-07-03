@@ -15,6 +15,7 @@
             --crema:#F8F6F3;--gris-1:#F0EDE9;--gris-2:#E2DED9;--gris-3:#B5B0AA;
             --txt:#1C1A18;--txt-mid:#6B6762;--txt-dim:#A09C97;
             --azul:#1a5276;--azul-light:#2e86c1;
+            --verde:#27ae60;--amarillo:#f39c12;
         }
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
         body{font-family:'DM Sans',sans-serif;background:var(--crema);color:var(--txt);min-height:100vh}
@@ -38,12 +39,12 @@
         .page-eyebrow::before{content:'';width:16px;height:1px;background:#2e86c1}
         .page-header h1{font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:700;color:white;letter-spacing:-0.02em;line-height:1.1}
         .page-header h1 em{font-style:italic;color:#2e86c1}
-        .page-header-sub{font-size:0.82rem;color:#6b6762;margin-top:8px;line-height:1.6}
+        .page-header-sub{font-size:0.82rem;color:#6b6762;margin-top:8px}
 
-        .main{padding:36px 48px 80px;max-width:700px}
+        .main{padding:36px 48px 80px;max-width:760px}
 
-        /* ── FORMULARIO ──────────────────────────────── */
-        .form-card{background:white;border:1px solid var(--gris-2);border-radius:16px;overflow:hidden;margin-bottom:20px}
+        /* ── FORMULARIO ─────────────────────────── */
+        .form-card{background:white;border:1px solid var(--gris-2);border-radius:16px;overflow:hidden;margin-bottom:24px}
         .form-card-header{padding:18px 24px;border-bottom:1px solid var(--gris-2);display:flex;align-items:center;gap:12px}
         .form-card-icon{width:36px;height:36px;border-radius:8px;background:rgba(46,134,193,0.08);border:1px solid rgba(46,134,193,0.2);display:flex;align-items:center;justify-content:center}
         .form-card-icon svg{width:18px;height:18px;color:#2e86c1}
@@ -62,35 +63,57 @@
         .form-hint{font-size:0.7rem;color:var(--txt-dim);margin-top:4px}
 
         .btn-consultar{width:100%;padding:12px;background:var(--azul-light);color:white;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:0.92rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 0.2s;margin-top:20px}
-        .btn-consultar:hover{background:#1a6fa3}
+        .btn-consultar:hover:not(:disabled){background:#1a6fa3}
+        .btn-consultar:disabled{opacity:0.6;cursor:not-allowed}
         .btn-consultar svg{width:16px;height:16px}
+        .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,0.4);border-top-color:white;border-radius:50%;animation:spin 0.7s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
 
-        /* ── INFO CHIPS ──────────────────────────────── */
-        .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
-        .info-chip{background:white;border:1px solid var(--gris-2);border-radius:10px;padding:14px 16px}
-        .info-chip-label{font-size:0.65rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--txt-dim);margin-bottom:4px}
-        .info-chip-val{font-size:0.88rem;font-weight:500;color:var(--txt)}
+        /* ── RESULTADO ──────────────────────────── */
+        .resultado-card{background:white;border:1px solid var(--gris-2);border-radius:16px;overflow:hidden;margin-bottom:24px}
+        .resultado-header{padding:16px 24px;border-bottom:1px solid var(--gris-2);display:flex;align-items:center;justify-content:space-between}
+        .resultado-titulo{font-size:0.9rem;font-weight:600;color:var(--txt)}
+        .resultado-rut{font-family:'DM Mono',monospace;font-size:0.8rem;color:var(--txt-dim)}
 
-        /* ── AVISO ───────────────────────────────────── */
-        .aviso{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;background:#eaf3fb;border:1px solid rgba(46,134,193,0.25);border-radius:10px;margin-bottom:20px}
-        .aviso svg{width:18px;height:18px;color:#2e86c1;flex-shrink:0;margin-top:1px}
-        .aviso-txt{font-size:0.82rem;color:#1a4a6b;line-height:1.5}
+        .estado-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:100px;font-size:0.75rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase}
+        .estado-badge.activo{background:rgba(39,174,96,0.1);color:var(--verde);border:1px solid rgba(39,174,96,0.25)}
+        .estado-badge.inactivo{background:rgba(192,57,43,0.08);color:var(--rojo);border:1px solid rgba(192,57,43,0.2)}
+        .estado-badge.alerta{background:rgba(243,156,18,0.1);color:var(--amarillo);border:1px solid rgba(243,156,18,0.25)}
+        .estado-dot{width:7px;height:7px;border-radius:50%;background:currentColor}
 
-        /* ── HISTORIAL ───────────────────────────────── */
+        .datos-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--gris-1)}
+        .dato-item{background:white;padding:16px 20px}
+        .dato-label{font-size:0.68rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--txt-dim);margin-bottom:5px}
+        .dato-val{font-size:0.88rem;font-weight:500;color:var(--txt);line-height:1.4}
+        .dato-val.mono{font-family:'DM Mono',monospace}
+
+        .actividades-list{padding:16px 20px;background:white}
+        .actividad-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--gris-1)}
+        .actividad-item:last-child{border-bottom:none}
+        .actividad-codigo{font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--txt-dim);flex-shrink:0;padding-top:2px;min-width:50px}
+        .actividad-nombre{font-size:0.82rem;color:var(--txt)}
+
+        .observaciones{padding:16px 20px;background:#fef9ec;border-top:1px solid #f0e68c}
+        .obs-titulo{font-size:0.72rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#856404;margin-bottom:8px}
+        .obs-item{font-size:0.82rem;color:#664d03;line-height:1.5;margin-bottom:4px}
+
+        .error-box{background:#fdf2f2;border:1px solid rgba(192,57,43,0.2);border-radius:10px;padding:16px 20px;display:flex;align-items:flex-start;gap:10px;color:var(--rojo);font-size:0.85rem}
+        .error-box svg{width:16px;height:16px;flex-shrink:0;margin-top:1px}
+
+        /* ── HISTORIAL ──────────────────────────── */
         .historial-titulo{font-size:0.72rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--txt-mid);margin-bottom:12px;display:flex;align-items:center;gap:10px}
         .historial-titulo::after{content:'';flex:1;height:1px;background:var(--gris-2)}
-        .historial-lista{display:flex;flex-direction:column;gap:8px}
-        .hist-item{background:white;border:1px solid var(--gris-2);border-radius:9px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;transition:border-color 0.15s}
+        .hist-item{background:white;border:1px solid var(--gris-2);border-radius:9px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;transition:border-color 0.15s;margin-bottom:8px}
         .hist-item:hover{border-color:var(--azul-light)}
-        .hist-rut{font-family:'DM Mono',monospace;font-size:0.85rem;font-weight:500;color:var(--txt)}
-        .hist-fecha{font-size:0.72rem;color:var(--txt-dim)}
-        .hist-btn{font-size:0.72rem;color:var(--azul-light);font-weight:500}
+        .hist-rut{font-family:'DM Mono',monospace;font-size:0.85rem;font-weight:500}
+        .hist-nombre{font-size:0.78rem;color:var(--txt-dim)}
+        .hist-btn{font-size:0.72rem;color:var(--azul-light);font-weight:500;white-space:nowrap}
 
         @media(max-width:768px){
             nav{padding:0 16px}.nav-title{display:none}
             .page-header{padding:24px 16px 20px}
             .main{padding:20px 16px 60px}
-            .info-grid{grid-template-columns:1fr}
+            .datos-grid{grid-template-columns:1fr}
             .rut-row{grid-template-columns:1fr auto auto}
         }
     </style>
@@ -116,16 +139,11 @@
     <div class="page-header-inner">
         <div class="page-eyebrow">Tributario</div>
         <h1>Consulta <em>SII</em></h1>
-        <div class="page-header-sub">Verifica la situación tributaria de proveedores y sociedades directamente en el SII.</div>
+        <div class="page-header-sub">Verifica la situación tributaria de proveedores y sociedades directo desde el SII.</div>
     </div>
 </div>
 
 <div class="main">
-
-    <div class="aviso">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <div class="aviso-txt">Al hacer clic en <strong>Consultar en SII</strong> se abrirá el sitio oficial del SII con el RUT precargado. Deberás resolver el CAPTCHA una vez para ver el resultado.</div>
-    </div>
 
     <div class="form-card">
         <div class="form-card-header">
@@ -134,7 +152,7 @@
             </div>
             <div>
                 <div class="form-card-titulo">Buscar contribuyente</div>
-                <div class="form-card-sub">Ingresa el RUT sin puntos y con dígito verificador</div>
+                <div class="form-card-sub">Ingresa el RUT sin puntos ni dígito verificador</div>
             </div>
         </div>
         <div class="form-card-body">
@@ -153,36 +171,25 @@
                         style="background:#f0ede9;color:var(--txt-mid)">
                 </div>
             </div>
-
-            <button class="btn-consultar" onclick="consultar()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                Consultar en SII
+            <button class="btn-consultar" id="btn-consultar" onclick="consultar()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                Consultar situación tributaria
             </button>
-
-            <!-- Instrucción post-clic -->
-            <div id="instruccion-rut" style="display:none;align-items:flex-start;gap:12px;padding:14px 16px;background:#f0f9f4;border:1px solid rgba(39,174,96,0.25);border-radius:10px;margin-top:14px">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;color:#27ae60;flex-shrink:0;margin-top:1px"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                <div style="font-size:0.82rem;color:#1a5e33;line-height:1.6">
-                    Se abrió el SII en una nueva pestaña. En el campo <strong>"Ingrese Rut del Contribuyente"</strong> escribe o pega:
-                    <div style="font-family:'DM Mono',monospace;font-size:1rem;font-weight:700;color:#1a4a2a;background:#d5f0e0;padding:6px 12px;border-radius:6px;margin-top:6px;display:inline-block" id="rut-mostrado"></div>
-                    <div style="margin-top:6px">Luego resuelve el CAPTCHA y haz clic en <strong>"Consultar Situación Tributaria"</strong>.</div>
-                    <button onclick="copiarRut()" style="margin-top:8px;padding:5px 12px;border:1px solid #27ae60;border-radius:6px;background:white;color:#27ae60;font-family:'DM Sans',sans-serif;font-size:0.78rem;font-weight:500;cursor:pointer">
-                        📋 Copiar RUT
-                    </button>
-                </div>
-            </div>
         </div>
     </div>
 
-    <!-- Historial de consultas recientes -->
+    <div id="resultado-wrap"></div>
+
     <div id="historial-wrap" style="display:none">
         <div class="historial-titulo">Consultas recientes</div>
-        <div class="historial-lista" id="historial-lista"></div>
+        <div id="historial-lista"></div>
     </div>
 
 </div>
 
 <script>
+const API = 'https://api.ibaker.cl';
+
 // ── MSAL ─────────────────────────────────────────────────────
 const msalConfig = {
     auth: {
@@ -223,73 +230,140 @@ function calcularDV() {
     const rut = document.getElementById('f-rut').value.trim();
     const dvInput = document.getElementById('f-dv');
     if (!rut || rut.length < 7) { dvInput.value = ''; return; }
-
     let suma = 0, multiplo = 2;
     for (let i = rut.length - 1; i >= 0; i--) {
         suma += parseInt(rut[i]) * multiplo;
         multiplo = multiplo < 7 ? multiplo + 1 : 2;
     }
     const res = 11 - (suma % 11);
-    const dv = res === 11 ? '0' : res === 10 ? 'K' : String(res);
-    dvInput.value = dv;
+    dvInput.value = res === 11 ? '0' : res === 10 ? 'K' : String(res);
 }
 
-// ── CONSULTAR EN SII ─────────────────────────────────────────
-function consultar() {
+// ── CONSULTAR ────────────────────────────────────────────────
+async function consultar() {
     const rut = document.getElementById('f-rut').value.trim();
     const dv  = document.getElementById('f-dv').value.trim();
+    if (!rut || rut.length < 7) { alert('Ingresa un RUT válido.'); return; }
 
-    if (!rut || rut.length < 7) {
-        alert('Ingresa un RUT válido.');
-        return;
-    }
+    const btn = document.getElementById('btn-consultar');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Consultando SII...';
 
-    // Guardar en historial local
-    guardarHistorial(rut, dv);
-    renderHistorial();
+    const rutCompleto = `${rut}-${dv}`;
+    document.getElementById('resultado-wrap').innerHTML = '';
 
-    // Formatear RUT con puntos para el campo del SII: 12.345.678-9
-    const rutFormateado = formatRut(rut) + '-' + dv;
+    try {
+        const res = await fetch(`${API}/sii/contribuyente/${encodeURIComponent(rutCompleto)}`);
+        const data = await res.json();
 
-    // Abrir el formulario del SII e inyectar el RUT via postMessage / hash
-    // La URL correcta es la página del formulario sin parámetros
-    const url = 'https://www2.sii.cl/stc/noauthz#' + encodeURIComponent(rutFormateado);
-    const win = window.open(url, '_blank');
-
-    // Intentar autocompletar el campo RUT una vez que cargue la página
-    // Usamos localStorage como puente (el SII no acepta parámetros GET)
-    localStorage.setItem('sii_rut_pendiente', rutFormateado);
-
-    // Mostrar instrucción al usuario
-    mostrarInstruccion(rutFormateado);
-}
-
-function mostrarInstruccion(rut) {
-    const div = document.getElementById('instruccion-rut');
-    if (div) {
-        div.style.display = 'flex';
-        document.getElementById('rut-mostrado').textContent = rut;
+        if (!res.ok) {
+            mostrarError(data.error || `Error ${res.status}`);
+        } else {
+            renderResultado(rutCompleto, data);
+            guardarHistorial(rut, dv, data);
+            renderHistorial();
+        }
+    } catch(e) {
+        mostrarError('No se pudo conectar con la API. Verifica que el servidor esté encendido.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> Consultar situación tributaria';
     }
 }
 
-// ── HISTORIAL LOCAL (sessionStorage) ─────────────────────────
-function copiarRut() {
-    const rut = document.getElementById('rut-mostrado').textContent;
-    navigator.clipboard.writeText(rut).then(() => {
-        const btn = event.target;
-        btn.textContent = '✓ Copiado';
-        setTimeout(() => btn.textContent = '📋 Copiar RUT', 2000);
-    });
+function renderResultado(rut, d) {
+    // Determinar estado
+    const activo = d.contribuyente?.activo ?? d.activo ?? null;
+    const estadoCls = activo === true ? 'activo' : activo === false ? 'inactivo' : 'alerta';
+    const estadoTxt = activo === true ? 'Activo' : activo === false ? 'Inactivo' : 'Sin información';
+
+    const nombre      = d.contribuyente?.razon_social || d.razon_social || d.nombre || '—';
+    const giro        = d.contribuyente?.giro || d.giro || '—';
+    const inicio      = d.contribuyente?.fecha_inicio_actividades || d.fecha_inicio || '—';
+    const comuna      = d.contribuyente?.comuna || d.comuna || '—';
+    const region      = d.contribuyente?.region || d.region || '—';
+    const actividades = d.contribuyente?.actividades || d.actividades || [];
+    const obs         = d.observaciones || d.situacion?.observaciones || [];
+
+    let html = `
+    <div class="resultado-card">
+        <div class="resultado-header">
+            <div>
+                <div class="resultado-titulo">${nombre}</div>
+                <div class="resultado-rut">${rut}</div>
+            </div>
+            <div class="estado-badge ${estadoCls}">
+                <div class="estado-dot"></div>
+                ${estadoTxt}
+            </div>
+        </div>
+        <div class="datos-grid">
+            <div class="dato-item">
+                <div class="dato-label">Giro principal</div>
+                <div class="dato-val">${giro}</div>
+            </div>
+            <div class="dato-item">
+                <div class="dato-label">Inicio de actividades</div>
+                <div class="dato-val mono">${inicio}</div>
+            </div>
+            <div class="dato-item">
+                <div class="dato-label">Comuna</div>
+                <div class="dato-val">${comuna}</div>
+            </div>
+            <div class="dato-item">
+                <div class="dato-label">Región</div>
+                <div class="dato-val">${region}</div>
+            </div>
+        </div>`;
+
+    if (actividades.length > 0) {
+        html += `
+        <div style="padding:12px 20px 4px;border-top:1px solid var(--gris-1)">
+            <div class="dato-label" style="margin-bottom:8px">Actividades económicas</div>
+        </div>
+        <div class="actividades-list">
+            ${actividades.map(a => `
+            <div class="actividad-item">
+                <div class="actividad-codigo">${a.codigo || ''}</div>
+                <div class="actividad-nombre">${a.nombre || a.descripcion || a}</div>
+            </div>`).join('')}
+        </div>`;
+    }
+
+    if (obs && obs.length > 0) {
+        html += `
+        <div class="observaciones">
+            <div class="obs-titulo">⚠️ Observaciones SII</div>
+            ${obs.map(o => `<div class="obs-item">• ${o}</div>`).join('')}
+        </div>`;
+    }
+
+    html += `</div>`;
+
+    // Si no sabemos parsear la respuesta, mostrar raw
+    if (nombre === '—' && giro === '—') {
+        html = `<div class="resultado-card"><div style="padding:20px"><pre style="font-size:0.75rem;overflow:auto;color:var(--txt-mid)">${JSON.stringify(d, null, 2)}</pre></div></div>`;
+    }
+
+    document.getElementById('resultado-wrap').innerHTML = html;
 }
 
-function guardarHistorial(rut, dv) {
-    const key = 'sii_historial';
-    let lista = JSON.parse(sessionStorage.getItem(key) || '[]');
-    // Quitar duplicados y agregar al inicio
+function mostrarError(msg) {
+    document.getElementById('resultado-wrap').innerHTML = `
+        <div class="error-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            ${msg}
+        </div>`;
+}
+
+// ── HISTORIAL ────────────────────────────────────────────────
+function guardarHistorial(rut, dv, data) {
+    const nombre = data?.contribuyente?.razon_social || data?.razon_social || data?.nombre || '';
+    let lista = JSON.parse(sessionStorage.getItem('sii_historial') || '[]');
     lista = lista.filter(x => x.rut !== rut);
-    lista.unshift({ rut, dv, fecha: new Date().toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' }) });
-    lista = lista.slice(0, 5); // máx 5 recientes
-    sessionStorage.setItem(key, JSON.stringify(lista));
+    lista.unshift({ rut, dv, nombre, hora: new Date().toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' }) });
+    lista = lista.slice(0, 5);
+    sessionStorage.setItem('sii_historial', JSON.stringify(lista));
 }
 
 function renderHistorial() {
@@ -297,19 +371,18 @@ function renderHistorial() {
     const wrap = document.getElementById('historial-wrap');
     const listaEl = document.getElementById('historial-lista');
     if (lista.length === 0) { wrap.style.display = 'none'; return; }
-
     wrap.style.display = 'block';
     listaEl.innerHTML = lista.map(item => `
-        <div class="hist-item" onclick="cargarRut('${item.rut}', '${item.dv}')">
+        <div class="hist-item" onclick="cargarRut('${item.rut}','${item.dv}')">
             <div>
                 <div class="hist-rut">${formatRut(item.rut)}-${item.dv}</div>
+                ${item.nombre ? `<div class="hist-nombre">${item.nombre}</div>` : ''}
             </div>
             <div style="display:flex;align-items:center;gap:12px">
-                <div class="hist-fecha">${item.fecha}</div>
-                <div class="hist-btn">Consultar →</div>
+                <span style="font-size:0.72rem;color:var(--txt-dim)">${item.hora}</span>
+                <span class="hist-btn">Consultar →</span>
             </div>
-        </div>
-    `).join('');
+        </div>`).join('');
 }
 
 function cargarRut(rut, dv) {
