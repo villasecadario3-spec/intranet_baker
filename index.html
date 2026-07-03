@@ -607,7 +607,7 @@
         </div>
         <div class="modulos-grid">
 
-            <a class="mod-card" href="softland.html">
+            <a class="mod-card" href="softland.html" data-modulo="softland.html">
                 <div class="mod-num">01</div>
                 <div class="mod-icon on">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -709,7 +709,7 @@
                 </div>
             </a>
 
-            <a class="mod-card" href="ds49.html">
+            <a class="mod-card" href="ds49.html" data-modulo="ds49.html">
                 <div class="mod-num">07</div>
                 <div class="mod-icon on">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -726,7 +726,7 @@
                 </div>
             </a>
 
-            <a class="mod-card" href="desvinculaciones.html">
+            <a class="mod-card" href="desvinculaciones.html" data-modulo="desvinculaciones.html">
                 <div class="mod-num">08</div>
                 <div class="mod-icon on">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -920,8 +920,12 @@ function actualizarUI() {
         document.getElementById('hero-nombre').innerText = primerNombre;
         bienvenida.classList.add('visible');
 
-        // Revisar acceso denegado desde Softland
+        // Revisar acceso denegado
         checkAccesoDenegado();
+
+        // Ocultar módulos sin acceso
+        const email = usuarioActual.username.toLowerCase();
+        aplicarAccesos(email);
     } else {
         blocker.classList.add('visible');
         bienvenida.classList.remove('visible');
@@ -993,6 +997,55 @@ async function init() {
     document.getElementById('loading').classList.add('oculto');
 }
 init();
+
+// ── CONTROL DE VISIBILIDAD DE MÓDULOS ────────────────────────
+const ACCESOS_MODULOS = {
+        "softland.html": [
+                "dvillaseca@ibaker.cl",
+                "informatica@ibaker.cl",
+                "jcumplido@ibaker.cl",
+                "bsilva@ibaker.cl",
+                "ccampos@ibaker.cl",
+                "scarreno@ibaker.cl",
+                "kalarcon@ibaker.cl",
+                "cquezada@ibaker.cl",
+                "mramos@ibaker.cl",
+                "pmorales@ibaker.cl"
+        ],
+        "ds49.html": [
+                "dvillaseca@ibaker.cl",
+                "informatica@ibaker.cl",
+                "cgarces@ibaker.cl",
+                "dparedes@epbrotar.cl",
+                "dponce@epbrotar.cl",
+                "nvedia@epbrotar.cl",
+                "ncaris@epbrotar.cl"
+        ],
+        "desvinculaciones.html": [
+                "dvillaseca@ibaker.cl",
+                "cgomez@ibaker.cl",
+                "jlara@ibaker.cl",
+                "ggalvez@ibaker.cl",
+                "jcumplido@ibaker.cl",
+                "cmadrid@ibaker.cl"
+        ]
+};
+
+function aplicarAccesos(email) {
+    const correo = (email || '').toLowerCase();
+    document.querySelectorAll('.mod-card[data-modulo]').forEach(card => {
+        const modulo = card.getAttribute('data-modulo');
+        const lista  = ACCESOS_MODULOS[modulo];
+        if (lista && !lista.includes(correo)) {
+            card.style.display = 'none';
+        }
+    });
+    // Actualizar contador de módulos visibles
+    const visibles = document.querySelectorAll('.mod-card:not([style*="none"])').length;
+    const badge = document.getElementById('mod-count-badge');
+    if (badge) badge.textContent = visibles + ' activos';
+}
+
 </script>
 </body>
 </html>
