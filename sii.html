@@ -158,6 +158,19 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                 Consultar en SII
             </button>
+
+            <!-- Instrucción post-clic -->
+            <div id="instruccion-rut" style="display:none;align-items:flex-start;gap:12px;padding:14px 16px;background:#f0f9f4;border:1px solid rgba(39,174,96,0.25);border-radius:10px;margin-top:14px">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;color:#27ae60;flex-shrink:0;margin-top:1px"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                <div style="font-size:0.82rem;color:#1a5e33;line-height:1.6">
+                    Se abrió el SII en una nueva pestaña. En el campo <strong>"Ingrese Rut del Contribuyente"</strong> escribe o pega:
+                    <div style="font-family:'DM Mono',monospace;font-size:1rem;font-weight:700;color:#1a4a2a;background:#d5f0e0;padding:6px 12px;border-radius:6px;margin-top:6px;display:inline-block" id="rut-mostrado"></div>
+                    <div style="margin-top:6px">Luego resuelve el CAPTCHA y haz clic en <strong>"Consultar Situación Tributaria"</strong>.</div>
+                    <button onclick="copiarRut()" style="margin-top:8px;padding:5px 12px;border:1px solid #27ae60;border-radius:6px;background:white;color:#27ae60;font-family:'DM Sans',sans-serif;font-size:0.78rem;font-weight:500;cursor:pointer">
+                        📋 Copiar RUT
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -235,13 +248,40 @@ function consultar() {
     guardarHistorial(rut, dv);
     renderHistorial();
 
-    // Abrir SII con RUT precargado
-    // La URL correcta del formulario público del SII
-    const url = `https://www2.sii.cl/stc/noauthz/consulta?rut=${rut}&dv=${dv}`;
-    window.open(url, '_blank');
+    // Formatear RUT con puntos para el campo del SII: 12.345.678-9
+    const rutFormateado = formatRut(rut) + '-' + dv;
+
+    // Abrir el formulario del SII e inyectar el RUT via postMessage / hash
+    // La URL correcta es la página del formulario sin parámetros
+    const url = 'https://www2.sii.cl/stc/noauthz#' + encodeURIComponent(rutFormateado);
+    const win = window.open(url, '_blank');
+
+    // Intentar autocompletar el campo RUT una vez que cargue la página
+    // Usamos localStorage como puente (el SII no acepta parámetros GET)
+    localStorage.setItem('sii_rut_pendiente', rutFormateado);
+
+    // Mostrar instrucción al usuario
+    mostrarInstruccion(rutFormateado);
+}
+
+function mostrarInstruccion(rut) {
+    const div = document.getElementById('instruccion-rut');
+    if (div) {
+        div.style.display = 'flex';
+        document.getElementById('rut-mostrado').textContent = rut;
+    }
 }
 
 // ── HISTORIAL LOCAL (sessionStorage) ─────────────────────────
+function copiarRut() {
+    const rut = document.getElementById('rut-mostrado').textContent;
+    navigator.clipboard.writeText(rut).then(() => {
+        const btn = event.target;
+        btn.textContent = '✓ Copiado';
+        setTimeout(() => btn.textContent = '📋 Copiar RUT', 2000);
+    });
+}
+
 function guardarHistorial(rut, dv) {
     const key = 'sii_historial';
     let lista = JSON.parse(sessionStorage.getItem(key) || '[]');
