@@ -1,14 +1,15 @@
 <!doctype html>
 <!--
   Módulo: Proyectos (Intranet Baker)
-  Versión: v0.3 — 2026-07-08
-  Cambios de esta versión: fix de ruta de sitio SharePoint (SP_SITE_PATH no
-  debe incluir la carpeta 1_OFICIALES, solo /sites/Proyectos), fix de tope
-  de navegación para no subir por encima de la carpeta raíz.
-  Si algo se rompe y hay que volver atrás: la versión anterior (v0.2) no
-  tenía el selector de carpetas SharePoint conectado (botón "Subir a
-  SharePoint" deshabilitado). Guarda una copia de este archivo antes de
-  seguir editando, para poder comparar/revertir.
+  Versión: v0.4 — 2026-07-08
+  Cambios de esta versión: "1_OFICIALES" se trata ahora como una biblioteca
+  de documentos propia del sitio (se busca vía /sites/{id}/drives), no como
+  una carpeta dentro de la biblioteca por defecto. Si esto tampoco calza,
+  el error mostrará la lista real de bibliotecas del sitio para ajustar
+  SP_ROOT_FOLDER al nombre exacto.
+  Si algo se rompe y hay que volver atrás: guarda una copia de este archivo
+  antes de seguir editando, para poder comparar/revertir (no tengo memoria
+  de versiones anteriores entre mensajes).
 -->
 <html lang="es">
 <head>
@@ -263,7 +264,7 @@
       <h1>Proyectos</h1>
       <div class="sub">Arma el nombre normado del documento o plano antes de subirlo al sitio. Reemplaza la planilla con macros.</div>
     </div>
-    <div class="badge">v0.3 — 2026-07-08 · Graph API</div>
+    <div class="badge">v0.4 — 2026-07-08 · Graph API</div>
   </div>
 
   <div class="toggle">
@@ -837,6 +838,7 @@ const SP_ROOT_FOLDER = '1_OFICIALES';        // carpeta raíz dentro del drive d
 
 let msalInstance = null;
 let graphSiteId  = null;
+let graphDriveId = null;
 let archivoSeleccionado = null;
 let spRuta = []; // segmentos de carpeta desde la raíz del drive, ej. ['1.5_RENGO', 'QUILLAYES', '01_APROBADOS CON TIMBRE']
 
@@ -878,16 +880,33 @@ async function resolverSitio(token){
   return graphSiteId;
 }
 
+async function resolverDrive(token){
+  if(graphDriveId) return graphDriveId;
+  const siteId = await resolverSitio(token);
+  const data = await graphFetch(`/sites/${siteId}/drives`, token);
+  const drives = data.value || [];
+  const match = drives.find(d =>
+    d.name.toUpperCase() === SP_ROOT_FOLDER.toUpperCase() ||
+    (d.webUrl && d.webUrl.toUpperCase().includes('/' + SP_ROOT_FOLDER.toUpperCase()))
+  );
+  if(!match){
+    const nombres = drives.map(d => d.name).join(', ') || '(ninguna encontrada)';
+    throw new Error(`No encontré una biblioteca llamada "${SP_ROOT_FOLDER}". Bibliotecas disponibles en el sitio: ${nombres}`);
+  }
+  graphDriveId = match.id;
+  return graphDriveId;
+}
+
 function rutaGraphPath(segmentos){
   return segmentos.map(s => encodeURIComponent(s)).join('/');
 }
 
 async function listarCarpeta(token, segmentos){
-  const siteId = await resolverSitio(token);
+  const driveId = await resolverDrive(token);
   const path = rutaGraphPath(segmentos);
   const endpoint = path
-    ? `/sites/${siteId}/drive/root:/${path}:/children?$select=id,name,folder&$top=200`
-    : `/sites/${siteId}/drive/root/children?$select=id,name,folder&$top=200`;
+    ? `/drives/${driveId}/root:/${path}:/children?$select=id,name,folder&$top=200`
+    : `/drives/${driveId}/root/children?$select=id,name,folder&$top=200`;
   const data = await graphFetch(endpoint, token);
   return (data.value || []).filter(item => item.folder).sort((a,b) => a.name.localeCompare(b.name));
 }
@@ -918,7 +937,7 @@ async function abrirSelectorCarpeta(){
   // Pre-navegación inteligente: Ciudad → Proyecto (si calza un nombre parecido) → 01/02 según tipo
   const ciudadVal = document.getElementById('sel-ciudad').value;
   const carpetaCiudad = CARPETAS_CIUDAD[ciudadVal];
-  spRuta = carpetaCiudad ? [SP_ROOT_FOLDER, carpetaCiudad] : [SP_ROOT_FOLDER];
+  spRuta = carpetaCiudad ? [carpetaCiudad] : [];
 
   try{
     if(carpetaCiudad){
@@ -943,12 +962,12 @@ async function abrirSelectorCarpeta(){
 async function renderCarpetaActual(token){
   const body = document.getElementById('sp-modal-body');
   const crumb = document.getElementById('sp-breadcrumb');
-  crumb.textContent = spRuta.join('/');
+  crumb.textContent = SP_ROOT_FOLDER + '/' + spRuta.join('/');
   body.innerHTML = '<div class="empty-state">Cargando carpetas…</div>';
   try{
     const items = await listarCarpeta(token, spRuta);
     let html = '';
-    if(spRuta.length > 1){
+    if(spRuta.length > 0){
       html += `<div class="sp-item" onclick="subirNivel()"><span class="ico">↑</span> .. (subir un nivel)</div>`;
     }
     if(items.length === 0){
@@ -994,9 +1013,9 @@ async function confirmarSubidaAqui(){
   nota.style.color = 'var(--ink-faint)';
 
   try{
-    const siteId = await resolverSitio(token);
+    const driveId = await resolverDrive(token);
     const path = rutaGraphPath(spRuta) + '/' + encodeURIComponent(nombreFinal);
-    const session = await graphFetch(`/sites/${siteId}/drive/root:/${path}:/createUploadSession`, token, {
+    const session = await graphFetch(`/drives/${driveId}/root:/${path}:/createUploadSession`, token, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'rename' } })
@@ -1015,7 +1034,7 @@ async function confirmarSubidaAqui(){
 
     cerrarSelectorCarpeta();
     mostrarToast('Archivo subido a SharePoint');
-    agregarHistorial(nombreFinal + '  →  ' + spRuta.join('/'));
+    agregarHistorial(nombreFinal + '  →  ' + SP_ROOT_FOLDER + '/' + spRuta.join('/'));
   } catch(e){
     nota.textContent = 'Error al subir: ' + e.message;
     nota.style.color = 'var(--err)';
