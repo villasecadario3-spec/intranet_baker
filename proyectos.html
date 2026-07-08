@@ -306,7 +306,7 @@
       <h1>Proyectos</h1>
       <div class="sub">Arma el nombre normado del documento o plano antes de subirlo al sitio. Reemplaza la planilla con macros.</div>
     </div>
-    <div class="badge">v0.7 — 2026-07-08 · láminas múltiples + subida masiva</div>
+    <div class="badge">v0.8 — 2026-07-08 · abrev sin espacios + destino 01</div>
   </div>
 
   <div class="panel">
@@ -513,7 +513,8 @@ function proyectosPorCiudad(ciudad){
 }
 function abrevProyecto(ciudad, proyectoNombre){
   const p = CONFIG.proyectos.find(x => x.ciudad.trim() === ciudad && x.proyecto === proyectoNombre);
-  return p ? p.abrev : '';
+  // Sin espacios ni separadores: "PLC II" -> "PLCII"
+  return p ? p.abrev.replace(/\s+/g, '') : '';
 }
 function abrevTipoCasa(tipo){
   const t = CONFIG.tipoCasa.find(x => x.tipo === tipo);
@@ -1223,7 +1224,7 @@ async function conectarYPrenavegar(prefijoTipo){
 async function abrirSelectorCarpeta(){
   if(!archivoSeleccionado || !calcularNombre()) return;
   modoMasivo = false;
-  await conectarYPrenavegar(tipoSeleccionado() === 'plano' ? '02' : '01');
+  await conectarYPrenavegar('01'); // documentos y planos aprobados van a 01_APROBADOS CON TIMBRE
 }
 
 async function abrirSelectorCarpetaMasivo(){
@@ -1231,7 +1232,7 @@ async function abrirSelectorCarpetaMasivo(){
   const completas = nombres.filter((_, idx) => archivosLamina[idx+1]).length;
   if(nombres.length === 0 || completas !== nombres.length) return;
   modoMasivo = true;
-  await conectarYPrenavegar('02'); // los planos siempre van en 02_ARCHIVOS CAD
+  await conectarYPrenavegar('01'); // igual que documentos: va a 01_APROBADOS CON TIMBRE
 }
 
 async function renderCarpetaActual(token){
