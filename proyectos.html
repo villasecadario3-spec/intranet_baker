@@ -134,6 +134,11 @@
     background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%235FD0FF'/></svg>");
     background-repeat:no-repeat; background-position:right 12px center; padding-right:30px;
   }
+  select optgroup{
+    background:var(--bg-deep); color:var(--cyan); font-family:var(--mono); font-style:normal;
+    font-size:11px; letter-spacing:.06em;
+  }
+  select option{background:var(--bg-deep); color:var(--ink); font-family:var(--sans); font-size:13.5px;}
   .hint{font-size:11px; color:var(--ink-faint); margin-top:2px;}
   .errfield{font-size:11px; color:var(--err); margin-top:2px; display:none;}
   .field.invalid select, .field.invalid input{border-color:var(--err);}
@@ -272,7 +277,7 @@
       <h1>Proyectos</h1>
       <div class="sub">Arma el nombre normado del documento o plano antes de subirlo al sitio. Reemplaza la planilla con macros.</div>
     </div>
-    <div class="badge">v0.5 — 2026-07-08 · unificado + historial</div>
+    <div class="badge">v0.6 — 2026-07-08 · agrupado por optgroup</div>
   </div>
 
   <div class="panel">
@@ -551,20 +556,37 @@ function onCarpetaChange(){
     update(); return;
   }
   const valorPlano = CARPETA_MAP[valorDoc];
-  const docs   = CONFIG.documentos.filter(d => d.carpetaValor === valorDoc).map(d => ({...d, _tipo:'documento'}));
-  const planos = valorPlano ? CONFIG.planos.filter(d => d.carpetaValor === valorPlano).map(d => ({...d, _tipo:'plano'})) : [];
-  const combinados = [...docs, ...planos].sort((a,b) => a.documento.localeCompare(b.documento));
+  const docs   = CONFIG.documentos.filter(d => d.carpetaValor === valorDoc).sort((a,b) => a.documento.localeCompare(b.documento));
+  const planos = valorPlano ? CONFIG.planos.filter(d => d.carpetaValor === valorPlano).sort((a,b) => a.documento.localeCompare(b.documento)) : [];
 
   selDoc.innerHTML = '';
   const opt0 = document.createElement('option');
   opt0.value = ''; opt0.textContent = 'Selecciona documento o plano';
   selDoc.appendChild(opt0);
-  combinados.forEach(d => {
-    const o = document.createElement('option');
-    o.value = d.abrev; o.textContent = d.documento + (d._tipo === 'plano' ? '  (plano)' : '');
-    o.dataset.tipo = d._tipo;
-    selDoc.appendChild(o);
-  });
+
+  if(docs.length){
+    const grupoDoc = document.createElement('optgroup');
+    grupoDoc.label = `Documentos (${docs.length})`;
+    docs.forEach(d => {
+      const o = document.createElement('option');
+      o.value = d.abrev; o.textContent = d.documento;
+      o.dataset.tipo = 'documento';
+      grupoDoc.appendChild(o);
+    });
+    selDoc.appendChild(grupoDoc);
+  }
+  if(planos.length){
+    const grupoPlano = document.createElement('optgroup');
+    grupoPlano.label = `Planos (${planos.length})`;
+    planos.forEach(d => {
+      const o = document.createElement('option');
+      o.value = d.abrev; o.textContent = d.documento;
+      o.dataset.tipo = 'plano';
+      grupoPlano.appendChild(o);
+    });
+    selDoc.appendChild(grupoPlano);
+  }
+
   selDoc.disabled = false;
   hint.style.display = 'none';
   renderNumeros(null);
