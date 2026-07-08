@@ -574,9 +574,13 @@ async function cargarProyectosRemotos(){
     const res = await fetch(`${API_BASE}/proyectos`);
     if(!res.ok) throw new Error('respuesta no ok');
     const data = await res.json();
-    if(Array.isArray(data) && data.length){
+    if(Array.isArray(data)){
       CONFIG.proyectos = data.map(p => ({ id: p.id, ciudad: (p.ciudad||'').trim(), proyecto: p.proyecto, abrev: p.abrev }));
       proyectosOrigen = 'remoto';
+      status.textContent = data.length ? '' : 'Todavía no hay proyectos cargados. Agrega el primero abajo.';
+      status.style.color = 'var(--ink-faint)';
+    } else {
+      throw new Error('formato inesperado');
     }
   } catch(e){
     proyectosOrigen = 'local';
@@ -586,6 +590,7 @@ async function cargarProyectosRemotos(){
   // A los proyectos que vinieron del Excel (sin id) les asigno uno temporal para poder listarlos/borrarlos en esta demo
   CONFIG.proyectos.forEach((p,i) => { if(p.id === undefined) p.id = 'local-' + i; });
   renderListaProyectos();
+  initCiudad();
 }
 
 function renderListaProyectos(){
