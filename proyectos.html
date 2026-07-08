@@ -171,6 +171,27 @@
     border-top:1px solid var(--grid-line-strong); padding-top:16px; margin-top:8px;
   }
   .footnote b{color:var(--ink-dim); font-weight:500;}
+
+  /* gestión de proyectos */
+  .adm-ciudad-grupo{margin-bottom:14px;}
+  .adm-ciudad-titulo{
+    font-family:var(--mono); font-size:11px; letter-spacing:.08em; color:var(--cyan);
+    text-transform:uppercase; margin-bottom:6px; padding-top:4px;
+  }
+  .adm-row{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:9px 12px; background:var(--bg-deep); border:1px solid var(--grid-line-strong);
+    border-radius:var(--radius); margin-bottom:6px;
+  }
+  .adm-row .info{display:flex; gap:10px; align-items:baseline; min-width:0;}
+  .adm-row .nombre{font-size:13px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .adm-row .abrev{font-family:var(--mono); font-size:11.5px; color:var(--ink-faint); flex-shrink:0;}
+  .adm-row .del{
+    background:none; border:1px solid var(--grid-line-strong); color:var(--err);
+    width:24px; height:24px; border-radius:var(--radius); cursor:pointer; flex-shrink:0;
+    font-size:13px; line-height:1;
+  }
+  .adm-row .del:hover{background:rgba(255,107,107,.12); border-color:var(--err);}
 </style>
 </head>
 <body>
@@ -265,10 +286,37 @@
     </div>
   </div>
 
+  <div class="panel" id="panel-gestion-proyectos">
+    <h2>Gestión de proyectos <span style="text-transform:none; letter-spacing:0; color:var(--ink-faint); font-family:var(--sans); font-size:11.5px;">— agrega o quita proyectos con su ciudad</span></h2>
+
+    <div class="grid" style="margin-bottom:14px;">
+      <div class="field">
+        <label>Ciudad</label>
+        <input type="text" id="adm-ciudad" placeholder="ej. RENGO" />
+      </div>
+      <div class="field">
+        <label>Nombre del proyecto</label>
+        <input type="text" id="adm-proyecto" placeholder="ej. PARQUE LOS ALERCES" />
+      </div>
+      <div class="field">
+        <label>Abreviación <span class="hint" style="display:inline">(la que va en el nombre final)</span></label>
+        <input type="text" id="adm-abrev" placeholder="ej. PLA" />
+      </div>
+      <div class="field" style="justify-content:flex-end;">
+        <button onclick="agregarProyecto()" style="background:var(--orange); border:1px solid var(--orange-dim); color:#1a0d02; font-weight:600; font-family:var(--display); font-size:13.5px; padding:10px; border-radius:var(--radius); cursor:pointer;">+ Agregar proyecto</button>
+      </div>
+    </div>
+
+    <div id="adm-status" style="font-family:var(--mono); font-size:11.5px; color:var(--ink-faint); margin-bottom:10px;"></div>
+
+    <div id="adm-lista"></div>
+  </div>
+
   <div class="panel">
     <h2>Historial de esta sesión</h2>
     <div id="historial"><div class="empty-state">Sin registros todavía</div></div>
   </div>
+
 
   <div class="footnote">
     <b>Nota técnica:</b> las tablas de Carpetas / Documentos / Proyectos / Tipo de Casa están cargadas aquí como config estática, extraída de "Generador_de_Nombres.xlsm", solo para esta demo. En la versión integrada se leen en vivo desde Listas de SharePoint editables por gerencia. El botón "Subir a SharePoint" se activa en la fase 2, junto con el selector de carpeta en vivo vía Graph API.
@@ -513,12 +561,128 @@ function mostrarToast(msg, isError){
   setTimeout(()=> t.classList.remove('show'), 2200);
 }
 
+/* ============ GESTIÓN DE PROYECTOS (persistente vía api.ibaker.cl) ============
+   Mismo patrón que Firma de Correo (firmas_generadas.json): un JSON en el
+   servidor, expuesto por endpoints REST. Ver server-proyectos-endpoints.js
+   para el código a pegar en server.js. */
+const API_BASE = 'https://api.ibaker.cl';
+let proyectosOrigen = 'local'; // 'remoto' | 'local' — para avisar si no hay conexión al backend
+
+async function cargarProyectosRemotos(){
+  const status = document.getElementById('adm-status');
+  try{
+    const res = await fetch(`${API_BASE}/proyectos`);
+    if(!res.ok) throw new Error('respuesta no ok');
+    const data = await res.json();
+    if(Array.isArray(data) && data.length){
+      CONFIG.proyectos = data.map(p => ({ id: p.id, ciudad: (p.ciudad||'').trim(), proyecto: p.proyecto, abrev: p.abrev }));
+      proyectosOrigen = 'remoto';
+    }
+  } catch(e){
+    proyectosOrigen = 'local';
+    status.textContent = 'Sin conexión al servidor — mostrando datos locales de ejemplo. Los cambios no se guardarán hasta reconectar.';
+    status.style.color = 'var(--err)';
+  }
+  // A los proyectos que vinieron del Excel (sin id) les asigno uno temporal para poder listarlos/borrarlos en esta demo
+  CONFIG.proyectos.forEach((p,i) => { if(p.id === undefined) p.id = 'local-' + i; });
+  renderListaProyectos();
+}
+
+function renderListaProyectos(){
+  const cont = document.getElementById('adm-lista');
+  if(CONFIG.proyectos.length === 0){
+    cont.innerHTML = '<div class="empty-state">Sin proyectos cargados</div>';
+    return;
+  }
+  const porCiudad = {};
+  CONFIG.proyectos.forEach(p => {
+    const c = p.ciudad || '(sin ciudad)';
+    (porCiudad[c] = porCiudad[c] || []).push(p);
+  });
+  const ciudadesOrdenadas = Object.keys(porCiudad).sort();
+  cont.innerHTML = ciudadesOrdenadas.map(ciudad => `
+    <div class="adm-ciudad-grupo">
+      <div class="adm-ciudad-titulo">${ciudad}</div>
+      ${porCiudad[ciudad].map(p => `
+        <div class="adm-row">
+          <div class="info">
+            <span class="nombre">${p.proyecto}</span>
+            <span class="abrev">${p.abrev}</span>
+          </div>
+          <button class="del" onclick="eliminarProyecto('${p.id}')" title="Quitar proyecto">×</button>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+async function agregarProyecto(){
+  const ciudad = document.getElementById('adm-ciudad').value.trim().toUpperCase();
+  const proyecto = document.getElementById('adm-proyecto').value.trim();
+  const abrev = document.getElementById('adm-abrev').value.trim();
+  const status = document.getElementById('adm-status');
+
+  if(!ciudad || !proyecto || !abrev){
+    mostrarToast('Completa ciudad, proyecto y abreviación', true);
+    return;
+  }
+  const yaExiste = CONFIG.proyectos.some(p => p.ciudad === ciudad && p.proyecto === proyecto);
+  if(yaExiste){
+    mostrarToast('Ese proyecto ya existe en esa ciudad', true);
+    return;
+  }
+
+  if(proyectosOrigen !== 'remoto'){
+    mostrarToast('Sin conexión al servidor, no se puede guardar', true);
+    return;
+  }
+
+  try{
+    const res = await fetch(`${API_BASE}/proyectos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ciudad, proyecto, abrev })
+    });
+    if(!res.ok) throw new Error('error al guardar');
+    const nuevo = await res.json();
+    CONFIG.proyectos.push({ id: nuevo.id, ciudad, proyecto, abrev });
+    document.getElementById('adm-ciudad').value = '';
+    document.getElementById('adm-proyecto').value = '';
+    document.getElementById('adm-abrev').value = '';
+    renderListaProyectos();
+    initCiudad();
+    mostrarToast('Proyecto agregado');
+  } catch(e){
+    mostrarToast('No se pudo guardar el proyecto', true);
+  }
+}
+
+async function eliminarProyecto(id){
+  if(!confirm('¿Quitar este proyecto de la lista? Ya no aparecerá en el generador de nombres.')) return;
+  if(proyectosOrigen !== 'remoto'){
+    mostrarToast('Sin conexión al servidor, no se puede eliminar', true);
+    return;
+  }
+  try{
+    const res = await fetch(`${API_BASE}/proyectos/${id}`, { method: 'DELETE' });
+    if(!res.ok) throw new Error('error al eliminar');
+    CONFIG.proyectos = CONFIG.proyectos.filter(p => String(p.id) !== String(id));
+    renderListaProyectos();
+    initCiudad();
+    mostrarToast('Proyecto eliminado');
+  } catch(e){
+    mostrarToast('No se pudo eliminar el proyecto', true);
+  }
+}
+
 /* ============ init ============ */
 initCiudad();
 initTipoCasa();
 initCarpeta();
 renderNumeros();
 update();
+cargarProyectosRemotos();
 </script>
+
 </body>
 </html>
