@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Proyectos · Intranet Baker</title>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -192,6 +193,50 @@
     font-size:13px; line-height:1;
   }
   .adm-row .del:hover{background:rgba(255,107,107,.12); border-color:var(--err);}
+
+  /* botón elegir archivo */
+  .btn-archivo{
+    font-family:var(--mono); font-size:11.5px; padding:9px 13px; border-radius:var(--radius);
+    border:1px solid #c9c3af; background:#fff; color:var(--stamp-ink); cursor:pointer;
+    display:flex; align-items:center;
+  }
+  .btn-archivo:hover{background:#eee9dc;}
+
+  /* modal explorador de carpetas */
+  .sp-modal-overlay{
+    position:fixed; inset:0; z-index:100; background:rgba(5,12,20,.75);
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .sp-modal{
+    width:100%; max-width:560px; max-height:80vh; display:flex; flex-direction:column;
+    background:var(--panel-2); border:1px solid var(--grid-line-strong); border-radius:var(--radius);
+    overflow:hidden;
+  }
+  .sp-modal-header{
+    padding:18px 20px; border-bottom:1px solid var(--grid-line-strong);
+    display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+  }
+  .sp-modal-titulo{font-family:var(--display); font-weight:600; font-size:16px; color:var(--ink); margin-bottom:6px;}
+  .sp-breadcrumb{font-family:var(--mono); font-size:11.5px; color:var(--cyan); word-break:break-word;}
+  .sp-cerrar{background:none; border:1px solid var(--grid-line-strong); color:var(--ink-faint); width:26px; height:26px; border-radius:var(--radius); cursor:pointer; flex-shrink:0;}
+  .sp-cerrar:hover{color:var(--ink); border-color:var(--ink-faint);}
+  .sp-modal-body{flex:1; overflow-y:auto; padding:8px 10px;}
+  .sp-item{
+    display:flex; align-items:center; gap:10px; padding:10px 10px; border-radius:var(--radius);
+    cursor:pointer; font-size:13.5px; color:var(--ink);
+  }
+  .sp-item:hover{background:var(--bg-deep);}
+  .sp-item .ico{color:var(--cyan); flex-shrink:0;}
+  .sp-modal-footer{
+    padding:14px 20px; border-top:1px solid var(--grid-line-strong);
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+  }
+  .sp-modal-nota{font-family:var(--mono); font-size:11px; color:var(--ink-faint); flex:1;}
+  .sp-modal-footer button{
+    font-family:var(--mono); font-size:11.5px; padding:9px 13px; border-radius:var(--radius);
+    border:1px solid var(--grid-line-strong); background:var(--bg-deep); color:var(--ink); cursor:pointer;
+  }
+  .sp-modal-footer button.primary-sp{background:var(--orange); border-color:var(--orange-dim); color:#1a0d02; font-weight:600;}
 </style>
 </head>
 <body>
@@ -281,7 +326,33 @@
       <div class="stamp-name" id="stamp-name"><span class="empty">completa los campos obligatorios…</span></div>
       <div class="stamp-actions">
         <button onclick="copiarNombre()">Copiar</button>
-        <button class="primary" id="btn-subir" disabled title="Fase 2: selector de carpeta SharePoint + Graph API">Subir a SharePoint →</button>
+        <label class="btn-archivo" for="input-archivo" id="label-archivo">Elegir archivo</label>
+        <input type="file" id="input-archivo" style="display:none;" onchange="onArchivoElegido(event)" />
+        <button class="primary" id="btn-subir" disabled title="Elige un archivo y completa el nombre primero" onclick="abrirSelectorCarpeta()">Subir a SharePoint →</button>
+      </div>
+    </div>
+    <div id="archivo-status" style="font-family:var(--mono); font-size:11px; color:var(--ink-faint); margin-top:8px;"></div>
+  </div>
+
+  <!-- Modal explorador de carpetas SharePoint -->
+  <div class="sp-modal-overlay" id="sp-modal" style="display:none;">
+    <div class="sp-modal">
+      <div class="sp-modal-header">
+        <div>
+          <div class="sp-modal-titulo">Elige la carpeta destino</div>
+          <div class="sp-breadcrumb" id="sp-breadcrumb"></div>
+        </div>
+        <button class="sp-cerrar" onclick="cerrarSelectorCarpeta()">✕</button>
+      </div>
+      <div class="sp-modal-body" id="sp-modal-body">
+        <div class="empty-state">Cargando…</div>
+      </div>
+      <div class="sp-modal-footer">
+        <div class="sp-modal-nota" id="sp-modal-nota"></div>
+        <div style="display:flex; gap:8px;">
+          <button onclick="cerrarSelectorCarpeta()">Cancelar</button>
+          <button class="primary-sp" onclick="confirmarSubidaAqui()">Subir en esta carpeta →</button>
+        </div>
       </div>
     </div>
   </div>
@@ -292,7 +363,9 @@
     <div class="grid" style="margin-bottom:14px;">
       <div class="field">
         <label>Ciudad</label>
-        <input type="text" id="adm-ciudad" placeholder="ej. RENGO" />
+        <input type="text" id="adm-ciudad" placeholder="ej. RENGO" list="adm-ciudad-lista" />
+        <datalist id="adm-ciudad-lista"></datalist>
+        <div class="hint">Debe calzar con el nombre real de la carpeta en SharePoint</div>
       </div>
       <div class="field">
         <label>Nombre del proyecto</label>
@@ -342,6 +415,25 @@
    Y el card correspondiente en el grid necesita data-modulo="proyectos.html".
    aplicarAccesos(email) ya se encarga de ocultar el card si el correo logueado
    (usuarioActual.username vía MSAL) no está en la lista. */
+
+/* ============ CARPETAS RAÍZ (SharePoint) ============
+   Las 10 carpetas de ciudad que ya existen en el sitio. La Ciudad que se
+   guarda en cada proyecto (CONFIG.proyectos / adm-ciudad) debe ser una de
+   las claves de este objeto — el valor es el nombre EXACTO de la carpeta
+   real, con su numeración, para cuando se conecte el selector de carpetas
+   vía Graph API (fase 2). */
+const CARPETAS_CIUDAD = {
+  'CONSTITUCIÓN':  '1.1_CONSTITUCIÓN',
+  'ROMERAL':       '1.2_ROMERAL',
+  'SAN FERNANDO':  '1.3_SAN FERNANDO',
+  'SANTA CRUZ':    '1.4_SANTA CRUZ',
+  'RENGO':         '1.5_RENGO',
+  'REQUINOA':      '1.6_REQUINOA',
+  'RANCAGUA':      '1.7_RANCAGUA',
+  'MACHALÍ':       '1.8_MACHALÍ',
+  'MELIPILLA':     '1.9_MELIPILLA',
+  'PUENTE ALTO':   '2.0_PUENTE ALTO'
+};
 
 /* ============ CONFIG (extraída del Excel — reemplazar por fetch a Listas SharePoint) ============ */
 const CONFIG = {"carpetasDocumentos": [{"carpeta": "01.0_Antecedentes de Terreno", "valor": "Terreno"}, {"carpeta": "01.1_Permiso de Loteo", "valor": "Loteo"}, {"carpeta": "01.2_Permiso de Edificación", "valor": "Edificacion"}, {"carpeta": "01.3_Sanitaria", "valor": "Sanitaria"}, {"carpeta": "01.4_Serviu", "valor": "Serviu"}, {"carpeta": "01.5_Singular", "valor": "Singular"}, {"carpeta": "01.6_Recepción", "valor": "Recepcion"}], "documentos": [{"carpetaValor": "Terreno", "documento": "Escritura Promesa", "abrev": "TE_Prom_Escr"}, {"carpetaValor": "Terreno", "documento": "Dominio Vigente", "abrev": "TE_DV_Dom Vig"}, {"carpetaValor": "Terreno", "documento": "Certificado de Hipoteca", "abrev": "TE_DV_Cert Hipot"}, {"carpetaValor": "Terreno", "documento": "Escritura Compra y Venta", "abrev": "TE_Escr_Escr CV"}, {"carpetaValor": "Terreno", "documento": "Escritura Fusion", "abrev": "TE_Escr_Escr Fusion"}, {"carpetaValor": "Terreno", "documento": "Resolución Aprobación Fusión", "abrev": "TE_Fusion_Res"}, {"carpetaValor": "Terreno", "documento": "Roles Asignados Fusión", "abrev": "TE_Fusion_Rol"}, {"carpetaValor": "Terreno", "documento": "Memoria Explicativa Fusión", "abrev": "TE_Fusion_Mem Expl"}, {"carpetaValor": "Terreno", "documento": "Resolución Aprobación Subdivisión", "abrev": "TE_Subdiv_Res"}, {"carpetaValor": "Terreno", "documento": "Retificación Resolución Subdivisión", "abrev": "TE_Subdiv_Rect Res"}, {"carpetaValor": "Terreno", "documento": "Roles Asignados Subdivisión", "abrev": "TE_Subdiv_Rol"}, {"carpetaValor": "Terreno", "documento": "Memoria Explicativa Subdivisión", "abrev": "TE_Subdiv_Mem Expl"}, {"carpetaValor": "Terreno", "documento": "Dominio Vigente Anterior", "abrev": "TE_Est Tit_Dom Vig Ant"}, {"carpetaValor": "Terreno", "documento": "Escritura Dominio Anterior", "abrev": "TE_Est Tit_Escr Ant"}, {"carpetaValor": "Terreno", "documento": "Resolución Aprobación Fusión Ant", "abrev": "TE_Est Tit_Fusion_Res"}, {"carpetaValor": "Terreno", "documento": "Roles Asignados Fusión Ant", "abrev": "TE_Est Tit_Fusion_Rol"}, {"carpetaValor": "Terreno", "documento": "Memoria Explicativa Fusión Ant", "abrev": "TE_Est Tit_Fusion_Mem Expl"}, {"carpetaValor": "Terreno", "documento": "Resolución Aprobación Subdivisión Ant", "abrev": "TE_Est Tit_Subdiv_Res"}, {"carpetaValor": "Terreno", "documento": "Roles Asignados Subdivisión Ant", "abrev": "TE_Est Tit_Subdiv_Rol"}, {"carpetaValor": "Terreno", "documento": "Memoria Explicativa Subdivisión Ant", "abrev": "TE_Est Tit_Subdiv_Mem Expl"}, {"carpetaValor": "Terreno", "documento": "Compra-Venta Anterior", "abrev": "TE_Est Tit_Escr CV"}, {"carpetaValor": "Terreno", "documento": "Escritura Cesión", "abrev": "TE_Ces Grat_Escr"}, {"carpetaValor": "Terreno", "documento": "Inscripción Cesión", "abrev": "TE_Ces Grat_Inscrip"}, {"carpetaValor": "Loteo", "documento": "Resolución de Aprobación", "abrev": "LO_Res"}, {"carpetaValor": "Loteo", "documento": "Modificación de Resolución", "abrev": "LO_Mod Res"}, {"carpetaValor": "Loteo", "documento": "Oficio de Aprobación Modificación", "abrev": "LO_Aprob Mod"}, {"carpetaValor": "Loteo", "documento": "Certificado Modificacion de Loteo", "abrev": "LO_Cert_Mod"}, {"carpetaValor": "Loteo", "documento": "Memoria Loteo", "abrev": "LO_Mem Loteo"}, {"carpetaValor": "Loteo", "documento": "Cuadro Superficie", "abrev": "LO_Superf"}, {"carpetaValor": "Loteo", "documento": "Resolución de Aprobación AP Loteo", "abrev": "LO_Res AP"}, {"carpetaValor": "Loteo", "documento": "Certificado Informaciones Previas", "abrev": "LO_Cip"}, {"carpetaValor": "Loteo", "documento": "Certificado de Ruralidad", "abrev": "LO_Cert Rural"}, {"carpetaValor": "Loteo", "documento": "Nombre de Calles", "abrev": "LO_Calles"}, {"carpetaValor": "Loteo", "documento": "Rectificación Nombre de Calles", "abrev": "LO_Rect Calles"}, {"carpetaValor": "Loteo", "documento": "Número Municipal", "abrev": "LO_Numero"}, {"carpetaValor": "Loteo", "documento": "Accesibilidad Universal", "abrev": "LO_Acc Univ"}, {"carpetaValor": "Loteo", "documento": "Certificado Asignaciones de Roles", "abrev": "LO_Rol"}, {"carpetaValor": "Loteo", "documento": "Aprobación Señaletica", "abrev": "LO_Sñltca"}, {"carpetaValor": "Loteo", "documento": "Aprobación Cambio Uso de Suelo", "abrev": "LO_Aprob Cus"}, {"carpetaValor": "Loteo", "documento": "Especificaciones Técnicas Áreas Verdes", "abrev": "LO_ET AV"}, {"carpetaValor": "Loteo", "documento": "Aprobación Areas Verdes", "abrev": "LO_Aprob AV"}, {"carpetaValor": "Edificacion", "documento": "Permiso de Edificación", "abrev": "ED_Perm Edif"}, {"carpetaValor": "Edificacion", "documento": "Resolución de Aprobación.", "abrev": "ED_Res"}, {"carpetaValor": "Edificacion", "documento": "Modificación de Resolución.", "abrev": "ED_Mod Res"}, {"carpetaValor": "Edificacion", "documento": "Rectificación Resolución", "abrev": "ED_Rect Res"}, {"carpetaValor": "Edificacion", "documento": "Resolución de Aprobación AP Edificación", "abrev": "ED_Res AP"}, {"carpetaValor": "Edificacion", "documento": "Certificado Mod Perm Edif", "abrev": "ED_Cert_Mod"}, {"carpetaValor": "Edificacion", "documento": "Informe Favorable Estructura", "abrev": "ED_Inf Estr"}, {"carpetaValor": "Edificacion", "documento": "Certificado Inscripción Vigente (Revisor)", "abrev": "ED_Civ Estr"}, {"carpetaValor": "Edificacion", "documento": "Especificaciones Técnicas Arquitectura", "abrev": "ED_ET Arq"}, {"carpetaValor": "Edificacion", "documento": "Informe Técnico PDA", "abrev": "ED_IT PDA"}, {"carpetaValor": "Edificacion", "documento": "Aprobación Areas Verdes.", "abrev": "ED_ET AV"}, {"carpetaValor": "Edificacion", "documento": "Especificaciones Técnicas Áreas Verdes.", "abrev": "ED_ET AV"}, {"carpetaValor": "Edificacion", "documento": "Especificaciones Técnicas Estructura", "abrev": "ED_ET Estr"}, {"carpetaValor": "Edificacion", "documento": "Memoria Cálculo", "abrev": "ED_Mem Estr"}, {"carpetaValor": "Edificacion", "documento": "Certificado Informaciones Previas Condominio", "abrev": "ED_Cip"}, {"carpetaValor": "Edificacion", "documento": "Aprobación Bomberos", "abrev": "ED_Bom_Aprob"}, {"carpetaValor": "Edificacion", "documento": "Resolución Aprobación Sala Basura", "abrev": "ED_Bas_Res"}, {"carpetaValor": "Edificacion", "documento": "Antecedentes Sala Basura", "abrev": "ED_Bas_Antec"}, {"carpetaValor": "Edificacion", "documento": "Certificado Copropiedad Inmobiliaria", "abrev": "ED_Cop Inmob_ley 19537"}, {"carpetaValor": "Edificacion", "documento": "Número Municipal.", "abrev": "ED_Numero"}, {"carpetaValor": "Edificacion", "documento": "Certificado de Roles", "abrev": "ED_Rol"}, {"carpetaValor": "Edificacion", "documento": "Accesibilidad Universal.", "abrev": "ED_Acc Univ"}, {"carpetaValor": "Edificacion", "documento": "Certificado Vivienda Social DOM", "abrev": "ED_Cert Viv Soc DOM"}, {"carpetaValor": "Edificacion", "documento": "Certificado Vivienda Social SERVIU", "abrev": "ED_Cert Viv Soc SERVIU"}, {"carpetaValor": "Edificacion", "documento": "Certificado Copropiedad Inmobiliaria", "abrev": "ED_Cop Inmob_Cert"}, {"carpetaValor": "Edificacion", "documento": "Reglamento Copropiedad", "abrev": "ED_Cop Inmob_Regl"}, {"carpetaValor": "Sanitaria", "documento": "Oficio de Aprobación Público", "abrev": "SA_Aprob Red"}, {"carpetaValor": "Sanitaria", "documento": "Oficio de Aprobación Domiciliario", "abrev": "SA_Aprob Dom"}, {"carpetaValor": "Sanitaria", "documento": "Oficio de Aprobación Áreas Verdes", "abrev": "SA_Aprob AV"}, {"carpetaValor": "Sanitaria", "documento": "Oficio de Aprobación PEAP", "abrev": "SA_PEAP_Aprob "}, {"carpetaValor": "Sanitaria", "documento": "Oficio de Aprobación PEAS", "abrev": "SA_PEAS_Aprob "}, {"carpetaValor": "Sanitaria", "documento": "Oficio de Aprobación AFRE", "abrev": "SA_Aprob AFRE"}, {"carpetaValor": "Sanitaria", "documento": "Contrato AFRE", "abrev": "SA_Contr AFRE"}, {"carpetaValor": "Sanitaria", "documento": "Oficio de Aprobación Paralelismo", "abrev": "SA_Aprob Paral"}, {"carpetaValor": "Sanitaria", "documento": "Modificación de Aprobación Red", "abrev": "SA_Mod Aprob Red"}, {"carpetaValor": "Sanitaria", "documento": "Modificación de Aprobación Dom", "abrev": "SA_Mod Aprob Dom"}, {"carpetaValor": "Sanitaria", "documento": "Modificación de Aprobación PEAP", "abrev": "SA_PEAP_Mod Aprob "}, {"carpetaValor": "Sanitaria", "documento": "Modificación de Aprobación PEAS", "abrev": "SA_PEAS_Mod Aprob "}, {"carpetaValor": "Sanitaria", "documento": "Propuesta Técnica Económica ATO", "abrev": "SA_Ato_PTE"}, {"carpetaValor": "Sanitaria", "documento": "Aceptación PTE ATO", "abrev": "SA_Ato_Acept"}, {"carpetaValor": "Sanitaria", "documento": "Convenio ATO", "abrev": "SA_Ato_Conv"}, {"carpetaValor": "Sanitaria", "documento": "Propuesta Técnica Económica 52 Bis", "abrev": "SA_52 Bis_PTE"}, {"carpetaValor": "Sanitaria", "documento": "Aceptación PTE 52Bis", "abrev": "SA_52 Bis_Acept"}, {"carpetaValor": "Sanitaria", "documento": "Convenio 52Bis", "abrev": "SA_52 Bis_Conv"}, {"carpetaValor": "Sanitaria", "documento": "Factibilidad Sanitaria", "abrev": "SA_Fact"}, {"carpetaValor": "Sanitaria", "documento": "Especificaciones Técnicas Sanitarias", "abrev": "SA_ET"}, {"carpetaValor": "Sanitaria", "documento": "Especificaciones Técnicas Sanitarias Dom", "abrev": "SA_ET Dom"}, {"carpetaValor": "Sanitaria", "documento": "Especificaciones Técnicas AP", "abrev": "SA_ET AP"}, {"carpetaValor": "Sanitaria", "documento": "Especificaciones Técnicas AP Dom", "abrev": "SA_ET AP Dom"}, {"carpetaValor": "Sanitaria", "documento": "Especificaciones Técnicas AS", "abrev": "SA_ET AS"}, {"carpetaValor": "Sanitaria", "documento": "Especificaciones Técnicas AS Dom", "abrev": "SA_ET AS Dom"}, {"carpetaValor": "Sanitaria", "documento": "Especificaciones Técnicas Paralelismo", "abrev": "SA_ET Paral"}, {"carpetaValor": "Sanitaria", "documento": "Especificaciones Técnicas Atravieso", "abrev": "SA_ET Atrav"}, {"carpetaValor": "Sanitaria", "documento": "Presupuesto AP", "abrev": "SA_Ppto AP"}, {"carpetaValor": "Sanitaria", "documento": "Presupuesto AS", "abrev": "SA_Ppto AS"}, {"carpetaValor": "Sanitaria", "documento": "Presupuesto AFRE", "abrev": "SA_Ppto AFRE"}, {"carpetaValor": "Sanitaria", "documento": "Memoria Sanitaria Público", "abrev": "SA_Mem Red"}, {"carpetaValor": "Sanitaria", "documento": "Memoria Sanitaria Domiciliaria", "abrev": "SA_Mem Dom"}, {"carpetaValor": "Sanitaria", "documento": "Memoria Sanitaria AFRE", "abrev": "SA_Mem AFRE"}, {"carpetaValor": "Sanitaria", "documento": "Memoria Sanitaria PEAP", "abrev": "SA_PEAP_Mem"}, {"carpetaValor": "Sanitaria", "documento": "Anexo Memoria Sanitaria PEAP", "abrev": "SA_PEAP_Anexo"}, {"carpetaValor": "Sanitaria", "documento": "Memoria Sanitaria PEAS", "abrev": "SA_PEAS_Mem"}, {"carpetaValor": "Sanitaria", "documento": "Memoria Eléctrico PEAP", "abrev": "SA_PEAP_Mem Elec"}, {"carpetaValor": "Sanitaria", "documento": "Memoria Eléctrico PEAS", "abrev": "SA_PEAS_Mem Elec "}, {"carpetaValor": "Sanitaria", "documento": "Presupuesto PEAP", "abrev": "SA_PEAP_Ppto"}, {"carpetaValor": "Sanitaria", "documento": "Memoria AP Público", "abrev": "SA_Mem AP Red"}, {"carpetaValor": "Sanitaria", "documento": "Memoria AP Domiciliario", "abrev": "SA_Mem AP Dom"}, {"carpetaValor": "Sanitaria", "documento": "Memoria AS Público", "abrev": "SA_Mem AS Red"}, {"carpetaValor": "Sanitaria", "documento": "Memoria AS Domiciliario", "abrev": "SA_Mem AS Dom"}, {"carpetaValor": "Sanitaria", "documento": "Memoria Paralelismo", "abrev": "SA_Mem Paral"}, {"carpetaValor": "Sanitaria", "documento": "Memoria Atravieso", "abrev": "SA_Mem Atrav"}, {"carpetaValor": "Sanitaria", "documento": "Memoria Sanitaria Areas Verdes", "abrev": "SA_Mem AV"}, {"carpetaValor": "Serviu", "documento": "Oficio de Aprobación.", "abrev": "SE_Aprob"}, {"carpetaValor": "Serviu", "documento": "Oficio de Aprobación DOM.", "abrev": "SE_Aprob DOM"}, {"carpetaValor": "Serviu", "documento": "Oficio de Aprobación EISTU.", "abrev": "SE_EISTU Aprob"}, {"carpetaValor": "Serviu", "documento": "Aprobación Servidumbre All", "abrev": "SE_Serv Aprob"}, {"carpetaValor": "Serviu", "documento": "Presupuesto Serviu", "abrev": "SE_Ppto"}, {"carpetaValor": "Serviu", "documento": "Memoria Serviu", "abrev": "SE_Mem"}, {"carpetaValor": "Serviu", "documento": "Memoria Serviu Pav", "abrev": "SE_Mem Pav"}, {"carpetaValor": "Serviu", "documento": "Memoria Serviu All", "abrev": "SE_Mem All"}, {"carpetaValor": "Serviu", "documento": "Memoria Eistu Pav", "abrev": "SE_EISTU_Mem Pav"}, {"carpetaValor": "Serviu", "documento": "Memoria Eistu All", "abrev": "SE_EISTU_Mem All"}, {"carpetaValor": "Serviu", "documento": "Memoria Serviu All", "abrev": "SE_Mem All"}, {"carpetaValor": "Serviu", "documento": "Especificaciones Serviu", "abrev": "SE_ET"}, {"carpetaValor": "Serviu", "documento": "Especificaciones Pavimento", "abrev": "SE_ET Pav"}, {"carpetaValor": "Serviu", "documento": "Especificaciones All", "abrev": "SE_ET All"}, {"carpetaValor": "Singular", "documento": "Informe Mecánica de Suelos", "abrev": "SG_IMS"}, {"carpetaValor": "Singular", "documento": "Informe Ensayos de Suelo", "abrev": "SG_IEns"}, {"carpetaValor": "Singular", "documento": "Electrificación", "abrev": "SG_Elec"}, {"carpetaValor": "Singular", "documento": "Electrificación", "abrev": "SG_Elec_Fact"}, {"carpetaValor": "Singular", "documento": "Gas", "abrev": "SG_Gas_Res"}, {"carpetaValor": "Singular", "documento": "Informe Factibilidad Técnica EISTU", "abrev": "SG_TRANSP_EISTU_ITF"}, {"carpetaValor": "Singular", "documento": "Memoria EISTU", "abrev": "SG_TRANSP_EISTU_Mem"}, {"carpetaValor": "Singular", "documento": "Oficio Aprobación EISTU", "abrev": "SG_TRANSP_EISTU_Aprob"}, {"carpetaValor": "Singular", "documento": "Rectificación Aprobación EISTU", "abrev": "SG_TRANSP_EISTU_Rect Aprob"}, {"carpetaValor": "Singular", "documento": "Informe Factibilidad Técnica EIV", "abrev": "SG_TRANSP_EIV_ITF"}, {"carpetaValor": "Singular", "documento": "Memoria EIV", "abrev": "SG_TRANSP_EIV_Mem"}, {"carpetaValor": "Singular", "documento": "Informe Factibilidad Técnica EVB", "abrev": "SG_TRANSP_EVB_ITF"}, {"carpetaValor": "Singular", "documento": "Memoria EVB", "abrev": "SG_TRANSP_EVB_Mem"}, {"carpetaValor": "Singular", "documento": "Oficio Aprobación Ing Detalle", "abrev": "SG_TRANSP_Vial_Aprob"}, {"carpetaValor": "Singular", "documento": "Especificaciones Técnicas Ing. Detalle", "abrev": "SG_TRANSP_Vial_ET"}, {"carpetaValor": "Singular", "documento": "Memoria Ing. Detalle", "abrev": "SG_TRANSP_Vial_Mem"}, {"carpetaValor": "Singular", "documento": "Oficio Aprobación Reprogramación semafórica", "abrev": "SG_TRANSP_Semaforo_Aprob"}, {"carpetaValor": "Singular", "documento": "Factibilidad Acceso", "abrev": "SG_Acc_Fact"}, {"carpetaValor": "Singular", "documento": "Resolución de Aprobación Acceso", "abrev": "SG_Acc_Res"}, {"carpetaValor": "Singular", "documento": "Memoria Cálculo Acceso", "abrev": "SG_Acc_Mem"}, {"carpetaValor": "Singular", "documento": "Aprobación Modificación de Cauce", "abrev": "SG_M. Cauce_Aprob"}, {"carpetaValor": "Singular", "documento": "Memoria Modificación de Cauce", "abrev": "SG_M. Cauce_Mem"}, {"carpetaValor": "Singular", "documento": "Antecedentes Modificación de Cauce", "abrev": "SG_M. Cauce_Antec"}, {"carpetaValor": "Singular", "documento": "Anexo Memoria Modificación de Cauce", "abrev": "SG_M. Cauce_Anexo Mem"}, {"carpetaValor": "Singular", "documento": "Especificaciones Modificación de Cauce", "abrev": "SG_M. Cauce_ET"}, {"carpetaValor": "Singular", "documento": "Resolución de Aprobación DGA", "abrev": "SG_DGA_Res"}, {"carpetaValor": "Singular", "documento": "Escritura Servidumbre", "abrev": "SG_Escrit Serv"}, {"carpetaValor": "Singular", "documento": "Rectificación Escritura Servidumbre", "abrev": "SG_Rect Escrit Serv"}, {"carpetaValor": "Singular", "documento": "Resolución Pertinencia de Ingreso", "abrev": "SG_DIA_Pertinencia"}, {"carpetaValor": "Singular", "documento": "Resolución de Calificación Ambiental", "abrev": "SG_DIA_RCA"}, {"carpetaValor": "Singular", "documento": "Declaración Impacto Ambiental", "abrev": "SG_DIA_Dia"}, {"carpetaValor": "Singular", "documento": "Admisibilidad DIA", "abrev": "SG_DIA_Adm"}, {"carpetaValor": "Singular", "documento": "Certificado de Inscripción TEL", "abrev": "SG_TEL_Inscr"}, {"carpetaValor": "Singular", "documento": "Certificado de Perfeccionamiento TEL", "abrev": "SG_TEL_Perf"}, {"carpetaValor": "Singular", "documento": "Certificado de Recepción TEL", "abrev": "SG_TEL_Recep"}, {"carpetaValor": "Singular", "documento": "Memoria TEL", "abrev": "SG_TEL_Mem"}, {"carpetaValor": "Singular", "documento": "Especificaciones Técnicas TEL", "abrev": "SG_TEL_ET"}, {"carpetaValor": "Singular", "documento": "Presupuesto TEL", "abrev": "SG_TEL_Ppto"}, {"carpetaValor": "Singular", "documento": "Aprobación PCE", "abrev": "SG_DIA_Aprob PCE"}, {"carpetaValor": "Singular", "documento": "Comprobante SNIFA", "abrev": "SG_DIA_Compr SNIFA"}, {"carpetaValor": "Singular", "documento": "Aprobación DOH", "abrev": "SG_DOH_Aprob"}, {"carpetaValor": "Singular", "documento": "Aprobación MOP Vialidad", "abrev": "SG_MOP_Vial_Aprob"}, {"carpetaValor": "Singular", "documento": "Memoria Vial", "abrev": "SG_MOP_Vial_Mem"}, {"carpetaValor": "Singular", "documento": "Memoria ALL Vialidad", "abrev": "SG_MOP_Vial_Mem All"}, {"carpetaValor": "Singular", "documento": "Especificaciones Vialidad", "abrev": "SG_MOP_Vial_ET"}, {"carpetaValor": "Singular", "documento": "Especificaciones Seguridad Vial", "abrev": "SG_MOP_Vial_ET Seg Vial"}, {"carpetaValor": "Recepcion", "documento": "Certificado de Recepción", "abrev": "RE_Cert Recep"}, {"carpetaValor": "Recepcion", "documento": "Certificado de Recepción Urbanización", "abrev": "RE_Cert Recep Urba"}], "carpetasPlanos": [{"carpeta": "01.0_Antecedentes de Terreno", "valor": "Terreno2"}, {"carpeta": "01.1_Permiso de Loteo", "valor": "Loteo2"}, {"carpeta": "01.2_Permiso de Edificación", "valor": "Edificacion2"}, {"carpeta": "01.3_Sanitaria", "valor": "Sanitaria2"}, {"carpeta": "01.4_Serviu", "valor": "Serviu2"}, {"carpeta": "01.5_Singular", "valor": "Singular2"}], "planos": [{"carpetaValor": "Terreno2", "documento": "Plano Fusión", "abrev": "PL_TE_Fusion_Inscrip"}, {"carpetaValor": "Terreno2", "documento": "Plano Subdivisión", "abrev": "PL_TE_Subdiv_Inscrip"}, {"carpetaValor": "Loteo2", "documento": "Plano de Loteo", "abrev": "PL_LO_Loteo"}, {"carpetaValor": "Loteo2", "documento": "Modificación Loteo", "abrev": "PL_LO_Mod Loteo"}, {"carpetaValor": "Loteo2", "documento": "Número Municipal", "abrev": "PL_LO_Numero"}, {"carpetaValor": "Loteo2", "documento": "Plano Perfil Calles", "abrev": "PL_LO_Perfil"}, {"carpetaValor": "Loteo2", "documento": "Plano Continuidad Vial", "abrev": "PL_LO_Continuidad vial"}, {"carpetaValor": "Loteo2", "documento": "Plano Areas Verdes", "abrev": "PL_LO_AV"}, {"carpetaValor": "Loteo2", "documento": "Plano Cambio Uso de Suelo", "abrev": "PL_LO_CUS"}, {"carpetaValor": "Loteo2", "documento": "Equipamiento Deportivo", "abrev": "PL_LO_Equip Dep"}, {"carpetaValor": "Loteo2", "documento": "Accesibilidad", "abrev": "PL_LO_Accesib"}, {"carpetaValor": "Loteo2", "documento": "Plano Señalética", "abrev": "PL_LO_Sñltca"}, {"carpetaValor": "Loteo2", "documento": "Plano Mitigación", "abrev": "PL_LO_Mitig"}, {"carpetaValor": "Loteo2", "documento": "Plano Asignaciones de Roles", "abrev": "PL_LO_Rol"}, {"carpetaValor": "Loteo2", "documento": "Anteproyecto Loteo", "abrev": "PL_LO_AP Loteo"}, {"carpetaValor": "Edificacion2", "documento": "Anteproyecto Arquitectura", "abrev": "PL_ED_AP Arq"}, {"carpetaValor": "Edificacion3", "documento": "Anteproyecto Loteo Arquitectura", "abrev": "PL_ED_AP Loteo"}, {"carpetaValor": "Edificacion2", "documento": "Arquitectura", "abrev": "PL_ED_Arq"}, {"carpetaValor": "Edificacion2", "documento": "Ficha Arquitectura", "abrev": "PL_ED_Ficha Arq"}, {"carpetaValor": "Edificacion2", "documento": "Loteo", "abrev": "PL_ED_Loteo"}, {"carpetaValor": "Edificacion2", "documento": "Plano Areas Verdes.", "abrev": "PL_ED_AV"}, {"carpetaValor": "Edificacion2", "documento": "Emplazamiento", "abrev": "PL_ED_Emplaz"}, {"carpetaValor": "Edificacion2", "documento": "Estructura", "abrev": "PL_ED_Est"}, {"carpetaValor": "Edificacion2", "documento": "Accesibilidad.", "abrev": "PL_ED_Accesib"}, {"carpetaValor": "Edificacion2", "documento": "Plano Ley 19537", "abrev": "PL_ED_Cop Inmob_ley 19537"}, {"carpetaValor": "Edificacion2", "documento": "Numeros Municipales", "abrev": "PL_ED_Numero"}, {"carpetaValor": "Edificacion2", "documento": "Plano Roles", "abrev": "PL_ED_Rol"}, {"carpetaValor": "Edificacion2", "documento": "Plano Bomberos", "abrev": "PL_ED_Bom"}, {"carpetaValor": "Edificacion2", "documento": "Plano Sala Basura", "abrev": "PL_ED_Bas"}, {"carpetaValor": "Sanitaria2", "documento": "Agua Potable Público", "abrev": "PL_SA_AP Red"}, {"carpetaValor": "Sanitaria2", "documento": "Agua Potable Domiciliario", "abrev": "PL_SA_AP Dom"}, {"carpetaValor": "Sanitaria2", "documento": "Agua Potable Areas Verdes", "abrev": "PL_SA_AP AV"}, {"carpetaValor": "Sanitaria2", "documento": "Plano Paralelismo AS", "abrev": "PL_SA_AS Paral"}, {"carpetaValor": "Sanitaria2", "documento": "Plano Paralelismo AP", "abrev": "PL_SA_AP Paral"}, {"carpetaValor": "Sanitaria2", "documento": "Plano Atravieso AS", "abrev": "PL_SA_AS Atrav"}, {"carpetaValor": "Sanitaria2", "documento": "Plano Atravieso AP", "abrev": "PL_SA_AP Atrav"}, {"carpetaValor": "Sanitaria2", "documento": "Planta Elevadora AP", "abrev": "PL_SA_PEAP"}, {"carpetaValor": "Sanitaria2", "documento": "Mod. Planta Elevadora AP", "abrev": "PL_SA_Mod PEAP"}, {"carpetaValor": "Sanitaria2", "documento": "Eléctrico Planta Elevadora AP", "abrev": "PL_SA_Elec PEAP"}, {"carpetaValor": "Sanitaria2", "documento": "Agua Servida Público", "abrev": "PL_SA_AS Red"}, {"carpetaValor": "Sanitaria2", "documento": "Agua Servida Domiciliario", "abrev": "PL_SA_AS Dom"}, {"carpetaValor": "Sanitaria2", "documento": "AS AFRE", "abrev": "PL_SA_AS AFRE"}, {"carpetaValor": "Sanitaria2", "documento": "AP AFRE", "abrev": "PL_SA_AP AFRE"}, {"carpetaValor": "Sanitaria2", "documento": "Planta Elevadora AS", "abrev": "PL_SA_PEAS"}, {"carpetaValor": "Sanitaria3", "documento": "Planta Elevadora AS Provisoria", "abrev": "PL_SA_PEAS Prov"}, {"carpetaValor": "Sanitaria2", "documento": "Mod. Planta Elevadora AS", "abrev": "PL_SA_Mod PEAS"}, {"carpetaValor": "Sanitaria2", "documento": "Elec Planta Elevadora AS", "abrev": "PL_SA_Elec PEAS"}, {"carpetaValor": "Sanitaria2", "documento": "Impulsión AS", "abrev": "PL_SA_IAS"}, {"carpetaValor": "Sanitaria2", "documento": "Estanque AP", "abrev": "PL_SA_Estq AP"}, {"carpetaValor": "Sanitaria2", "documento": "Servidumbre AP", "abrev": "PL_SA_Servid AP"}, {"carpetaValor": "Sanitaria2", "documento": "Servidumbre AS", "abrev": "PL_SA_Servid AS"}, {"carpetaValor": "Sanitaria2", "documento": "Agua Servida Areas Verdes", "abrev": "PL_SA_AS AV"}, {"carpetaValor": "Serviu2", "documento": "Pavimento", "abrev": "PL_SE_Pav"}, {"carpetaValor": "Serviu2", "documento": "Pavimento EISTU", "abrev": "PL_SE_EISTU_Pav"}, {"carpetaValor": "Serviu2", "documento": "Atravieso", "abrev": "PL_SE_Atrav"}, {"carpetaValor": "Serviu2", "documento": "Plano de Loteo.", "abrev": "PL_SE_Loteo"}, {"carpetaValor": "Serviu2", "documento": "Plano Seguridad Vial", "abrev": "PL_SE_Seg Vial"}, {"carpetaValor": "Serviu2", "documento": "Aguas Lluvias", "abrev": "PL_SE_All"}, {"carpetaValor": "Serviu2", "documento": "Servidumbre Aguas Lluvias", "abrev": "PL_SE_Serv All"}, {"carpetaValor": "Singular2", "documento": "Plano Electrificación", "abrev": "PL_SG_Elec"}, {"carpetaValor": "Singular2", "documento": "Plano Topografía", "abrev": "PL_SG_Topo"}, {"carpetaValor": "Singular2", "documento": "Plano EISTU", "abrev": "PL_SG_TRANSP_EISTU"}, {"carpetaValor": "Singular2", "documento": "Plano EISTU PREDISEÑO", "abrev": "PL_SG_TRANSP_EISTU PREDISEÑO"}, {"carpetaValor": "Singular2", "documento": "Plano EISTU CATASTRO", "abrev": "PL_SG_TRANSP_EISTU CATASTRO"}, {"carpetaValor": "Singular2", "documento": "Plano EIV", "abrev": "PL_SG_TRANSP_EIV"}, {"carpetaValor": "Singular2", "documento": "Plano EVB", "abrev": "PL_SG_TRANSP_EVB"}, {"carpetaValor": "Singular2", "documento": "Plano Ingenieria Detalle Pav", "abrev": "PL_SG_TRANSP_Vial_Pav"}, {"carpetaValor": "Singular2", "documento": "Plano Ingenieria Detalle All", "abrev": "PL_SG_TRANSP_Vial_All"}, {"carpetaValor": "Singular2", "documento": "Plano Ingenieria Detalle Seguridad", "abrev": "PL_SG_TRANSP_Vial_Seg Vial"}, {"carpetaValor": "Singular2", "documento": "Plano Semaforo", "abrev": "PL_SG_TRANSP_Semaforo_Reprogram"}, {"carpetaValor": "Singular2", "documento": "Plano Atravieso", "abrev": "PL_SG_TRANSP_Atrav"}, {"carpetaValor": "Singular2", "documento": "Plano Acceso", "abrev": "PL_SG_Acc"}, {"carpetaValor": "Singular2", "documento": "Plano Acceso MOP", "abrev": "PL_SG_MOP_Acc"}, {"carpetaValor": "Singular2", "documento": "Plano Estr Puente MDC", "abrev": "PL_SG_Mod Cauce_Estr Puente"}, {"carpetaValor": "Singular2", "documento": "Plano Modificación de Cauce", "abrev": "PL_SG_Mod Cauce"}, {"carpetaValor": "Singular2", "documento": "Plano Servidumbre", "abrev": "PL_SG_Serv"}, {"carpetaValor": "Singular2", "documento": "Plano Empalme Telecomunicaciones", "abrev": "PL_SG_Telecom_Empalme"}, {"carpetaValor": "Singular2", "documento": "Plano RIT Condominio", "abrev": "PL_SG_Telecom_RIT"}, {"carpetaValor": "Singular2", "documento": "Plano Canalización Lateral", "abrev": "PL_SG_Telecom_Canal. Lat"}, {"carpetaValor": "Singular2", "documento": "Plano Distribución interior", "abrev": "PL_SG_Telecom_Distr. Lat"}, {"carpetaValor": "Singular2", "documento": "Plano Distribución cubierta", "abrev": "PL_SG_Telecom_Distrib. Cub"}, {"carpetaValor": "Singular2", "documento": "Plano Esquema Infra. Física", "abrev": "PL_SG_Telecom_Infra Fis"}, {"carpetaValor": "Singular2", "documento": "Plano Esquema Red Alam. Coaxial", "abrev": "PL_SG_Telecom_Red Alam Coax"}, {"carpetaValor": "Singular2", "documento": "Plano Esquema Red Alam. F.O.", "abrev": "PL_SG_Telecom_Red Alam FO"}, {"carpetaValor": "Singular2", "documento": "Plano Esquema Red Inalam. Coaxial", "abrev": "PL_SG_Telecom_Red Inal Coax"}, {"carpetaValor": "Singular2", "documento": "Plano RIU", "abrev": "PL_SG_Telecom_RIU"}, {"carpetaValor": "Singular2", "documento": "Plano Detalle CTR", "abrev": "PL_SG_Telecom_CTR"}, {"carpetaValor": "Singular2", "documento": "Plano Detalle SOTU", "abrev": "PL_SG_Telecom_SOTU"}], "proyectos": [{"ciudad": "MELIPILLA", "proyecto": "PORTAL ORIENTE I", "abrev": "PO I"}, {"ciudad": "MELIPILLA", "proyecto": "PORTAL ORIENTE II", "abrev": "PO II"}, {"ciudad": "MELIPILLA", "proyecto": "PORTAL ORIENTE III", "abrev": "PO III"}, {"ciudad": "MELIPILLA", "proyecto": "PORTAL ORIENTE IV", "abrev": "PO IV"}, {"ciudad": "SANTA_CRUZ", "proyecto": "VALLES DE APALTA", "abrev": "VDA"}, {"ciudad": "REQUINOA", "proyecto": "PORTAL EL ABRA I", "abrev": "PEA I"}, {"ciudad": "RENGO", "proyecto": "QUILLAYES", "abrev": "QUI"}, {"ciudad": "RENGO", "proyecto": "PARQUE BALUARTE I", "abrev": "PB I"}, {"ciudad": "RENGO", "proyecto": "PARQUE BALUARTE II", "abrev": "PB II"}, {"ciudad": "RENGO", "proyecto": "ALTO SAN MARTIN I", "abrev": "ASM I"}, {"ciudad": "RENGO", "proyecto": "ALTO SAN MARTIN II", "abrev": "ASM II"}, {"ciudad": "SAN_FERNANDO", "proyecto": "VILLA SAN FRANCISCO", "abrev": "VSF"}, {"ciudad": "ROMERAL", "proyecto": "PORTAL LA CAÑADA II", "abrev": "PLC II"}, {"ciudad": "CONSTITUCIÓN", "proyecto": "ROCAS DE LA IGLESIA", "abrev": "RDLI"}], "tipoCasa": [{"tipo": "TIPO A", "abrev": "TA"}, {"tipo": "TIPO B", "abrev": "TB"}, {"tipo": "TIPO C", "abrev": "TC"}, {"tipo": "TIPO D", "abrev": "TD"}, {"tipo": "TIPO A+", "abrev": "TA+"}, {"tipo": "DALI PLUS", "abrev": "DALP"}, {"tipo": "EDIFICIO", "abrev": "EDIF"}, {"tipo": "LOCAL COMERCIAL", "abrev": "LCOM"}]};
@@ -511,6 +603,23 @@ function update(){
     status.textContent = 'incompleto';
     status.style.color = 'var(--ink-faint)';
   }
+  btnSubir.disabled = !(nombre && archivoSeleccionado);
+  btnSubir.title = !nombre ? 'Completa el nombre primero' : !archivoSeleccionado ? 'Elige un archivo primero' : 'Subir a SharePoint';
+}
+
+function onArchivoElegido(e){
+  archivoSeleccionado = e.target.files[0] || null;
+  const label = document.getElementById('label-archivo');
+  const statusEl = document.getElementById('archivo-status');
+  if(archivoSeleccionado){
+    label.textContent = archivoSeleccionado.name.length > 28 ? archivoSeleccionado.name.slice(0,25) + '…' : archivoSeleccionado.name;
+    const mb = (archivoSeleccionado.size / (1024*1024)).toFixed(1);
+    statusEl.textContent = `${archivoSeleccionado.name} — ${mb} MB`;
+  } else {
+    label.textContent = 'Elegir archivo';
+    statusEl.textContent = '';
+  }
+  update();
 }
 
 /* ============ copiar + historial ============ */
@@ -631,6 +740,10 @@ async function agregarProyecto(){
     mostrarToast('Completa ciudad, proyecto y abreviación', true);
     return;
   }
+  if(!CARPETAS_CIUDAD[ciudad]){
+    const continuar = confirm(`"${ciudad}" no está en la lista de carpetas de ciudad conocidas (${Object.keys(CARPETAS_CIUDAD).join(', ')}).\n\n¿Es una ciudad nueva que ya existe como carpeta en SharePoint? Si es así, avisa a TI para agregarla al mapeo de carpetas.\n\n¿Continuar de todas formas?`);
+    if(!continuar) return;
+  }
   const yaExiste = CONFIG.proyectos.some(p => p.ciudad === ciudad && p.proyecto === proyecto);
   if(yaExiste){
     mostrarToast('Ese proyecto ya existe en esa ciudad', true);
@@ -687,6 +800,216 @@ initCarpeta();
 renderNumeros();
 update();
 cargarProyectosRemotos();
+
+const dlCiudades = document.getElementById('adm-ciudad-lista');
+dlCiudades.innerHTML = Object.keys(CARPETAS_CIUDAD).map(c => `<option value="${c}">`).join('');
+
+/* ============ SHAREPOINT / GRAPH API ============
+   Reutiliza la sesión MSAL de la intranet (mismo clientId/tenant, misma
+   pestaña → sessionStorage compartido). La primera vez va a pedir un
+   consentimiento extra porque el scope Files.ReadWrite.All no estaba
+   pedido antes — requiere que ese permiso esté agregado y consentido en
+   el registro de la app de Azure AD (o consentimiento del propio usuario,
+   según cómo esté configurado el tenant). */
+const msalConfig = {
+  auth: {
+    clientId:    "9a56ab1c-d3c4-4460-9892-1d4da768ecfb",
+    authority:   "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
+    redirectUri: window.location.origin,
+  },
+  cache: { cacheLocation: "sessionStorage" }
+};
+const GRAPH_SCOPES = ['Files.ReadWrite.All'];
+const SP_HOSTNAME  = 'ibaker.sharepoint.com';
+const SP_SITE_PATH = '/sites/Proyectos/1_OFICIALES';
+
+let msalInstance = null;
+let graphSiteId  = null;
+let archivoSeleccionado = null;
+let spRuta = []; // segmentos de carpeta desde la raíz del drive, ej. ['1.5_RENGO', 'QUILLAYES', '01_APROBADOS CON TIMBRE']
+
+async function getGraphToken(){
+  if(!msalInstance){
+    msalInstance = new msal.PublicClientApplication(msalConfig);
+    await msalInstance.initialize();
+  }
+  const accounts = msalInstance.getAllAccounts();
+  if(accounts.length === 0){
+    throw new Error('SIN_SESION');
+  }
+  const account = accounts[0];
+  try{
+    const result = await msalInstance.acquireTokenSilent({ scopes: GRAPH_SCOPES, account });
+    return result.accessToken;
+  } catch(e){
+    const result = await msalInstance.acquireTokenPopup({ scopes: GRAPH_SCOPES, account });
+    return result.accessToken;
+  }
+}
+
+async function graphFetch(path, token, options = {}){
+  const res = await fetch(`https://graph.microsoft.com/v1.0${path}`, {
+    ...options,
+    headers: { 'Authorization': `Bearer ${token}`, ...(options.headers || {}) }
+  });
+  if(!res.ok){
+    const texto = await res.text().catch(()=> '');
+    throw new Error(`Graph ${res.status}: ${texto.slice(0,200)}`);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+async function resolverSitio(token){
+  if(graphSiteId) return graphSiteId;
+  const data = await graphFetch(`/sites/${SP_HOSTNAME}:${SP_SITE_PATH}`, token);
+  graphSiteId = data.id;
+  return graphSiteId;
+}
+
+function rutaGraphPath(segmentos){
+  return segmentos.map(s => encodeURIComponent(s)).join('/');
+}
+
+async function listarCarpeta(token, segmentos){
+  const siteId = await resolverSitio(token);
+  const path = rutaGraphPath(segmentos);
+  const endpoint = path
+    ? `/sites/${siteId}/drive/root:/${path}:/children?$select=id,name,folder&$top=200`
+    : `/sites/${siteId}/drive/root/children?$select=id,name,folder&$top=200`;
+  const data = await graphFetch(endpoint, token);
+  return (data.value || []).filter(item => item.folder).sort((a,b) => a.name.localeCompare(b.name));
+}
+
+/* ── flujo del botón "Subir a SharePoint" ── */
+async function abrirSelectorCarpeta(){
+  if(!archivoSeleccionado || !calcularNombre()) return;
+
+  const modal = document.getElementById('sp-modal');
+  const body  = document.getElementById('sp-modal-body');
+  const nota  = document.getElementById('sp-modal-nota');
+  modal.style.display = 'flex';
+  body.innerHTML = '<div class="empty-state">Conectando con SharePoint…</div>';
+  nota.textContent = '';
+
+  let token;
+  try{
+    token = await getGraphToken();
+  } catch(e){
+    if(e.message === 'SIN_SESION'){
+      body.innerHTML = '<div class="empty-state">No hay una sesión activa. Vuelve a la intranet, inicia sesión, y abre este módulo de nuevo desde ahí.</div>';
+    } else {
+      body.innerHTML = `<div class="empty-state">No se pudo conectar: ${e.message}<br><br>Si es la primera vez, puede que falte otorgar el permiso "Files.ReadWrite.All" en el registro de la app en Azure AD.</div>`;
+    }
+    return;
+  }
+
+  // Pre-navegación inteligente: Ciudad → Proyecto (si calza un nombre parecido) → 01/02 según tipo
+  const ciudadVal = document.getElementById('sel-ciudad').value;
+  const carpetaCiudad = CARPETAS_CIUDAD[ciudadVal];
+  spRuta = carpetaCiudad ? [carpetaCiudad] : [];
+
+  try{
+    if(carpetaCiudad){
+      const proyectoVal = document.getElementById('sel-proyecto').value;
+      const hijosCiudad = await listarCarpeta(token, spRuta);
+      const matchProyecto = hijosCiudad.find(f => proyectoVal && f.name.toUpperCase().includes(proyectoVal.toUpperCase()));
+      if(matchProyecto){
+        spRuta.push(matchProyecto.name);
+        const hijosProyecto = await listarCarpeta(token, spRuta);
+        const prefijo = tipoActual === 'documento' ? '01' : '02';
+        const matchTipo = hijosProyecto.find(f => f.name.startsWith(prefijo));
+        if(matchTipo) spRuta.push(matchTipo.name);
+      }
+    }
+  } catch(e){
+    // si la pre-navegación falla, seguimos desde donde se pudo — no es crítico
+  }
+
+  await renderCarpetaActual(token);
+}
+
+async function renderCarpetaActual(token){
+  const body = document.getElementById('sp-modal-body');
+  const crumb = document.getElementById('sp-breadcrumb');
+  crumb.textContent = '1_OFICIALES/' + spRuta.join('/');
+  body.innerHTML = '<div class="empty-state">Cargando carpetas…</div>';
+  try{
+    const items = await listarCarpeta(token, spRuta);
+    let html = '';
+    if(spRuta.length > 0){
+      html += `<div class="sp-item" onclick="subirNivel()"><span class="ico">↑</span> .. (subir un nivel)</div>`;
+    }
+    if(items.length === 0){
+      html += '<div class="empty-state">Esta carpeta no tiene subcarpetas</div>';
+    } else {
+      html += items.map(f => `<div class="sp-item" onclick="entrarCarpeta('${f.name.replace(/'/g,"\\'")}')"><span class="ico">📁</span> ${f.name}</div>`).join('');
+    }
+    body.innerHTML = html;
+    window._spToken = token;
+  } catch(e){
+    body.innerHTML = `<div class="empty-state">Error al listar carpetas: ${e.message}</div>`;
+  }
+}
+
+function entrarCarpeta(nombre){
+  spRuta.push(nombre);
+  renderCarpetaActual(window._spToken);
+}
+function subirNivel(){
+  spRuta.pop();
+  renderCarpetaActual(window._spToken);
+}
+function cerrarSelectorCarpeta(){
+  document.getElementById('sp-modal').style.display = 'none';
+}
+
+async function confirmarSubidaAqui(){
+  const nombre = calcularNombre();
+  if(!nombre || !archivoSeleccionado) return;
+  const nota = document.getElementById('sp-modal-nota');
+  const token = window._spToken;
+
+  const ext = archivoSeleccionado.name.includes('.') ? '.' + archivoSeleccionado.name.split('.').pop() : '';
+  const nombreFinal = nombre + ext;
+
+  if(archivoSeleccionado.size > 60 * 1024 * 1024){
+    nota.textContent = 'El archivo pesa más de 60 MB — súbelo directo en SharePoint por ahora, esta versión no soporta archivos tan grandes.';
+    nota.style.color = 'var(--err)';
+    return;
+  }
+
+  nota.textContent = 'Subiendo…';
+  nota.style.color = 'var(--ink-faint)';
+
+  try{
+    const siteId = await resolverSitio(token);
+    const path = rutaGraphPath(spRuta) + '/' + encodeURIComponent(nombreFinal);
+    const session = await graphFetch(`/sites/${siteId}/drive/root:/${path}:/createUploadSession`, token, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'rename' } })
+    });
+
+    const buffer = await archivoSeleccionado.arrayBuffer();
+    const res = await fetch(session.uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Length': buffer.byteLength,
+        'Content-Range': `bytes 0-${buffer.byteLength - 1}/${buffer.byteLength}`
+      },
+      body: buffer
+    });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+
+    cerrarSelectorCarpeta();
+    mostrarToast('Archivo subido a SharePoint');
+    agregarHistorial(nombreFinal + '  →  1_OFICIALES/' + spRuta.join('/'));
+  } catch(e){
+    nota.textContent = 'Error al subir: ' + e.message;
+    nota.style.color = 'var(--err)';
+  }
+}
+
 </script>
 
 </body>
