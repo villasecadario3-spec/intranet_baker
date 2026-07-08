@@ -1,20 +1,22 @@
 <!doctype html>
 <!--
   Módulo: Proyectos (Intranet Baker)
-  Versión: v0.5 — 2026-07-08
+  Versión: v0.7 — 2026-07-08
   Cambios de esta versión:
-  - Se quitó el toggle Documento/Plano: ahora es un solo formulario
-    "Documentos / Planos", el tipo se detecta según lo que se elige.
-  - Espacios en el nombre final se reemplazan por guion bajo.
-  - Fecha ahora es Día + Mes (abreviado 3 letras, ej. JUL) + Año, en vez
-    de selector de calendario nativo.
-  - Panel "Gestión de proyectos" visible solo para pzuniga@ibaker.cl
-    (antes lo veían los 4 correos con acceso al módulo).
-  - Historial ahora es compartido entre todos los usuarios (vía backend,
-    endpoints /historial en server.js) y muestra el correo de quien hizo
-    cada acción.
-  Requiere: server.js con los endpoints /historial agregados (ver archivo
-  server.js entregado junto con esta versión).
+  - Planos con más de 1 lámina: se quitó el campo "N° de Lámina" (ya no
+    hace falta escribirlo a mano). Con Revisión + Total de Láminas, se
+    generan automáticamente N tarjetas (Lám 1 de N ... Lám N de N), cada
+    una con su propio botón Copiar y su propio selector de archivo.
+  - Botón "Subir archivos de forma masiva": aparece cuando todas las
+    láminas tienen archivo elegido. Abre el mismo explorador de carpetas
+    de siempre (pre-navega a Ciudad/Proyecto/02_ARCHIVOS CAD) y sube todos
+    los archivos de una vez a la carpeta que se elija, cada uno con su
+    nombre correspondiente.
+  - OJO: no configuré una carpeta destino fija "ARCHIVOS TIMBRADOS" — no
+    tengo certeza de dónde vive exactamente esa carpeta en el árbol real.
+    Por ahora la persona la elige a mano en el explorador, igual que
+    cualquier otra carpeta. Avísame el nombre/ubicación exacta si quieres
+    que quede pre-seleccionada automáticamente.
   Si algo se rompe y hay que volver atrás: guarda una copia de este archivo
   antes de seguir editando, para poder comparar/revertir (no tengo memoria
   de versiones anteriores entre mensajes).
@@ -262,6 +264,33 @@
     border:1px solid var(--grid-line-strong); background:var(--bg-deep); color:var(--ink); cursor:pointer;
   }
   .sp-modal-footer button.primary-sp{background:var(--orange); border-color:var(--orange-dim); color:#1a0d02; font-weight:600;}
+
+  /* láminas múltiples */
+  .lamina-card{
+    background:var(--stamp); color:var(--stamp-ink);
+    border-radius:var(--radius); padding:14px 16px; margin-bottom:8px;
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    border:1px solid #d8d3c4;
+  }
+  .lamina-card.completa{border-color:var(--ok); box-shadow:inset 0 0 0 1px var(--ok);}
+  .lamina-info{min-width:0; flex:1;}
+  .lamina-num{font-family:var(--mono); font-size:10.5px; color:#8a8570; letter-spacing:.08em; text-transform:uppercase; margin-bottom:3px;}
+  .lamina-nombre{font-family:var(--mono); font-size:13px; font-weight:600; word-break:break-all;}
+  .lamina-archivo{font-family:var(--mono); font-size:10.5px; color:#8a8570; margin-top:4px;}
+  .lamina-actions{display:flex; gap:6px; flex-shrink:0;}
+  .lamina-actions button, .lamina-actions label{
+    font-family:var(--mono); font-size:11px; padding:7px 10px; border-radius:var(--radius);
+    border:1px solid #c9c3af; background:#fff; color:var(--stamp-ink); cursor:pointer; white-space:nowrap;
+  }
+  .lamina-actions button:hover, .lamina-actions label:hover{background:#eee9dc;}
+  .planos-multi-footer{
+    display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:10px;
+  }
+  #btn-subir-masivo{
+    font-family:var(--display); font-weight:600; font-size:14px; padding:11px 16px;
+    border-radius:var(--radius); border:1px solid var(--orange-dim); background:var(--orange); color:#1a0d02; cursor:pointer;
+  }
+  #btn-subir-masivo:disabled{opacity:.4; cursor:not-allowed;}
 </style>
 </head>
 <body>
@@ -277,7 +306,7 @@
       <h1>Proyectos</h1>
       <div class="sub">Arma el nombre normado del documento o plano antes de subirlo al sitio. Reemplaza la planilla con macros.</div>
     </div>
-    <div class="badge">v0.6 — 2026-07-08 · agrupado por optgroup</div>
+    <div class="badge">v0.7 — 2026-07-08 · láminas múltiples + subida masiva</div>
   </div>
 
   <div class="panel">
@@ -338,7 +367,7 @@
     </div>
   </div>
 
-  <div class="stamp-wrap">
+  <div class="stamp-wrap" id="stamp-single">
     <div class="stamp-label">
       <span>Vista previa — nombre final</span>
       <span id="stamp-status"></span>
@@ -353,6 +382,19 @@
       </div>
     </div>
     <div id="archivo-status" style="font-family:var(--mono); font-size:11px; color:var(--ink-faint); margin-top:8px;"></div>
+  </div>
+
+  <!-- Planos con más de una lámina: un banner por lámina + subida masiva -->
+  <div class="stamp-wrap" id="planos-multi" style="display:none;">
+    <div class="stamp-label">
+      <span id="planos-multi-titulo">Láminas</span>
+      <span id="planos-multi-status"></span>
+    </div>
+    <div id="planos-multi-lista"></div>
+    <div class="planos-multi-footer">
+      <div id="planos-multi-nota" class="hint"></div>
+      <button class="primary" id="btn-subir-masivo" disabled onclick="abrirSelectorCarpetaMasivo()">Subir archivos de forma masiva →</button>
+    </div>
   </div>
 
   <!-- Modal explorador de carpetas SharePoint -->
@@ -621,15 +663,13 @@ function renderNumeros(tipo){
         <input type="text" id="inp-rev" placeholder="ej. A" oninput="update()" />
         <div class="errfield">Ingresa la revisión</div>
       </div>
-      <div class="field" id="f-lam">
-        <label>N° de Lámina <span class="req">*</span></label>
-        <input type="text" id="inp-lam" placeholder="ej. 1" oninput="update()" />
-        <div class="errfield">Ingresa el N° de lámina</div>
-      </div>
       <div class="field" id="f-total">
         <label>Total de Láminas <span class="req">*</span></label>
-        <input type="text" id="inp-total" placeholder="ej. 4" oninput="update()" />
+        <input type="text" id="inp-total" placeholder="ej. 5" oninput="update()" />
         <div class="errfield">Ingresa el total</div>
+      </div>
+      <div class="field" style="justify-content:flex-end;">
+        <div class="hint">Se genera un archivo por cada lámina, de 1 hasta el total.</div>
       </div>`;
   } else {
     grid.innerHTML = `<div class="hint" style="grid-column:1/-1;">Elige un documento o plano arriba para ver los campos de numeración.</div>`;
@@ -655,30 +695,58 @@ function calcularNombre(){
   const docAbrev = document.getElementById('sel-documento').value;
   const tipo = tipoSeleccionado();
 
-  let resultado = null;
+  if(tipo !== 'documento') return null;
 
-  if(tipo === 'documento'){
-    const n = (document.getElementById('inp-n') || {}).value || '';
-    if(!docAbrev || !n || !abrevProy || !fecha) return null;
-    const primeraParte = `${docAbrev} N°${n}`;
-    resultado = [primeraParte, abrevCasa, abrevProy, fecha].filter(Boolean).join('_');
-  } else if(tipo === 'plano'){
-    const rev = (document.getElementById('inp-rev') || {}).value || '';
-    const lam = (document.getElementById('inp-lam') || {}).value || '';
-    const total = (document.getElementById('inp-total') || {}).value || '';
-    if(!docAbrev || !rev || !lam || !total || !abrevProy) return null;
-    const lamina = `Lam ${lam} de ${total}`;
-    resultado = [docAbrev, abrevCasa, abrevProy, `Rev ${rev}`, lamina].filter(Boolean).join('_');
-  } else {
-    return null;
-  }
+  const n = (document.getElementById('inp-n') || {}).value || '';
+  if(!docAbrev || !n || !abrevProy || !fecha) return null;
+  const primeraParte = `${docAbrev} N°${n}`;
+  const resultado = [primeraParte, abrevCasa, abrevProy, fecha].filter(Boolean).join('_');
 
   // Cualquier espacio que haya quedado (por abreviaciones con espacio, ej. "Cert Hipot") se
   // reemplaza por guion bajo, para que el nombre final sea un nombre de archivo prolijo.
   return resultado.replace(/\s+/g, '_');
 }
 
+/* Un plano puede tener varias láminas (1 a N): se genera un nombre por cada una. */
+function calcularNombresPlano(){
+  const tipo = tipoSeleccionado();
+  if(tipo !== 'plano') return [];
+
+  const ciudad = document.getElementById('sel-ciudad').value;
+  const proyecto = document.getElementById('sel-proyecto').value;
+  const abrevProy = abrevProyecto(ciudad, proyecto);
+  const abrevCasa = abrevTipoCasa(document.getElementById('sel-tipocasa').value);
+  const docAbrev = document.getElementById('sel-documento').value;
+  const rev = (document.getElementById('inp-rev') || {}).value || '';
+  const totalRaw = (document.getElementById('inp-total') || {}).value || '';
+  const total = parseInt(totalRaw, 10);
+
+  if(!docAbrev || !rev || !abrevProy || !total || total < 1 || total > 200) return [];
+
+  const nombres = [];
+  for(let i = 1; i <= total; i++){
+    const lamina = `Lam ${i} de ${total}`;
+    const partes = [docAbrev, abrevCasa, abrevProy, `Rev ${rev}`, lamina].filter(Boolean).join('_');
+    nombres.push(partes.replace(/\s+/g, '_'));
+  }
+  return nombres;
+}
+
+let ultimoNombresPlanoJSON = null;
+
 function update(){
+  const tipo = tipoSeleccionado();
+
+  if(tipo === 'plano'){
+    document.getElementById('stamp-single').style.display = 'none';
+    document.getElementById('planos-multi').style.display = 'block';
+    renderPlanosMulti();
+    return;
+  }
+
+  document.getElementById('stamp-single').style.display = '';
+  document.getElementById('planos-multi').style.display = 'none';
+
   const nombre = calcularNombre();
   const el = document.getElementById('stamp-name');
   const status = document.getElementById('stamp-status');
@@ -694,6 +762,79 @@ function update(){
   }
   btnSubir.disabled = !(nombre && archivoSeleccionado);
   btnSubir.title = !nombre ? 'Completa el nombre primero' : !archivoSeleccionado ? 'Elige un archivo primero' : 'Subir a SharePoint';
+}
+
+/* ============ láminas múltiples (planos) ============ */
+let archivosLamina = {}; // { 1: File, 2: File, ... }
+
+function renderPlanosMulti(){
+  const nombres = calcularNombresPlano();
+  const cont = document.getElementById('planos-multi-lista');
+  const titulo = document.getElementById('planos-multi-titulo');
+  const status = document.getElementById('planos-multi-status');
+  const nota = document.getElementById('planos-multi-nota');
+  const btnMasivo = document.getElementById('btn-subir-masivo');
+
+  if(nombres.length === 0){
+    cont.innerHTML = '<div class="empty-state">Completa Revisión y Total de Láminas para ver las láminas a generar.</div>';
+    titulo.textContent = 'Láminas';
+    status.textContent = '';
+    nota.textContent = '';
+    btnMasivo.disabled = true;
+    archivosLamina = {};
+    return;
+  }
+
+  // Si cambió el set de nombres (cambió total, revisión, proyecto, etc.), se reinician los
+  // archivos ya elegidos — ya no corresponden a las láminas nuevas.
+  const nombresJSON = JSON.stringify(nombres);
+  if(nombresJSON !== ultimoNombresPlanoJSON){
+    archivosLamina = {};
+    ultimoNombresPlanoJSON = nombresJSON;
+  }
+
+  titulo.textContent = `Láminas (${nombres.length})`;
+
+  cont.innerHTML = nombres.map((nombre, idx) => {
+    const i = idx + 1;
+    const archivo = archivosLamina[i];
+    return `
+      <div class="lamina-card ${archivo ? 'completa' : ''}" id="lamina-card-${i}">
+        <div class="lamina-info">
+          <div class="lamina-num">Lámina ${i} de ${nombres.length}</div>
+          <div class="lamina-nombre">${nombre}</div>
+          <div class="lamina-archivo">${archivo ? archivo.name + ' — ' + (archivo.size/(1024*1024)).toFixed(1) + ' MB' : 'sin archivo elegido'}</div>
+        </div>
+        <div class="lamina-actions">
+          <button onclick="copiarNombreLamina(${i})">Copiar</button>
+          <label for="input-lamina-${i}">${archivo ? 'Cambiar' : 'Elegir archivo'}</label>
+          <input type="file" id="input-lamina-${i}" style="display:none;" onchange="onArchivoLamina(${i}, event)" />
+        </div>
+      </div>`;
+  }).join('');
+
+  const completas = nombres.filter((_, idx) => archivosLamina[idx+1]).length;
+  status.textContent = `${completas}/${nombres.length} con archivo`;
+  status.style.color = completas === nombres.length ? 'var(--ok)' : 'var(--ink-faint)';
+  nota.textContent = completas === nombres.length
+    ? 'Todas las láminas tienen archivo — listo para subir de forma masiva.'
+    : `Faltan ${nombres.length - completas} archivo(s) por elegir.`;
+  btnMasivo.disabled = completas !== nombres.length;
+}
+
+function onArchivoLamina(i, e){
+  archivosLamina[i] = e.target.files[0] || null;
+  if(!archivosLamina[i]) delete archivosLamina[i];
+  renderPlanosMulti();
+}
+
+function copiarNombreLamina(i){
+  const nombres = calcularNombresPlano();
+  const nombre = nombres[i-1];
+  if(!nombre) return;
+  navigator.clipboard?.writeText(nombre).catch(()=>{});
+  mostrarToast(`Nombre de lámina ${i} copiado`);
+  agregarHistorial(nombre, 'copiado');
 }
 
 function onArchivoElegido(e){
@@ -783,10 +924,7 @@ async function registrarHistorialRemoto(entry){
 
 function marcarCamposFaltantes(){
   document.querySelectorAll('.field').forEach(f => f.classList.remove('invalid'));
-  const tipo = tipoSeleccionado();
-  const checks = tipo === 'plano'
-    ? [['sel-ciudad','f-ciudad'],['sel-proyecto','f-proyecto'],['sel-carpeta','f-carpeta'],['sel-documento','f-documento'],['inp-rev','f-rev'],['inp-lam','f-lam'],['inp-total','f-total']]
-    : [['sel-ciudad','f-ciudad'],['sel-proyecto','f-proyecto'],['sel-carpeta','f-carpeta'],['sel-documento','f-documento'],['inp-dia','f-fecha'],['sel-mes','f-fecha'],['inp-anio','f-fecha'],['inp-n','f-n']];
+  const checks = [['sel-ciudad','f-ciudad'],['sel-proyecto','f-proyecto'],['sel-carpeta','f-carpeta'],['sel-documento','f-documento'],['inp-dia','f-fecha'],['sel-mes','f-fecha'],['inp-anio','f-fecha'],['inp-n','f-n']];
   let faltan = [];
   checks.forEach(([inputId, fieldId]) => {
     const el = document.getElementById(inputId);
@@ -1035,9 +1173,9 @@ async function listarCarpeta(token, segmentos){
 }
 
 /* ── flujo del botón "Subir a SharePoint" ── */
-async function abrirSelectorCarpeta(){
-  if(!archivoSeleccionado || !calcularNombre()) return;
+let modoMasivo = false;
 
+async function conectarYPrenavegar(prefijoTipo){
   const modal = document.getElementById('sp-modal');
   const body  = document.getElementById('sp-modal-body');
   const nota  = document.getElementById('sp-modal-nota');
@@ -1054,7 +1192,7 @@ async function abrirSelectorCarpeta(){
     } else {
       body.innerHTML = `<div class="empty-state">No se pudo conectar: ${e.message}<br><br>Si es la primera vez, puede que falte otorgar el permiso "Files.ReadWrite.All" en el registro de la app en Azure AD.</div>`;
     }
-    return;
+    return null;
   }
 
   // Pre-navegación inteligente: Ciudad → Proyecto (si calza un nombre parecido) → 01/02 según tipo
@@ -1070,8 +1208,7 @@ async function abrirSelectorCarpeta(){
       if(matchProyecto){
         spRuta.push(matchProyecto.name);
         const hijosProyecto = await listarCarpeta(token, spRuta);
-        const prefijo = tipoSeleccionado() === 'plano' ? '02' : '01';
-        const matchTipo = hijosProyecto.find(f => f.name.startsWith(prefijo));
+        const matchTipo = hijosProyecto.find(f => f.name.startsWith(prefijoTipo));
         if(matchTipo) spRuta.push(matchTipo.name);
       }
     }
@@ -1080,6 +1217,21 @@ async function abrirSelectorCarpeta(){
   }
 
   await renderCarpetaActual(token);
+  return token;
+}
+
+async function abrirSelectorCarpeta(){
+  if(!archivoSeleccionado || !calcularNombre()) return;
+  modoMasivo = false;
+  await conectarYPrenavegar(tipoSeleccionado() === 'plano' ? '02' : '01');
+}
+
+async function abrirSelectorCarpetaMasivo(){
+  const nombres = calcularNombresPlano();
+  const completas = nombres.filter((_, idx) => archivosLamina[idx+1]).length;
+  if(nombres.length === 0 || completas !== nombres.length) return;
+  modoMasivo = true;
+  await conectarYPrenavegar('02'); // los planos siempre van en 02_ARCHIVOS CAD
 }
 
 async function renderCarpetaActual(token){
@@ -1117,11 +1269,77 @@ function cerrarSelectorCarpeta(){
   document.getElementById('sp-modal').style.display = 'none';
 }
 
+async function subirUnArchivo(token, nombreFinal, archivo){
+  const driveId = await resolverDrive(token);
+  const path = rutaGraphPath(spRuta) + '/' + encodeURIComponent(nombreFinal);
+  const session = await graphFetch(`/drives/${driveId}/root:/${path}:/createUploadSession`, token, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'rename' } })
+  });
+
+  const buffer = await archivo.arrayBuffer();
+  const res = await fetch(session.uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Length': buffer.byteLength,
+      'Content-Range': `bytes 0-${buffer.byteLength - 1}/${buffer.byteLength}`
+    },
+    body: buffer
+  });
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+}
+
 async function confirmarSubidaAqui(){
-  const nombre = calcularNombre();
-  if(!nombre || !archivoSeleccionado) return;
   const nota = document.getElementById('sp-modal-nota');
   const token = window._spToken;
+
+  if(modoMasivo){
+    const nombres = calcularNombresPlano();
+    const total = nombres.length;
+    let subidas = 0;
+    let errores = [];
+
+    for(let i = 1; i <= total; i++){
+      const archivo = archivosLamina[i];
+      const nombre = nombres[i-1];
+      if(!archivo || !nombre) continue;
+
+      const ext = archivo.name.includes('.') ? '.' + archivo.name.split('.').pop() : '';
+      const nombreFinal = nombre + ext;
+
+      if(archivo.size > 60 * 1024 * 1024){
+        errores.push(`Lámina ${i}: pesa más de 60 MB, sáltala y súbela directo en SharePoint`);
+        continue;
+      }
+
+      nota.textContent = `Subiendo lámina ${i} de ${total}…`;
+      nota.style.color = 'var(--ink-faint)';
+      try{
+        await subirUnArchivo(token, nombreFinal, archivo);
+        subidas++;
+        agregarHistorial(nombreFinal, 'subido', SP_ROOT_FOLDER + '/' + spRuta.join('/'));
+      } catch(e){
+        errores.push(`Lámina ${i}: ${e.message}`);
+      }
+    }
+
+    if(errores.length === 0){
+      cerrarSelectorCarpeta();
+      mostrarToast(`${subidas} láminas subidas a SharePoint`);
+      archivosLamina = {};
+      ultimoNombresPlanoJSON = null;
+      renderPlanosMulti();
+    } else {
+      nota.innerHTML = `Subidas ${subidas}/${total}. Problemas:<br>${errores.join('<br>')}`;
+      nota.style.color = 'var(--err)';
+    }
+    return;
+  }
+
+  // modo individual (documentos)
+  const nombre = calcularNombre();
+  if(!nombre || !archivoSeleccionado) return;
 
   const ext = archivoSeleccionado.name.includes('.') ? '.' + archivoSeleccionado.name.split('.').pop() : '';
   const nombreFinal = nombre + ext;
@@ -1136,25 +1354,7 @@ async function confirmarSubidaAqui(){
   nota.style.color = 'var(--ink-faint)';
 
   try{
-    const driveId = await resolverDrive(token);
-    const path = rutaGraphPath(spRuta) + '/' + encodeURIComponent(nombreFinal);
-    const session = await graphFetch(`/drives/${driveId}/root:/${path}:/createUploadSession`, token, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'rename' } })
-    });
-
-    const buffer = await archivoSeleccionado.arrayBuffer();
-    const res = await fetch(session.uploadUrl, {
-      method: 'PUT',
-      headers: {
-        'Content-Length': buffer.byteLength,
-        'Content-Range': `bytes 0-${buffer.byteLength - 1}/${buffer.byteLength}`
-      },
-      body: buffer
-    });
-    if(!res.ok) throw new Error('HTTP ' + res.status);
-
+    await subirUnArchivo(token, nombreFinal, archivoSeleccionado);
     cerrarSelectorCarpeta();
     mostrarToast('Archivo subido a SharePoint');
     agregarHistorial(nombreFinal, 'subido', SP_ROOT_FOLDER + '/' + spRuta.join('/'));
