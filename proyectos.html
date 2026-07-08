@@ -1,4 +1,15 @@
 <!doctype html>
+<!--
+  Módulo: Proyectos (Intranet Baker)
+  Versión: v0.3 — 2026-07-08
+  Cambios de esta versión: fix de ruta de sitio SharePoint (SP_SITE_PATH no
+  debe incluir la carpeta 1_OFICIALES, solo /sites/Proyectos), fix de tope
+  de navegación para no subir por encima de la carpeta raíz.
+  Si algo se rompe y hay que volver atrás: la versión anterior (v0.2) no
+  tenía el selector de carpetas SharePoint conectado (botón "Subir a
+  SharePoint" deshabilitado). Guarda una copia de este archivo antes de
+  seguir editando, para poder comparar/revertir.
+-->
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
@@ -252,7 +263,7 @@
       <h1>Proyectos</h1>
       <div class="sub">Arma el nombre normado del documento o plano antes de subirlo al sitio. Reemplaza la planilla con macros.</div>
     </div>
-    <div class="badge">v0.1 — motor de nombres</div>
+    <div class="badge">v0.3 — 2026-07-08 · Graph API</div>
   </div>
 
   <div class="toggle">
@@ -820,8 +831,9 @@ const msalConfig = {
   cache: { cacheLocation: "sessionStorage" }
 };
 const GRAPH_SCOPES = ['Files.ReadWrite.All'];
-const SP_HOSTNAME  = 'ibaker.sharepoint.com';
-const SP_SITE_PATH = '/sites/Proyectos/1_OFICIALES';
+const SP_HOSTNAME    = 'ibaker.sharepoint.com';
+const SP_SITE_PATH   = '/sites/Proyectos';   // solo el sitio — Graph lo resuelve así, no acepta carpetas en esta parte
+const SP_ROOT_FOLDER = '1_OFICIALES';        // carpeta raíz dentro del drive del sitio, se agrega a la ruta al navegar
 
 let msalInstance = null;
 let graphSiteId  = null;
@@ -906,7 +918,7 @@ async function abrirSelectorCarpeta(){
   // Pre-navegación inteligente: Ciudad → Proyecto (si calza un nombre parecido) → 01/02 según tipo
   const ciudadVal = document.getElementById('sel-ciudad').value;
   const carpetaCiudad = CARPETAS_CIUDAD[ciudadVal];
-  spRuta = carpetaCiudad ? [carpetaCiudad] : [];
+  spRuta = carpetaCiudad ? [SP_ROOT_FOLDER, carpetaCiudad] : [SP_ROOT_FOLDER];
 
   try{
     if(carpetaCiudad){
@@ -931,12 +943,12 @@ async function abrirSelectorCarpeta(){
 async function renderCarpetaActual(token){
   const body = document.getElementById('sp-modal-body');
   const crumb = document.getElementById('sp-breadcrumb');
-  crumb.textContent = '1_OFICIALES/' + spRuta.join('/');
+  crumb.textContent = spRuta.join('/');
   body.innerHTML = '<div class="empty-state">Cargando carpetas…</div>';
   try{
     const items = await listarCarpeta(token, spRuta);
     let html = '';
-    if(spRuta.length > 0){
+    if(spRuta.length > 1){
       html += `<div class="sp-item" onclick="subirNivel()"><span class="ico">↑</span> .. (subir un nivel)</div>`;
     }
     if(items.length === 0){
@@ -1003,7 +1015,7 @@ async function confirmarSubidaAqui(){
 
     cerrarSelectorCarpeta();
     mostrarToast('Archivo subido a SharePoint');
-    agregarHistorial(nombreFinal + '  →  1_OFICIALES/' + spRuta.join('/'));
+    agregarHistorial(nombreFinal + '  →  ' + spRuta.join('/'));
   } catch(e){
     nota.textContent = 'Error al subir: ' + e.message;
     nota.style.color = 'var(--err)';
