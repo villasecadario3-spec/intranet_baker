@@ -88,6 +88,8 @@
         .pend-acciones{display:flex;gap:8px}
         .btn-aprobar{padding:7px 14px;background:var(--verde);color:white;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer;transition:background 0.15s}
         .btn-aprobar:hover{background:#1e8449}
+        .btn-preview{padding:7px 14px;background:white;color:var(--azul);border:1px solid rgba(46,134,193,0.3);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer;transition:all 0.15s}
+        .btn-preview:hover{background:rgba(46,134,193,0.06)}
         .btn-rechazar{padding:7px 14px;background:white;color:var(--rojo);border:1px solid rgba(192,57,43,0.3);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer;transition:all 0.15s}
         .btn-rechazar:hover{background:rgba(192,57,43,0.06)}
 
@@ -373,10 +375,33 @@ function renderPendientes(lista) {
                 <span class="pend-badge pendiente">Pendiente</span>
             </div>
             <div class="pend-acciones">
+                <button class="btn-preview" onclick="previsualizarDoc('${doc.id}')">👁 Vista previa</button>
                 <button class="btn-aprobar" onclick="aprobar('${doc.id}')">✓ Aprobar y publicar</button>
                 <button class="btn-rechazar" onclick="rechazar('${doc.id}')">✗ Rechazar</button>
             </div>
         </div>`).join('');
+}
+
+async function previsualizarDoc(id) {
+    try {
+        const res = await fetch(`${API}/docs/preview/${id}?email=${encodeURIComponent(emailActual)}`);
+        if (!res.ok) throw new Error('No se pudo obtener el documento');
+        const data = await res.json();
+        // Crear blob URL desde base64 y abrir en nueva pestaña
+        const byteChars = atob(data.archivo);
+        const byteArr = new Uint8Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+        const mime = data.tipo === 'pdf' ? 'application/pdf'
+            : data.tipo === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            : data.tipo === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            : 'application/octet-stream';
+        const blob = new Blob([byteArr], { type: mime });
+        const url  = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch(e) {
+        mostrarToast('Error al previsualizar: ' + e.message, 'err');
+    }
 }
 
 async function aprobar(id) {
