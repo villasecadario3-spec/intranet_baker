@@ -14,68 +14,115 @@
             --rojo:#C0392B;--negro:#111010;--negro-3:#242220;--borde-dark:#2E2C2A;
             --crema:#F8F6F3;--gris-1:#F0EDE9;--gris-2:#E2DED9;--gris-3:#B5B0AA;
             --txt:#1C1A18;--txt-mid:#6B6762;--txt-dim:#A09C97;
+            --verde:#27ae60;--azul:#2e86c1;--amarillo:#f39c12;
         }
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
         body{font-family:'DM Sans',sans-serif;background:var(--crema);color:var(--txt);min-height:100vh}
 
         nav{position:sticky;top:0;z-index:100;background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px solid var(--borde-dark);height:60px;display:flex;align-items:center;padding:0 48px;gap:16px}
-        .nav-logo{text-decoration:none}
-        .nav-logo img{height:26px;background:white;border-radius:6px;padding:4px 10px;display:block}
+        .nav-logo{text-decoration:none}.nav-logo img{height:26px;background:white;border-radius:6px;padding:4px 10px;display:block}
         .nav-sep{width:1px;height:18px;background:var(--borde-dark)}
         .nav-back{display:flex;align-items:center;gap:6px;color:var(--gris-3);text-decoration:none;font-size:0.78rem;font-weight:500;transition:color 0.2s}
-        .nav-back:hover{color:white}
-        .nav-back svg{width:14px;height:14px}
+        .nav-back:hover{color:white}.nav-back svg{width:14px;height:14px}
         .nav-title{font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--gris-3);letter-spacing:0.1em;text-transform:uppercase}
         .nav-spacer{flex:1}
         .user-chip{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;background:var(--negro-3);border:1px solid var(--borde-dark);border-radius:100px}
         .user-av{width:26px;height:26px;border-radius:50%;background:var(--rojo);display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:white}
         .user-nm{font-size:0.78rem;font-weight:500;color:white;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-        .page-header{background:var(--negro);padding:40px 48px 36px;border-bottom:1px solid var(--borde-dark);position:relative;overflow:hidden}
+        .page-header{background:var(--negro);padding:36px 48px 32px;border-bottom:1px solid var(--borde-dark);position:relative;overflow:hidden}
         .page-header::before{content:'';position:absolute;inset:0;background-image:linear-gradient(var(--borde-dark) 1px,transparent 1px),linear-gradient(90deg,var(--borde-dark) 1px,transparent 1px);background-size:40px 40px;opacity:0.3}
-        .page-header::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 50% 100% at 0% 50%,rgba(192,57,43,0.1) 0%,transparent 70%)}
-        .page-header-inner{position:relative;z-index:2}
+        .page-header::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 50% 100% at 0% 50%,rgba(192,57,43,0.08) 0%,transparent 70%)}
+        .page-header-inner{position:relative;z-index:2;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
         .page-eyebrow{font-size:0.65rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--rojo);margin-bottom:10px;display:flex;align-items:center;gap:8px}
         .page-eyebrow::before{content:'';width:16px;height:1px;background:var(--rojo)}
-        .page-header h1{font-family:'Playfair Display',serif;font-size:2rem;font-weight:700;color:white;letter-spacing:-0.02em;line-height:1.1}
+        .page-header h1{font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:700;color:white;letter-spacing:-0.02em;line-height:1.1}
         .page-header h1 em{font-style:italic;color:var(--rojo)}
         .page-header-sub{font-size:0.82rem;color:#6b6762;margin-top:8px}
+        .btn-subir{display:flex;align-items:center;gap:7px;padding:9px 18px;background:var(--rojo);color:white;border:none;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:0.85rem;font-weight:600;cursor:pointer;transition:background 0.2s;white-space:nowrap}
+        .btn-subir:hover{background:#a93226}
+        .btn-subir svg{width:14px;height:14px}
 
-        .main{padding:36px 48px 80px;max-width:900px}
+        .main{padding:32px 48px 80px;max-width:900px}
 
-        .search-wrap{position:relative;margin-bottom:28px}
+        /* ── TABS ────────────────────────────── */
+        .tabs{display:flex;gap:4px;margin-bottom:24px;border-bottom:1px solid var(--gris-2);padding-bottom:0}
+        .tab{padding:9px 18px;font-size:0.84rem;font-weight:500;color:var(--txt-mid);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s}
+        .tab:hover{color:var(--txt)}
+        .tab.activo{color:var(--rojo);border-bottom-color:var(--rojo);font-weight:600}
+        .tab-panel{display:none}.tab-panel.activo{display:block}
+
+        /* ── BÚSQUEDA ────────────────────────── */
+        .search-wrap{position:relative;margin-bottom:20px}
         .search-wrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--txt-dim)}
         .search-input{width:100%;padding:10px 14px 10px 38px;border:1px solid var(--gris-2);border-radius:10px;background:white;color:var(--txt);font-family:'DM Sans',sans-serif;font-size:0.88rem;transition:border-color 0.2s}
         .search-input:focus{outline:none;border-color:var(--rojo)}
         .search-input::placeholder{color:var(--txt-dim)}
 
+        /* ── DOCUMENTOS ──────────────────────── */
         .doc-list{display:flex;flex-direction:column;gap:10px}
-        .doc-card{background:white;border:1px solid var(--gris-2);border-radius:12px;padding:18px 20px;display:flex;align-items:center;gap:16px;transition:all 0.15s}
+        .doc-card{background:white;border:1px solid var(--gris-2);border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:16px;transition:all 0.15s}
         .doc-card:hover{border-color:var(--rojo);box-shadow:0 4px 16px rgba(192,57,43,0.08)}
-        .doc-icon{width:44px;height:44px;border-radius:8px;background:rgba(192,57,43,0.08);border:1px solid rgba(192,57,43,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-        .doc-icon svg{width:22px;height:22px;color:var(--rojo)}
+        .doc-icon{width:42px;height:42px;border-radius:8px;background:rgba(192,57,43,0.08);border:1px solid rgba(192,57,43,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .doc-icon svg{width:20px;height:20px;color:var(--rojo)}
         .doc-info{flex:1;min-width:0}
         .doc-nombre{font-size:0.9rem;font-weight:600;color:var(--txt)}
         .doc-meta{font-size:0.74rem;color:var(--txt-dim);margin-top:3px}
         .doc-acciones{display:flex;gap:8px;flex-shrink:0}
         .btn-doc{display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.8rem;font-weight:500;cursor:pointer;text-decoration:none;transition:all 0.15s;border:1px solid}
         .btn-ver{background:var(--rojo);border-color:var(--rojo);color:white}
-        .btn-ver:hover{background:var(--rojo-dark,#96281B);border-color:var(--rojo-dark,#96281B)}
+        .btn-ver:hover{background:#a93226;border-color:#a93226}
         .btn-dl{background:white;border-color:var(--gris-2);color:var(--txt-mid)}
         .btn-dl:hover{border-color:var(--gris-3);color:var(--txt)}
         .btn-doc svg{width:13px;height:13px}
 
-        .empty{display:flex;flex-direction:column;align-items:center;padding:60px 20px;text-align:center;gap:10px;color:var(--txt-dim)}
-        .empty svg{width:36px;height:36px;opacity:0.4}
+        /* ── PENDIENTES ──────────────────────── */
+        .pend-card{background:white;border:1px solid var(--gris-2);border-radius:12px;padding:16px 20px;margin-bottom:10px}
+        .pend-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+        .pend-nombre{font-size:0.9rem;font-weight:600;color:var(--txt)}
+        .pend-meta{font-size:0.76rem;color:var(--txt-dim);margin-top:3px}
+        .pend-badge{padding:3px 10px;border-radius:100px;font-size:0.68rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase}
+        .pend-badge.pendiente{background:rgba(243,156,18,0.1);color:var(--amarillo);border:1px solid rgba(243,156,18,0.25)}
+        .pend-badge.aprobado{background:rgba(39,174,96,0.1);color:var(--verde);border:1px solid rgba(39,174,96,0.2)}
+        .pend-badge.rechazado{background:rgba(192,57,43,0.08);color:var(--rojo);border:1px solid rgba(192,57,43,0.2)}
+        .pend-acciones{display:flex;gap:8px}
+        .btn-aprobar{padding:7px 14px;background:var(--verde);color:white;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer;transition:background 0.15s}
+        .btn-aprobar:hover{background:#1e8449}
+        .btn-rechazar{padding:7px 14px;background:white;color:var(--rojo);border:1px solid rgba(192,57,43,0.3);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer;transition:all 0.15s}
+        .btn-rechazar:hover{background:rgba(192,57,43,0.06)}
 
-        @media(max-width:768px){
-            nav{padding:0 16px}.nav-title{display:none}
-            .page-header{padding:28px 16px 24px}
-            .main{padding:24px 16px 60px}
-            .doc-card{flex-wrap:wrap}
-            .doc-acciones{width:100%}
-            .btn-doc{flex:1;justify-content:center}
-        }
+        /* ── MODAL SUBIR ─────────────────────── */
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;padding:20px}
+        .modal-overlay.visible{display:flex}
+        .modal{background:white;border-radius:16px;padding:28px;width:100%;max-width:500px;box-shadow:0 20px 60px rgba(0,0,0,0.15)}
+        .modal-titulo{font-family:'Playfair Display',serif;font-size:1.2rem;margin-bottom:20px;color:var(--txt)}
+        .modal-form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+        .modal-label{font-size:0.72rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--txt-mid)}
+        .modal-input,.modal-textarea{padding:9px 12px;border:1px solid var(--gris-2);border-radius:8px;background:var(--crema);color:var(--txt);font-family:'DM Sans',sans-serif;font-size:0.88rem;width:100%;transition:border-color 0.2s}
+        .modal-input:focus,.modal-textarea:focus{outline:none;border-color:var(--rojo);background:white}
+        .modal-textarea{min-height:70px;resize:vertical}
+        .drop-zone{border:2px dashed var(--gris-2);border-radius:10px;padding:24px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--crema)}
+        .drop-zone:hover,.drop-zone.dragover{border-color:var(--rojo);background:#fdf2f2}
+        .drop-zone-txt{font-size:0.84rem;color:var(--txt-dim)}
+        .drop-zone-txt strong{color:var(--rojo)}
+        .archivo-sel{font-size:0.8rem;color:var(--verde);margin-top:8px;font-weight:500}
+        .modal-btns{display:flex;gap:10px;margin-top:20px}
+        .btn-enviar-modal{flex:1;padding:11px;background:var(--rojo);color:white;border:none;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;transition:background 0.2s}
+        .btn-enviar-modal:hover:not(:disabled){background:#a93226}
+        .btn-enviar-modal:disabled{opacity:0.5;cursor:not-allowed}
+        .btn-cancelar-modal{padding:11px 20px;background:white;border:1px solid var(--gris-2);border-radius:9px;font-family:'DM Sans',sans-serif;font-size:0.9rem;color:var(--txt-mid);cursor:pointer}
+        .spinner-sm{width:14px;height:14px;border:2px solid rgba(255,255,255,0.4);border-top-color:white;border-radius:50%;animation:spin 0.7s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
+        @keyframes spin{to{transform:rotate(360deg)}}
+
+        .empty{display:flex;flex-direction:column;align-items:center;padding:50px 20px;text-align:center;gap:10px;color:var(--txt-dim)}
+        .empty svg{width:32px;height:32px;opacity:0.4}
+
+        /* ── TOAST ───────────────────────────── */
+        .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:11px 18px;border-radius:10px;font-size:0.82rem;font-weight:500;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.12);white-space:nowrap;display:flex;align-items:center;gap:8px}
+        .toast.ok{background:#1a4a2a;border:1px solid rgba(39,174,96,0.3);color:#5dde90}
+        .toast.err{background:#2a1a18;border:1px solid rgba(192,57,43,0.3);color:#ff8070}
+
+        @media(max-width:768px){nav{padding:0 16px}.nav-title{display:none}.page-header{padding:24px 16px 20px}.main{padding:20px 16px 60px}.doc-card{flex-wrap:wrap}.doc-acciones{width:100%}.btn-doc{flex:1;justify-content:center}}
     </style>
 </head>
 <body>
@@ -97,25 +144,85 @@
 
 <div class="page-header">
     <div class="page-header-inner">
-        <div class="page-eyebrow">Documentación Interna</div>
-        <h1>Procedimientos<br>e <em>Instructivos</em></h1>
-        <div class="page-header-sub">Documentos internos del grupo Baker.</div>
+        <div>
+            <div class="page-eyebrow">Documentación Interna</div>
+            <h1>Procedimientos<br>e <em>Instructivos</em></h1>
+            <div class="page-header-sub">Documentos internos del grupo Baker.</div>
+        </div>
+        <button class="btn-subir" onclick="abrirModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Subir documento
+        </button>
     </div>
 </div>
 
 <div class="main">
-    <div class="search-wrap">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input class="search-input" id="search" type="text" placeholder="Buscar documentos…" oninput="filtrar()">
+
+    <!-- TABS — solo visibles para aprobadores -->
+    <div class="tabs" id="tabs-wrap" style="display:none">
+        <div class="tab activo" onclick="cambiarTab('publicados')">Publicados</div>
+        <div class="tab" onclick="cambiarTab('pendientes')">Pendientes de aprobación <span id="badge-pend" style="background:var(--amarillo);color:white;border-radius:100px;padding:1px 7px;font-size:0.7rem;margin-left:4px;display:none">0</span></div>
     </div>
-    <div class="doc-list" id="doc-list"></div>
+
+    <!-- TAB: PUBLICADOS -->
+    <div class="tab-panel activo" id="panel-publicados">
+        <div class="search-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input class="search-input" id="search" type="text" placeholder="Buscar documentos…" oninput="filtrar()">
+        </div>
+        <div class="doc-list" id="doc-list"></div>
+    </div>
+
+    <!-- TAB: PENDIENTES (solo aprobadores) -->
+    <div class="tab-panel" id="panel-pendientes">
+        <div id="pend-list"></div>
+    </div>
+
+</div>
+
+<!-- MODAL SUBIR DOCUMENTO -->
+<div class="modal-overlay" id="modal-overlay">
+    <div class="modal">
+        <div class="modal-titulo">Subir documento</div>
+        <div class="modal-form-group">
+            <label class="modal-label">Nombre del documento *</label>
+            <input class="modal-input" id="m-nombre" type="text" placeholder="Ej: Procedimiento de Compras 2026">
+        </div>
+        <div class="modal-form-group">
+            <label class="modal-label">Descripción (opcional)</label>
+            <textarea class="modal-textarea" id="m-desc" placeholder="Breve descripción del contenido…"></textarea>
+        </div>
+        <div class="modal-form-group">
+            <label class="modal-label">Archivo *</label>
+            <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()"
+                ondragover="event.preventDefault();this.classList.add('dragover')"
+                ondragleave="this.classList.remove('dragover')"
+                ondrop="handleDrop(event)">
+                <div class="drop-zone-txt">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px;color:var(--txt-dim);margin:0 auto 8px;display:block"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    Arrastra un archivo aquí o <strong>haz clic para seleccionar</strong><br>
+                    <span style="font-size:0.75rem">PDF, Word, Excel — máx. 10 MB</span>
+                </div>
+                <div class="archivo-sel" id="archivo-sel" style="display:none"></div>
+            </div>
+            <input type="file" id="file-input" accept=".pdf,.doc,.docx,.xls,.xlsx" style="display:none" onchange="handleFile(this.files[0])">
+        </div>
+        <div class="modal-btns">
+            <button class="btn-cancelar-modal" onclick="cerrarModal()">Cancelar</button>
+            <button class="btn-enviar-modal" id="btn-enviar-modal" onclick="enviarDocumento()">
+                Enviar para aprobación
+            </button>
+        </div>
+    </div>
 </div>
 
 <script>
-// ── DOCUMENTOS ────────────────────────────────────────────────
-// Para agregar un nuevo documento, añade un objeto a este array:
-// { nombre, archivo, tipo, fecha }
-const DOCUMENTOS = [
+const API = 'https://api.ibaker.cl';
+const APROBADORES = ['dvillaseca@ibaker.cl', 'jcumplido@ibaker.cl'];
+const GITHUB_RAW  = 'https://raw.githubusercontent.com/villasecadario3-spec/intranet_baker/main/docs/';
+
+// Documentos publicados (lista estática + GitHub raw)
+const DOCUMENTOS_FIJOS = [
     {
         nombre: 'Procedimientos Fondo por Rendir y Fijo 2026',
         archivo: 'docs/PROCEDIMIENTOS_FONDO_POR_RENDIR_Y_FIJO_2026.pdf',
@@ -124,7 +231,12 @@ const DOCUMENTOS = [
     },
 ];
 
-// ── MSAL ─────────────────────────────────────────────────────
+let emailActual = '';
+let archivoBase64 = '';
+let archivoTipo = '';
+let docsGithub = [];
+
+// ── MSAL ──────────────────────────────────────────────────────
 const msalConfig = {
     auth: {
         clientId: "9a56ab1c-d3c4-4460-9892-1d4da768ecfb",
@@ -141,6 +253,7 @@ async function initAuth() {
         const accounts = msalInstance.getAllAccounts();
         if (accounts.length > 0) {
             const usuario = accounts[0];
+            emailActual = usuario.username.toLowerCase();
             const nombre = usuario.name || usuario.username;
             const iniciales = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
             document.getElementById('auth-area').innerHTML = `
@@ -148,54 +261,240 @@ async function initAuth() {
                     <div class="user-av">${iniciales}</div>
                     <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
                 </div>`;
-            renderDocs(DOCUMENTOS);
+            if (APROBADORES.includes(emailActual)) {
+                document.getElementById('tabs-wrap').style.display = 'flex';
+                cargarPendientes();
+            }
+            cargarDocsGithub();
         } else {
             window.location.href = 'index.html';
         }
     } catch(e) { window.location.href = 'index.html'; }
 }
 
-function renderDocs(docs) {
+// ── DOCUMENTOS PUBLICADOS ─────────────────────────────────────
+async function cargarDocsGithub() {
+    try {
+        // Leer la carpeta docs/ del repo via GitHub API (público)
+        const res = await fetch('https://api.github.com/repos/villasecadario3-spec/intranet_baker/contents/docs');
+        if (!res.ok) throw new Error('Error GitHub');
+        const files = await res.json();
+        docsGithub = files
+            .filter(f => f.type === 'file' && !f.name.startsWith('.'))
+            .map(f => ({
+                nombre: f.name.replace(/_/g, ' ').replace(/\.[^.]+$/, ''),
+                archivo: `docs/${f.name}`,
+                tipo:    f.name.split('.').pop().toUpperCase(),
+                fecha:   '',
+                githubUrl: f.download_url,
+            }));
+    } catch(e) {
+        console.error('Error cargando docs GitHub:', e);
+    }
+    renderDocs();
+}
+
+function renderDocs() {
     const query = document.getElementById('search').value.toLowerCase();
-    const filtrados = query
-        ? docs.filter(d => d.nombre.toLowerCase().includes(query))
-        : docs;
+    // Combinar fijos + GitHub (evitar duplicados)
+    const nombresGithub = docsGithub.map(d => d.archivo);
+    const fijos = DOCUMENTOS_FIJOS.filter(d => !nombresGithub.includes(d.archivo));
+    const todos = [...fijos, ...docsGithub];
+    const filtrados = query ? todos.filter(d => d.nombre.toLowerCase().includes(query)) : todos;
 
     const lista = document.getElementById('doc-list');
-
     if (filtrados.length === 0) {
-        lista.innerHTML = `
-            <div class="empty">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                <div>No se encontraron documentos</div>
-            </div>`;
+        lista.innerHTML = `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div>No hay documentos</div></div>`;
         return;
     }
 
-    lista.innerHTML = filtrados.map(doc => `
+    lista.innerHTML = filtrados.map(doc => {
+        const url = doc.githubUrl || doc.archivo;
+        return `
         <div class="doc-card">
             <div class="doc-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             </div>
             <div class="doc-info">
                 <div class="doc-nombre">${doc.nombre}</div>
-                <div class="doc-meta">${doc.tipo} · ${doc.fecha}</div>
+                <div class="doc-meta">${doc.tipo}${doc.fecha ? ' · ' + doc.fecha : ''}</div>
             </div>
             <div class="doc-acciones">
-                <a class="btn-doc btn-ver" href="${doc.archivo}" target="_blank">
+                <a class="btn-doc btn-ver" href="${url}" target="_blank">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                     Ver
                 </a>
-                <a class="btn-doc btn-dl" href="${doc.archivo}" download>
+                <a class="btn-doc btn-dl" href="${url}" download>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     Descargar
                 </a>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 }
 
-function filtrar() { renderDocs(DOCUMENTOS); }
+function filtrar() { renderDocs(); }
+
+// ── PENDIENTES (aprobadores) ──────────────────────────────────
+async function cargarPendientes() {
+    try {
+        const res = await fetch(`${API}/docs/pendientes?email=${encodeURIComponent(emailActual)}`);
+        const lista = await res.json();
+        const badge = document.getElementById('badge-pend');
+        if (lista.length > 0) {
+            badge.style.display = 'inline';
+            badge.textContent = lista.length;
+        } else {
+            badge.style.display = 'none';
+        }
+        renderPendientes(lista);
+    } catch(e) {
+        console.error('Error cargando pendientes:', e);
+    }
+}
+
+function renderPendientes(lista) {
+    const div = document.getElementById('pend-list');
+    if (lista.length === 0) {
+        div.innerHTML = `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><div>No hay documentos pendientes</div></div>`;
+        return;
+    }
+    div.innerHTML = lista.map(doc => `
+        <div class="pend-card" id="pend-${doc.id}">
+            <div class="pend-header">
+                <div>
+                    <div class="pend-nombre">${doc.nombre}</div>
+                    <div class="pend-meta">
+                        Subido por <strong>${doc.subidoPor}</strong> · 
+                        ${new Date(doc.fecha).toLocaleDateString('es-CL', {day:'numeric', month:'long', year:'numeric'})}
+                        ${doc.descripcion ? `<br>${doc.descripcion}` : ''}
+                    </div>
+                </div>
+                <span class="pend-badge pendiente">Pendiente</span>
+            </div>
+            <div class="pend-acciones">
+                <button class="btn-aprobar" onclick="aprobar('${doc.id}')">✓ Aprobar y publicar</button>
+                <button class="btn-rechazar" onclick="rechazar('${doc.id}')">✗ Rechazar</button>
+            </div>
+        </div>`).join('');
+}
+
+async function aprobar(id) {
+    if (!confirm('¿Aprobar y publicar este documento?')) return;
+    try {
+        const res = await fetch(`${API}/docs/aprobar/${id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: emailActual })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        mostrarToast('Documento publicado correctamente', 'ok');
+        cargarPendientes();
+        cargarDocsGithub();
+    } catch(e) {
+        mostrarToast('Error al aprobar: ' + e.message, 'err');
+    }
+}
+
+async function rechazar(id) {
+    const motivo = prompt('Motivo del rechazo (opcional):') || '';
+    try {
+        const res = await fetch(`${API}/docs/rechazar/${id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: emailActual, motivo })
+        });
+        if (!res.ok) throw new Error('Error al rechazar');
+        mostrarToast('Documento rechazado', 'ok');
+        cargarPendientes();
+    } catch(e) {
+        mostrarToast('Error: ' + e.message, 'err');
+    }
+}
+
+// ── TABS ──────────────────────────────────────────────────────
+function cambiarTab(tab) {
+    document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('activo', (i === 0 && tab === 'publicados') || (i === 1 && tab === 'pendientes')));
+    document.getElementById('panel-publicados').classList.toggle('activo', tab === 'publicados');
+    document.getElementById('panel-pendientes').classList.toggle('activo', tab === 'pendientes');
+}
+
+// ── MODAL SUBIR ───────────────────────────────────────────────
+function abrirModal() { document.getElementById('modal-overlay').classList.add('visible'); }
+function cerrarModal() {
+    document.getElementById('modal-overlay').classList.remove('visible');
+    document.getElementById('m-nombre').value = '';
+    document.getElementById('m-desc').value = '';
+    document.getElementById('archivo-sel').style.display = 'none';
+    document.getElementById('archivo-sel').textContent = '';
+    archivoBase64 = ''; archivoTipo = '';
+    const btn = document.getElementById('btn-enviar-modal');
+    btn.disabled = false;
+    btn.textContent = 'Enviar para aprobación';
+}
+
+function handleFile(file) {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { alert('El archivo no puede superar 10 MB'); return; }
+    archivoTipo = file.name.split('.').pop().toLowerCase();
+    const reader = new FileReader();
+    reader.onload = e => {
+        archivoBase64 = e.target.result.split(',')[1];
+        document.getElementById('archivo-sel').style.display = 'block';
+        document.getElementById('archivo-sel').textContent = `✓ ${file.name} (${(file.size/1024).toFixed(0)} KB)`;
+    };
+    reader.readAsDataURL(file);
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('drop-zone').classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+}
+
+async function enviarDocumento() {
+    const nombre = document.getElementById('m-nombre').value.trim();
+    const desc   = document.getElementById('m-desc').value.trim();
+    if (!nombre) { alert('Ingresa el nombre del documento'); return; }
+    if (!archivoBase64) { alert('Selecciona un archivo'); return; }
+
+    const btn = document.getElementById('btn-enviar-modal');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-sm"></span> Enviando...';
+
+    try {
+        const res = await fetch(`${API}/docs/pendiente`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                nombre,
+                descripcion: desc,
+                archivo: archivoBase64,
+                tipo: archivoTipo,
+                subidoPor: emailActual
+            })
+        });
+        if (!res.ok) throw new Error('Error al enviar');
+        cerrarModal();
+        mostrarToast('Documento enviado — quedará visible una vez aprobado por TI', 'ok');
+        if (APROBADORES.includes(emailActual)) cargarPendientes();
+    } catch(e) {
+        mostrarToast('Error al enviar: ' + e.message, 'err');
+        btn.disabled = false;
+        btn.textContent = 'Enviar para aprobación';
+    }
+}
+
+// ── TOAST ─────────────────────────────────────────────────────
+function mostrarToast(msg, tipo) {
+    const t = document.createElement('div');
+    t.className = `toast ${tipo}`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 4000);
+}
 
 initAuth();
 </script>
