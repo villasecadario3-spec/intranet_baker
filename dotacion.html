@@ -393,7 +393,12 @@ async function leerExcel() {
     // Convertir filas del Excel a workers
     workers = rows.map(r => excelRowToWorker(r)).filter(w => w.name);
     meta.ultimoMesReal = meta.ultimoMesReal || 5;
-    setSyncStatus('ok', `Excel leído — ${workers.length} personas`);
+    // Log de diagnóstico
+    const ccsEncontrados = [...new Set(workers.map(w => w.cc))].sort();
+    console.log('[Dotación] Workers cargados:', workers.length);
+    console.log('[Dotación] CGs encontrados:', ccsEncontrados);
+    console.log('[Dotación] Ejemplo fila 0:', workers[0]);
+    setSyncStatus('ok', `Excel leído — ${workers.length} personas · CGs: ${ccsEncontrados.join(', ')}`);
     renderAll();
     renderObrasList();
   } catch(e) {
