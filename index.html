@@ -48,6 +48,7 @@
             -webkit-font-smoothing: antialiased;
         }
 
+        /* ── LOADING ──────────────────────────────────────── */
         .loading {
             position: fixed; inset:0; z-index:9999;
             background: var(--color-obsidian);
@@ -76,6 +77,7 @@
             color: var(--color-ash);
         }
 
+        /* ── LOGIN BLOCKER ────────────────────────────────── */
         .login-blocker {
             position: fixed; inset:0; z-index:500;
             background: var(--color-obsidian);
@@ -134,6 +136,7 @@
             text-align:center; letter-spacing:0.01em;
         }
 
+        /* ── NAV ──────────────────────────────────────────── */
         nav {
             position: sticky; top:0; z-index:200;
             background: rgba(0,0,0,0.85);
@@ -197,6 +200,7 @@
         }
         .btn-out:hover { color:var(--color-ember-gold); }
 
+        /* ── HERO ─────────────────────────────────────────── */
         .hero {
             padding: 80px 40px 72px;
             position: relative; overflow:hidden;
@@ -210,6 +214,7 @@
             object-fit:cover; object-position:center 40%;
             opacity: 0.07; display:block;
         }
+        /* Viñeta sobre la imagen */
         .hero-bg::after {
             content:'';
             position:absolute; inset:0;
@@ -265,8 +270,10 @@
         }
         .hero-hola strong { color: var(--color-bone); font-weight:500; }
 
+        /* ── MAIN ─────────────────────────────────────────── */
         .main { padding: 56px 40px 100px; max-width:1280px; }
 
+        /* Sección header */
         .sec-header {
             display:flex; align-items:center; gap:16px;
             margin-bottom: 20px;
@@ -282,6 +289,7 @@
             white-space:nowrap; letter-spacing:0.06em;
         }
 
+        /* ── MÓDULOS ──────────────────────────────────────── */
         .modulos { margin-bottom: 60px; }
         .modulos-grid {
             display: grid;
@@ -367,6 +375,7 @@
             transform: translateX(3px);
         }
 
+        /* ── NOTICIAS ─────────────────────────────────────── */
         .noticias-grid {
             display: grid;
             grid-template-columns: 1.5fr 1fr 1fr;
@@ -429,6 +438,7 @@
             margin-top:2px;
         }
 
+        /* ── FOOTER ───────────────────────────────────────── */
         footer {
             border-top: 1px solid var(--color-iron);
             padding: 18px 40px;
@@ -458,7 +468,8 @@
         @media(max-width:480px) {
             .modulos-grid { grid-template-columns:1fr; }
         }
-
+    
+        /* ══ ACCESOS RÁPIDOS ══════════════════════════════════ */
         .accesos-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -516,6 +527,7 @@
 </head>
 <body>
 
+<!-- LOADING -->
 <div class="loading" id="loading">
     <div class="loading-logo">
         <img src="LOGO_BAKER.png" alt="Baker" loading="eager" fetchpriority="high"
@@ -525,6 +537,7 @@
     <div class="loading-label">Cargando portal</div>
 </div>
 
+<!-- LOGIN BLOCKER -->
 <div class="login-blocker" id="login-blocker">
     <div class="login-box">
         <div class="login-eyebrow">Portal Corporativo</div>
@@ -543,6 +556,7 @@
     </div>
 </div>
 
+<!-- NAV -->
 <nav>
     <a class="nav-logo" href="#">
         <img src="LOGO_BAKER.png" alt="Baker"
@@ -565,6 +579,7 @@
     </div>
 </nav>
 
+<!-- HERO -->
 <section class="hero">
     <div class="hero-bg">
         <img src="vista-panoramica.jpg" alt="" fetchpriority="high">
@@ -580,13 +595,15 @@
     </div>
 </section>
 
+<!-- MAIN -->
 <div class="main">
 
+    <!-- Módulos -->
     <div class="modulos">
         <div class="sec-header">
             <div class="sec-titulo">Módulos</div>
             <div class="sec-linea"></div>
-            <div class="sec-meta" id="mod-count-badge">11 activos</div>
+            <div class="sec-meta">11 activos</div>
         </div>
         <div class="modulos-grid">
 
@@ -760,16 +777,16 @@
                 </div>
             </a>
 
-            <a class="mod-card" href="proyectos.html" data-modulo="proyectos.html">
+            <a class="mod-card" href="dotacion.html" data-modulo="dotacion.html">
                 <div class="mod-num">11</div>
                 <div class="mod-icon on">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 7v13a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
                     </svg>
                 </div>
                 <div class="mod-body">
-                    <div class="mod-nombre">Proyectos</div>
-                    <div class="mod-desc">Genera el nombre normado de documentos y planos antes de subirlos al sitio, según el proyecto y la carpeta correspondiente.</div>
+                    <div class="mod-nombre">Control de Dotación</div>
+                    <div class="mod-desc">Gestión de personal por obra. Sincronizado con Excel en SharePoint y Power BI.</div>
                 </div>
                 <div class="mod-footer">
                     <div class="mod-status status-on">Activo</div>
@@ -780,6 +797,7 @@
         </div>
     </div>
 
+        <!-- Accesos Rápidos -->
     <div style="margin-bottom:60px">
         <div class="sec-header">
             <div class="sec-titulo">Accesos Rápidos</div>
@@ -824,6 +842,7 @@
         </div>
     </div>
 
+    <!-- Noticias -->
     <div>
         <div class="sec-header">
             <div class="sec-titulo">Novedades internas</div>
@@ -873,6 +892,7 @@
 
 </div>
 
+<!-- FOOTER -->
 <footer>
     <div class="footer-l">Inmobiliaria Baker SPA — Portal Interno</div>
     <div class="footer-r">v1.0.0 · 2026</div>
@@ -934,8 +954,10 @@ function actualizarUI() {
         document.getElementById('hero-nombre').innerText = primerNombre;
         bienvenida.classList.add('visible');
 
+        // Revisar acceso denegado
         checkAccesoDenegado();
 
+        // Ocultar módulos sin acceso
         const email = usuarioActual.username.toLowerCase();
         aplicarAccesos(email);
     } else {
@@ -991,18 +1013,20 @@ function precargarImagen(src) {
     return new Promise(resolve => {
         const img = new Image();
         img.onload = resolve;
-        img.onerror = resolve;
+        img.onerror = resolve; // si falla igual ocultamos el loading
         img.src = src;
     });
 }
 
 async function init() {
+    // Precargar las imágenes críticas en paralelo con el login silencioso
     const [_auth, _logo, _bg] = await Promise.all([
         intentarLoginSilencioso(),
         precargarImagen('LOGO_BAKER.png'),
         precargarImagen('vista-panoramica.jpg'),
     ]);
     actualizarUI();
+    // Esperar mínimo 800ms para que la barra de loading se vea completa
     await new Promise(r => setTimeout(r, 800));
     document.getElementById('loading').classList.add('oculto');
 }
@@ -1046,12 +1070,6 @@ const ACCESOS_MODULOS = {
         "sii.html": [
                 "dvillaseca@ibaker.cl",
                 "jcumplido@ibaker.cl"
-        ],
-        "proyectos.html": [
-                "jcumplido@ibaker.cl",
-                "dvillaseca@ibaker.cl",
-                "pzuniga@ibaker.cl",
-                "mmatamala@ibaker.cl"
         ]
 };
 
@@ -1064,6 +1082,7 @@ function aplicarAccesos(email) {
             card.style.display = 'none';
         }
     });
+    // Actualizar contador de módulos visibles
     const visibles = document.querySelectorAll('.mod-card:not([style*="none"])').length;
     const badge = document.getElementById('mod-count-badge');
     if (badge) badge.textContent = visibles + ' activos';
