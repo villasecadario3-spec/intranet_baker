@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control de Dotación — Baker</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+<style>
+:root{
+  --ink:#16263A;--paper:#EFEBE2;--panel:#FFFFFF;--steel:#66748A;
+  --line:#DCD5C6;--line-strong:#C3BAA6;--orange:#DD5A2A;--orange-soft:#FBE3D4;
+  --green:#2E6B4F;--green-soft:#DCEBE1;--red:#B23A2E;--red-soft:#F6DEDA;
+  --gray-soft:#E7E3D8;
+  --font-display:'Barlow Condensed',sans-serif;
+  --font-body:'Inter',sans-serif;
+  --font-mono:'IBM Plex Mono',monospace;
+  /* intranet nav */
+  --rojo:#C0392B;--negro:#111010;--negro-3:#242220;--borde-dark:#2E2C2A;--gris-3:#B5B0AA;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;}
+::selection{background:var(--orange-soft);}
+
+/* ── INTRANET NAV ────────────────────────────────────────── */
+.intranet-nav{position:sticky;top:0;z-index:200;background:rgba(17,16,16,0.97);backdrop-filter:blur(24px);border-bottom:1px solid var(--borde-dark);height:56px;display:flex;align-items:center;padding:0 28px;gap:14px;}
+.nav-logo{text-decoration:none}.nav-logo img{height:24px;background:white;border-radius:5px;padding:3px 9px;display:block}
+.nav-sep{width:1px;height:16px;background:var(--borde-dark)}
+.nav-back{display:flex;align-items:center;gap:5px;color:var(--gris-3);text-decoration:none;font-size:0.76rem;font-weight:500;font-family:'DM Sans',sans-serif;transition:color 0.2s}
+.nav-back:hover{color:white}.nav-back svg{width:13px;height:13px}
+.nav-title{font-family:var(--font-mono);font-size:0.68rem;color:var(--gris-3);letter-spacing:0.1em;text-transform:uppercase}
+.nav-spacer{flex:1}
+.user-chip{display:flex;align-items:center;gap:7px;padding:3px 11px 3px 3px;background:var(--negro-3);border:1px solid var(--borde-dark);border-radius:100px}
+.user-av{width:24px;height:24px;border-radius:50%;background:var(--rojo);display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:700;color:white;font-family:'DM Sans',sans-serif}
+.user-nm{font-size:0.76rem;font-weight:500;color:white;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:'DM Sans',sans-serif}
+.sync-badge{display:flex;align-items:center;gap:5px;font-size:0.68rem;color:var(--gris-3);font-family:var(--font-mono)}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:#666;flex-shrink:0}
+.sync-dot.ok{background:#27ae60}
+.sync-dot.sync{background:#f39c12;animation:pulse 1s infinite}
+.sync-dot.err{background:#e74c3c}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+/* ── APP LAYOUT ──────────────────────────────────────────── */
+.app-layout{display:flex;min-height:calc(100vh - 56px)}
+
+/* ── SIDEBAR OBRAS ───────────────────────────────────────── */
+.sidebar{
+  width:220px;flex-shrink:0;
+  background:var(--ink);
+  border-right:1px solid rgba(255,255,255,0.06);
+  padding:20px 0;
+  position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto;
+}
+.sidebar-label{
+  font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;color:#6B7B8D;padding:0 16px 10px;
+}
+.obra-item{
+  display:flex;flex-direction:column;gap:2px;
+  padding:10px 16px;cursor:pointer;
+  border-left:3px solid transparent;
+  transition:all 0.15s;
+}
+.obra-item:hover{background:rgba(255,255,255,0.04)}
+.obra-item.activa{background:rgba(221,90,42,0.12);border-left-color:var(--orange)}
+.obra-cg{font-family:var(--font-mono);font-size:10.5px;color:#6B7B8D}
+.obra-nombre{font-size:12.5px;font-weight:600;color:#C7D0DB;line-height:1.2}
+.obra-item.activa .obra-nombre{color:#fff}
+.obra-item.activa .obra-cg{color:var(--orange)}
+.obra-count{font-family:var(--font-mono);font-size:10px;color:#4A5A6A;margin-top:2px}
+.sidebar-divider{height:1px;background:rgba(255,255,255,0.06);margin:10px 0}
+
+/* ── MAIN CONTENT ────────────────────────────────────────── */
+.main-content{flex:1;min-width:0}
+
+/* ── TOPBAR ORIGINAL ─────────────────────────────────────── */
+.topbar{background:var(--ink);color:#fff;padding:18px 24px 16px;}
+.topbar-inner{max-width:100%;margin:0 auto;}
+.eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9FB0C4;margin:0 0 4px;}
+.h1{font-family:var(--font-display);font-weight:700;font-size:28px;line-height:1;letter-spacing:.01em;margin:0 0 3px;}
+.h1 span{color:var(--orange);}
+.sub{font-size:12.5px;color:#C7D0DB;margin:0;max-width:640px;}
+.legend-strip{display:flex;gap:6px;margin-top:12px;align-items:center;flex-wrap:wrap;}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:#C7D0DB;}
+.legend-swatch{width:11px;height:11px;border-radius:3px;flex:none;}
+
+/* SYNC BAR */
+.sync-bar{
+  background:rgba(255,255,255,0.04);border-bottom:1px solid rgba(255,255,255,0.06);
+  padding:8px 24px;display:flex;align-items:center;gap:12px;
+  font-size:11.5px;color:#9FB0C4;font-family:var(--font-mono);
+}
+.btn-sync{
+  padding:4px 12px;background:rgba(221,90,42,0.15);border:1px solid rgba(221,90,42,0.3);
+  border-radius:5px;color:var(--orange);font-family:var(--font-mono);font-size:11px;
+  cursor:pointer;transition:all 0.15s;
+}
+.btn-sync:hover{background:rgba(221,90,42,0.25)}
+.btn-sync:disabled{opacity:0.4;cursor:default}
+
+/* ── REST (inherited from original) ─────────────────────── */
+.wrap{max-width:100%;padding:18px 24px 80px;}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:16px;}
+.field{display:flex;flex-direction:column;gap:4px;}
+.field label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--steel);font-weight:600;}
+select,input[type=text],input[type=date]{font-family:var(--font-body);font-size:13px;padding:7px 9px;border:1px solid var(--line-strong);border-radius:7px;background:#fff;color:var(--ink);}
+select:focus,input:focus{outline:2px solid var(--orange);outline-offset:1px;}
+.search{flex:1;min-width:160px;}.search input{width:100%;}
+.chips{display:flex;gap:5px;flex-wrap:wrap;}
+.chip{font-family:var(--font-mono);font-size:11.5px;padding:5px 10px;border-radius:20px;border:1px solid var(--line-strong);background:#fff;cursor:pointer;color:var(--steel);white-space:nowrap;}
+.chip.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+.btn{font-family:var(--font-body);font-weight:600;font-size:13px;padding:8px 14px;border-radius:7px;border:1px solid transparent;cursor:pointer;transition:transform .06s ease;}
+.btn:active{transform:scale(.97);}
+.btn-primary{background:var(--orange);color:#fff;}
+.btn-primary:hover{background:#C74E22;}
+.btn-ghost{background:#fff;border-color:var(--line-strong);color:var(--ink);}
+.btn-ghost:hover{background:var(--gray-soft);}
+.btn-sm{padding:5px 10px;font-size:12px;}
+.spacer{flex:1;}
+.roster{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+.roster-head{display:grid;grid-template-columns:1.7fr 1.2fr 1fr 105px 168px 190px 200px;gap:10px;padding:10px 14px;background:var(--gray-soft);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--steel);font-weight:700;border-bottom:1px solid var(--line);}
+.row{display:grid;grid-template-columns:1.7fr 1.2fr 1fr 105px 168px 190px 200px;gap:10px;padding:11px 14px;align-items:center;border-bottom:1px solid var(--line);}
+.row:last-child{border-bottom:none;}.row:hover{background:#FAF8F3;}.row.is-out{opacity:.55;}
+.name{font-weight:600;font-size:13.5px;}.rut{font-family:var(--font-mono);font-size:11px;color:var(--steel);margin-top:1px;}
+.role{font-size:12.5px;color:var(--ink);}.cc{font-family:var(--font-mono);font-size:11.5px;color:var(--steel);}
+.badge-ingreso{display:inline-block;margin-left:6px;font-size:9px;font-family:var(--font-mono);background:var(--orange-soft);color:var(--orange);padding:1px 5px;border-radius:8px;text-transform:uppercase;letter-spacing:.05em;}
+.mini{display:flex;gap:2px;}.mini i{width:10px;height:18px;border-radius:2px;background:var(--gray-soft);}
+.mini i.auto{background:var(--ink);}.mini i.manual-on{background:var(--green);}.mini i.manual-out{background:var(--red);}
+.mini-wrap{display:flex;flex-direction:column;gap:3px;width:140px;}
+.mini-caption{font-size:9px;color:var(--steel);font-family:var(--font-mono);display:flex;justify-content:space-between;align-items:center;width:100%;}
+.mini-caption .mid{flex:1;text-align:center;color:var(--line-strong);}
+.status-toggle{display:flex;gap:5px;}
+.toggle-btn{flex:1;text-align:center;font-size:11px;font-weight:600;padding:5px 3px;border-radius:6px;border:1px solid var(--line-strong);background:#fff;cursor:pointer;color:var(--steel);}
+.toggle-btn.sel-on{background:var(--green-soft);border-color:var(--green);color:var(--green);}
+.toggle-btn.sel-off{background:var(--red-soft);border-color:var(--red);color:var(--red);}
+.toggle-btn.sel-projected{background:var(--orange-soft);border-color:var(--orange);color:var(--orange);}
+.empty{padding:36px 20px;text-align:center;color:var(--steel);font-size:13px;}
+.section-title{font-family:var(--font-display);font-size:19px;font-weight:700;margin:28px 0 10px;display:flex;align-items:center;gap:9px;}
+.section-title .n{font-family:var(--font-mono);font-size:11.5px;color:var(--steel);background:var(--gray-soft);padding:2px 7px;border-radius:12px;}
+.ingreso-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;}
+.ingreso-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:10px;}
+.ingreso-grid .field,.ingreso-grid select,.ingreso-grid input{width:100%;}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 18px;border-radius:8px;font-size:12.5px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease;z-index:999;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.export-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;}
+.export-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+.export-note{font-size:12px;color:var(--steel);max-width:480px;line-height:1.5;}
+table.preview{width:100%;border-collapse:collapse;margin-top:12px;font-size:11.5px;}
+table.preview th,table.preview td{border:1px solid var(--line);padding:4px 6px;text-align:center;}
+table.preview th{background:var(--gray-soft);font-family:var(--font-mono);font-weight:600;}
+table.preview td.name-col,table.preview th.name-col{text-align:left;font-family:var(--font-body);}
+table.preview tr td.on{background:var(--green-soft);color:var(--green);font-weight:700;}
+table.preview tr td.off{color:var(--line-strong);}
+.modal-backdrop{position:fixed;inset:0;background:rgba(22,38,58,.45);display:none;align-items:center;justify-content:center;z-index:600;padding:20px;}
+.modal-backdrop.show{display:flex;}
+.modal{background:#fff;border-radius:12px;padding:20px;max-width:400px;width:100%;}
+.modal h3{font-family:var(--font-display);font-size:19px;margin:0 0 6px;}
+.modal p{font-size:12.5px;color:var(--steel);line-height:1.5;margin:0 0 14px;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;}
+
+/* Empty obra */
+.obra-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 30px;text-align:center;gap:12px;color:var(--steel);}
+.obra-empty-icon{font-size:2.5rem;opacity:0.4}
+.obra-empty-title{font-family:var(--font-display);font-size:22px;font-weight:700;color:var(--ink)}
+.obra-empty-sub{font-size:13px;max-width:360px;line-height:1.6}
+
+@media(max-width:900px){
+  .sidebar{display:none}
+  .roster-head{display:none}
+  .row{grid-template-columns:1fr;gap:7px;padding:12px 14px;}
+  .ingreso-grid{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- INTRANET NAV -->
+<nav class="intranet-nav">
+  <a class="nav-logo" href="index.html">
+    <img src="LOGO_BAKER.png" alt="Baker" onerror="this.outerHTML='<span style=&quot;font-family:serif;font-weight:900;color:white;font-size:0.95rem&quot;>BAKER</span>'">
+  </a>
+  <div class="nav-sep"></div>
+  <a class="nav-back" href="index.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    Inicio
+  </a>
+  <div class="nav-sep"></div>
+  <div class="nav-title">Control de Dotación</div>
+  <div class="nav-spacer"></div>
+  <div class="sync-badge" id="syncBadge">
+    <div class="sync-dot" id="syncDot"></div>
+    <span id="syncLabel">—</span>
+  </div>
+  <div class="nav-sep"></div>
+  <div id="auth-area"></div>
+</nav>
+
+<!-- APP LAYOUT -->
+<div class="app-layout">
+
+  <!-- SIDEBAR OBRAS -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-label">Obras / Proyectos</div>
+    <div id="obrasList"></div>
+  </nav>
+
+  <!-- MAIN -->
+  <div class="main-content">
+
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div class="topbar-inner">
+        <p class="eyebrow" id="obraEyebrow">iBaker · Control de Gestión</p>
+        <h1 class="h1">Control de <span>Dotación</span></h1>
+        <p class="sub" id="obraSub">Selecciona una obra en el menú lateral para ver y gestionar su dotación.</p>
+        <div class="legend-strip" id="legendStrip"></div>
+      </div>
+    </div>
+
+    <!-- SYNC BAR -->
+    <div class="sync-bar" id="syncBar">
+      <span id="syncBarMsg">Conectando con SharePoint...</span>
+      <div style="flex:1"></div>
+      <button class="btn-sync" id="btnSync" onclick="sincronizarSharePoint()" disabled>↕ Sincronizar</button>
+      <button class="btn-sync" id="btnPushExcel" onclick="pushToExcel()" disabled style="margin-left:6px">↑ Guardar en Excel</button>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="wrap" id="mainContent">
+      <div class="obra-empty">
+        <div class="obra-empty-icon">🏗️</div>
+        <div class="obra-empty-title">Selecciona una obra</div>
+        <div class="obra-empty-sub">Elige un proyecto en el menú lateral para ver y gestionar su dotación de personal.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="modal-backdrop" id="exitModal">
+  <div class="modal">
+    <h3>Fecha de término</h3>
+    <p id="exitModalName"></p>
+    <div class="field" style="margin-bottom:10px;">
+      <label for="exitDate">Fecha de término (pasada o futura)</label>
+      <input type="date" id="exitDate" style="width:100%;">
+    </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label for="exitMotivo">Motivo</label>
+      <select id="exitMotivo" style="width:100%;">
+        <option value="renuncia">Renuncia</option>
+        <option value="vencimiento_plazo">Vencimiento de plazo</option>
+        <option value="necesidades_empresa">Necesidades de la empresa</option>
+        <option value="no_concurrencia">No concurrencia</option>
+        <option value="muerte">Fallecimiento</option>
+        <option value="otro">Otro</option>
+      </select>
+    </div>
+    <p style="font-size:11px;color:var(--steel);line-height:1.5;margin:0 0 14px;">
+      Fecha pasada → salida confirmada. Fecha futura → término proyectado (sigue activo hasta ese mes).
+    </p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" id="exitCancel">Cancelar</button>
+      <button class="btn btn-primary btn-sm" id="exitConfirm">Guardar fecha de término</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIGURACIÓN ────────────────────────────────────────────
+const YEAR = 2026;
+const MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+// Centros de Gestión con sus obras
+const OBRAS = [
+  { id: 'CG015', nombre: 'Portal Los Maitenes',          cgs: ['CG0158201', 'CG0158191', 'CG0156301'] },
+  { id: 'CG019', nombre: 'Mirador El Pino',               cgs: [] },
+  { id: 'CG012', nombre: 'Los Molinos',                   cgs: [] },
+  { id: 'CG013', nombre: 'Portal El Abra II',             cgs: [] },
+  { id: 'CG008', nombre: 'Portal Oriente II DS19 Etapa 4',cgs: [] },
+];
+
+// Excel SharePoint sharing URL
+const EXCEL_SHARING_URL = 'https://ibaker.sharepoint.com/:x:/s/BAKER/IQAvh5AWxn5vTLnwKzRr5jNsAf9AVFeDfzedNvKHb-zlxR8?e=KsgtSC';
+const EXCEL_SHARING_ENCODED = 'u!aHR0cHM6Ly9pYmFrZXIuc2hhcmVwb2ludC5jb20vOng6L3MvQkFLRVIvSVFBdmg1QVd4bjV2VExud0t6UnI1ak5zQWY5QVZGZURmemVkTnZLSGItemx4Ujg_ZT1Lc2d0U0M';
+
+// MSAL
+const msalConfig = {
+  auth: {
+    clientId: '9a56ab1c-d3c4-4460-9892-1d4da768ecfb',
+    authority: 'https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26',
+    redirectUri: window.location.origin,
+  },
+  cache: { cacheLocation: 'sessionStorage' }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+const SCOPES = ['User.Read', 'Files.ReadWrite.All', 'Sites.ReadWrite.All'];
+let usuarioActual = null;
+let tokenActual   = null;
+
+// Estado
+let workers    = [];
+let meta       = { ultimoMesReal: 5 };
+let activeCC   = 'todos';
+let obraActiva = null;
+let pendingExitId = null;
+let excelDriveId  = null;
+let excelItemId   = null;
+let syncStatus    = 'idle'; // idle | syncing | ok | err
+
+// ── MSAL ─────────────────────────────────────────────────────
+async function getToken() {
+  if (!usuarioActual) return null;
+  try {
+    await msalInstance.initialize();
+    const r = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: usuarioActual });
+    tokenActual = r.accessToken; return tokenActual;
+  } catch(e) {
+    const r = await msalInstance.acquireTokenPopup({ scopes: SCOPES });
+    tokenActual = r.accessToken; return tokenActual;
+  }
+}
+
+async function initAuth() {
+  try {
+    await msalInstance.initialize();
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length > 0) {
+      usuarioActual = accounts[0];
+      const emailUsuario = usuarioActual.username.toLowerCase();
+      const ACCESO_DOTACION = ['dvillaseca@ibaker.cl','tsanmartin@ibaker.cl','jcumplido@ibaker.cl'];
+      if (!ACCESO_DOTACION.includes(emailUsuario)) {
+        window.location.href = 'index.html?acceso=denegado';
+        return;
+      }
+      const nombre = usuarioActual.name || usuarioActual.username;
+      const iniciales = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+      document.getElementById('auth-area').innerHTML = `
+        <div class="user-chip">
+          <div class="user-av">${iniciales}</div>
+          <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
+        </div>`;
+      await init();
+    } else {
+      window.location.href = 'index.html';
+    }
+  } catch(e) { window.location.href = 'index.html'; }
+}
+
+// ── GRAPH API EXCEL ───────────────────────────────────────────
+async function graphGet(url) {
+  const token = await getToken();
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error(`Graph ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+async function resolverExcelItem() {
+  if (excelDriveId && excelItemId) return true;
+  try {
+    const data = await graphGet(
+      `https://graph.microsoft.com/v1.0/shares/${EXCEL_SHARING_ENCODED}/driveItem`
+    );
+    excelDriveId = data.parentReference?.driveId;
+    excelItemId  = data.id;
+    return !!(excelDriveId && excelItemId);
+  } catch(e) {
+    console.error('Error resolviendo Excel:', e);
+    return false;
+  }
+}
+
+async function leerExcel() {
+  setSyncStatus('syncing', 'Leyendo Excel de SharePoint...');
+  const ok = await resolverExcelItem();
+  if (!ok) { setSyncStatus('err', 'No se pudo acceder al Excel'); return; }
+  try {
+    const token = await getToken();
+    const res = await fetch(
+      `https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/content`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!res.ok) throw new Error(`Error ${res.status}`);
+    const buffer = await res.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    // Convertir filas del Excel a workers
+    workers = rows.map(r => excelRowToWorker(r)).filter(w => w.name);
+    meta.ultimoMesReal = meta.ultimoMesReal || 5;
+    setSyncStatus('ok', `Excel leído — ${workers.length} personas`);
+    renderAll();
+    renderObrasList();
+  } catch(e) {
+    console.error('Error leyendo Excel:', e);
+    setSyncStatus('err', 'Error al leer Excel: ' + e.message);
+  }
+}
+
+function excelRowToWorker(r) {
+  const cc   = String(r.job_cost_center || r['job_cost_center'] || '').trim();
+  const name = String(r.full_name || r['full_name'] || '').trim();
+  const rut  = String(r.rut || '').trim();
+  const role = String(r.role_name || r['role_name'] || '').trim();
+  const fs   = parseFecha(r.job_end_date || r['job_end_date']);
+  const fc   = parseFecha(r.job_start_date || r['job_start_date']);
+  const motivo = String(r.termination_reason || r['termination_reason'] || '').trim() || null;
+  const rutlimpio = rut.replace(/[^0-9kK]/g,'').toUpperCase();
+  const id = (r.ID || r['ID'] || `${rutlimpio}#${cc}#${role}`).toString().trim();
+  return {
+    id, rutlimpio, cc, role, name, rut,
+    fc: fc || null,
+    fs: fs || null,
+    motivo: motivo || null,
+    status: (fs && new Date(fs) <= new Date()) ? 'finiquitado' : 'activo',
+    source: 'excel',
+  };
+}
+
+function parseFecha(val) {
+  if (!val) return null;
+  const s = String(val).trim();
+  if (!s || s === '0' || s === '') return null;
+  // DD-MM-YYYY
+  if (/^\d{2}-\d{2}-\d{4}$/.test(s)) {
+    const [d, m, y] = s.split('-');
+    return `${y}-${m}-${d}`;
+  }
+  // YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // número serial Excel
+  const n = Number(s);
+  if (Number.isFinite(n) && n > 40000) {
+    const d = XLSX.SSF.parse_date_code(n);
+    if (d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+  }
+  return null;
+}
+
+async function pushToExcel() {
+  setSyncStatus('syncing', 'Guardando en Excel...');
+  const ok = await resolverExcelItem();
+  if (!ok) { setSyncStatus('err', 'No se pudo acceder al Excel'); return; }
+  try {
+    // Construir datos para el Excel
+    const header = ['job_cost_center','role_name','full_name','rut','termination_reason','job_start_date','job_end_date','ID','ID 2'];
+    const rows = [header];
+    workers.forEach(w => {
+      const id1 = `${w.role}${w.rutlimpio}`;
+      const id2 = `${w.role}${w.rutlimpio}${w.cc}`;
+      rows.push([
+        w.cc || '',
+        w.role || '',
+        w.name || '',
+        w.rutlimpio || '',
+        w.motivo || '',
+        w.fc ? w.fc.split('-').reverse().join('-') : '',
+        w.fs ? w.fs.split('-').reverse().join('-') : '',
+        id1, id2
+      ]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+
+    const token = await getToken();
+    const res = await fetch(
+      `https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/content`,
+      {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/octet-stream' },
+        body: new Uint8Array(buf)
+      }
+    );
+    if (!res.ok) throw new Error(`Error ${res.status}: ${await res.text()}`);
+    setSyncStatus('ok', `Excel actualizado — ${workers.length} personas · ${new Date().toLocaleTimeString('es-CL')}`);
+    toast('Cambios guardados en SharePoint');
+  } catch(e) {
+    console.error('Error guardando Excel:', e);
+    setSyncStatus('err', 'Error al guardar: ' + e.message);
+    toast('Error al guardar en Excel: ' + e.message);
+  }
+}
+
+async function sincronizarSharePoint() {
+  await leerExcel();
+}
+
+function setSyncStatus(status, msg) {
+  syncStatus = status;
+  const dot   = document.getElementById('syncDot');
+  const label = document.getElementById('syncLabel');
+  const bar   = document.getElementById('syncBarMsg');
+  const btnS  = document.getElementById('btnSync');
+  const btnP  = document.getElementById('btnPushExcel');
+  dot.className   = 'sync-dot ' + status;
+  label.textContent = msg;
+  if (bar) bar.textContent = msg;
+  const busy = status === 'syncing';
+  if (btnS) btnS.disabled = busy;
+  if (btnP) btnP.disabled = busy;
+}
+
+// ── COSTOS (igual que original) ───────────────────────────────
+const COSTOS = [{"cc":"CG0156301","role":"Albañil","amt":1174966.5},{"cc":"CG0156301","role":"Ayudante de Carpintero","amt":969111},{"cc":"CG0156301","role":"Ayudante de Trazador","amt":940161.78},{"cc":"CG0156301","role":"Ayudante de Urbanización","amt":928580.77},{"cc":"CG0156301","role":"Jornal","amt":888202.27},{"cc":"CG0156301","role":"Maestro Urbanización","amt":1241739.67},{"cc":"CG0158191","role":"Albañil","amt":1625114.4},{"cc":"CG0158191","role":"Asistente de Bodega","amt":1062884.4},{"cc":"CG0158191","role":"Asistente Prevencionista de Riesgo","amt":1164718},{"cc":"CG0158191","role":"Ayudante de Carpintero","amt":809075.33},{"cc":"CG0158191","role":"Carpintero","amt":1078221.4},{"cc":"CG0158191","role":"Encargado de Mantención","amt":1064334.4},{"cc":"CG0158191","role":"Jornal","amt":776293.16},{"cc":"CG0158191","role":"Operador de Maquinaria","amt":1042794.17},{"cc":"CG0158191","role":"Pañolero","amt":1083282.4},{"cc":"CG0158191","role":"Supervisor","amt":1833754.83},{"cc":"CG0158191","role":"Trazador","amt":1475361.4},{"cc":"CG0158201","role":"Albañil","amt":1033737.75},{"cc":"CG0158201","role":"Andamiero","amt":1689646.83},{"cc":"CG0158201","role":"Ayudante Andamiero","amt":745265.56},{"cc":"CG0158201","role":"Ayudante de Trazador","amt":702097.67},{"cc":"CG0158201","role":"Carpintero","amt":1140168.26},{"cc":"CG0158201","role":"Jefe de Terreno","amt":3298172.71},{"cc":"CG0158201","role":"Jornal","amt":791879.82},{"cc":"CG0158201","role":"Jornal Canguero","amt":389385},{"cc":"CG0158201","role":"Maestro Multifuncional","amt":1769829.74},{"cc":"CG0158201","role":"Maestro Tabiquero","amt":1299525.5},{"cc":"CG0158201","role":"Supervisor","amt":2701625.5},{"cc":"CG0158201","role":"Trazador","amt":1153334.5},{"cc":"CG0158201","role":"Operador de Maquinaria","amt":862007}];
+function costoMensual(w){
+  if(w.costoManual!==undefined&&w.costoManual!==null&&Number.isFinite(Number(w.costoManual))) return Math.round(Number(w.costoManual));
+  const f=COSTOS.find(c=>c.cc===w.cc&&c.role===w.role);
+  return f&&Number.isFinite(Number(f.amt))?Math.round(Number(f.amt)):null;
+}
+function formatCLP(n){ return n===null||n===undefined?'—':'$'+Math.round(n).toLocaleString('es-CL'); }
+
+// ── HELPERS ───────────────────────────────────────────────────
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),2400);
+}
+function monthKey(y,m){return y+'-'+String(m).padStart(2,'0');}
+function ymOf(dateStr){
+  if(!dateStr)return null;
+  const d=new Date(dateStr+'T00:00:00');
+  return{y:d.getFullYear(),m:d.getMonth()+1};
+}
+function todayMidnight(){const t=new Date();t.setHours(0,0,0,0);return t;}
+function isDeparted(w){
+  if(w.status!=='finiquitado'||!w.fs)return false;
+  return new Date(w.fs+'T00:00:00')<=todayMidnight();
+}
+function isProjectedEnd(w){return w.status==='finiquitado'&&w.fs&&!isDeparted(w);}
+function computeMonthStates(w){
+  const states=[];const fc=ymOf(w.fc);const fs=ymOf(w.fs);
+  for(let m=1;m<=12;m++){
+    let working=false;
+    if(fc&&(fc.y<YEAR||(fc.y===YEAR&&fc.m<=m)))working=true;
+    if(fc&&fc.y===YEAR&&fc.m>m)working=false;
+    if(working&&w.status==='finiquitado'&&fs){if(fs.y===YEAR&&fs.m<m)working=false;}
+    if(!working){states.push('before');continue;}
+    states.push(m<=meta.ultimoMesReal?'auto':(w.status==='finiquitado'&&fs&&fs.y===YEAR&&fs.m===m?'manual-out':'manual-on'));
+  }
+  return states;
+}
+function motivoLabel(m){
+  const map={renuncia:'Renuncia',vencimiento_plazo:'Vencimiento de plazo',necesidades_empresa:'Necesidades de la empresa',no_concurrencia:'No concurrencia',muerte:'Fallecimiento',otro:'Otro'};
+  return map[m]||m||'';
+}
+
+// ── RENDERS ───────────────────────────────────────────────────
+function renderObrasList() {
+  const list = document.getElementById('obrasList');
+  list.innerHTML = OBRAS.map(obra => {
+    const count = workers.filter(w => obra.cgs.includes(w.cc)).length;
+    const activos = workers.filter(w => obra.cgs.includes(w.cc) && !isDeparted(w)).length;
+    const activa = obraActiva && obraActiva.id === obra.id;
+    return `
+    <div class="obra-item ${activa ? 'activa' : ''}" onclick="seleccionarObra('${obra.id}')">
+      <div class="obra-cg">${obra.id}</div>
+      <div class="obra-nombre">${obra.nombre}</div>
+      ${count > 0 ? `<div class="obra-count">${activos} activos · ${count} total</div>` : '<div class="obra-count">Sin datos</div>'}
+    </div>`;
+  }).join('<div class="sidebar-divider"></div>');
+}
+
+function seleccionarObra(id) {
+  obraActiva = OBRAS.find(o => o.id === id);
+  activeCC = 'todos';
+  renderObrasList();
+  if (!obraActiva || obraActiva.cgs.length === 0) {
+    document.getElementById('mainContent').innerHTML = `
+      <div class="obra-empty">
+        <div class="obra-empty-icon">🚧</div>
+        <div class="obra-empty-title">${obraActiva ? obraActiva.nombre : ''}</div>
+        <div class="obra-empty-sub">Esta obra no tiene datos de dotación cargados aún. Los datos aparecerán aquí cuando se registren en el Excel de SharePoint.</div>
+      </div>`;
+    document.getElementById('obraEyebrow').textContent = `iBaker · ${obraActiva?.id || ''}`;
+    document.getElementById('obraSub').textContent = `${obraActiva?.nombre || ''} — Sin datos disponibles`;
+    return;
+  }
+  document.getElementById('obraEyebrow').textContent = `iBaker · ${obraActiva.id}`;
+  document.getElementById('obraSub').textContent = `${obraActiva.nombre} · ${obraActiva.cgs.join(', ')}`;
+  renderMainContent();
+}
+
+function renderMainContent() {
+  document.getElementById('mainContent').innerHTML = `
+    <div class="toolbar">
+      <div class="field">
+        <label for="mesReal">Último mes con costo real cargado</label>
+        <select id="mesReal"></select>
+      </div>
+      <div class="field">
+        <label>Centro de gestión</label>
+        <div class="chips" id="ccChips"></div>
+      </div>
+      <div class="field search">
+        <label for="searchBox">Buscar</label>
+        <input type="text" id="searchBox" placeholder="Nombre, rut o cargo...">
+      </div>
+      <div class="spacer"></div>
+      <button class="btn btn-ghost btn-sm" id="downloadBackupBtn">Descargar respaldo JSON</button>
+    </div>
+
+    <div class="section-title">Dotación activa <span class="n" id="activeCount">0</span></div>
+    <div class="roster">
+      <div class="roster-head">
+        <div>Nombre</div><div>Cargo</div><div>Centro gestión</div>
+        <div>Fecha contrato</div><div>Estado</div><div>Detalle salida</div>
+        <div>Línea del año (Ene–Dic)</div>
+      </div>
+      <div id="rosterBody"></div>
+    </div>
+
+    <div class="section-title">Agregar ingreso</div>
+    <div class="ingreso-card">
+      <div class="ingreso-grid">
+        <div class="field"><label for="inName">Nombre completo</label><input type="text" id="inName" placeholder="Nombre y apellidos"></div>
+        <div class="field"><label for="inRut">RUT</label><input type="text" id="inRut" placeholder="12.345.678-9"></div>
+        <div class="field"><label for="inRole">Cargo</label><input type="text" id="inRole" placeholder="Ej: Jornal"></div>
+        <div class="field"><label for="inCC">Centro de gestión</label><input type="text" id="inCC" placeholder="${obraActiva?.cgs[0] || 'Ej: CG0158201'}"></div>
+        <div class="field"><label for="inFC">Fecha de contratación</label><input type="date" id="inFC"></div>
+        <div class="field"><label for="inCosto">Costo empresa (opcional)</label><input type="text" id="inCosto" placeholder="Ej: 950000"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" id="addIngresoBtn">+ Agregar a la dotación</button>
+      <div id="ingresoCostPreview" style="margin-top:8px;font-size:12px;color:var(--steel);"></div>
+    </div>
+
+    <div class="section-title">Exportar</div>
+    <div class="export-card">
+      <div class="export-row">
+        <p class="export-note"><strong>Excel:</strong> genera un .xlsx con las mismas columnas del ConsolidadoPersonal.<br><strong>CSV:</strong> solo meses manuales posteriores al último con costo real.</p>
+        <div class="spacer"></div>
+        <button class="btn btn-ghost" id="exportExcelBtn">Descargar Excel</button>
+        <button class="btn btn-ghost" id="exportBtn">Descargar CSV</button>
+      </div>
+      <div id="previewWrap"></div>
+    </div>`;
+
+  // Bind events
+  renderMesRealSelect();
+  renderCCChips();
+  renderRoster();
+  renderExportPreview();
+  renderLegend();
+
+  document.getElementById('searchBox').addEventListener('input', renderRoster);
+  document.getElementById('addIngresoBtn').addEventListener('click', addIngreso);
+  document.getElementById('inRole').addEventListener('input', updateIngresoCostPreview);
+  document.getElementById('inCC').addEventListener('input', updateIngresoCostPreview);
+  document.getElementById('inCosto').addEventListener('input', updateIngresoCostPreview);
+  document.getElementById('exportBtn').addEventListener('click', downloadCSV);
+  document.getElementById('exportExcelBtn').addEventListener('click', downloadExcelConsolidado);
+  document.getElementById('downloadBackupBtn').addEventListener('click', downloadBackupJSON);
+  updateIngresoCostPreview();
+}
+
+function workersDeObra() {
+  if (!obraActiva) return [];
+  return workers.filter(w => obraActiva.cgs.includes(w.cc));
+}
+
+function renderLegend(){
+  const el=document.getElementById('legendStrip');
+  if(!el)return;
+  el.innerHTML=`
+    <div class="legend-item"><span class="legend-swatch" style="background:var(--ink)"></span>Mes con costo real</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:var(--green)"></span>Activo (manual)</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:var(--red)"></span>Término</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:var(--gray-soft)"></span>Sin dotación</div>`;
+}
+
+function renderMesRealSelect(){
+  const sel=document.getElementById('mesReal');
+  if(!sel)return;
+  sel.innerHTML=MONTH_NAMES.map((n,i)=>`<option value="${i+1}">${n} ${YEAR}</option>`).join('');
+  sel.value=meta.ultimoMesReal;
+  sel.onchange=()=>{meta.ultimoMesReal=parseInt(sel.value,10);renderRoster();renderExportPreview();};
+}
+
+function renderCCChips(){
+  const wrap=document.getElementById('ccChips');
+  if(!wrap)return;
+  const ccs=Array.from(new Set(workersDeObra().map(w=>w.cc))).sort();
+  const all=['todos',...ccs];
+  wrap.innerHTML=all.map(cc=>`<div class="chip ${cc===activeCC?'active':''}" data-cc="${cc}">${cc==='todos'?'Todos':cc}</div>`).join('');
+  wrap.querySelectorAll('.chip').forEach(chip=>{chip.onclick=()=>{activeCC=chip.dataset.cc;renderRoster();renderCCChips();};});
+}
+
+function matchesSearch(w,q){
+  if(!q)return true;q=q.toLowerCase();
+  return w.name.toLowerCase().includes(q)||(w.rut||'').toLowerCase().includes(q)||(w.role||'').toLowerCase().includes(q);
+}
+
+function renderRoster(){
+  const body=document.getElementById('rosterBody');
+  if(!body)return;
+  const q=document.getElementById('searchBox')?.value.trim()||'';
+  let list=workersDeObra().filter(w=>(activeCC==='todos'||w.cc===activeCC)&&matchesSearch(w,q));
+  list=list.slice().sort((a,b)=>(isDeparted(a))-(isDeparted(b))||a.name.localeCompare(b.name));
+  const countEl=document.getElementById('activeCount');
+  if(countEl) countEl.textContent=`${workersDeObra().filter(w=>!isDeparted(w)).length} de ${workersDeObra().length}`;
+  if(list.length===0){body.innerHTML=`<div class="empty">No hay personas que coincidan.</div>`;return;}
+  body.innerHTML=list.map(w=>{
+    const states=computeMonthStates(w);
+    const bars=states.map((s,i)=>`<i class="${s==='auto'?'auto':s==='manual-on'?'manual-on':s==='manual-out'?'manual-out':''}" title="${MONTH_NAMES[i]}"></i>`).join('');
+    const departed=isDeparted(w);const projected=isProjectedEnd(w);const hasEnd=w.status==='finiquitado';
+    let detail='—';
+    if(departed) detail=`<div style="font-size:11px;color:var(--red);margin-top:5px;">Salió ${w.fs} · ${motivoLabel(w.motivo)}</div>`;
+    else if(projected) detail=`<div style="font-size:11px;color:var(--orange);margin-top:5px;">Proyectado ${w.fs} · ${motivoLabel(w.motivo)}</div>`;
+    return `
+    <div class="row ${departed?'is-out':''}" data-id="${w.id}">
+      <div><div class="name">${w.name}${w.source==='ingreso'?'<span class="badge-ingreso">Ingreso</span>':''}</div><div class="rut">${w.rut||''}</div></div>
+      <div><div class="role">${w.role||''}</div><div style="font-size:11px;color:var(--steel);margin-top:2px;">${formatCLP(costoMensual(w))}/mes</div></div>
+      <div class="cc">${w.cc||''}</div>
+      <div style="font-size:12px;">${w.fc||'-'}</div>
+      <div>
+        <div class="status-toggle">
+          <div class="toggle-btn ${!hasEnd?'sel-on':''}" data-action="sigue">Sigue</div>
+          <div class="toggle-btn ${departed?'sel-off':projected?'sel-projected':''}" data-action="salio">Con término</div>
+        </div>${detail}
+      </div>
+      <div style="font-size:12px;color:var(--steel);">${hasEnd?`<button class="btn btn-ghost btn-sm" data-action="editar-salida">Editar</button>`:'—'}</div>
+      <div class="mini-wrap"><div class="mini">${bars}</div><div class="mini-caption"><span>${MONTH_NAMES[0]}</span><span class="mid">· · ·</span><span>${MONTH_NAMES[11]}</span></div></div>
+    </div>`;
+  }).join('');
+  body.querySelectorAll('.row').forEach(row=>{
+    const id=row.dataset.id;
+    row.querySelector('[data-action="sigue"]').onclick=()=>setSigue(id);
+    row.querySelector('[data-action="salio"]').onclick=()=>openExitModal(id);
+    const eb=row.querySelector('[data-action="editar-salida"]');
+    if(eb)eb.onclick=()=>openExitModal(id);
+  });
+}
+
+function setSigue(id){
+  const w=workers.find(x=>x.id===id);if(!w)return;
+  w.status='activo';w.fs=null;w.motivo=null;
+  renderRoster();renderExportPreview();
+}
+
+function openExitModal(id){
+  pendingExitId=id;const w=workers.find(x=>x.id===id);
+  document.getElementById('exitModalName').textContent=w.name+' — '+(w.role||'');
+  document.getElementById('exitDate').value=w.fs||'';
+  document.getElementById('exitMotivo').value=w.motivo||'renuncia';
+  document.getElementById('exitModal').classList.add('show');
+}
+function closeExitModal(){document.getElementById('exitModal').classList.remove('show');pendingExitId=null;}
+function confirmExit(){
+  const w=workers.find(x=>x.id===pendingExitId);if(!w){closeExitModal();return;}
+  const date=document.getElementById('exitDate').value;
+  if(!date){toast('Ingresa una fecha de salida');return;}
+  w.status='finiquitado';w.fs=date;w.motivo=document.getElementById('exitMotivo').value;
+  closeExitModal();renderRoster();renderExportPreview();
+}
+
+function updateIngresoCostPreview(){
+  const el=document.getElementById('ingresoCostPreview');if(!el)return;
+  const role=document.getElementById('inRole')?.value.trim();
+  const cc=document.getElementById('inCC')?.value.trim();
+  const costoRaw=document.getElementById('inCosto')?.value.trim();
+  if(costoRaw){const n=Number(costoRaw.replace(/[^0-9.]/g,''));if(Number.isFinite(n)&&n>0){el.innerHTML=`Costo manual: <strong>${formatCLP(n)}/mes</strong>`;return;}}
+  if(!role||!cc){el.textContent='Ingresa cargo y CG para ver el costo promedio.';return;}
+  const cost=costoMensual({cc,role});
+  el.innerHTML=cost?`Costo promedio: <strong>${formatCLP(cost)}/mes</strong>`:`Sin costo promedio para ${role} en ${cc}.`;
+}
+
+function addIngreso(){
+  const name=document.getElementById('inName')?.value.trim();
+  const rut=document.getElementById('inRut')?.value.trim();
+  const role=document.getElementById('inRole')?.value.trim();
+  const cc=document.getElementById('inCC')?.value.trim()||obraActiva?.cgs[0]||'';
+  const fc=document.getElementById('inFC')?.value;
+  const costoRaw=document.getElementById('inCosto')?.value.trim();
+  if(!name||!cc||!fc){toast('Completa nombre, centro de gestión y fecha');return;}
+  const id=(rut||name).replace(/[^a-zA-Z0-9]/g,'').toUpperCase()+'-'+Date.now().toString().slice(-4);
+  const rutlimpio=(rut||'').replace(/[^0-9kK]/g,'').toUpperCase();
+  const costoManual=costoRaw?Number(costoRaw.replace(/[^0-9.]/g,'')):null;
+  workers.push({id,rutlimpio,cc,role:role||'',name,rut:rut||'',fc,fs:null,motivo:null,status:'activo',source:'ingreso',costoManual:(costoManual&&Number.isFinite(costoManual))?costoManual:null});
+  ['inName','inRut','inRole','inCC','inFC','inCosto'].forEach(elId=>{const el=document.getElementById(elId);if(el)el.value='';});
+  renderCCChips();renderRoster();renderExportPreview();renderObrasList();
+  toast('Ingreso agregado — usa "Guardar en Excel" para sincronizar');
+}
+
+function manualMonthsList(){const list=[];for(let m=meta.ultimoMesReal+1;m<=12;m++)list.push(m);return list;}
+
+function renderExportPreview(){
+  const months=manualMonthsList();const wrap=document.getElementById('previewWrap');if(!wrap)return;
+  if(months.length===0){wrap.innerHTML=`<p class="export-note" style="margin-top:10px;">No hay meses manuales pendientes.</p>`;return;}
+  const rows=workersDeObra().slice().sort((a,b)=>a.name.localeCompare(b.name)).map(w=>{
+    const states=computeMonthStates(w);
+    const cells=months.map(m=>{const s=states[m-1];const on=s==='manual-on'||s==='manual-out';return`<td class="${on?'on':'off'}">${on?1:0}</td>`;}).join('');
+    return`<tr><td class="name-col">${w.name}</td><td>${w.cc}</td>${cells}</tr>`;
+  }).join('');
+  wrap.innerHTML=`<table class="preview"><thead><tr><th class="name-col">Nombre</th><th>CG</th>${months.map(m=>`<th>${MONTH_NAMES[m-1]}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function downloadBackupJSON(){
+  const payload=JSON.stringify({workers,meta,exportedAt:new Date().toISOString()},null,2);
+  const blob=new Blob([payload],{type:'application/json;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=url;a.download=`dotacion_respaldo_${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+  toast('Respaldo descargado');
+}
+
+function downloadExcelConsolidado(){
+  if(typeof XLSX==='undefined'){toast('Librería Excel no disponible');return;}
+  const header=['job_cost_center','role_name','full_name','rut','termination_reason','job_start_date','job_end_date','ID','ID 2'];
+  const data=[header];
+  workersDeObra().slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(w=>{
+    const id1=`${w.role}${w.rutlimpio}`;const id2=`${w.role}${w.rutlimpio}${w.cc}`;
+    data.push([w.cc||'',w.role||'',w.name||'',w.rut||'',w.motivo||'',w.fc||'',w.fs||'',id1,id2]);
+  });
+  const sheet=XLSX.utils.aoa_to_sheet(data);const book=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(book,sheet,'ConsolidadoPersonal');
+  XLSX.writeFile(book,`ConsolidadoPersonal_${obraActiva?.id||'obra'}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('Excel descargado');
+}
+
+function downloadCSV(){
+  const months=manualMonthsList();if(months.length===0){toast('No hay meses manuales');return;}
+  const header=['rutlimpio','nombre','cargo','cg',...months.map(m=>MONTH_NAMES[m-1]+'_'+YEAR)];
+  const lines=[header.join(',')];
+  workersDeObra().slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(w=>{
+    const states=computeMonthStates(w);
+    const vals=months.map(m=>(states[m-1]==='manual-on'||states[m-1]==='manual-out')?1:0);
+    lines.push([w.rutlimpio||w.id,`"${w.name}"`,`"${w.role||''}"`,w.cc,...vals].join(','));
+  });
+  const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=url;a.download=`permanencia_manual_${YEAR}.csv`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+
+function renderAll(){if(obraActiva)renderMainContent();}
+
+async function init() {
+  renderLegend();
+  renderObrasList();
+  document.getElementById('exitCancel').addEventListener('click', closeExitModal);
+  document.getElementById('exitConfirm').addEventListener('click', confirmExit);
+  document.getElementById('exitModal').addEventListener('click', e=>{if(e.target.id==='exitModal')closeExitModal();});
+  // Cargar datos desde SharePoint
+  await leerExcel();
+}
+
+initAuth();
+</script>
+</body>
+</html>
