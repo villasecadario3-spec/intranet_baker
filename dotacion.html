@@ -222,7 +222,7 @@ table.preview tr td.off{color:var(--line-strong);}
 
     <!-- SYNC BAR -->
     <div class="sync-bar" id="syncBar">
-      <span id="syncBarMsg">Conectando con SharePoint...</span>
+      <span id="syncBarMsg">Conectando con SharePoint...</span><span style="margin-left:8px;opacity:0.5;font-size:10px">· Se actualiza automáticamente cada 3 min</span>
       <div style="flex:1"></div>
       <button class="btn-sync" id="btnSync" onclick="sincronizarSharePoint()" disabled>↕ Sincronizar</button>
       <button class="btn-sync" id="btnPushExcel" onclick="pushToExcel()" disabled style="margin-left:6px">↑ Guardar en Excel</button>
@@ -866,6 +866,12 @@ async function init() {
   document.getElementById('exitModal').addEventListener('click', e=>{if(e.target.id==='exitModal')closeExitModal();});
   // Cargar datos desde SharePoint
   await leerExcel();
+
+  // Auto-refresh cada 3 minutos — detecta cambios hechos en el Excel
+  setInterval(async () => {
+    console.log('[Dotación] Auto-refresh...');
+    await leerExcel();
+  }, 3 * 60 * 1000);
 }
 
 initAuth();
