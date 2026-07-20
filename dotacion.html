@@ -381,29 +381,38 @@ async function leerExcel() {
   if (!ok) { setSyncStatus('err', 'No se pudo acceder al Excel'); return; }
   try {
     const token = await getToken();
+    // Usar Graph Workbook API — funciona aunque el archivo esté abierto
     const res = await fetch(
-      `https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/content`,
-      { headers: { Authorization: `Bearer ${token}` } }
+      `https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets/Sheet1/usedRange`,
+      { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
     );
-    if (!res.ok) throw new Error(`Error ${res.status}`);
-    const buffer = await res.arrayBuffer();
-    const wb = XLSX.read(buffer, { type: 'array' });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-    // Convertir filas del Excel a workers
+    if (!res.ok) throw new Error(`Error ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+    const values = data.values; // array de arrays [[header...], [row...], ...]
+    if (!values || values.length < 2) {
+      setSyncStatus('err', 'El Excel está vacío o no tiene datos');
+      return;
+    }
+    // Primera fila = headers
+    const headers = values[0].map(h => String(h).trim());
+    const rows = values.slice(1).map(row => {
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = row[i] !== undefined ? row[i] : ''; });
+      return obj;
+    });
     workers = rows.map(r => excelRowToWorker(r)).filter(w => w.name);
     meta.ultimoMesReal = meta.ultimoMesReal || 5;
-    // Log de diagnóstico
     const ccsEncontrados = [...new Set(workers.map(w => w.cc))].sort();
     console.log('[Dotación] Workers cargados:', workers.length);
     console.log('[Dotación] CGs encontrados:', ccsEncontrados);
-    console.log('[Dotación] Ejemplo fila 0:', workers[0]);
-    setSyncStatus('ok', `Excel leído — ${workers.length} personas · CGs: ${ccsEncontrados.join(', ')}`);
+    console.log('[Dotación] Headers encontrados:', headers);
+    if (workers.length > 0) console.log('[Dotación] Ejemplo:', workers[0]);
+    setSyncStatus('ok', `Excel leído — ${workers.length} personas`);
     renderAll();
     renderObrasList();
   } catch(e) {
     console.error('Error leyendo Excel:', e);
-    setSyncStatus('err', 'Error al leer Excel: ' + e.message);
+    setSyncStatus('err', 'Error al leer: ' + e.message);
   }
 }
 
@@ -452,13 +461,12 @@ async function pushToExcel() {
   const ok = await resolverExcelItem();
   if (!ok) { setSyncStatus('err', 'No se pudo acceder al Excel'); return; }
   try {
-    // Construir datos para el Excel
-    const header = ['job_cost_center','role_name','full_name','rut','termination_reason','job_start_date','job_end_date','ID','ID 2'];
-    const rows = [header];
-    workers.forEach(w => {
+    const token = await getToken();
+    const headers = ['job_cost_center','role_name','full_name','rut','termination_reason','job_start_date','job_end_date','ID','ID 2'];
+    const dataRows = workers.map(w => {
       const id1 = `${w.role}${w.rutlimpio}`;
       const id2 = `${w.role}${w.rutlimpio}${w.cc}`;
-      rows.push([
+      return [
         w.cc || '',
         w.role || '',
         w.name || '',
@@ -467,20 +475,25 @@ async function pushToExcel() {
         w.fc ? w.fc.split('-').reverse().join('-') : '',
         w.fs ? w.fs.split('-').reverse().join('-') : '',
         id1, id2
-      ]);
+      ];
     });
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    const values = [headers, ...dataRows];
+    const numRows = values.length;
+    const numCols = headers.length;
+    // Calcular rango: A1:I{n}
+    const colLetter = String.fromCharCode(64 + numCols); // I = col 9
+    const rangeAddr  = `A1:${colLetter}${numRows}`;
 
-    const token = await getToken();
+    // Usar Graph Workbook API PATCH — funciona con el archivo abierto
     const res = await fetch(
-      `https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/content`,
+      `https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets/Sheet1/range(address='${rangeAddr}')`,
       {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/octet-stream' },
-        body: new Uint8Array(buf)
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ values })
       }
     );
     if (!res.ok) throw new Error(`Error ${res.status}: ${await res.text()}`);
@@ -489,7 +502,7 @@ async function pushToExcel() {
   } catch(e) {
     console.error('Error guardando Excel:', e);
     setSyncStatus('err', 'Error al guardar: ' + e.message);
-    toast('Error al guardar en Excel: ' + e.message);
+    toast('Error: ' + e.message);
   }
 }
 
