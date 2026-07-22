@@ -69,9 +69,8 @@
         }
         .loading-bar-fill {
             height:100%; background: var(--color-ember-gold);
-            animation: fillBar 1.6s cubic-bezier(.4,0,.2,1) forwards;
+            width: 0; transition: width 0.3s ease;
         }
-        @keyframes fillBar { from{width:0} to{width:100%} }
         .loading-label {
             font-size: 11px; font-weight:500;
             letter-spacing: 0.12em; text-transform:uppercase;
@@ -409,7 +408,7 @@
 
 <div class="loading" id="loading">
     <div class="loading-logo">
-        <img src="LOGO_BAKER.png" alt="Baker" loading="eager" fetchpriority="high"
+        <img src="LOGO_BAKER.png" alt="Baker" id="loading-logo-img" fetchpriority="high"
              onerror="this.outerHTML='<span style=\'font-family:Georgia,serif;font-size:1.4rem;color:white\'>BAKER</span>'">
     </div>
     <div class="loading-bar"><div class="loading-bar-fill"></div></div>
@@ -813,25 +812,36 @@ function precargarImagen(src) {
 }
 
 async function init() {
-    // Cargar imágenes con promesa real — no continuar hasta que estén listas
-    function cargarImagen(src) {
-        return new Promise(resolve => {
-            const img = new Image();
-            img.onload  = resolve;
-            img.onerror = resolve;
-            img.src = src;
-            if (img.complete) resolve();
-        });
-    }
-    // Cargar auth e imágenes en paralelo
-    await Promise.all([
-        intentarLoginSilencioso(),
-        cargarImagen('LOGO_BAKER.png'),
-        cargarImagen('vista-panoramica.jpg'),
-    ]);
+    const barra = document.querySelector('.loading-bar-fill');
+
+    // Fase 1: auth silencioso
+    if (barra) barra.style.width = '10%';
+    await intentarLoginSilencioso();
+    if (barra) barra.style.width = '40%';
+
+    // Fase 2: esperar que el logo del loading esté visible en el DOM
+    await new Promise(resolve => {
+        const img = document.getElementById('loading-logo-img');
+        if (!img || img.complete) { resolve(); return; }
+        img.addEventListener('load',  resolve, { once: true });
+        img.addEventListener('error', resolve, { once: true });
+        setTimeout(resolve, 4000); // máximo 4s
+    });
+    if (barra) barra.style.width = '70%';
+
+    // Fase 3: precargar imagen de fondo del hero
+    await new Promise(resolve => {
+        const img = new Image();
+        img.onload  = resolve;
+        img.onerror = resolve;
+        img.src = 'vista-panoramica.jpg';
+        if (img.complete) resolve();
+        setTimeout(resolve, 4000);
+    });
+    if (barra) barra.style.width = '100%';
+
     actualizarUI();
-    // Forzar que el browser pinte antes de ocultar el loading
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await new Promise(r => setTimeout(r, 150));
     document.getElementById('loading').classList.add('oculto');
 }
 init();
