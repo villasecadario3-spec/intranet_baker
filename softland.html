@@ -1148,11 +1148,22 @@ function cambiarPag(dir) {
 }
 
 // ══ PESTAÑAS ══════════════════════════════════════════════════
+let r8ChipsIniciados = false;
 function cambiarTab(tab, btn) {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('activo'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('activa'));
     document.getElementById('panel-' + tab).classList.add('activo');
     btn.classList.add('activa');
+    // Inicializar chips del reporte8 la primera vez que se abre
+    if (tab === 'reporte8' && !r8ChipsIniciados) {
+        const wrap = document.getElementById('r8-chips');
+        if (wrap) {
+            wrap.innerHTML = R8_MESES.map((m,i) =>
+                `<div class="r8-chip" data-mes="${i+1}" onclick="r8ToggleMes(this,${i+1})">${m}</div>`
+            ).join('');
+            r8ChipsIniciados = true;
+        }
+    }
 }
 
 // ══ REPORTE 8 COLUMNAS ════════════════════════════════════════
@@ -1160,12 +1171,7 @@ const R8_MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','N
 let r8MesesActivos = [];
 let r8Datos = null;
 
-(function initR8Chips(){
-    const wrap = document.getElementById('r8-chips');
-    wrap.innerHTML = R8_MESES.map((m,i) =>
-        `<div class="r8-chip" data-mes="${i+1}" onclick="r8ToggleMes(this,${i+1})">${m}</div>`
-    ).join('');
-})();
+// chips se inicializan al abrir la pestaña
 
 function r8ToggleMes(el, mes) {
     el.classList.toggle('activo');
