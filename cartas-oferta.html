@@ -84,6 +84,7 @@ input[type=file] { display: none; }
 
 /* RESULTADO */
 .resultado-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 20px; display: none; overflow: hidden; }
+.historial-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 20px; overflow: hidden; }
 .resultado-card.visible { display: block; }
 .resultado-header { padding: 16px 20px; border-bottom: 1px solid var(--border2); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .resultado-titulo { font-size: 0.95rem; font-weight: 600; color: var(--ink); }
@@ -210,11 +211,21 @@ input[type=file] { display: none; }
   <div class="acceso-denegado-sub">Este módulo es solo para el equipo de escrituración.</div>
 </div>
 
+<div class="historial-card" id="historialCard" style="display:none;">
+  <div class="resultado-header">
+    <div class="resultado-titulo">Historial de procesamientos</div>
+    <button class="btn btn-secondary" style="font-size:0.75rem;padding:5px 10px;" onclick="cargarHistorial()">↻ Actualizar</button>
+  </div>
+  <div class="cartas-lista" id="historialLista" style="max-height:300px;"></div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────
-const ACCESO = ['mbello@ibaker.cl', 'jcumplido@ibaker.cl', 'dvillaseca@ibaker.cl'];
+const ACCESO   = ['mbello@ibaker.cl', 'jcumplido@ibaker.cl', 'dvillaseca@ibaker.cl'];
+const API_BASE = 'https://api.ibaker.cl';
+let correoActual = '';
 const PATRON_INICIO = 'carta oferta de la inmobiliaria';
 const PATRON_FIN    = 'moises bello puebla';
 const PATRON_NOMBRE = 'nombre completo cliente';
@@ -230,10 +241,11 @@ const msalConfig = {
 const msalInstance = new msal.PublicClientApplication(msalConfig);
 
 // Estado global
-let pdfBytes    = null;   // ArrayBuffer del PDF original
-let pdfDocCache = null;   // PDFDocument ya cargado (reutilizado para todas las cartas)
-let cartasData  = [];     // [{nombre, inicio, fin, paginas}]
-let zipGenerado = null;
+let pdfBytes          = null;
+let pdfDocCache       = null;
+let cartasData        = [];
+let zipGenerado       = null;
+let file_nombre_actual = '';
 
 // ── AUTH ──────────────────────────────────────────────────────
 async function initAuth() {
@@ -252,7 +264,9 @@ async function initAuth() {
       <div class="user-av">${iniciales}</div>
       <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
     </div>`;
+  correoActual = correo;
   document.getElementById('main-wrap').style.display = 'block';
+  cargarHistorial();
 }
 
 // ── DRAG & DROP ───────────────────────────────────────────────
@@ -270,6 +284,7 @@ dz.addEventListener('drop', e => {
 async function procesarArchivo(event, fileOverride) {
   const file = fileOverride || event.target.files[0];
   if (!file) return;
+  file_nombre_actual = file.name;
 
   resetearEstado();
   mostrarProgress(true);
@@ -449,6 +464,7 @@ async function descargarIndividual(idx) {
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 5000);
     toast(`Descargado: ${carta.nombreArchivo}`);
+    registrarHistorial('individual', 1, carta.nombreArchivo);
   } catch(err) {
     toast('Error al generar PDF: ' + err.message, true);
   }
@@ -493,6 +509,7 @@ async function descargarZip() {
     setTimeout(() => URL.revokeObjectURL(url), 10000);
 
     toast(`ZIP descargado con ${cartasData.length} cartas`);
+    registrarHistorial('zip', cartasData.length, file_nombre_actual);
   } catch(err) {
     toast('Error al generar ZIP: ' + err.message, true);
     mostrarProgress(false);
@@ -513,10 +530,11 @@ function mostrarProgress(visible) {
   document.getElementById('progressCard').classList.toggle('visible', visible);
 }
 function resetearEstado() {
-  pdfBytes    = null;
-  pdfDocCache = null;
-  cartasData  = [];
-  zipGenerado = null;
+  pdfBytes           = null;
+  pdfDocCache        = null;
+  cartasData         = [];
+  zipGenerado        = null;
+  file_nombre_actual = '';
   document.getElementById('resultadoCard').classList.remove('visible');
   document.getElementById('warnBox').classList.remove('visible');
   document.getElementById('cartasLista').innerHTML = '';
@@ -535,6 +553,48 @@ function toast(msg, err = false) {
   t.classList.add('show');
   clearTimeout(t._t);
   t._t = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ── HISTORIAL ────────────────────────────────────────────────
+async function registrarHistorial(accion, totalCartas, archivo) {
+  try {
+    await fetch(`${API_BASE}/historial-cartas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: correoActual, archivo, totalCartas, accion })
+    });
+    cargarHistorial();
+  } catch(e) { console.warn('historial-cartas: sin conexión'); }
+}
+
+async function cargarHistorial() {
+  const card  = document.getElementById('historialCard');
+  const lista = document.getElementById('historialLista');
+  try {
+    const res  = await fetch(`${API_BASE}/historial-cartas`);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    if (!data.length) {
+      lista.innerHTML = '<div style="padding:16px 20px;font-family:var(--mono);font-size:0.78rem;color:var(--ink3);">Sin registros todavía</div>';
+    } else {
+      lista.innerHTML = data.slice(0, 50).map(h => {
+        const fecha = new Date(h.fecha).toLocaleString('es-CL', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
+        const accionLabel = h.accion === 'zip' ? `ZIP · ${h.totalCartas} cartas` : `PDF individual`;
+        return `
+          <div class="carta-item">
+            <div class="carta-icon">${h.accion === 'zip' ? '🗜️' : '📋'}</div>
+            <div class="carta-info">
+              <div class="carta-nombre">${h.email}</div>
+              <div class="carta-pages">${accionLabel} · ${h.archivo || ''}</div>
+            </div>
+            <div style="font-family:var(--mono);font-size:0.72rem;color:var(--ink3);flex-shrink:0;">${fecha}</div>
+          </div>`;
+      }).join('');
+    }
+    card.style.display = 'block';
+  } catch(e) {
+    card.style.display = 'none';
+  }
 }
 
 // ── INIT ──────────────────────────────────────────────────────
