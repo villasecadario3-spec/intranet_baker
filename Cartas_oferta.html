@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Divisor Cartas Oferta — Baker</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root {
+  --bg: #0f1923;
+  --bg2: #162030;
+  --panel: #1c2d40;
+  --border: rgba(99,179,237,0.15);
+  --border2: rgba(99,179,237,0.08);
+  --ink: #e2eaf2;
+  --ink2: #8fadc8;
+  --ink3: #5a7a96;
+  --cyan: #63b3ed;
+  --orange: #f6ad55;
+  --green: #68d391;
+  --red: #fc8181;
+  --radius: 8px;
+  --mono: 'DM Mono', monospace;
+  --sans: 'DM Sans', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+
+/* NAV */
+.nav { height: 52px; background: rgba(15,25,35,0.95); border-bottom: 1px solid var(--border2); display: flex; align-items: center; padding: 0 24px; gap: 12px; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(12px); }
+.nav-logo img { height: 22px; background: white; border-radius: 3px; padding: 2px 8px; display: block; }
+.nav-sep { width: 1px; height: 14px; background: var(--border); }
+.nav-back { display: flex; align-items: center; gap: 4px; color: var(--ink3); text-decoration: none; font-size: 0.78rem; font-weight: 500; transition: color 0.15s; }
+.nav-back:hover { color: var(--ink); }
+.nav-back svg { width: 12px; height: 12px; }
+.nav-title { font-family: var(--mono); font-size: 0.68rem; color: var(--ink3); letter-spacing: 0.1em; text-transform: uppercase; }
+.nav-spacer { flex: 1; }
+.user-chip { display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 3px; background: var(--panel); border: 1px solid var(--border); border-radius: 100px; }
+.user-av { width: 22px; height: 22px; border-radius: 50%; background: var(--orange); display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; color: #1a0d02; }
+.user-nm { font-size: 0.76rem; font-weight: 500; color: var(--ink); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* WRAP */
+.wrap { max-width: 860px; margin: 0 auto; padding: 32px 24px 80px; }
+
+/* HEADER */
+.page-header { margin-bottom: 28px; }
+.eyebrow { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--cyan); margin-bottom: 8px; }
+.page-title { font-size: 1.8rem; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); margin-bottom: 6px; }
+.page-sub { font-size: 0.88rem; color: var(--ink2); line-height: 1.6; max-width: 580px; }
+
+/* DROP ZONE */
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--bg2);
+  margin-bottom: 24px;
+}
+.dropzone:hover, .dropzone.drag { border-color: var(--cyan); background: rgba(99,179,237,0.04); }
+.dropzone-icon { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.6; }
+.dropzone-title { font-size: 1rem; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+.dropzone-sub { font-size: 0.82rem; color: var(--ink2); }
+.dropzone-sub span { color: var(--cyan); }
+input[type=file] { display: none; }
+
+/* PROGRESS */
+.progress-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; margin-bottom: 20px; display: none; }
+.progress-card.visible { display: block; }
+.progress-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.progress-text { font-size: 0.85rem; font-weight: 500; color: var(--ink); }
+.progress-pct { font-family: var(--mono); font-size: 0.82rem; color: var(--cyan); }
+.progress-bar { height: 4px; background: var(--bg); border-radius: 2px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--cyan); border-radius: 2px; transition: width 0.3s ease; width: 0%; }
+.progress-detail { font-family: var(--mono); font-size: 0.75rem; color: var(--ink3); margin-top: 8px; }
+
+/* RESULTADO */
+.resultado-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 20px; display: none; overflow: hidden; }
+.resultado-card.visible { display: block; }
+.resultado-header { padding: 16px 20px; border-bottom: 1px solid var(--border2); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.resultado-titulo { font-size: 0.95rem; font-weight: 600; color: var(--ink); }
+.resultado-stats { display: flex; gap: 16px; }
+.stat { text-align: center; }
+.stat-n { font-family: var(--mono); font-size: 1.3rem; font-weight: 700; color: var(--cyan); line-height: 1; }
+.stat-l { font-size: 0.7rem; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+.resultado-acciones { padding: 14px 20px; border-bottom: 1px solid var(--border2); display: flex; gap: 10px; flex-wrap: wrap; }
+.btn { font-family: var(--sans); font-weight: 600; font-size: 0.82rem; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
+.btn-primary { background: var(--cyan); color: #0f1923; }
+.btn-primary:hover { background: #90cdf4; }
+.btn-secondary { background: var(--panel); border: 1px solid var(--border); color: var(--ink); }
+.btn-secondary:hover { background: var(--bg2); }
+.btn-warn { background: var(--orange); color: #1a0d02; }
+.btn-warn:hover { background: #fbd38d; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* LISTA DE CARTAS */
+.cartas-lista { max-height: 420px; overflow-y: auto; }
+.carta-item { display: flex; align-items: center; gap: 12px; padding: 11px 20px; border-bottom: 1px solid var(--border2); transition: background 0.1s; }
+.carta-item:last-child { border-bottom: none; }
+.carta-item:hover { background: var(--bg2); }
+.carta-num { font-family: var(--mono); font-size: 0.72rem; color: var(--ink3); width: 28px; flex-shrink: 0; text-align: right; }
+.carta-icon { width: 28px; height: 28px; border-radius: 4px; background: rgba(99,179,237,0.1); border: 1px solid rgba(99,179,237,0.2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.85rem; }
+.carta-info { flex: 1; min-width: 0; }
+.carta-nombre { font-size: 0.88rem; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.carta-pages { font-family: var(--mono); font-size: 0.72rem; color: var(--ink3); margin-top: 2px; }
+.carta-warn { font-size: 0.72rem; color: var(--orange); margin-top: 2px; }
+.carta-dl { flex-shrink: 0; }
+.btn-dl { font-family: var(--mono); font-size: 0.72rem; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--cyan); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.btn-dl:hover { background: var(--panel); border-color: var(--cyan); }
+
+/* ADVERTENCIAS */
+.warn-box { background: rgba(246,173,85,0.08); border: 1px solid rgba(246,173,85,0.25); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; display: none; }
+.warn-box.visible { display: block; }
+.warn-box-title { font-size: 0.82rem; font-weight: 600; color: var(--orange); margin-bottom: 6px; }
+.warn-box ul { padding-left: 16px; }
+.warn-box li { font-size: 0.8rem; color: var(--ink2); line-height: 1.6; }
+
+/* TOAST */
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(10px); background: var(--green); color: #0f2318; font-family: var(--mono); font-size: 0.8rem; font-weight: 600; padding: 9px 18px; border-radius: 6px; opacity: 0; transition: all 0.2s; pointer-events: none; z-index: 999; white-space: nowrap; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.err { background: var(--red); color: #1a0505; }
+
+/* ACCESO DENEGADO */
+.acceso-denegado { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 12px; text-align: center; }
+.acceso-denegado.visible { display: flex; }
+.acceso-denegado-icon { font-size: 3rem; opacity: 0.4; }
+.acceso-denegado-title { font-size: 1.2rem; font-weight: 600; color: var(--ink); }
+.acceso-denegado-sub { font-size: 0.85rem; color: var(--ink2); }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-back" href="index.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    Inicio
+  </a>
+  <div class="nav-sep"></div>
+  <div class="nav-title">Cartas Oferta</div>
+  <div class="nav-spacer"></div>
+  <div id="auth-area"></div>
+</nav>
+
+<div class="wrap" id="main-wrap" style="display:none;">
+  <div class="page-header">
+    <div class="eyebrow">iBaker · Escrituración</div>
+    <h1 class="page-title">Divisor de Cartas Oferta</h1>
+    <p class="page-sub">Sube el PDF unificado con todas las cartas oferta. El sistema las detecta automáticamente, extrae el nombre de cada cliente y genera PDFs individuales listos para descargar.</p>
+  </div>
+
+  <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+    <input type="file" id="fileInput" accept=".pdf" onchange="procesarArchivo(event)">
+    <div class="dropzone-icon">📄</div>
+    <div class="dropzone-title">Arrastra el PDF aquí o haz clic para seleccionarlo</div>
+    <div class="dropzone-sub">Solo archivos <span>.pdf</span> · Sin límite de tamaño</div>
+  </div>
+
+  <div class="progress-card" id="progressCard">
+    <div class="progress-label">
+      <span class="progress-text" id="progressText">Procesando...</span>
+      <span class="progress-pct" id="progressPct">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-detail" id="progressDetail"></div>
+  </div>
+
+  <div class="warn-box" id="warnBox">
+    <div class="warn-box-title">⚠️ Cartas con advertencias</div>
+    <ul id="warnList"></ul>
+  </div>
+
+  <div class="resultado-card" id="resultadoCard">
+    <div class="resultado-header">
+      <div class="resultado-titulo">Cartas detectadas</div>
+      <div class="resultado-stats">
+        <div class="stat"><div class="stat-n" id="statCartas">0</div><div class="stat-l">Cartas</div></div>
+        <div class="stat"><div class="stat-n" id="statPaginas">0</div><div class="stat-l">Páginas</div></div>
+      </div>
+    </div>
+    <div class="resultado-acciones">
+      <button class="btn btn-primary" id="btnZip" onclick="descargarZip()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Descargar todo en ZIP
+      </button>
+      <button class="btn btn-secondary" onclick="resetear()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+        Procesar otro PDF
+      </button>
+    </div>
+    <div class="cartas-lista" id="cartasLista"></div>
+  </div>
+</div>
+
+<div class="acceso-denegado" id="accesoDenegado">
+  <div class="acceso-denegado-icon">🔒</div>
+  <div class="acceso-denegado-title">Acceso restringido</div>
+  <div class="acceso-denegado-sub">Este módulo es solo para el equipo de escrituración.</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────
+const ACCESO = ['mbello@ibaker.cl', 'jcumplido@ibaker.cl', 'dvillaseca@ibaker.cl'];
+const PATRON_INICIO = 'carta oferta de la inmobiliaria';
+const PATRON_FIN    = 'moises bello puebla';
+const PATRON_NOMBRE = 'nombre completo cliente';
+
+const msalConfig = {
+  auth: {
+    clientId: '9a56ab1c-d3c4-4460-9892-1d4da768ecfb',
+    authority: 'https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26',
+    redirectUri: window.location.origin,
+  },
+  cache: { cacheLocation: 'sessionStorage' }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+// Estado global
+let pdfBytes    = null;   // ArrayBuffer del PDF original
+let cartasData  = [];     // [{nombre, inicio, fin, paginas}]
+let zipGenerado = null;
+
+// ── AUTH ──────────────────────────────────────────────────────
+async function initAuth() {
+  await msalInstance.initialize();
+  const accounts = msalInstance.getAllAccounts();
+  if (!accounts.length) { window.location.href = 'index.html'; return; }
+  const correo = accounts[0].username.toLowerCase();
+  if (!ACCESO.includes(correo)) {
+    document.getElementById('accesoDenegado').classList.add('visible');
+    return;
+  }
+  const nombre = accounts[0].name || accounts[0].username;
+  const iniciales = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('auth-area').innerHTML = `
+    <div class="user-chip">
+      <div class="user-av">${iniciales}</div>
+      <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
+    </div>`;
+  document.getElementById('main-wrap').style.display = 'block';
+}
+
+// ── DRAG & DROP ───────────────────────────────────────────────
+const dz = document.getElementById('dropzone');
+dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type === 'application/pdf') procesarArchivo(null, file);
+  else toast('Solo se aceptan archivos PDF', true);
+});
+
+// ── PROCESAMIENTO PRINCIPAL ───────────────────────────────────
+async function procesarArchivo(event, fileOverride) {
+  const file = fileOverride || event.target.files[0];
+  if (!file) return;
+
+  resetearEstado();
+  mostrarProgress(true);
+  setProgress(5, `Cargando "${file.name}"...`, '');
+
+  try {
+    // Leer el archivo
+    pdfBytes = await file.arrayBuffer();
+    setProgress(10, 'Leyendo páginas...', '');
+
+    // Configurar PDF.js para extracción de texto
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    const pdfDoc = await pdfjsLib.getDocument({ data: pdfBytes.slice(0) }).promise;
+    const totalPaginas = pdfDoc.numPages;
+    setProgress(15, `PDF cargado — ${totalPaginas} páginas`, `Analizando texto de cada página...`);
+
+    // Extraer texto de cada página
+    const textosPaginas = [];
+    for (let i = 1; i <= totalPaginas; i++) {
+      const page    = await pdfDoc.getPage(i);
+      const content = await page.getTextContent();
+      const texto   = content.items.map(s => s.str).join(' ').toLowerCase();
+      textosPaginas.push(texto);
+      const pct = 15 + Math.round((i / totalPaginas) * 50);
+      setProgress(pct, `Leyendo página ${i} de ${totalPaginas}...`, '');
+    }
+
+    setProgress(65, 'Detectando cartas...', '');
+
+    // Detectar límites de cada carta
+    const inicios = []; // índices base-0 de páginas donde empieza una carta
+    for (let i = 0; i < textosPaginas.length; i++) {
+      if (textosPaginas[i].includes(PATRON_INICIO)) {
+        inicios.push(i);
+      }
+    }
+
+    if (inicios.length === 0) {
+      toast('No se encontraron cartas oferta en el PDF', true);
+      mostrarProgress(false);
+      return;
+    }
+
+    // Para cada inicio, buscar el fin (página que contiene el patrón de fin)
+    // y extraer el nombre del cliente
+    const advertencias = [];
+    cartasData = [];
+
+    for (let idx = 0; idx < inicios.length; idx++) {
+      const paginaInicio = inicios[idx]; // base-0
+      // Buscar fin: desde paginaInicio hasta el inicio de la siguiente carta (o fin del doc)
+      const limite = idx + 1 < inicios.length ? inicios[idx + 1] : textosPaginas.length;
+      let paginaFin = -1;
+      for (let p = paginaInicio; p < limite; p++) {
+        if (textosPaginas[p].includes(PATRON_FIN)) {
+          paginaFin = p;
+          break;
+        }
+      }
+      // Si no encontró el patrón de fin, tomar hasta el inicio de la siguiente carta - 1
+      if (paginaFin === -1) {
+        paginaFin = limite - 1;
+        advertencias.push(`Carta ${idx + 1}: no se encontró firma de Moises Bello — se tomaron páginas ${paginaInicio + 1} a ${paginaFin + 1}`);
+      }
+
+      // Extraer nombre del cliente buscando el patrón en las páginas de esta carta
+      let nombreCliente = '';
+      for (let p = paginaInicio; p <= paginaFin; p++) {
+        const texto = textosPaginas[p];
+        const idxNombre = texto.indexOf(PATRON_NOMBRE);
+        if (idxNombre !== -1) {
+          // Extraer el texto que sigue al patrón
+          const resto = texto.slice(idxNombre + PATRON_NOMBRE.length).trim();
+          // Tomar hasta el primer salto de línea o punto, máx 60 chars
+          const match = resto.match(/^([a-záéíóúüñ\s]{3,60})/i);
+          if (match) {
+            nombreCliente = match[1].trim().toUpperCase()
+              .replace(/\s+/g, ' ')
+              .replace(/[^A-ZÁÉÍÓÚÜÑ\s]/g, '');
+            break;
+          }
+        }
+      }
+
+      if (!nombreCliente) {
+        nombreCliente = `CARTA_${String(idx + 1).padStart(3, '0')}`;
+        advertencias.push(`Carta ${idx + 1} (páginas ${paginaInicio + 1}–${paginaFin + 1}): no se pudo extraer el nombre del cliente`);
+      }
+
+      // Sanitizar nombre para usar como nombre de archivo
+      const nombreArchivo = nombreCliente
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^A-Z0-9\s]/g, '').trim()
+        .replace(/\s+/g, '_') + '.pdf';
+
+      cartasData.push({
+        nombre:        nombreCliente,
+        nombreArchivo,
+        inicio:        paginaInicio, // base-0
+        fin:           paginaFin,    // base-0
+        paginas:       paginaFin - paginaInicio + 1,
+        advertencia:   advertencias.some(a => a.startsWith(`Carta ${idx + 1}:`))
+      });
+
+      setProgress(65 + Math.round((idx / inicios.length) * 20), `Detectando carta ${idx + 1} de ${inicios.length}...`, '');
+    }
+
+    setProgress(85, 'Preparando resultados...', '');
+
+    // Mostrar advertencias
+    if (advertencias.length > 0) {
+      document.getElementById('warnBox').classList.add('visible');
+      document.getElementById('warnList').innerHTML = advertencias.map(a => `<li>${a}</li>`).join('');
+    }
+
+    // Mostrar resultados
+    document.getElementById('statCartas').textContent   = cartasData.length;
+    document.getElementById('statPaginas').textContent  = totalPaginas;
+
+    const lista = document.getElementById('cartasLista');
+    lista.innerHTML = cartasData.map((carta, i) => `
+      <div class="carta-item">
+        <div class="carta-num">${i + 1}</div>
+        <div class="carta-icon">📋</div>
+        <div class="carta-info">
+          <div class="carta-nombre">${carta.nombre}</div>
+          <div class="carta-pages">Páginas ${carta.inicio + 1} – ${carta.fin + 1} · ${carta.paginas} ${carta.paginas === 1 ? 'hoja' : 'hojas'}</div>
+          ${carta.advertencia ? '<div class="carta-warn">⚠️ Ver advertencia arriba</div>' : ''}
+        </div>
+        <div class="carta-dl">
+          <button class="btn-dl" onclick="descargarIndividual(${i})">↓ PDF</button>
+        </div>
+      </div>`).join('');
+
+    setProgress(100, `${cartasData.length} cartas detectadas correctamente`, '');
+    setTimeout(() => mostrarProgress(false), 800);
+    document.getElementById('resultadoCard').classList.add('visible');
+    toast(`${cartasData.length} cartas detectadas`);
+
+  } catch(err) {
+    console.error(err);
+    toast('Error al procesar el PDF: ' + err.message, true);
+    mostrarProgress(false);
+  }
+}
+
+// ── EXTRAER PDF INDIVIDUAL ────────────────────────────────────
+async function extraerPdf(carta) {
+  const { PDFDocument } = PDFLib;
+  const srcDoc  = await PDFDocument.load(pdfBytes);
+  const newDoc  = await PDFDocument.create();
+  // Copiar páginas (base-0)
+  const indices = [];
+  for (let i = carta.inicio; i <= carta.fin; i++) indices.push(i);
+  const pagsCopadas = await newDoc.copyPages(srcDoc, indices);
+  pagsCopadas.forEach(p => newDoc.addPage(p));
+  return await newDoc.save();
+}
+
+async function descargarIndividual(idx) {
+  const carta = cartasData[idx];
+  try {
+    toast(`Generando ${carta.nombreArchivo}...`);
+    const bytes = await extraerPdf(carta);
+    const blob  = new Blob([bytes], { type: 'application/pdf' });
+    const url   = URL.createObjectURL(blob);
+    const a     = document.createElement('a');
+    a.href = url; a.download = carta.nombreArchivo;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    toast(`Descargado: ${carta.nombreArchivo}`);
+  } catch(err) {
+    toast('Error al generar PDF: ' + err.message, true);
+  }
+}
+
+// ── DESCARGAR ZIP ─────────────────────────────────────────────
+async function descargarZip() {
+  const btn = document.getElementById('btnZip');
+  btn.disabled = true;
+  btn.textContent = 'Generando ZIP...';
+
+  try {
+    const zip = new JSZip();
+    const carpeta = zip.folder('Cartas_Oferta_Baker');
+
+    for (let i = 0; i < cartasData.length; i++) {
+      const carta = cartasData[i];
+      setProgress(Math.round((i / cartasData.length) * 100),
+        `Generando PDF ${i + 1} de ${cartasData.length}...`,
+        carta.nombre);
+      mostrarProgress(true);
+      const bytes = await extraerPdf(carta);
+      carpeta.file(carta.nombreArchivo, bytes);
+    }
+
+    setProgress(100, 'Comprimiendo...', '');
+    const blob = await zip.generateAsync({
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    });
+
+    mostrarProgress(false);
+
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const fecha = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = `Cartas_Oferta_Baker_${fecha}.zip`;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+    toast(`ZIP descargado con ${cartasData.length} cartas`);
+  } catch(err) {
+    toast('Error al generar ZIP: ' + err.message, true);
+    mostrarProgress(false);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Descargar todo en ZIP`;
+  }
+}
+
+// ── HELPERS UI ────────────────────────────────────────────────
+function setProgress(pct, texto, detalle) {
+  document.getElementById('progressFill').style.width  = pct + '%';
+  document.getElementById('progressPct').textContent   = pct + '%';
+  document.getElementById('progressText').textContent  = texto;
+  document.getElementById('progressDetail').textContent = detalle;
+}
+function mostrarProgress(visible) {
+  document.getElementById('progressCard').classList.toggle('visible', visible);
+}
+function resetearEstado() {
+  pdfBytes   = null;
+  cartasData = [];
+  zipGenerado = null;
+  document.getElementById('resultadoCard').classList.remove('visible');
+  document.getElementById('warnBox').classList.remove('visible');
+  document.getElementById('cartasLista').innerHTML = '';
+  document.getElementById('warnList').innerHTML = '';
+}
+function resetear() {
+  resetearEstado();
+  mostrarProgress(false);
+  document.getElementById('fileInput').value = '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function toast(msg, err = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = 'toast' + (err ? ' err' : '');
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+initAuth();
+</script>
+</body>
+</html>
