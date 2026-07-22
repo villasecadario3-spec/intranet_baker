@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&family=Inter:wght@300;400;500;600;700&family=Inter+Tight:wght@400;500&display=swap" rel="stylesheet">
     <link rel="preload" as="image" href="vista-panoramica.jpg" fetchpriority="high">
+    <link rel="preload" as="image" href="LOGO_BAKER.png" fetchpriority="high">
     <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
     <style>
         :root {
@@ -432,7 +433,7 @@
 
 <nav>
     <a class="nav-logo" href="#">
-        <img src="LOGO_BAKER.png" alt="Baker"
+        <img src="LOGO_BAKER.png" alt="Baker" fetchpriority="high"
              onerror="this.outerHTML='<span style=\'font-family:Georgia,serif;font-size:0.9rem;color:white;font-weight:500\'>BAKER</span>'">
     </a>
     <div class="nav-divider"></div>
@@ -685,42 +686,8 @@
         </div>
     </div>
 
-    <div>
-        <div class="sec-header">
-            <div class="sec-titulo">Novedades internas</div>
-            <div class="sec-linea"></div>
-            <div class="sec-meta">Julio 2026</div>
-        </div>
-        <div class="noticias-grid">
-            <div class="not-card principal">
-                <div class="not-visual">🏗️<div class="not-cat">Tecnología</div></div>
-                <div class="not-body">
-                    <div class="not-fecha">Jul 2026</div>
-                    <div class="not-titulo">Nuevo módulo: Control de Dotación</div>
-                    <div class="not-extracto">Ya está disponible el módulo de gestión de personal por obra, sincronizado en tiempo real con el Excel de SharePoint y Power BI.</div>
-                </div>
-            </div>
-            <div class="not-card">
-                <div class="not-visual" style="font-size:1.8rem">📄<div class="not-cat">Documentos</div></div>
-                <div class="not-body">
-                    <div class="not-fecha">Jun 2026</div>
-                    <div class="not-titulo">Flujo de aprobación de documentos</div>
-                    <div class="not-extracto">El módulo de Procedimientos ahora permite que cualquier colaborador suba documentos, que pasan por aprobación antes de publicarse.</div>
-                </div>
-            </div>
-            <div class="not-card">
-                <div class="not-visual" style="font-size:1.8rem">🔍<div class="not-cat">Tributario</div></div>
-                <div class="not-body">
-                    <div class="not-fecha">Jun 2026</div>
-                    <div class="not-titulo">Consulta SII integrada</div>
-                    <div class="not-extracto">Nuevo módulo para verificar la situación tributaria de proveedores y sociedades directamente desde la intranet.</div>
-                </div>
-            </div>
-        </div>
-    </div>
 
 </div>
-
 <footer>
     <div class="footer-l">Inmobiliaria Baker SPA — Portal Interno</div>
     <div class="footer-r">v1.0.0 · 2026</div>
@@ -845,13 +812,25 @@ function precargarImagen(src) {
 }
 
 async function init() {
-    const [_auth, _logo, _bg] = await Promise.all([
+    // Cargar imágenes con promesa real — no continuar hasta que estén listas
+    function cargarImagen(src) {
+        return new Promise(resolve => {
+            const img = new Image();
+            img.onload  = resolve;
+            img.onerror = resolve; // si falla igual continúa
+            img.src = src + '?v=' + Date.now(); // evitar cache vacío en primera carga
+            // Si ya está en caché, onload puede no disparar en algunos browsers
+            if (img.complete) resolve();
+        });
+    }
+    await Promise.all([
         intentarLoginSilencioso(),
-        precargarImagen('LOGO_BAKER.png'),
-        precargarImagen('vista-panoramica.jpg'),
+        cargarImagen('LOGO_BAKER.png'),
+        cargarImagen('vista-panoramica.jpg'),
     ]);
     actualizarUI();
-    await new Promise(r => setTimeout(r, 800));
+    // Pequeño delay para que el render termine antes de ocultar el loading
+    await new Promise(r => setTimeout(r, 300));
     document.getElementById('loading').classList.add('oculto');
 }
 init();
