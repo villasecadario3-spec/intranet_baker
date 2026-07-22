@@ -1324,12 +1324,22 @@ function exportarR8Excel() {
     XLSX.utils.book_append_sheet(wb, ws, 'Reporte 8 Columnas');
     XLSX.writeFile(wb, `Reporte8Col_${empresa.replace(/\s/g,'_')}_${mes==='todos'?ano:ano+'_meses'}.xlsx`);
 }
-// Inicializar pestañas con addEventListener (evita problemas con onclick+comillas)
-document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
-    btn.addEventListener('click', function() {
-        cambiarTab(this.getAttribute('data-tab'));
+// Inicializar pestañas cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            cambiarTab(this.getAttribute('data-tab'));
+        });
     });
 });
+// También intentar inmediatamente por si DOMContentLoaded ya pasó
+if (document.readyState !== 'loading') {
+    document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            cambiarTab(this.getAttribute('data-tab'));
+        });
+    });
+}
 </script>
 </div>
 </body>
