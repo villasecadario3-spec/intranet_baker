@@ -231,6 +231,7 @@ const msalInstance = new msal.PublicClientApplication(msalConfig);
 
 // Estado global
 let pdfBytes    = null;   // ArrayBuffer del PDF original
+let pdfDocCache = null;   // PDFDocument ya cargado (reutilizado para todas las cartas)
 let cartasData  = [];     // [{nombre, inicio, fin, paginas}]
 let zipGenerado = null;
 
@@ -344,8 +345,9 @@ async function procesarArchivo(event, fileOverride) {
         if (idxNombre !== -1) {
           // Extraer el texto que sigue al patrón
           const resto = texto.slice(idxNombre + PATRON_NOMBRE.length).trim();
-          // Tomar hasta el primer salto de línea o punto, máx 60 chars
-          const match = resto.match(/^([a-záéíóúüñ\s]{3,60})/i);
+          // Cortar antes de "rut cliente" u otros campos que siguen
+          const restoLimpio = resto.split(/rut\s*cliente|fecha|domicilio|teléfono|telefono/i)[0].trim();
+          const match = restoLimpio.match(/^([a-záéíóúüñ\s]{3,60})/i);
           if (match) {
             nombreCliente = match[1].trim().toUpperCase()
               .replace(/\s+/g, ' ')
@@ -379,6 +381,9 @@ async function procesarArchivo(event, fileOverride) {
     }
 
     setProgress(85, 'Preparando resultados...', '');
+    // Precargar el PDFDocument con pdf-lib una sola vez — se reutiliza para todas las cartas
+    const { PDFDocument: PDFDocumentLib } = PDFLib;
+    pdfDocCache = await PDFDocumentLib.load(pdfBytes);
 
     // Mostrar advertencias
     if (advertencias.length > 0) {
@@ -420,7 +425,8 @@ async function procesarArchivo(event, fileOverride) {
 // ── EXTRAER PDF INDIVIDUAL ────────────────────────────────────
 async function extraerPdf(carta) {
   const { PDFDocument } = PDFLib;
-  const srcDoc  = await PDFDocument.load(pdfBytes);
+  // Reusar el documento ya cargado en lugar de leer los bytes cada vez
+  const srcDoc  = pdfDocCache || await PDFDocument.load(pdfBytes);
   const newDoc  = await PDFDocument.create();
   // Copiar páginas (base-0)
   const indices = [];
@@ -507,8 +513,9 @@ function mostrarProgress(visible) {
   document.getElementById('progressCard').classList.toggle('visible', visible);
 }
 function resetearEstado() {
-  pdfBytes   = null;
-  cartasData = [];
+  pdfBytes    = null;
+  pdfDocCache = null;
+  cartasData  = [];
   zipGenerado = null;
   document.getElementById('resultadoCard').classList.remove('visible');
   document.getElementById('warnBox').classList.remove('visible');
