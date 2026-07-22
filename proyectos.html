@@ -234,6 +234,34 @@
     <div id="adm-status" style="font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);margin-bottom:10px;"></div>
     <div id="adm-lista"></div>
   </div>
+  <div class="panel" id="panel-gestion-docs" style="display:none;">
+    <h2>Gestión de documentos y planos <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint);font-family:var(--sans);font-size:11.5px;">— agrega o quita sin tocar el código</span></h2>
+    <div class="grid" style="margin-bottom:14px;">
+      <div class="field">
+        <label>Tipo</label>
+        <select id="adm-doc-tipo">
+          <option value="documento">Documento</option>
+          <option value="plano">Plano</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Carpeta</label>
+        <select id="adm-doc-carpeta"></select>
+      </div>
+      <div class="field">
+        <label>Nombre del documento / plano</label>
+        <input type="text" id="adm-doc-nombre" placeholder="ej. Resolución Aprobación IMIV" />
+      </div>
+      <div class="field">
+        <label>Abreviación <span class="hint" style="display:inline">(solo la parte fija, sin proyecto ni fecha)</span></label>
+        <input type="text" id="adm-doc-abrev" placeholder="ej. SG_TRANSP_IMIV_Aprob" />
+      </div>
+    </div>
+    <button onclick="agregarDocConfig()" style="background:var(--orange);border:1px solid var(--orange-dim);color:#1a0d02;font-weight:600;font-family:var(--display);font-size:13.5px;padding:10px 16px;border-radius:var(--radius);cursor:pointer;margin-bottom:14px;">+ Agregar documento / plano</button>
+    <div id="adm-doc-status" style="font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);margin-bottom:10px;"></div>
+    <div id="adm-doc-lista"></div>
+  </div>
+
   <div class="panel">
     <h2>Historial de esta sesión</h2>
     <div id="historial"><div class="empty-state">Sin registros todavía</div></div>
@@ -320,7 +348,7 @@ async function cargarProyectosRemotos(){const status=document.getElementById('ad
 function renderListaProyectos(){const cont=document.getElementById('adm-lista');if(CONFIG.proyectos.length===0){cont.innerHTML='<div class="empty-state">Sin proyectos cargados</div>';return;}const porCiudad={};CONFIG.proyectos.forEach(p=>{const c=p.ciudad||'(sin ciudad)';(porCiudad[c]=porCiudad[c]||[]).push(p);});cont.innerHTML=Object.keys(porCiudad).sort().map(ciudad=>`<div class="adm-ciudad-grupo"><div class="adm-ciudad-titulo">${ciudad}</div>${porCiudad[ciudad].map(p=>`<div class="adm-row"><div class="info"><span class="nombre">${p.proyecto}</span><span class="abrev">${p.abrev}</span></div><button class="del" onclick="eliminarProyecto('${p.id}')" title="Quitar proyecto">×</button></div>`).join('')}</div>`).join('');}
 async function agregarProyecto(){const ciudad=document.getElementById('adm-ciudad').value.trim().toUpperCase();const proyecto=document.getElementById('adm-proyecto').value.trim();const abrev=document.getElementById('adm-abrev').value.trim();if(!ciudad||!proyecto||!abrev){mostrarToast('Completa ciudad, proyecto y abreviación',true);return;}if(!CARPETAS_CIUDAD[ciudad]){const continuar=confirm(`"${ciudad}" no está en la lista de ciudades conocidas.\n\n¿Continuar de todas formas?`);if(!continuar)return;}if(CONFIG.proyectos.some(p=>p.ciudad===ciudad&&p.proyecto===proyecto)){mostrarToast('Ese proyecto ya existe en esa ciudad',true);return;}if(proyectosOrigen!=='remoto'){mostrarToast('Sin conexión al servidor, no se puede guardar',true);return;}try{const res=await fetch(`${API_BASE}/proyectos`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ciudad,proyecto,abrev})});if(!res.ok)throw new Error('error al guardar');const nuevo=await res.json();CONFIG.proyectos.push({id:nuevo.id,ciudad,proyecto,abrev});document.getElementById('adm-ciudad').value='';document.getElementById('adm-proyecto').value='';document.getElementById('adm-abrev').value='';renderListaProyectos();initCiudad();mostrarToast('Proyecto agregado');}catch(e){mostrarToast('No se pudo guardar el proyecto',true);}}
 async function eliminarProyecto(id){if(!confirm('¿Quitar este proyecto de la lista?'))return;if(proyectosOrigen!=='remoto'){mostrarToast('Sin conexión al servidor',true);return;}try{const res=await fetch(`${API_BASE}/proyectos/${id}`,{method:'DELETE'});if(!res.ok)throw new Error('error al eliminar');CONFIG.proyectos=CONFIG.proyectos.filter(p=>String(p.id)!==String(id));renderListaProyectos();initCiudad();mostrarToast('Proyecto eliminado');}catch(e){mostrarToast('No se pudo eliminar el proyecto',true);}}
-initCiudad();initTipoCasa();initMes();initCarpeta();renderNumeros(null);update();cargarProyectosRemotos();
+initCiudad();initTipoCasa();initMes();initCarpeta();renderNumeros(null);update();cargarProyectosRemotos();cargarDocsConfig();
 const dlCiudades=document.getElementById('adm-ciudad-lista');dlCiudades.innerHTML=Object.keys(CARPETAS_CIUDAD).map(c=>`<option value="${c}">`).join('');
 const msalConfig={auth:{clientId:"9a56ab1c-d3c4-4460-9892-1d4da768ecfb",authority:"https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",redirectUri:window.location.origin},cache:{cacheLocation:"sessionStorage"}};
 const GRAPH_SCOPES=['Files.ReadWrite.All'];
@@ -345,9 +373,141 @@ function subirNivel(){spRuta.pop();renderCarpetaActual(window._spToken);}
 function cerrarSelectorCarpeta(){document.getElementById('sp-modal').style.display='none';}
 async function subirUnArchivo(token,nombreFinal,archivo){const driveId=await resolverDrive(token);const path=rutaGraphPath(spRuta)+'/'+encodeURIComponent(nombreFinal);const session=await graphFetch(`/drives/${driveId}/root:/${path}:/createUploadSession`,token,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item:{'@microsoft.graph.conflictBehavior':'rename'}})});const buffer=await archivo.arrayBuffer();const res=await fetch(session.uploadUrl,{method:'PUT',headers:{'Content-Length':buffer.byteLength,'Content-Range':`bytes 0-${buffer.byteLength-1}/${buffer.byteLength}`},body:buffer});if(!res.ok)throw new Error('HTTP '+res.status);}
 async function confirmarSubidaAqui(){const nota=document.getElementById('sp-modal-nota');const token=window._spToken;if(modoMasivo){const nombres=calcularNombresPlano();const total=nombres.length;let subidas=0,errores=[];for(let i=1;i<=total;i++){const archivo=archivosLamina[i];const nombre=nombres[i-1];if(!archivo||!nombre)continue;const ext=archivo.name.includes('.')?'.'+archivo.name.split('.').pop():'';const nombreFinal=nombre+ext;if(archivo.size>60*1024*1024){errores.push(`Lámina ${i}: pesa más de 60 MB`);continue;}nota.textContent=`Subiendo lámina ${i} de ${total}…`;nota.style.color='var(--ink-faint)';try{await subirUnArchivo(token,nombreFinal,archivo);subidas++;agregarHistorial(nombreFinal,'subido',SP_ROOT_FOLDER+'/'+spRuta.join('/'));}catch(e){errores.push(`Lámina ${i}: ${e.message}`);}}if(errores.length===0){cerrarSelectorCarpeta();mostrarToast(`${subidas} láminas subidas a SharePoint`);archivosLamina={};ultimoNombresPlanoJSON=null;renderPlanosMulti();}else{nota.innerHTML=`Subidas ${subidas}/${total}. Problemas:<br>${errores.join('<br>')}`;nota.style.color='var(--err)';}return;}const nombre=calcularNombre();if(!nombre||!archivoSeleccionado)return;const ext=archivoSeleccionado.name.includes('.')?'.'+archivoSeleccionado.name.split('.').pop():'';const nombreFinal=nombre+ext;if(archivoSeleccionado.size>60*1024*1024){nota.textContent='El archivo pesa más de 60 MB.';nota.style.color='var(--err)';return;}nota.textContent='Subiendo…';nota.style.color='var(--ink-faint)';try{await subirUnArchivo(token,nombreFinal,archivoSeleccionado);cerrarSelectorCarpeta();mostrarToast('Archivo subido a SharePoint');agregarHistorial(nombreFinal,'subido',SP_ROOT_FOLDER+'/'+spRuta.join('/'));}catch(e){nota.textContent='Error al subir: '+e.message;nota.style.color='var(--err)';}}
+// ── GESTIÓN DE DOCUMENTOS/PLANOS PERSONALIZADOS ──────────────
+let docsConfigOrigen = 'local';
+
+function initAdmDocCarpeta(){
+  const sel = document.getElementById('adm-doc-carpeta');
+  if (!sel) return;
+  const tipo = document.getElementById('adm-doc-tipo').value;
+  // Carpetas de documentos
+  const carpetasDoc = CONFIG.carpetasDocumentos.map(c => ({ valor: c.valor, label: c.carpeta }));
+  // Carpetas de planos
+  const carpetasPla = CONFIG.carpetasPlanos.map(c => ({ valor: c.valor, label: c.carpeta + ' (Planos)' }));
+  const lista = tipo === 'documento' ? carpetasDoc : carpetasPla;
+  sel.innerHTML = lista.map(c => `<option value="${c.valor}">${c.label}</option>`).join('');
+}
+
+async function cargarDocsConfig(){
+  try {
+    const res = await fetch(`${API_BASE}/docs-config`);
+    if (!res.ok) throw new Error('respuesta no ok');
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      // Mezclar con el CONFIG estático
+      data.forEach(d => {
+        if (d.tipo === 'documento') {
+          const yaEsta = CONFIG.documentos.some(x => x.carpetaValor === d.carpetaValor && x.documento === d.documento);
+          if (!yaEsta) CONFIG.documentos.push({ carpetaValor: d.carpetaValor, documento: d.documento, abrev: d.abrev, _id: d.id });
+        } else {
+          const yaEsta = CONFIG.planos.some(x => x.carpetaValor === d.carpetaValor && x.documento === d.documento);
+          if (!yaEsta) CONFIG.planos.push({ carpetaValor: d.carpetaValor, documento: d.documento, abrev: d.abrev, _id: d.id });
+        }
+      });
+      docsConfigOrigen = 'remoto';
+      renderAdmDocLista(data);
+    }
+  } catch(e) {
+    docsConfigOrigen = 'local';
+    console.warn('docs-config: sin conexión al servidor');
+  }
+  // Poblar select de carpetas del panel admin
+  const selTipo = document.getElementById('adm-doc-tipo');
+  if (selTipo) selTipo.onchange = initAdmDocCarpeta;
+  initAdmDocCarpeta();
+}
+
+function renderAdmDocLista(lista){
+  const cont = document.getElementById('adm-doc-lista');
+  if (!cont) return;
+  if (!lista || lista.length === 0) {
+    cont.innerHTML = '<div class="empty-state">Sin documentos personalizados todavía</div>';
+    return;
+  }
+  // Agrupar por tipo
+  const docs  = lista.filter(d => d.tipo === 'documento');
+  const planos = lista.filter(d => d.tipo === 'plano');
+  let html = '';
+  if (docs.length) {
+    html += `<div class="adm-ciudad-titulo">Documentos (${docs.length})</div>`;
+    html += docs.map(d => `
+      <div class="adm-row">
+        <div class="info">
+          <span class="nombre">${d.documento}</span>
+          <span class="abrev">${d.carpetaValor} · ${d.abrev}</span>
+        </div>
+        <button class="del" onclick="eliminarDocConfig('${d.id}')" title="Quitar">×</button>
+      </div>`).join('');
+  }
+  if (planos.length) {
+    html += `<div class="adm-ciudad-titulo" style="margin-top:10px;">Planos (${planos.length})</div>`;
+    html += planos.map(d => `
+      <div class="adm-row">
+        <div class="info">
+          <span class="nombre">${d.documento}</span>
+          <span class="abrev">${d.carpetaValor} · ${d.abrev}</span>
+        </div>
+        <button class="del" onclick="eliminarDocConfig('${d.id}')" title="Quitar">×</button>
+      </div>`).join('');
+  }
+  cont.innerHTML = html;
+}
+
+async function agregarDocConfig(){
+  const tipo       = document.getElementById('adm-doc-tipo').value;
+  const carpetaValor = document.getElementById('adm-doc-carpeta').value;
+  const documento  = document.getElementById('adm-doc-nombre').value.trim();
+  const abrev      = document.getElementById('adm-doc-abrev').value.trim();
+  const status     = document.getElementById('adm-doc-status');
+  if (!carpetaValor || !documento || !abrev) { mostrarToast('Completa todos los campos', true); return; }
+  if (docsConfigOrigen !== 'remoto') { mostrarToast('Sin conexión al servidor', true); return; }
+  try {
+    const res = await fetch(`${API_BASE}/docs-config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ carpetaValor, documento, abrev, tipo })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'error al guardar');
+    }
+    const nuevo = await res.json();
+    // Agregar al CONFIG en memoria
+    if (tipo === 'documento') CONFIG.documentos.push({ carpetaValor, documento, abrev, _id: nuevo.id });
+    else CONFIG.planos.push({ carpetaValor, documento, abrev, _id: nuevo.id });
+    document.getElementById('adm-doc-nombre').value = '';
+    document.getElementById('adm-doc-abrev').value  = '';
+    // Refrescar lista
+    const lista = await (await fetch(`${API_BASE}/docs-config`)).json();
+    renderAdmDocLista(lista);
+    mostrarToast('Agregado correctamente — ya aparece en el generador');
+  } catch(e) {
+    mostrarToast('No se pudo guardar: ' + e.message, true);
+  }
+}
+
+async function eliminarDocConfig(id){
+  if (!confirm('¿Quitar este documento del generador?')) return;
+  if (docsConfigOrigen !== 'remoto') { mostrarToast('Sin conexión al servidor', true); return; }
+  try {
+    const res = await fetch(`${API_BASE}/docs-config/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('error al eliminar');
+    // Quitar del CONFIG en memoria
+    CONFIG.documentos = CONFIG.documentos.filter(d => d._id !== id);
+    CONFIG.planos     = CONFIG.planos.filter(d => d._id !== id);
+    const lista = await (await fetch(`${API_BASE}/docs-config`)).json();
+    renderAdmDocLista(lista);
+    mostrarToast('Eliminado correctamente');
+  } catch(e) {
+    mostrarToast('No se pudo eliminar: ' + e.message, true);
+  }
+}
+
 let correoActual=null;
-const CORREO_GESTION_PROYECTOS='pzuniga@ibaker.cl';
-async function identificarUsuario(){try{if(!msalInstance){msalInstance=new msal.PublicClientApplication(msalConfig);await msalInstance.initialize();}const accounts=msalInstance.getAllAccounts();if(accounts.length>0)correoActual=(accounts[0].username||'').toLowerCase();}catch(e){correoActual=null;}document.getElementById('panel-gestion-proyectos').style.display=(correoActual===CORREO_GESTION_PROYECTOS)?'':'none';cargarHistorialRemoto();}
+const CORREOS_GESTION_PROYECTOS=['pzuniga@ibaker.cl','dvillaseca@ibaker.cl'];
+async function identificarUsuario(){try{if(!msalInstance){msalInstance=new msal.PublicClientApplication(msalConfig);await msalInstance.initialize();}const accounts=msalInstance.getAllAccounts();if(accounts.length>0)correoActual=(accounts[0].username||'').toLowerCase();}catch(e){correoActual=null;}document.getElementById('panel-gestion-proyectos').style.display=(CORREOS_GESTION_PROYECTOS.includes(correoActual))?'':'none';
+  document.getElementById('panel-gestion-docs').style.display=(CORREOS_GESTION_PROYECTOS.includes(correoActual))?'':'none';
+  cargarHistorialRemoto();}
 identificarUsuario();
 </script>
 </body>
