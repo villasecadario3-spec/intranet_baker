@@ -1148,7 +1148,11 @@ function cambiarPag(dir) {
 }
 
 // ══ PESTAÑAS ══════════════════════════════════════════════════
+const R8_MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+let r8MesesActivos = [];
+let r8Datos = null;
 let r8ChipsIniciados = false;
+
 function cambiarTab(tab, btn) {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('activo'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('activa'));
@@ -1167,9 +1171,6 @@ function cambiarTab(tab, btn) {
 }
 
 // ══ REPORTE 8 COLUMNAS ════════════════════════════════════════
-const R8_MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-let r8MesesActivos = [];
-let r8Datos = null;
 
 // chips se inicializan al abrir la pestaña
 
