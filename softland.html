@@ -684,8 +684,6 @@
     <!-- PANEL REPORTE 8 -->
     <div id="panel-reporte8" style="display:none;">
 
-        <p id="r8-debug" style="color:red;font-size:1.5rem;padding:20px;">✓ Panel reporte8 visible</p>
-
         <div class="r8-filtros">
             <div class="form-group">
                 <label class="form-label">Sociedad <span style="color:var(--rojo)">*</span></label>
@@ -708,6 +706,12 @@
                     <option value="2022">2022</option>
                     <option value="2021">2021</option>
                     <option value="2020">2020</option>
+                    <option value="2019">2019</option>
+                    <option value="2018">2018</option>
+                    <option value="2017">2017</option>
+                    <option value="2016">2016</option>
+                    <option value="2015">2015</option>
+                    <option value="2014">2014</option>
                 </select>
             </div>
             <div class="form-group">
@@ -1247,23 +1251,26 @@ function renderR8(data) {
     document.getElementById('r8-titulo').textContent = `${empresa} — ${periodo} · ${filas.length} cuentas`;
 
     const utilidad = totales.ganancia - totales.perdida;
+    const resultado = totales.resultadoEjercicio || (totales.ganancia - totales.perdida);
     document.getElementById('r8-stats').innerHTML = `
-        <div class="r8-stat">
-            <div class="r8-stat-label">Total Debe</div>
-            <div class="r8-stat-val">$${Math.round(totales.debe).toLocaleString('es-CL')}</div>
-        </div>
-        <div class="r8-stat">
-            <div class="r8-stat-label">Total Haber</div>
-            <div class="r8-stat-val">$${Math.round(totales.haber).toLocaleString('es-CL')}</div>
-        </div>
         <div class="r8-stat">
             <div class="r8-stat-label">Total Activo</div>
             <div class="r8-stat-val">$${Math.round(totales.activo).toLocaleString('es-CL')}</div>
         </div>
         <div class="r8-stat">
-            <div class="r8-stat-label">Utilidad / Pérdida</div>
-            <div class="r8-stat-val ${utilidad >= 0 ? 'verde' : 'rojo'}">
-                ${utilidad >= 0 ? '+' : ''}$${Math.round(utilidad).toLocaleString('es-CL')}
+            <div class="r8-stat-label">Total Pasivo</div>
+            <div class="r8-stat-val">$${Math.round(totales.pasivo).toLocaleString('es-CL')}</div>
+        </div>
+        <div class="r8-stat">
+            <div class="r8-stat-label">Resultado Ejercicio</div>
+            <div class="r8-stat-val ${resultado >= 0 ? 'verde' : 'rojo'}">
+                ${resultado >= 0 ? 'Utilidad' : 'Pérdida'} $${Math.abs(Math.round(resultado)).toLocaleString('es-CL')}
+            </div>
+        </div>
+        <div class="r8-stat">
+            <div class="r8-stat-label">Balance</div>
+            <div class="r8-stat-val ${Math.abs(totales.activo - totales.pasivo) < 1 ? 'verde' : 'rojo'}">
+                ${Math.abs(totales.activo - totales.pasivo) < 1 ? '✓ Cuadra' : '✗ No cuadra'}
             </div>
         </div>`;
     document.getElementById('r8-stats').style.display = 'grid';
@@ -1293,6 +1300,14 @@ function renderR8(data) {
             <td>$${Math.round(totales.pasivo).toLocaleString('es-CL')}</td>
             <td>$${Math.round(totales.perdida).toLocaleString('es-CL')}</td>
             <td>$${Math.round(totales.ganancia).toLocaleString('es-CL')}</td>
+        </tr>
+        <tr style="background:rgba(26,122,74,0.08);font-style:italic;">
+            <td colspan="6" style="color:var(--verde);font-size:0.75rem;">
+                * Pasivo incluye resultado del ejercicio (${resultado >= 0 ? 'Utilidad' : 'Pérdida'} $${Math.abs(Math.round(resultado)).toLocaleString('es-CL')})
+            </td>
+            <td style="color:var(--verde);font-family:'DM Mono',monospace;text-align:right;">= $${Math.round(totales.activo).toLocaleString('es-CL')}</td>
+            <td style="color:var(--verde);font-family:'DM Mono',monospace;text-align:right;">= $${Math.round(totales.pasivo).toLocaleString('es-CL')}</td>
+            <td colspan="2"></td>
         </tr>`;
 
     document.getElementById('r8-inicial').style.display    = 'none';
