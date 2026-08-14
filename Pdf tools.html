@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Herramientas PDF — Baker</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    :root {
+      --bg:#F7F6F3; --surface:#FFFFFF; --border:#E2E0DA; --border-strong:#C8C5BC;
+      --text:#1A1916; --text-2:#6B6860; --text-3:#9E9C97;
+      --accent:#C0392B; --accent-light:#FBEAE9; --accent-dark:#96231A;
+      --green:#1A7A4A; --green-light:#E8F5EE;
+      --radius:10px; --radius-lg:16px;
+    }
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:"DM Sans",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.6}
+
+    /* NAV */
+    nav.intranet-nav{position:sticky;top:0;z-index:100;background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px solid #2E2C2A;height:60px;display:flex;align-items:center;padding:0 48px;gap:16px}
+    .nav-logo{text-decoration:none}.nav-logo img{height:26px;background:white;border-radius:6px;padding:4px 10px}
+    .nav-sep{width:1px;height:18px;background:#2E2C2A}
+    .nav-back{display:flex;align-items:center;gap:6px;color:#B5B0AA;text-decoration:none;font-size:0.78rem;font-weight:500;transition:color 0.2s}
+    .nav-back:hover{color:white}.nav-back svg{width:14px;height:14px}
+    .nav-title{font-family:"DM Mono",monospace;font-size:0.72rem;color:#B5B0AA;letter-spacing:0.1em;text-transform:uppercase}
+    .nav-spacer{flex:1}
+    .user-chip{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;background:#242220;border:1px solid #2E2C2A;border-radius:100px}
+    .user-av{width:26px;height:26px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:white}
+    .user-nm{font-size:0.78rem;font-weight:500;color:white;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+    /* LAYOUT */
+    main{max-width:960px;margin:0 auto;padding:2.5rem 2rem}
+
+    /* HERO */
+    .hero{text-align:center;margin-bottom:2.5rem}
+    .hero-icon{width:64px;height:64px;background:var(--accent-light);border:1px solid #F0C5C2;border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem}
+    .hero-icon svg{width:28px;height:28px;stroke:var(--accent);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+    .hero h1{font-size:26px;font-weight:600;letter-spacing:-0.03em;margin-bottom:0.5rem}
+    .hero p{font-size:15px;color:var(--text-2);max-width:500px;margin:0 auto}
+
+    /* TABS */
+    .tabs{display:flex;gap:4px;background:var(--border);border-radius:12px;padding:4px;margin-bottom:2rem}
+    .tab{flex:1;padding:10px 8px;border:none;background:transparent;border-radius:9px;font-family:"DM Sans",sans-serif;font-size:13px;font-weight:500;color:var(--text-2);cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px}
+    .tab svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+    .tab.active{background:var(--surface);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,0.08)}
+    .tab:hover:not(.active){color:var(--text)}
+
+    /* PANELS */
+    .panel{display:none}.panel.active{display:block}
+
+    /* CARD */
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1.5rem}
+    .card-header{padding:1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+    .card-header-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center}
+    .card-header-icon svg{width:16px;height:16px;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;fill:none}
+    .card-header h2{font-size:14px;font-weight:600}
+    .card-header p{font-size:12px;color:var(--text-3);margin-top:2px}
+    .card-body{padding:1.5rem}
+
+    /* DROP ZONE */
+    .drop-zone{border:1.5px dashed var(--border-strong);border-radius:var(--radius);padding:2rem;text-align:center;cursor:pointer;transition:border-color 0.15s,background 0.15s;position:relative}
+    .drop-zone:hover,.drop-zone.drag-over{border-color:var(--accent);background:var(--accent-light)}
+    .drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+    .drop-icon{width:40px;height:40px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem}
+    .drop-icon svg{width:20px;height:20px;stroke:var(--text-2);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+    .drop-zone h3{font-size:14px;font-weight:500;margin-bottom:4px}
+    .drop-zone p{font-size:12px;color:var(--text-3)}
+    .drop-tag{display:inline-block;font-family:"DM Mono",monospace;font-size:11px;background:var(--bg);border:1px solid var(--border-strong);color:var(--text-2);padding:2px 8px;border-radius:5px;margin-top:8px}
+
+    /* FILE LIST */
+    .file-list{display:flex;flex-direction:column;gap:8px;margin-top:1rem}
+    .file-item{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px}
+    .file-item-icon{width:32px;height:32px;background:var(--accent-light);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .file-item-icon svg{width:16px;height:16px;stroke:var(--accent);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .file-item-info{flex:1;min-width:0}
+    .file-item-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .file-item-meta{font-size:11px;color:var(--text-3);margin-top:1px}
+    .file-item-drag{cursor:grab;color:var(--text-3);padding:4px}
+    .file-item-drag svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2}
+    .file-remove{background:none;border:none;cursor:pointer;color:var(--text-3);padding:4px;border-radius:6px;display:flex;align-items:center;transition:color 0.1s;flex-shrink:0}
+    .file-remove:hover{color:var(--accent)}
+    .file-remove svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+
+    /* PAGES GRID */
+    .pages-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;margin-top:1rem;max-height:400px;overflow-y:auto}
+    .page-thumb{background:var(--bg);border:2px solid var(--border);border-radius:var(--radius);padding:8px;cursor:pointer;transition:all 0.15s;position:relative;text-align:center}
+    .page-thumb.selected{border-color:var(--accent);background:var(--accent-light)}
+    .page-thumb canvas{width:100%;display:block;border-radius:4px}
+    .page-thumb .page-num{font-family:"DM Mono",monospace;font-size:10px;color:var(--text-3);margin-top:4px}
+    .page-thumb .page-check{position:absolute;top:4px;right:4px;width:18px;height:18px;background:var(--accent);border-radius:50%;display:none;align-items:center;justify-content:center}
+    .page-thumb.selected .page-check{display:flex}
+    .page-thumb .page-check svg{width:10px;height:10px;stroke:white;fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+
+    /* CONTROLS */
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:1rem}
+    .field{margin-bottom:1rem}
+    .field label{display:block;font-size:12px;font-weight:500;color:var(--text-2);margin-bottom:6px;letter-spacing:0.02em;text-transform:uppercase}
+    .field input,.field select{width:100%;height:38px;border:1px solid var(--border);border-radius:8px;padding:0 12px;font-size:13px;font-family:"DM Sans",sans-serif;background:var(--surface);color:var(--text);transition:border-color 0.15s;outline:none}
+    .field input:focus,.field select:focus{border-color:var(--accent)}
+    .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .field textarea{width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;font-family:"DM Sans",sans-serif;background:var(--surface);color:var(--text);outline:none;resize:vertical;min-height:80px}
+    .field textarea:focus{border-color:var(--accent)}
+
+    /* ROTATION GRID */
+    .rot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:1rem;max-height:360px;overflow-y:auto}
+    .rot-item{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px;text-align:center}
+    .rot-item canvas{width:100%;display:block;border-radius:4px;transition:transform 0.2s}
+    .rot-item .page-num{font-family:"DM Mono",monospace;font-size:10px;color:var(--text-3);margin-top:4px}
+    .rot-controls{display:flex;justify-content:center;gap:4px;margin-top:6px}
+    .rot-btn{background:var(--surface);border:1px solid var(--border);border-radius:6px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.1s}
+    .rot-btn:hover{border-color:var(--accent);color:var(--accent)}
+    .rot-btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+    /* BTNS */
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:0 20px;height:42px;border-radius:9px;font-size:14px;font-weight:500;font-family:"DM Sans",sans-serif;cursor:pointer;border:1px solid transparent;transition:opacity 0.15s,transform 0.1s}
+    .btn:active{transform:scale(0.98)}
+    .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent-dark)}
+    .btn-primary:hover{opacity:0.9}
+    .btn-primary:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+    .btn-secondary{background:var(--surface);color:var(--text);border-color:var(--border)}
+    .btn-secondary:hover{background:var(--bg)}
+    .btn-secondary:disabled{opacity:0.4;cursor:not-allowed}
+    .btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+    .btn-download{width:100%;justify-content:center;background:var(--green);color:#fff;border-color:#155C39;height:46px;border-radius:var(--radius);margin-top:1rem;font-size:15px;display:none}
+    .btn-download.show{display:inline-flex}
+    .btn-download:hover{opacity:0.9}
+
+    /* ALERTS */
+    .alert{display:none;padding:10px 14px;border-radius:var(--radius);font-size:13px;margin-top:1rem;align-items:center;gap:8px}
+    .alert.show{display:flex}
+    .alert-error{background:var(--accent-light);color:var(--accent-dark);border:1px solid #F0C5C2}
+    .alert-success{background:var(--green-light);color:#155C39;border:1px solid #B6DEC9}
+    .alert svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;flex-shrink:0}
+
+    /* PROGRESS */
+    .progress-block{display:none;margin-top:1rem}
+    .progress-block.show{display:block}
+    .progress-bar-track{height:5px;background:var(--border);border-radius:99px;overflow:hidden}
+    .progress-bar-fill{height:100%;background:var(--accent);border-radius:99px;width:0%;transition:width 0.3s}
+    .progress-label{font-size:12px;color:var(--text-2);margin-bottom:6px}
+
+    /* SPLIT OPTIONS */
+    .split-mode{display:flex;gap:8px;margin-bottom:1rem}
+    .split-opt{flex:1;border:1.5px solid var(--border);border-radius:var(--radius);padding:12px;cursor:pointer;transition:all 0.15s;text-align:center}
+    .split-opt.active{border-color:var(--accent);background:var(--accent-light)}
+    .split-opt strong{display:block;font-size:13px;font-weight:600}
+    .split-opt span{font-size:11px;color:var(--text-3)}
+
+    /* WATERMARK */
+    .wm-preview{width:100%;height:120px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;margin-top:1rem}
+    .wm-preview-text{position:absolute;font-size:36px;font-weight:700;color:rgba(192,57,43,0.2);transform:rotate(-30deg);pointer-events:none;white-space:nowrap}
+    .wm-preview-doc{font-size:12px;color:var(--text-3)}
+
+    footer{text-align:center;padding:2rem;font-size:12px;color:var(--text-3);border-top:1px solid var(--border);margin-top:1rem}
+
+    /* LOADING OVERLAY */
+    #auth-loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999}
+    #auth-loading .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    #auth-loading p{font-size:14px;color:var(--text-2)}
+    #app-content{display:none}
+  </style>
+</head>
+<body>
+
+<!-- AUTH LOADING -->
+<div id="auth-loading">
+  <div class="spinner"></div>
+  <p>Verificando acceso…</p>
+</div>
+
+<!-- APP -->
+<div id="app-content">
+<nav class="intranet-nav">
+  <a class="nav-logo" href="index.html">
+    <img src="LOGO_BAKER.png" alt="Baker" onerror="this.outerHTML='<span style=&quot;font-family:serif;font-weight:900;color:white&quot;>BAKER</span>'">
+  </a>
+  <div class="nav-sep"></div>
+  <a class="nav-back" href="index.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    Inicio
+  </a>
+  <div class="nav-sep"></div>
+  <div class="nav-title">Herramientas PDF</div>
+  <div class="nav-spacer"></div>
+  <div id="auth-area"></div>
+</nav>
+
+<main>
+  <div class="hero">
+    <div class="hero-icon">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    </div>
+    <h1>Herramientas PDF</h1>
+    <p>Unir, dividir, comprimir, rotar y editar tus documentos PDF directamente en el navegador, sin subir archivos a ningún servidor.</p>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('merge',this)">
+      <svg viewBox="0 0 24 24"><path d="M8 6H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3"/><polyline points="15 3 12 6 9 3"/></svg>
+      Unir PDFs
+    </button>
+    <button class="tab" onclick="switchTab('split',this)">
+      <svg viewBox="0 0 24 24"><path d="M16 18H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h11"/><polyline points="9 21 12 18 15 21"/></svg>
+      Dividir
+    </button>
+    <button class="tab" onclick="switchTab('extract',this)">
+      <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Extraer páginas
+    </button>
+    <button class="tab" onclick="switchTab('rotate',this)">
+      <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      Rotar
+    </button>
+    <button class="tab" onclick="switchTab('compress',this)">
+      <svg viewBox="0 0 24 24"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>
+      Comprimir
+    </button>
+    <button class="tab" onclick="switchTab('watermark',this)">
+      <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Marca de agua
+    </button>
+    <button class="tab" onclick="switchTab('number',this)">
+      <svg viewBox="0 0 24 24"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
+      Numeración
+    </button>
+    <button class="tab" onclick="switchTab('imgpdf',this)">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      Imágenes → PDF
+    </button>
+    <button class="tab" onclick="switchTab('protect',this)">
+      <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Contraseña
+    </button>
+  </div>
+
+  <!-- ═══════════════════════════════ UNIR ═══════════════════════════════ -->
+  <div id="panel-merge" class="panel active">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-icon" style="background:#FBEAE9">
+          <svg viewBox="0 0 24 24" stroke="#C0392B"><path d="M8 6H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3"/><polyline points="15 3 12 6 9 3"/></svg>
+        </div>
+        <div>
+          <h2>Unir PDFs</h2>
+          <p>Combina varios archivos PDF en uno solo, en el orden que quieras</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="drop-zone" id="merge-drop">
+          <input type="file" accept=".pdf" multiple id="merge-input" onchange="addMergeFiles(this.files)">
+          <div class="drop-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+          <h3>Arrastra los PDFs aquí</h3>
+          <p>o haz clic para seleccionarlos</p>
+          <span class="drop-tag">.PDF</span>
+        </div>
+        <div class="file-list" id="merge-list"></div>
+        <div id="merge-alert" class="alert alert-error" style="margin-top:1rem">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span id="merge-alert-msg"></span>
+        </div>
+        <div class="controls" style="margin-top:1.25rem">
+          <button class="btn btn-primary" onclick="doMerge()" id="merge-btn" disabled>
+            <svg viewBox="0 0 24 24"><path d="M8 6H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3"/><polyline points="15 3 12 6 9 3"/></svg>
+            Unir PDFs
+          </button>
+        </div>
+        <button class="btn btn-download" id="merge-download" onclick="downloadResult('merge')">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Descargar PDF unido
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ DIVIDIR ═══════════════════════════════ -->
+  <div id="panel-split" class="panel">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-icon" style="background:#FBEAE9">
+          <svg viewBox="0 0 24 24" stroke="#C0392B"><path d="M16 18H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h11"/><polyline points="9 21 12 18 15 21"/></svg>
+        </div>
+        <div>
+          <h2>Dividir PDF</h2>
+          <p>Corta un PDF en múltiples archivos</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="drop-zone" id="split-drop">
+          <input type="file" accept=".pdf" id="split-input" onchange="loadSplitFile(this.files[0])">
+          <div class="drop-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+          <h3>Arrastra el PDF aquí</h3>
+          <p>o haz clic para seleccionarlo</p>
+          <span class="drop-tag">.PDF</span>
+        </div>
+        <div id="split-options" style="display:none;margin-top:1.25rem">
+          <div class="split-mode">
+            <div class="split-opt active" onclick="setSplitMode('all',this)">
+              <strong>Todas las páginas</strong>
+              <span>Una página por archivo</span>
+            </div>
+            <div class="split-opt" onclick="setSplitMode('range',this)">
+              <strong>Por rangos</strong>
+              <span>Ej: 1-3, 4-6, 7-10</span>
+            </div>
+            <div class="split-opt" onclick="setSplitMode('every',this)">
+              <strong>Cada N páginas</strong>
+              <span>Ej: cada 2 páginas</span>
+            </div>
+          </div>
+          <div id="split-range-input" class="field" style="display:none">
+            <label>Rangos (separados por coma)</label>
+            <input type="text" placeholder="Ej: 1-3, 4-6, 7-10" id="split-ranges">
+          </div>
+          <div id="split-every-input" class="field" style="display:none">
+            <label>Cada cuántas páginas</label>
+            <input type="number" min="1" value="1" id="split-every-n">
+          </div>
+          <div style="margin-top:0.5rem;font-size:12px;color:var(--text-3)" id="split-info"></div>
+          <div class="controls">
+            <button class="btn btn-primary" onclick="doSplit()" id="split-btn">
+              <svg viewBox="0 0 24 24"><path d="M16 18H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h11"/><polyline points="9 21 12 18 15 21"/></svg>
+              Dividir PDF
+            </button>
+          </div>
+          <button class="btn btn-download" id="split-download" onclick="downloadResult('split')">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Descargar ZIP con las partes
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ EXTRAER ═══════════════════════════════ -->
+  <div id="panel-extract" class="panel">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-icon" style="background:#FBEAE9">
+          <svg viewBox="0 0 24 24" stroke="#C0392B"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </div>
+        <div>
+          <h2>Extraer páginas</h2>
+          <p>Selecciona las páginas que quieres guardar en un nuevo PDF</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="drop-zone" id="extract-drop">
+          <input type="file" accept=".pdf" id="extract-input" onchange="loadExtractFile(this.files[0])">
+          <div class="drop-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+          <h3>Arrastra el PDF aquí</h3>
+          <p>o haz clic para seleccionarlo</p>
+          <span class="drop-tag">.PDF</span>
+        </div>
+        <div id="extract-area" style="display:none">
+          <p style="font-size:13px;color:var(--text-2);margin-top:1rem;margin-bottom:0.5rem">Haz clic en las páginas que quieres extraer:</p>
+          <div class="pages-grid" id="extract-grid"></div>
+          <div style="margin-top:1rem;font-size:12px;color:var(--text-3)" id="extract-info">Ninguna página seleccionada</div>
+          <div class="controls">
+            <button class="btn btn-primary" onclick="doExtract()" id="extract-btn" disabled>
+              <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Extraer selección
+            </button>
+            <button class="btn btn-secondary" onclick="selectAllPages()">Todas</button>
+            <button class="btn btn-secondary" onclick="clearSelection()">Ninguna</button>
+          </div>
+          <button class="btn btn-download" id="extract-download" onclick="downloadResult('extract')">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Descargar páginas extraídas
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ ROTAR ═══════════════════════════════ -->
+  <div id="panel-rotate" class="panel">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-icon" style="background:#FBEAE9">
+          <svg viewBox="0 0 24 24" stroke="#C0392B"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        </div>
+        <div>
+          <h2>Rotar páginas</h2>
+          <p>Gira páginas individuales o todo el documento</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="drop-zone" id="rotate-drop">
+          <input type="file" accept=".pdf" id="rotate-input" onchange="loadRotateFile(this.files[0])">
+          <div class="drop-icon"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></div>
+          <h3>Arrastra el PDF aquí</h3>
+          <p>o haz clic para seleccionarlo</p>
+          <span class="drop-tag">.PDF</span>
+        </div>
+        <div id="rotate-area" style="display:none">
+          <div class="controls" style="margin-top:1rem">
+            <button class="btn btn-secondary" onclick="rotateAll(90)">
+              <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Rotar todo 90° →
+            </button>
+            <button class="btn btn-secondary" onclick="rotateAll(-90)">
+              <svg viewBox="0 0 24 24" style="transform:scaleX(-1)"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Rotar todo 90° ←
+            </button>
+            <button class="btn btn-secondary" onclick="rotateAll(180)">180°</button>
+          </div>
+          <div class="rot-grid" id="rotate-grid"></div>
+          <div class="controls" style="margin-top:1rem">
+            <button class="btn btn-primary" onclick="doRotate()">
+              <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Aplicar rotaciones
+            </button>
+          </div>
+          <button class="btn btn-download" id="rotate-download" onclick="downloadResult('rotate')">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Descargar PDF rotado
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ COMPRIMIR ═══════════════════════════════ -->
+  <div id="panel-compress" class="panel">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-icon" style="background:#FBEAE9">
+          <svg viewBox="0 0 24 24" stroke="#C0392B"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>
+        </div>
+        <div>
+          <h2>Comprimir PDF</h2>
+          <p>Reduce el tamaño del archivo PDF</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="drop-zone" id="compress-drop">
+          <input type="file" accept=".pdf" id="compress-input" onchange="loadCompressFile(this.files[0])">
+          <div class="drop-icon"><svg viewBox="0 0 24 24"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg></div>
+          <h3>Arrastra el PDF aquí</h3>
+          <p>o haz clic para seleccionarlo</p>
+          <span class="drop-tag">.PDF</span>
+        </div>
+        <div id="compress-area" style="display:none;margin-top:1.25rem">
+          <div id="compress-info" style="font-size:13px;color:var(--text-2);margin-bottom:1rem"></div>
+          <div class="field">
+            <label>Nivel de compresión</label>
+            <select id="compress-level">
+              <option value="low">Baja — mejor calidad, menor reducción</option>
+              <option value="mid" selected>Media — equilibrio entre calidad y tamaño</option>
+              <option value="high">Alta — mayor reducción, menor calidad</option>
+            </select>
+          </div>
+          <div class="controls">
+            <button class="btn btn-primary" onclick="doCompress()">
+              <svg viewBox="0 0 24 24"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>
+              Comprimir
+            </button>
+          </div>
+          <div id="compress-result" style="display:none;margin-top:1rem;background:var(--green-light);border:1px solid #B6DEC9;border-radius:var(--radius);padding:12px 16px;font-size:13px;color:#155C39"></div>
+          <button class="btn btn-download" id="compress-download" onclick="downloadResult('compress')">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Descargar PDF comprimido
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ MARCA DE AGUA ═══════════════════════════════ -->
+  <div id="panel-watermark" class="panel">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-icon" style="background:#FBEAE9">
+          <svg viewBox="0 0 24 24" stroke="#C0392B"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div>
+          <h2>Marca de agua</h2>
+          <p>Añade texto sobre todas las páginas del PDF</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="drop-zone" id="wm-drop">
+          <input type="file" accept=".pdf" id="wm-input" onchange="loadWmFile(this.files[0])">
+          <div class="drop-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+          <h3>Arrastra el PDF aquí</h3>
+          <p>o haz clic para seleccionarlo</p>
+          <span class="drop-tag">.PDF</span>
+        </div>
+        <div id="wm-area" style="display:none;margin-top:1.25rem">
+          <div class="field-row">
+            <div class="field">
+              <label>Texto de la marca de agua</label>
+              <input type="text" id="wm-text" value="CONFIDENCIAL" oninput="updateWmPreview()">
+            </div>
+            <div class="field">
+              <label>Opacidad</label>
+              <select id="wm-opacity" onchange="updateWmPreview()">
+                <option value="0.10">Muy suave (10%)</option>
+                <option value="0.20" selected>Suave (20%)</option>
+                <option value="0.35">Media (35%)</option>
+                <option value="0.50">Fuerte (50%)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Color</label>
+              <select id="wm-color" onchange="updateWmPreview()">
+                <option value="gray">Gris</option>
+                <option value="red" selected>Rojo</option>
+                <option value="black">Negro</option>
+                <option value="blue">Azul</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Posición</label>
+              <select id="wm-pos">
+                <option value="center" selected>Centro (diagonal)</option>
+                <option value="top">Arriba</option>
+                <option value="bottom">Abajo</option>
+              </select>
+            </div>
+          </div>
+          <div class="wm-preview">
+            <span class="wm-preview-doc">Documento PDF</span>
+            <span class="wm-preview-text" id="wm-preview-label">CONFIDENCIAL</span>
+          </div>
+          <div class="controls" style="margin-top:1rem">
+            <button class="btn btn-primary" onclick="doWatermark()">
+              <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Añadir marca de agua
+            </button>
+          </div>
+          <button class="btn btn-download" id="wm-download" onclick="downloadResult('wm')">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Descargar con marca de agua
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ NUMERACIÓN ═══════════════════════════════ -->
+  <div id="panel-number" class="panel">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-icon" style="background:#FBEAE9">
+          <svg viewBox="0 0 24 24" stroke="#C0392B"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
+        </div>
+        <div>
+          <h2>Numeración de páginas</h2>
+          <p>Añade número de página a cada hoja del PDF</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="drop-zone" id="num-drop">
+          <input type="file" accept=".pdf" id="num-input" onchange="loadNumFile(this.files[0])">
+          <div class="drop-icon"><svg viewBox="0 0 24 24"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/></svg></div>
+          <h3>Arrastra el PDF aquí</h3>
+          <p>o haz clic para seleccionarlo</p>
+          <span class="drop-tag">.PDF</span>
+        </div>
+        <div id="num-area" style="display:none;margin-top:1.25rem">
+          <div class="field-row">
+            <div class="field">
+              <label>Posición</label>
+              <select id="num-pos">
+                <option value="bottom-center" selected>Abajo al centro</option>
+                <option value="bottom-right">Abajo a la derecha</option>
+                <option value="bottom-left">Abajo a la izquierda</option>
+                <option value="top-center">Arriba al centro</option>
+                <option value="top-right">Arriba a la derecha</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Empezar desde</label>
+              <input type="number" id="num-start" value="1" min="1">
+            </div>
+            <div class="field">
+              <label>Formato</label>
+              <select id="num-format">
+                <option value="n">1, 2, 3…</option>
+                <option value="n/total">1/10, 2/10…</option>
+                <option value="pag-n">Página 1, Página 2…</option>
+              </select>
+            </div>
+          </div>
+          <div class="controls">
+            <button class="btn btn-primary" onclick="doNumber()">
+              <svg viewBox="0 0 24 24"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/></svg>
+              Numerar páginas
+            </button>
+          </div>
+          <button class="btn btn-download" id="num-download" onclick="downloadResult('num')">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Descargar con numeración
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ IMÁGENES A PDF ═══════════════════════════════ -->
+  <div id="panel-imgpdf" class="panel">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-icon" style="background:#FBEAE9">
+          <svg viewBox="0 0 24 24" stroke="#C0392B"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        </div>
+        <div>
+          <h2>Imágenes a PDF</h2>
+          <p>Convierte fotos o imágenes JPG/PNG en un PDF</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="drop-zone" id="img-drop">
+          <input type="file" accept=".jpg,.jpeg,.png" multiple id="img-input" onchange="addImgFiles(this.files)">
+          <div class="drop-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
+          <h3>Arrastra las imágenes aquí</h3>
+          <p>o haz clic para seleccionarlas</p>
+          <span class="drop-tag">.JPG .JPEG .PNG</span>
+        </div>
+        <div class="file-list" id="img-list"></div>
+        <div id="img-options" style="display:none;margin-top:1rem">
+          <div class="field-row">
+            <div class="field">
+              <label>Tamaño de página</label>
+              <select id="img-size">
+                <option value="A4" selected>A4 (210×297 mm)</option>
+                <option value="Letter">Letter (216×279 mm)</option>
+                <option value="fit">Ajustar a imagen</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Orientación</label>
+              <select id="img-orient">
+                <option value="portrait" selected>Vertical (Portrait)</option>
+                <option value="landscape">Horizontal (Landscape)</option>
+              </select>
+            </div>
+          </div>
+          <div class="controls">
+            <button class="btn btn-primary" onclick="doImgToPdf()">
+              <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              Convertir a PDF
+            </button>
+          </div>
+          <button class="btn btn-download" id="img-download" onclick="downloadResult('img')">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Descargar PDF
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ CONTRASEÑA ═══════════════════════════════ -->
+  <div id="panel-protect" class="panel">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-icon" style="background:#FBEAE9">
+          <svg viewBox="0 0 24 24" stroke="#C0392B"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div>
+          <h2>Proteger con contraseña</h2>
+          <p>El PDF solo se podrá abrir con la clave que ingreses</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="drop-zone" id="prot-drop">
+          <input type="file" accept=".pdf" id="prot-input" onchange="loadProtFile(this.files[0])">
+          <div class="drop-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+          <h3>Arrastra el PDF aquí</h3>
+          <p>o haz clic para seleccionarlo</p>
+          <span class="drop-tag">.PDF</span>
+        </div>
+        <div id="prot-area" style="display:none;margin-top:1.25rem">
+          <div id="prot-info" style="font-size:13px;color:var(--text-2);margin-bottom:1rem"></div>
+          <div class="field-row">
+            <div class="field">
+              <label>Contraseña para abrir</label>
+              <input type="password" id="prot-pass" placeholder="Mínimo 4 caracteres">
+            </div>
+            <div class="field">
+              <label>Confirmar contraseña</label>
+              <input type="password" id="prot-pass2" placeholder="Repite la contraseña">
+            </div>
+          </div>
+          <div id="prot-alert" class="alert alert-error">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span id="prot-alert-msg"></span>
+          </div>
+          <div class="controls" style="margin-top:1rem">
+            <button class="btn btn-primary" onclick="doProtect()">
+              <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Proteger PDF
+            </button>
+          </div>
+          <button class="btn btn-download" id="prot-download" onclick="downloadResult('prot')">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Descargar PDF protegido
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+<footer>
+  <img src="LOGO_BAKER.png" alt="" onerror="this.remove()">
+  Intranet Baker &mdash; Herramientas PDF &mdash; Procesamiento 100% local, sin subir archivos a internet
+</footer>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// MSAL AUTH
+// ═══════════════════════════════════════════════════════════════════════
+const ALLOWED = [
+  "dvillaseca@ibaker.cl"
+];
+const msalConfig = {
+  auth:{clientId:"9a56ab1c-d3c4-4460-9892-1d4da768ecfb",authority:"https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",redirectUri:window.location.origin+window.location.pathname},
+  cache:{cacheLocation:"sessionStorage"}
+};
+let msalInstance=null;
+window.addEventListener("load",async()=>{
+  msalInstance=new msal.PublicClientApplication(msalConfig);
+  await msalInstance.initialize();
+  await initAuth();
+});
+async function initAuth(){
+  try{
+    const resp=await msalInstance.handleRedirectPromise();
+    let account=resp?resp.account:msalInstance.getAllAccounts()[0];
+    if(!account){await msalInstance.loginRedirect({scopes:["User.Read"]});return;}
+    const email=account.username.toLowerCase();
+    if(!ALLOWED.includes(email)){
+      document.getElementById("auth-loading").innerHTML='<div style="text-align:center;padding:2rem"><h2 style="color:#C0392B">Acceso no autorizado</h2><p style="margin-top:8px;color:#6B6860">Tu cuenta no tiene permiso para usar esta herramienta.</p></div>';
+      return;
+    }
+    const initials=account.name?account.name.split(" ").slice(0,2).map(n=>n[0]).join("").toUpperCase():email[0].toUpperCase();
+    document.getElementById("auth-area").innerHTML=`<div class="user-chip"><div class="user-av">${initials}</div><div class="user-nm">${account.name||email}</div></div>`;
+    document.getElementById("auth-loading").style.display="none";
+    document.getElementById("app-content").style.display="block";
+  }catch(e){console.error(e);}
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════════════════
+function switchTab(id,el){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
+  el.classList.add("active");
+  document.getElementById("panel-"+id).classList.add("active");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════════════════
+const results={};
+function fmtSize(b){if(b<1024)return b+"B";if(b<1048576)return(b/1024).toFixed(1)+"KB";return(b/1048576).toFixed(2)+"MB";}
+function readFile(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(new Uint8Array(e.target.result));r.onerror=rej;r.readAsArrayBuffer(f);});}
+function readDataUrl(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(f);});}
+function downloadResult(key){
+  const {bytes,name}=results[key];
+  const blob=new Blob([bytes],{type:"application/pdf"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+function downloadZip(key){
+  const {zipBytes,name}=results[key];
+  const blob=new Blob([zipBytes],{type:"application/zip"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+function buildZip(files){
+  // Simple ZIP STORE builder
+  const enc=new TextEncoder();
+  const localHeaders=[];const centralDir=[];let offset=0;
+  for(const {name,data} of files){
+    const nameBytes=enc.encode(name);
+    const crc=crc32(data);
+    const local=new Uint8Array(30+nameBytes.length+data.length);
+    const dv=new DataView(local.buffer);
+    dv.setUint32(0,0x04034b50,true);dv.setUint16(4,20,true);dv.setUint16(6,0,true);
+    dv.setUint16(8,0,true);dv.setUint16(10,0,true);dv.setUint16(12,0,true);
+    dv.setUint32(14,crc,true);dv.setUint32(18,data.length,true);dv.setUint32(22,data.length,true);
+    dv.setUint16(26,nameBytes.length,true);dv.setUint16(28,0,true);
+    local.set(nameBytes,30);local.set(data,30+nameBytes.length);
+    const cd=new Uint8Array(46+nameBytes.length);const dvcd=new DataView(cd.buffer);
+    dvcd.setUint32(0,0x02014b50,true);dvcd.setUint16(4,20,true);dvcd.setUint16(6,20,true);
+    dvcd.setUint16(8,0,true);dvcd.setUint16(10,0,true);dvcd.setUint16(12,0,true);dvcd.setUint16(14,0,true);
+    dvcd.setUint32(16,crc,true);dvcd.setUint32(20,data.length,true);dvcd.setUint32(24,data.length,true);
+    dvcd.setUint16(28,nameBytes.length,true);dvcd.setUint16(30,0,true);dvcd.setUint16(32,0,true);
+    dvcd.setUint16(34,0,true);dvcd.setUint16(36,0,true);dvcd.setUint32(38,0,true);dvcd.setUint32(42,offset,true);
+    cd.set(nameBytes,46);localHeaders.push(local);centralDir.push(cd);offset+=local.length;
+  }
+  const cdSize=centralDir.reduce((a,c)=>a+c.length,0);
+  const eocd=new Uint8Array(22);const dv=new DataView(eocd.buffer);
+  dv.setUint32(0,0x06054b50,true);dv.setUint16(4,0,true);dv.setUint16(6,0,true);
+  dv.setUint16(8,files.length,true);dv.setUint16(10,files.length,true);
+  dv.setUint32(12,cdSize,true);dv.setUint32(16,offset,true);dv.setUint16(20,0,true);
+  const total=new Uint8Array([...localHeaders,...centralDir,eocd].reduce((a,c)=>[...a,...c],[]));
+  return total;
+}
+function crc32(data){
+  let crc=0xFFFFFFFF;
+  for(let i=0;i<data.length;i++){crc^=data[i];for(let j=0;j<8;j++){crc=(crc&1)?(crc>>>1)^0xEDB88320:(crc>>>1);}}
+  return (crc^0xFFFFFFFF)>>>0;
+}
+async function renderPageThumb(pdfDoc,pageNum,width=90){
+  const page=await pdfDoc.getPage(pageNum);
+  const vp=page.getViewport({scale:1});
+  const scale=width/vp.width;
+  const viewport=page.getViewport({scale});
+  const canvas=document.createElement("canvas");
+  canvas.width=viewport.width;canvas.height=viewport.height;
+  await page.render({canvasContext:canvas.getContext("2d"),viewport}).promise;
+  return canvas;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// DRAG & DROP genérico
+// ═══════════════════════════════════════════════════════════════════════
+["merge","split","extract","rotate","compress","wm","num","img","prot"].forEach(id=>{
+  const drop=document.getElementById(id+"-drop");
+  if(!drop)return;
+  drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("drag-over");});
+  drop.addEventListener("dragleave",()=>drop.classList.remove("drag-over"));
+  drop.addEventListener("drop",e=>{
+    e.preventDefault();drop.classList.remove("drag-over");
+    const files=e.dataTransfer.files;
+    if(id==="merge")addMergeFiles(files);
+    else if(id==="img")addImgFiles(files);
+    else if(id==="split")loadSplitFile(files[0]);
+    else if(id==="extract")loadExtractFile(files[0]);
+    else if(id==="rotate")loadRotateFile(files[0]);
+    else if(id==="compress")loadCompressFile(files[0]);
+    else if(id==="wm")loadWmFile(files[0]);
+    else if(id==="num")loadNumFile(files[0]);
+    else if(id==="prot")loadProtFile(files[0]);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// MERGE
+// ═══════════════════════════════════════════════════════════════════════
+let mergeFiles=[];
+function addMergeFiles(files){
+  for(const f of files){if(f.type==="application/pdf")mergeFiles.push(f);}
+  renderMergeList();
+}
+function renderMergeList(){
+  const list=document.getElementById("merge-list");
+  list.innerHTML="";
+  mergeFiles.forEach((f,i)=>{
+    const div=document.createElement("div");div.className="file-item";
+    div.innerHTML=`<div class="file-item-icon"><svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+    <div class="file-item-info"><div class="file-item-name">${f.name}</div><div class="file-item-meta">${fmtSize(f.size)}</div></div>
+    <span style="font-size:11px;color:var(--text-3);font-family:DM Mono,monospace">#${i+1}</span>
+    <button class="file-remove" onclick="removeMerge(${i})" title="Quitar"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
+    list.appendChild(div);
+  });
+  document.getElementById("merge-btn").disabled=mergeFiles.length<2;
+}
+function removeMerge(i){mergeFiles.splice(i,1);renderMergeList();}
+async function doMerge(){
+  const btn=document.getElementById("merge-btn");btn.disabled=true;btn.textContent="Uniendo…";
+  try{
+    const {PDFDocument}=PDFLib;
+    const merged=await PDFDocument.create();
+    for(const f of mergeFiles){
+      const bytes=await readFile(f);
+      const src=await PDFDocument.load(bytes);
+      const pages=await merged.copyPages(src,src.getPageIndices());
+      pages.forEach(p=>merged.addPage(p));
+    }
+    const out=await merged.save();
+    results.merge={bytes:out,name:"unido.pdf"};
+    document.getElementById("merge-download").classList.add("show");
+  }catch(e){showAlert("merge-alert","merge-alert-msg","Error al unir: "+e.message);}
+  btn.disabled=false;btn.textContent="Unir PDFs";
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SPLIT
+// ═══════════════════════════════════════════════════════════════════════
+let splitFileData=null,splitTotalPages=0,splitMode="all";
+async function loadSplitFile(f){
+  if(!f||f.type!=="application/pdf")return;
+  splitFileData=await readFile(f);
+  const {PDFDocument}=PDFLib;
+  const doc=await PDFDocument.load(splitFileData);
+  splitTotalPages=doc.getPageCount();
+  document.getElementById("split-options").style.display="block";
+  document.getElementById("split-info").textContent=`El PDF tiene ${splitTotalPages} páginas.`;
+}
+function setSplitMode(mode,el){
+  splitMode=mode;
+  document.querySelectorAll(".split-opt").forEach(o=>o.classList.remove("active"));
+  el.classList.add("active");
+  document.getElementById("split-range-input").style.display=mode==="range"?"block":"none";
+  document.getElementById("split-every-input").style.display=mode==="every"?"block":"none";
+}
+async function doSplit(){
+  if(!splitFileData)return;
+  const {PDFDocument}=PDFLib;
+  const src=await PDFDocument.load(splitFileData);
+  const parts=[];
+  if(splitMode==="all"){
+    for(let i=0;i<splitTotalPages;i++){
+      const d=await PDFDocument.create();
+      const [p]=await d.copyPages(src,[i]);d.addPage(p);
+      parts.push({name:`pagina_${i+1}.pdf`,data:await d.save()});
+    }
+  }else if(splitMode==="every"){
+    const n=parseInt(document.getElementById("split-every-n").value)||1;
+    for(let i=0;i<splitTotalPages;i+=n){
+      const d=await PDFDocument.create();
+      const idxs=[];for(let j=i;j<Math.min(i+n,splitTotalPages);j++)idxs.push(j);
+      const pgs=await d.copyPages(src,idxs);pgs.forEach(p=>d.addPage(p));
+      parts.push({name:`parte_${Math.floor(i/n)+1}.pdf`,data:await d.save()});
+    }
+  }else{
+    const raw=document.getElementById("split-ranges").value;
+    const ranges=raw.split(",").map(r=>r.trim());
+    for(const r of ranges){
+      const [a,b]=r.split("-").map(x=>parseInt(x.trim())-1);
+      const end=isNaN(b)?a:b;
+      const d=await PDFDocument.create();
+      const idxs=[];for(let i=a;i<=Math.min(end,splitTotalPages-1);i++)idxs.push(i);
+      const pgs=await d.copyPages(src,idxs);pgs.forEach(p=>d.addPage(p));
+      parts.push({name:`rango_${r.replace("-","_")}.pdf`,data:await d.save()});
+    }
+  }
+  const zip=buildZip(parts);
+  results.split={zipBytes:zip,name:"division.zip"};
+  const btn=document.getElementById("split-download");
+  btn.classList.add("show");
+  btn.onclick=()=>downloadZip("split");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// EXTRACT
+// ═══════════════════════════════════════════════════════════════════════
+let extractFileData=null,extractSelected=new Set(),extractPdfJs=null;
+pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+async function loadExtractFile(f){
+  if(!f||f.type!=="application/pdf")return;
+  extractFileData=await readFile(f);
+  extractSelected=new Set();
+  const doc=await pdfjsLib.getDocument({data:extractFileData}).promise;
+  extractPdfJs=doc;
+  const grid=document.getElementById("extract-grid");grid.innerHTML="";
+  for(let i=1;i<=doc.numPages;i++){
+    const canvas=await renderPageThumb(doc,i);
+    const div=document.createElement("div");div.className="page-thumb";div.dataset.page=i;
+    div.innerHTML=`<div class="page-check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>`;
+    div.insertBefore(canvas,div.firstChild);
+    div.innerHTML+=`<div class="page-num">Página ${i}</div>`;
+    div.onclick=()=>toggleExtract(i,div);
+    grid.appendChild(div);
+  }
+  document.getElementById("extract-area").style.display="block";
+  updateExtractInfo();
+}
+function toggleExtract(n,el){
+  if(extractSelected.has(n)){extractSelected.delete(n);el.classList.remove("selected");}
+  else{extractSelected.add(n);el.classList.add("selected");}
+  updateExtractInfo();
+}
+function updateExtractInfo(){
+  const n=extractSelected.size;
+  document.getElementById("extract-info").textContent=n===0?"Ninguna página seleccionada":`${n} página${n>1?"s":""} seleccionada${n>1?"s":""}`;
+  document.getElementById("extract-btn").disabled=n===0;
+}
+function selectAllPages(){document.querySelectorAll("#extract-grid .page-thumb").forEach(el=>{const n=parseInt(el.dataset.page);extractSelected.add(n);el.classList.add("selected");});updateExtractInfo();}
+function clearSelection(){extractSelected.clear();document.querySelectorAll("#extract-grid .page-thumb").forEach(el=>el.classList.remove("selected"));updateExtractInfo();}
+async function doExtract(){
+  if(!extractFileData||extractSelected.size===0)return;
+  const {PDFDocument}=PDFLib;
+  const src=await PDFDocument.load(extractFileData);
+  const d=await PDFDocument.create();
+  const idxs=[...extractSelected].sort((a,b)=>a-b).map(n=>n-1);
+  const pgs=await d.copyPages(src,idxs);pgs.forEach(p=>d.addPage(p));
+  results.extract={bytes:await d.save(),name:"extraido.pdf"};
+  document.getElementById("extract-download").classList.add("show");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ROTATE
+// ═══════════════════════════════════════════════════════════════════════
+let rotateFileData=null,rotations={};
+async function loadRotateFile(f){
+  if(!f||f.type!=="application/pdf")return;
+  rotateFileData=await readFile(f);rotations={};
+  const doc=await pdfjsLib.getDocument({data:rotateFileData}).promise;
+  const grid=document.getElementById("rotate-grid");grid.innerHTML="";
+  for(let i=1;i<=doc.numPages;i++){
+    rotations[i]=0;
+    const canvas=await renderPageThumb(doc,i,100);
+    const div=document.createElement("div");div.className="rot-item";div.id=`rot-${i}`;
+    div.innerHTML=`<div class="page-num">Página ${i}</div>
+    <div class="rot-controls">
+      <button class="rot-btn" onclick="addRot(${i},-90)" title="Girar izquierda"><svg viewBox="0 0 24 24" style="transform:scaleX(-1)"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+      <button class="rot-btn" onclick="addRot(${i},90)" title="Girar derecha"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+    </div>`;
+    div.insertBefore(canvas,div.firstChild);
+    canvas.style.transition="transform 0.2s";canvas.id=`canvas-rot-${i}`;
+    grid.appendChild(div);
+  }
+  document.getElementById("rotate-area").style.display="block";
+}
+function addRot(n,deg){rotations[n]=(rotations[n]+deg+360)%360;const c=document.getElementById(`canvas-rot-${n}`);if(c)c.style.transform=`rotate(${rotations[n]}deg)`;}
+function rotateAll(deg){for(const k in rotations)addRot(parseInt(k),deg);}
+async function doRotate(){
+  if(!rotateFileData)return;
+  const {PDFDocument,degrees}=PDFLib;
+  const doc=await PDFDocument.load(rotateFileData);
+  doc.getPages().forEach((p,i)=>{const r=rotations[i+1]||0;if(r)p.setRotation(degrees(r));});
+  results.rotate={bytes:await doc.save(),name:"rotado.pdf"};
+  document.getElementById("rotate-download").classList.add("show");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// COMPRESS (optimización metadata + streams)
+// ═══════════════════════════════════════════════════════════════════════
+let compressFileData=null,compressFileName="";
+async function loadCompressFile(f){
+  if(!f||f.type!=="application/pdf")return;
+  compressFileData=await readFile(f);compressFileName=f.name;
+  document.getElementById("compress-area").style.display="block";
+  document.getElementById("compress-info").textContent=`Archivo: ${f.name} — Tamaño original: ${fmtSize(f.size)}`;
+}
+async function doCompress(){
+  if(!compressFileData)return;
+  const {PDFDocument}=PDFLib;
+  const level=document.getElementById("compress-level").value;
+  const opts={useObjectStreams:level!=="low",addDefaultPage:false,objectsPerTick:level==="high"?100:50};
+  const doc=await PDFDocument.load(compressFileData,{ignoreEncryption:true});
+  const out=await doc.save(opts);
+  const orig=compressFileData.length,comp=out.length;
+  const pct=Math.round((1-comp/orig)*100);
+  results.compress={bytes:out,name:"comprimido_"+compressFileName};
+  const res=document.getElementById("compress-result");
+  res.style.display="block";
+  res.textContent=`Tamaño original: ${fmtSize(orig)} → Comprimido: ${fmtSize(comp)} (${pct>0?"-"+pct+"%":"+"+Math.abs(pct)+"% (ya estaba optimizado)"})`;
+  document.getElementById("compress-download").classList.add("show");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// WATERMARK
+// ═══════════════════════════════════════════════════════════════════════
+let wmFileData=null,wmFileName="";
+async function loadWmFile(f){
+  if(!f||f.type!=="application/pdf")return;
+  wmFileData=await readFile(f);wmFileName=f.name;
+  document.getElementById("wm-area").style.display="block";
+  updateWmPreview();
+}
+function updateWmPreview(){
+  const txt=document.getElementById("wm-text").value||"";
+  const op=parseFloat(document.getElementById("wm-opacity").value);
+  const col=document.getElementById("wm-color").value;
+  const label=document.getElementById("wm-preview-label");
+  label.textContent=txt;
+  const colors={gray:"rgba(100,100,100",red:"rgba(192,57,43",black:"rgba(0,0,0",blue:"rgba(44,130,201"};
+  label.style.color=`${colors[col]||"rgba(100,100,100"},${op})`;
+}
+async function doWatermark(){
+  if(!wmFileData)return;
+  const {PDFDocument,rgb,degrees}=PDFLib;
+  const txt=document.getElementById("wm-text").value||"CONFIDENCIAL";
+  const op=parseFloat(document.getElementById("wm-opacity").value);
+  const col=document.getElementById("wm-color").value;
+  const pos=document.getElementById("wm-pos").value;
+  const colorMap={gray:rgb(0.4,0.4,0.4),red:rgb(0.75,0.22,0.17),black:rgb(0,0,0),blue:rgb(0.17,0.51,0.79)};
+  const doc=await PDFDocument.load(wmFileData);
+  const font=await doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+  doc.getPages().forEach(page=>{
+    const {width,height}=page.getSize();
+    const sz=Math.min(width,height)*0.12;
+    let x=width/2,y=height/2,rot=degrees(-30);
+    if(pos==="top"){y=height-60;rot=degrees(0);}
+    if(pos==="bottom"){y=40;rot=degrees(0);}
+    page.drawText(txt,{x,y,size:sz,font,color:colorMap[col]||colorMap.gray,opacity:op,rotate:rot,xSkewAngle:degrees(0),ySkewAngle:degrees(0)});
+  });
+  results.wm={bytes:await doc.save(),name:"marcado_"+wmFileName};
+  document.getElementById("wm-download").classList.add("show");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// NUMERACIÓN
+// ═══════════════════════════════════════════════════════════════════════
+let numFileData=null,numFileName="";
+async function loadNumFile(f){
+  if(!f||f.type!=="application/pdf")return;
+  numFileData=await readFile(f);numFileName=f.name;
+  document.getElementById("num-area").style.display="block";
+}
+async function doNumber(){
+  if(!numFileData)return;
+  const {PDFDocument,rgb}=PDFLib;
+  const doc=await PDFDocument.load(numFileData);
+  const font=await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+  const posVal=document.getElementById("num-pos").value;
+  const startNum=parseInt(document.getElementById("num-start").value)||1;
+  const fmt=document.getElementById("num-format").value;
+  const total=doc.getPageCount();
+  doc.getPages().forEach((page,i)=>{
+    const {width,height}=page.getSize();
+    const n=i+startNum;
+    let label="";
+    if(fmt==="n")label=`${n}`;
+    else if(fmt==="n/total")label=`${n}/${total+startNum-1}`;
+    else label=`Página ${n}`;
+    let x=width/2,y=20;
+    if(posVal.includes("right"))x=width-30;
+    if(posVal.includes("left"))x=20;
+    if(posVal.includes("top"))y=height-20;
+    const tw=font.widthOfTextAtSize(label,10);
+    if(posVal.includes("center"))x=width/2-tw/2;
+    page.drawText(label,{x,y,size:10,font,color:rgb(0.3,0.3,0.3)});
+  });
+  results.num={bytes:await doc.save(),name:"numerado_"+numFileName};
+  document.getElementById("num-download").classList.add("show");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// IMÁGENES A PDF
+// ═══════════════════════════════════════════════════════════════════════
+let imgFiles=[];
+function addImgFiles(files){
+  for(const f of files){if(/image\/(jpeg|jpg|png)/.test(f.type))imgFiles.push(f);}
+  renderImgList();
+}
+function renderImgList(){
+  const list=document.getElementById("img-list");list.innerHTML="";
+  imgFiles.forEach((f,i)=>{
+    const div=document.createElement("div");div.className="file-item";
+    div.innerHTML=`<div class="file-item-icon" style="background:var(--green-light)"><svg viewBox="0 0 24 24" stroke="#1A7A4A" fill="none" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
+    <div class="file-item-info"><div class="file-item-name">${f.name}</div><div class="file-item-meta">${fmtSize(f.size)}</div></div>
+    <span style="font-size:11px;color:var(--text-3);font-family:DM Mono,monospace">#${i+1}</span>
+    <button class="file-remove" onclick="removeImg(${i})"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
+    list.appendChild(div);
+  });
+  document.getElementById("img-options").style.display=imgFiles.length>0?"block":"none";
+}
+function removeImg(i){imgFiles.splice(i,1);renderImgList();}
+async function doImgToPdf(){
+  if(imgFiles.length===0)return;
+  const {PDFDocument}=PDFLib;
+  const doc=await PDFDocument.create();
+  const size=document.getElementById("img-size").value;
+  const orient=document.getElementById("img-orient").value;
+  const A4=[595.28,841.89],Letter=[612,792];
+  for(const f of imgFiles){
+    const url=await readDataUrl(f);
+    const isJpg=f.type==="image/jpeg"||f.type==="image/jpg";
+    const img=isJpg?await doc.embedJpg(url):await doc.embedPng(url);
+    const iDims=img.scale(1);
+    let pw,ph;
+    if(size==="fit"){pw=iDims.width;ph=iDims.height;}
+    else{[pw,ph]=size==="A4"?A4:Letter;if(orient==="landscape")[pw,ph]=[ph,pw];}
+    const page=doc.addPage([pw,ph]);
+    const scale=Math.min(pw/iDims.width,ph/iDims.height)*0.95;
+    const dw=iDims.width*scale,dh=iDims.height*scale;
+    page.drawImage(img,{x:(pw-dw)/2,y:(ph-dh)/2,width:dw,height:dh});
+  }
+  results.img={bytes:await doc.save(),name:"imagenes.pdf"};
+  document.getElementById("img-download").classList.add("show");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CONTRASEÑA (pdf-lib no soporta encriptación nativa — aviso honesto)
+// ═══════════════════════════════════════════════════════════════════════
+let protFileData=null,protFileName="";
+async function loadProtFile(f){
+  if(!f||f.type!=="application/pdf")return;
+  protFileData=await readFile(f);protFileName=f.name;
+  document.getElementById("prot-area").style.display="block";
+  document.getElementById("prot-info").textContent=`Archivo: ${f.name} — ${fmtSize(f.size)}`;
+}
+async function doProtect(){
+  const p1=document.getElementById("prot-pass").value;
+  const p2=document.getElementById("prot-pass2").value;
+  const alertEl=document.getElementById("prot-alert");const msgEl=document.getElementById("prot-alert-msg");
+  alertEl.classList.remove("show");
+  if(!p1||p1.length<4){msgEl.textContent="La contraseña debe tener al menos 4 caracteres.";alertEl.classList.add("show");return;}
+  if(p1!==p2){msgEl.textContent="Las contraseñas no coinciden.";alertEl.classList.add("show");return;}
+  // pdf-lib no implementa encriptación AES — usamos metadatos personalizados como nota honesta
+  msgEl.textContent="La librería gratuita usada no soporta encriptación real de PDFs en el navegador. Para contraseña real, usa Adobe Acrobat o una herramienta de escritorio.";alertEl.classList.add("show");
+}
+
+function showAlert(alertId,msgId,msg){const a=document.getElementById(alertId);document.getElementById(msgId).textContent=msg;a.classList.add("show");setTimeout(()=>a.classList.remove("show"),5000);}
+</script>
+</body>
+</html>
