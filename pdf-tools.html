@@ -158,6 +158,13 @@
     .wm-preview-doc{font-size:12px;color:var(--text-3)}
 
     footer{text-align:center;padding:2rem;font-size:12px;color:var(--text-3);border-top:1px solid var(--border);margin-top:1rem}
+    .convert-step{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13px;color:var(--text-2);transition:opacity 0.3s}
+    .convert-step-dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--border-strong);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.3s}
+    .convert-step-dot.active{border-color:var(--accent);background:var(--accent-light);animation:pulse 1s infinite}
+    .convert-step-dot.done{border-color:var(--green);background:var(--green-light)}
+    .convert-step-dot.done::after{content:'✓';font-size:10px;color:var(--green);font-weight:700}
+    .convert-step-dot.active::after{content:'';width:8px;height:8px;border-radius:50%;background:var(--accent)}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
 
     /* LOADING OVERLAY */
     #auth-loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999}
@@ -238,6 +245,10 @@
     <button class="tab" onclick="switchTab('pdftxt',this)">
       <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="12" y2="16"/></svg>
       PDF a Texto
+    </button>
+    <button class="tab" onclick="switchTab('convert',this)">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg>
+      PDF → Office
     </button>
   </div>
 
@@ -710,9 +721,91 @@
     </div>
   </div>
 
+  <!-- ═══════════════════════════════ PDF → OFFICE ═══════════════════════════════ -->
+  <div id="panel-convert" class="panel">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-icon" style="background:#FBEAE9">
+          <svg viewBox="0 0 24 24" stroke="#C0392B" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg>
+        </div>
+        <div>
+          <h2>PDF → Office</h2>
+          <p>Convierte un PDF a Word, Excel o PowerPoint usando Microsoft Graph API</p>
+        </div>
+      </div>
+      <div class="card-body">
+
+        <!-- Info banner -->
+        <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:var(--radius);padding:12px 14px;font-size:13px;color:#1E40AF;display:flex;gap:10px;align-items:flex-start;margin-bottom:1.25rem">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8"/><line x1="12" y1="12" x2="12" y2="16"/></svg>
+          <span>La conversión usa tu cuenta Microsoft. El PDF se sube temporalmente a tu OneDrive, se convierte y se descarga automáticamente — luego se elimina. Nadie más tiene acceso.</span>
+        </div>
+
+        <div class="drop-zone" id="convert-drop">
+          <input type="file" accept=".pdf" id="convert-input" onchange="loadConvertFile(this.files[0])">
+          <div class="drop-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <h3>Arrastra el PDF aquí</h3>
+          <p>o haz clic para seleccionarlo</p>
+          <span class="drop-tag">.PDF</span>
+        </div>
+
+        <div id="convert-area" style="display:none;margin-top:1.25rem">
+          <div id="convert-info" style="font-size:13px;color:var(--text-2);margin-bottom:1rem"></div>
+
+          <div class="field">
+            <label>Convertir a</label>
+            <select id="convert-format">
+              <option value="docx">Word (.docx)</option>
+              <option value="pptx">PowerPoint (.pptx)</option>
+              <option value="xlsx">Excel (.xlsx)</option>
+              <option value="html">HTML (.html) — para editar online</option>
+              <option value="ods">OpenDocument (.ods)</option>
+              <option value="odp">OpenDocument Presentación (.odp)</option>
+            </select>
+          </div>
+
+          <div class="controls">
+            <button class="btn btn-primary" onclick="doConvert()" id="convert-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg>
+              Convertir
+            </button>
+          </div>
+
+          <!-- Progress steps -->
+          <div id="convert-progress" style="display:none;margin-top:1.25rem">
+            <div id="convert-step-1" class="convert-step">
+              <div class="convert-step-dot" id="dot-1"></div>
+              <span>Subiendo PDF a OneDrive…</span>
+            </div>
+            <div id="convert-step-2" class="convert-step" style="opacity:0.3">
+              <div class="convert-step-dot" id="dot-2"></div>
+              <span>Convirtiendo con Microsoft Office…</span>
+            </div>
+            <div id="convert-step-3" class="convert-step" style="opacity:0.3">
+              <div class="convert-step-dot" id="dot-3"></div>
+              <span>Descargando resultado…</span>
+            </div>
+            <div id="convert-step-4" class="convert-step" style="opacity:0.3">
+              <div class="convert-step-dot" id="dot-4"></div>
+              <span>Eliminando archivo temporal…</span>
+            </div>
+          </div>
+
+          <div id="convert-alert" class="alert alert-error" style="margin-top:1rem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span id="convert-alert-msg"></span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
 </main>
 <footer>
-  Intranet Baker &mdash; Herramientas PDF &mdash; Procesamiento 100% local, sin subir archivos a internet
+  Intranet Baker &mdash; Herramientas PDF &mdash; Procesamiento 100% local excepto conversión PDF→Office (usa Microsoft Graph)
 </footer>
 </div>
 
@@ -843,6 +936,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     num:     f=>loadNumFile(f[0]),
     img:     f=>addImgFiles(f),
     pdftxt:  f=>loadPdftxtFile(f[0]),
+    convert: f=>loadConvertFile(f[0]),
   };
   Object.keys(map).forEach(id=>{
     const drop=document.getElementById(id+'-drop');
@@ -1239,6 +1333,143 @@ function downloadTxt(){
   if(!pdftxtContent)return;
   const base=pdftxtFileName.replace(/\.pdf$/i,'').replace(/\s+/g,'-').slice(0,40);
   downloadBytes(new TextEncoder().encode(pdftxtContent),base+'_TEXTO.txt','text/plain;charset=utf-8');
+}
+
+// ── PDF → OFFICE vía Microsoft Graph API ─────────────────────────────
+let convertFileData=null,convertFileName='';
+
+async function loadConvertFile(f){
+  if(!f||f.type!=='application/pdf')return;
+  convertFileData=await readFile(f);convertFileName=f.name;
+  document.getElementById('convert-area').style.display='block';
+  document.getElementById('convert-info').textContent='Archivo: '+f.name+' — '+fmtSize(f.size);
+  document.getElementById('convert-alert').classList.remove('show');
+  document.getElementById('convert-progress').style.display='none';
+  resetConvertSteps();
+}
+
+function resetConvertSteps(){
+  [1,2,3,4].forEach(n=>{
+    const dot=document.getElementById('dot-'+n);
+    const step=document.getElementById('convert-step-'+n);
+    if(dot){dot.className='convert-step-dot';}
+    if(step){step.style.opacity=n===1?'1':'0.3';}
+  });
+}
+
+function setConvertStep(n,state){
+  // state: 'active' | 'done'
+  const dot=document.getElementById('dot-'+n);
+  const step=document.getElementById('convert-step-'+n);
+  if(dot)dot.className='convert-step-dot '+state;
+  if(step)step.style.opacity='1';
+  // activar siguiente
+  if(state==='done'&&n<4){
+    const next=document.getElementById('convert-step-'+(n+1));
+    if(next)next.style.opacity='1';
+  }
+}
+
+async function getGraphToken(){
+  // Pedir token con scope Files.ReadWrite
+  const tokenResp=await msalInstance.acquireTokenSilent({
+    scopes:['Files.ReadWrite'],
+    account:msalInstance.getAllAccounts()[0]
+  }).catch(async()=>{
+    return msalInstance.acquireTokenPopup({scopes:['Files.ReadWrite']});
+  });
+  return tokenResp.accessToken;
+}
+
+async function doConvert(){
+  if(!convertFileData)return;
+  const btn=document.getElementById('convert-btn');
+  const format=document.getElementById('convert-format').value;
+  const alertEl=document.getElementById('convert-alert');
+  const msgEl=document.getElementById('convert-alert-msg');
+
+  btn.disabled=true;btn.textContent='Convirtiendo…';
+  alertEl.classList.remove('show');
+  document.getElementById('convert-progress').style.display='block';
+  resetConvertSteps();
+
+  const mimeMap={
+    docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    html:'text/html',
+    ods:'application/vnd.oasis.opendocument.spreadsheet',
+    odp:'application/vnd.oasis.opendocument.presentation',
+  };
+
+  let token,uploadedItemId;
+  const baseName=convertFileName.replace(/\.pdf$/i,'').replace(/\s+/g,'-').slice(0,50);
+  const tempName='baker-conv-'+Date.now()+'.pdf';
+  const outName=baseName+'_CONVERTIDO.'+format;
+
+  try{
+    // ── Paso 1: Obtener token ─────────────────────────────────────────
+    setConvertStep(1,'active');
+    token=await getGraphToken();
+
+    // ── Paso 1b: Subir PDF a OneDrive ─────────────────────────────────
+    // Usamos upload session para archivos de cualquier tamaño
+    const uploadUrl=`https://graph.microsoft.com/v1.0/me/drive/root:/baker-pdf-tools/${tempName}:/content`;
+    const uploadResp=await fetch(uploadUrl,{
+      method:'PUT',
+      headers:{
+        'Authorization':'Bearer '+token,
+        'Content-Type':'application/pdf',
+      },
+      body:convertFileData
+    });
+    if(!uploadResp.ok){
+      const err=await uploadResp.json().catch(()=>({}));
+      throw new Error('Error subiendo PDF: '+(err.error?.message||uploadResp.status));
+    }
+    const uploadedItem=await uploadResp.json();
+    uploadedItemId=uploadedItem.id;
+    setConvertStep(1,'done');
+
+    // ── Paso 2: Convertir vía Graph ───────────────────────────────────
+    setConvertStep(2,'active');
+    const convertUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${uploadedItemId}/content?format=${format}`;
+    const convertResp=await fetch(convertUrl,{
+      headers:{'Authorization':'Bearer '+token}
+    });
+    if(!convertResp.ok){
+      const err=await convertResp.json().catch(()=>({}));
+      throw new Error('Error convirtiendo: '+(err.error?.message||convertResp.status)+'. Verifica que el formato sea compatible con el PDF.');
+    }
+    setConvertStep(2,'done');
+
+    // ── Paso 3: Descargar resultado ───────────────────────────────────
+    setConvertStep(3,'active');
+    const convertedBytes=new Uint8Array(await convertResp.arrayBuffer());
+    downloadBytes(convertedBytes,outName,mimeMap[format]||'application/octet-stream');
+    setConvertStep(3,'done');
+
+    // ── Paso 4: Eliminar temporal de OneDrive ─────────────────────────
+    setConvertStep(4,'active');
+    await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${uploadedItemId}`,{
+      method:'DELETE',
+      headers:{'Authorization':'Bearer '+token}
+    });
+    setConvertStep(4,'done');
+
+  }catch(e){
+    // Si subimos pero falló la conversión, intentar limpiar
+    if(uploadedItemId&&token){
+      fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${uploadedItemId}`,{
+        method:'DELETE',
+        headers:{'Authorization':'Bearer '+token}
+      }).catch(()=>{});
+    }
+    msgEl.textContent=e.message||'Error desconocido';
+    alertEl.classList.add('show');
+  }
+
+  btn.disabled=false;btn.textContent='Convertir';
 }
 
 // ── HELPERS UI ────────────────────────────────────────────────────────
