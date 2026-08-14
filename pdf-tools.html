@@ -717,72 +717,32 @@
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════════════════════════
-// MSAL AUTH
-// ═══════════════════════════════════════════════════════════════════════
-const ALLOWED = [
-  "dvillaseca@ibaker.cl"
-];
-const msalConfig = {
-  auth:{clientId:"9a56ab1c-d3c4-4460-9892-1d4da768ecfb",authority:"https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",redirectUri:window.location.origin+window.location.pathname},
-  cache:{cacheLocation:"sessionStorage"}
-};
-let msalInstance=null;
-window.addEventListener("load",async()=>{
-  msalInstance=new msal.PublicClientApplication(msalConfig);
-  await msalInstance.initialize();
-  await initAuth();
-});
-async function initAuth(){
-  try{
-    const resp=await msalInstance.handleRedirectPromise();
-    let account=resp?resp.account:msalInstance.getAllAccounts()[0];
-    if(!account){await msalInstance.loginRedirect({scopes:["User.Read"]});return;}
-    const email=account.username.toLowerCase();
-    if(!ALLOWED.includes(email)){
-      document.getElementById("auth-loading").innerHTML='<div style="text-align:center;padding:2rem"><h2 style="color:#C0392B">Acceso no autorizado</h2><p style="margin-top:8px;color:#6B6860">Tu cuenta no tiene permiso para usar esta herramienta.</p></div>';
-      return;
-    }
-    const initials=account.name?account.name.split(" ").slice(0,2).map(n=>n[0]).join("").toUpperCase():email[0].toUpperCase();
-    document.getElementById("auth-area").innerHTML=`<div class="user-chip"><div class="user-av">${initials}</div><div class="user-nm">${account.name||email}</div></div>`;
-    document.getElementById("auth-loading").style.display="none";
-    document.getElementById("app-content").style.display="block";
-  }catch(e){console.error(e);}
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// TABS
-// ═══════════════════════════════════════════════════════════════════════
-function switchTab(id,el){
-  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-  document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
-  el.classList.add("active");
-  document.getElementById("panel-"+id).classList.add("active");
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// UTILS
-// ═══════════════════════════════════════════════════════════════════════
+// ── HELPERS ──────────────────────────────────────────────────────────
 const results={};
-function fmtSize(b){if(b<1024)return b+"B";if(b<1048576)return(b/1024).toFixed(1)+"KB";return(b/1048576).toFixed(2)+"MB";}
+function fmtSize(b){if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1)+'KB';return(b/1048576).toFixed(2)+'MB';}
 function readFile(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(new Uint8Array(e.target.result));r.onerror=rej;r.readAsArrayBuffer(f);});}
 function readDataUrl(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(f);});}
-function downloadResult(key){
-  const {bytes,name}=results[key];
-  const blob=new Blob([bytes],{type:"application/pdf"});
+
+// Nombre de salida con sufijo legible
+function outName(original, suffix){
+  // "contrato baker enero 2025.pdf" → "contrato-baker-enero-2025_UNIDO.pdf"
+  const base = original.replace(/\.pdf$/i,'').replace(/\s+/g,'-').replace(/[^a-zA-Z0-9_\-áéíóúÁÉÍÓÚñÑ]/g,'').slice(0,40);
+  return base + '_' + suffix + '.pdf';
+}
+function outNameTxt(original){
+  const base = original.replace(/\.pdf$/i,'').replace(/\s+/g,'-').slice(0,40);
+  return base + '_TEXTO.txt';
+}
+
+function downloadBytes(bytes, name, mime='application/pdf'){
+  const blob=new Blob([bytes],{type:mime});
   const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");a.href=url;a.download=name;a.click();
+  const a=document.createElement('a');a.href=url;a.download=name;a.click();
   setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
-function downloadZip(key){
-  const {zipBytes,name}=results[key];
-  const blob=new Blob([zipBytes],{type:"application/zip"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");a.href=url;a.download=name;a.click();
-  setTimeout(()=>URL.revokeObjectURL(url),2000);
-}
+function downloadResult(key){const {bytes,name}=results[key];downloadBytes(bytes,name);}
+
 function buildZip(files){
-  // Simple ZIP STORE builder
   const enc=new TextEncoder();
   const localHeaders=[];const centralDir=[];let offset=0;
   for(const {name,data} of files){
@@ -804,76 +764,106 @@ function buildZip(files){
     cd.set(nameBytes,46);localHeaders.push(local);centralDir.push(cd);offset+=local.length;
   }
   const cdSize=centralDir.reduce((a,c)=>a+c.length,0);
-  const eocd=new Uint8Array(22);const dv=new DataView(eocd.buffer);
-  dv.setUint32(0,0x06054b50,true);dv.setUint16(4,0,true);dv.setUint16(6,0,true);
-  dv.setUint16(8,files.length,true);dv.setUint16(10,files.length,true);
-  dv.setUint32(12,cdSize,true);dv.setUint32(16,offset,true);dv.setUint16(20,0,true);
-  const total=new Uint8Array([...localHeaders,...centralDir,eocd].reduce((a,c)=>[...a,...c],[]));
+  const eocd=new Uint8Array(22);const dv2=new DataView(eocd.buffer);
+  dv2.setUint32(0,0x06054b50,true);dv2.setUint16(4,0,true);dv2.setUint16(6,0,true);
+  dv2.setUint16(8,files.length,true);dv2.setUint16(10,files.length,true);
+  dv2.setUint32(12,cdSize,true);dv2.setUint32(16,offset,true);dv2.setUint16(20,0,true);
+  const all=[...localHeaders,...centralDir,eocd];
+  const total=new Uint8Array(all.reduce((a,c)=>a+c.length,0));
+  let pos=0;for(const a of all){total.set(a,pos);pos+=a.length;}
   return total;
 }
 function crc32(data){
   let crc=0xFFFFFFFF;
   for(let i=0;i<data.length;i++){crc^=data[i];for(let j=0;j<8;j++){crc=(crc&1)?(crc>>>1)^0xEDB88320:(crc>>>1);}}
-  return (crc^0xFFFFFFFF)>>>0;
+  return(crc^0xFFFFFFFF)>>>0;
 }
-async function renderPageThumb(pdfDoc,pageNum,width=90){
-  const page=await pdfDoc.getPage(pageNum);
+
+// ── PDF.js worker ─────────────────────────────────────────────────────
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+async function renderPageThumb(pdfJsDoc, pageNum, width=90){
+  const page=await pdfJsDoc.getPage(pageNum);
   const vp=page.getViewport({scale:1});
   const scale=width/vp.width;
   const viewport=page.getViewport({scale});
-  const canvas=document.createElement("canvas");
-  canvas.width=viewport.width;canvas.height=viewport.height;
-  await page.render({canvasContext:canvas.getContext("2d"),viewport}).promise;
+  const canvas=document.createElement('canvas');
+  canvas.width=Math.round(viewport.width);
+  canvas.height=Math.round(viewport.height);
+  await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
   return canvas;
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// DRAG & DROP genérico
-// ═══════════════════════════════════════════════════════════════════════
-["merge","split","extract","rotate","compress","wm","num","img","pdftxt"].forEach(id=>{
-  const drop=document.getElementById(id+"-drop");
-  if(!drop)return;
-  drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("drag-over");});
-  drop.addEventListener("dragleave",()=>drop.classList.remove("drag-over"));
-  drop.addEventListener("drop",e=>{
-    e.preventDefault();drop.classList.remove("drag-over");
-    const files=e.dataTransfer.files;
-    if(id==="merge")addMergeFiles(files);
-    else if(id==="img")addImgFiles(files);
-    else if(id==="split")loadSplitFile(files[0]);
-    else if(id==="extract")loadExtractFile(files[0]);
-    else if(id==="rotate")loadRotateFile(files[0]);
-    else if(id==="compress"){addCompressFiles(files);}
-    else if(id==="wm")loadWmFile(files[0]);
-    else if(id==="num")loadNumFile(files[0]);
-    else if(id==="pdftxt")loadPdftxtFile(files[0]);
+// ── MSAL AUTH ─────────────────────────────────────────────────────────
+const ALLOWED=['dvillaseca@ibaker.cl','jcumplido@ibaker.cl'];
+const msalConfig={
+  auth:{clientId:'9a56ab1c-d3c4-4460-9892-1d4da768ecfb',authority:'https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26',redirectUri:window.location.origin+window.location.pathname},
+  cache:{cacheLocation:'sessionStorage'}
+};
+let msalInstance=null;
+window.addEventListener('load',async()=>{
+  msalInstance=new msal.PublicClientApplication(msalConfig);
+  await msalInstance.initialize();
+  await initAuth();
+});
+async function initAuth(){
+  try{
+    const resp=await msalInstance.handleRedirectPromise();
+    let account=resp?resp.account:msalInstance.getAllAccounts()[0];
+    if(!account){await msalInstance.loginRedirect({scopes:['User.Read']});return;}
+    const email=account.username.toLowerCase();
+    if(!ALLOWED.includes(email)){
+      document.getElementById('auth-loading').innerHTML='<div style="text-align:center;padding:2rem"><h2 style="color:#C0392B">Acceso no autorizado</h2><p style="margin-top:8px;color:#6B6860">Tu cuenta no tiene permiso para usar esta herramienta.</p></div>';
+      return;
+    }
+    const initials=account.name?account.name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase():email[0].toUpperCase();
+    document.getElementById('auth-area').innerHTML=`<div class="user-chip"><div class="user-av">${initials}</div><div class="user-nm">${account.name||email}</div></div>`;
+    document.getElementById('auth-loading').style.display='none';
+    document.getElementById('app-content').style.display='block';
+  }catch(e){console.error(e);}
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────
+function switchTab(id,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-'+id).classList.add('active');
+}
+
+// ── DRAG & DROP genérico ──────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded',()=>{
+  const map={
+    merge:   f=>addMergeFiles(f),
+    split:   f=>loadSplitFile(f[0]),
+    extract: f=>loadExtractFile(f[0]),
+    rotate:  f=>loadRotateFile(f[0]),
+    compress:f=>addCompressFiles(f),
+    wm:      f=>loadWmFile(f[0]),
+    num:     f=>loadNumFile(f[0]),
+    img:     f=>addImgFiles(f),
+    pdftxt:  f=>loadPdftxtFile(f[0]),
+  };
+  Object.keys(map).forEach(id=>{
+    const drop=document.getElementById(id+'-drop');
+    if(!drop)return;
+    drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('drag-over');});
+    drop.addEventListener('dragleave',()=>drop.classList.remove('drag-over'));
+    drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('drag-over');map[id](e.dataTransfer.files);});
   });
 });
 
-// ═══════════════════════════════════════════════════════════════════════
-// MERGE
-// ═══════════════════════════════════════════════════════════════════════
+// ── UNIR ──────────────────────────────────────────────────────────────
 let mergeFiles=[];
 function addMergeFiles(files){
-  for(const f of files){if(f.type==="application/pdf")mergeFiles.push(f);}
-  renderMergeList();
+  for(const f of files){if(f.type==='application/pdf')mergeFiles.push(f);}
+  renderFileList('merge-list',mergeFiles,removeMerge);
+  document.getElementById('merge-btn').disabled=mergeFiles.length<2;
 }
-function renderMergeList(){
-  const list=document.getElementById("merge-list");
-  list.innerHTML="";
-  mergeFiles.forEach((f,i)=>{
-    const div=document.createElement("div");div.className="file-item";
-    div.innerHTML=`<div class="file-item-icon"><svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
-    <div class="file-item-info"><div class="file-item-name">${f.name}</div><div class="file-item-meta">${fmtSize(f.size)}</div></div>
-    <span style="font-size:11px;color:var(--text-3);font-family:DM Mono,monospace">#${i+1}</span>
-    <button class="file-remove" onclick="removeMerge(${i})" title="Quitar"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
-    list.appendChild(div);
-  });
-  document.getElementById("merge-btn").disabled=mergeFiles.length<2;
-}
-function removeMerge(i){mergeFiles.splice(i,1);renderMergeList();}
+function removeMerge(i){mergeFiles.splice(i,1);addMergeFiles([]);}
 async function doMerge(){
-  const btn=document.getElementById("merge-btn");btn.disabled=true;btn.textContent="Uniendo…";
+  if(mergeFiles.length<2)return;
+  const btn=document.getElementById('merge-btn');btn.disabled=true;btn.textContent='Uniendo…';
   try{
     const {PDFDocument}=PDFLib;
     const merged=await PDFDocument.create();
@@ -884,106 +874,112 @@ async function doMerge(){
       pages.forEach(p=>merged.addPage(p));
     }
     const out=await merged.save();
-    results.merge={bytes:out,name:"unido.pdf"};
-    document.getElementById("merge-download").classList.add("show");
-  }catch(e){showAlert("merge-alert","merge-alert-msg","Error al unir: "+e.message);}
-  btn.disabled=false;btn.textContent="Unir PDFs";
+    const baseName=mergeFiles[0].name.replace(/\.pdf$/i,'').replace(/\s+/g,'-').slice(0,30);
+    results.merge={bytes:out,name:baseName+'_UNIDO.pdf'};
+    showDownload('merge-download');
+  }catch(e){alert('Error al unir: '+e.message);}
+  btn.disabled=false;btn.textContent='Unir PDFs';
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// SPLIT
-// ═══════════════════════════════════════════════════════════════════════
-let splitFileData=null,splitTotalPages=0,splitMode="all";
+// ── DIVIDIR ───────────────────────────────────────────────────────────
+let splitFileData=null,splitFileName='',splitTotalPages=0,splitMode='all';
 async function loadSplitFile(f){
-  if(!f||f.type!=="application/pdf")return;
-  splitFileData=await readFile(f);
+  if(!f||f.type!=='application/pdf')return;
+  splitFileData=await readFile(f);splitFileName=f.name;
   const {PDFDocument}=PDFLib;
   const doc=await PDFDocument.load(splitFileData);
   splitTotalPages=doc.getPageCount();
-  document.getElementById("split-options").style.display="block";
-  document.getElementById("split-info").textContent=`El PDF tiene ${splitTotalPages} páginas.`;
+  document.getElementById('split-options').style.display='block';
+  document.getElementById('split-info').textContent='El PDF tiene '+splitTotalPages+' páginas.';
 }
 function setSplitMode(mode,el){
   splitMode=mode;
-  document.querySelectorAll(".split-opt").forEach(o=>o.classList.remove("active"));
-  el.classList.add("active");
-  document.getElementById("split-range-input").style.display=mode==="range"?"block":"none";
-  document.getElementById("split-every-input").style.display=mode==="every"?"block":"none";
+  document.querySelectorAll('.split-opt').forEach(o=>o.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('split-range-input').style.display=mode==='range'?'block':'none';
+  document.getElementById('split-every-input').style.display=mode==='every'?'block':'none';
 }
 async function doSplit(){
   if(!splitFileData)return;
   const {PDFDocument}=PDFLib;
   const src=await PDFDocument.load(splitFileData);
+  const base=splitFileName.replace(/\.pdf$/i,'').replace(/\s+/g,'-').slice(0,30);
   const parts=[];
-  if(splitMode==="all"){
+  if(splitMode==='all'){
     for(let i=0;i<splitTotalPages;i++){
       const d=await PDFDocument.create();
       const [p]=await d.copyPages(src,[i]);d.addPage(p);
-      parts.push({name:`pagina_${i+1}.pdf`,data:await d.save()});
+      parts.push({name:base+'_PAG'+(i+1)+'.pdf',data:await d.save()});
     }
-  }else if(splitMode==="every"){
-    const n=parseInt(document.getElementById("split-every-n").value)||1;
+  }else if(splitMode==='every'){
+    const n=parseInt(document.getElementById('split-every-n').value)||1;
     for(let i=0;i<splitTotalPages;i+=n){
       const d=await PDFDocument.create();
       const idxs=[];for(let j=i;j<Math.min(i+n,splitTotalPages);j++)idxs.push(j);
       const pgs=await d.copyPages(src,idxs);pgs.forEach(p=>d.addPage(p));
-      parts.push({name:`parte_${Math.floor(i/n)+1}.pdf`,data:await d.save()});
+      parts.push({name:base+'_PARTE'+(Math.floor(i/n)+1)+'.pdf',data:await d.save()});
     }
   }else{
-    const raw=document.getElementById("split-ranges").value;
-    const ranges=raw.split(",").map(r=>r.trim());
+    const raw=document.getElementById('split-ranges').value;
+    const ranges=raw.split(',').map(r=>r.trim());
     for(const r of ranges){
-      const [a,b]=r.split("-").map(x=>parseInt(x.trim())-1);
-      const end=isNaN(b)?a:b;
+      const parts2=r.split('-').map(x=>parseInt(x.trim())-1);
+      const a=parts2[0],end=isNaN(parts2[1])?parts2[0]:parts2[1];
       const d=await PDFDocument.create();
       const idxs=[];for(let i=a;i<=Math.min(end,splitTotalPages-1);i++)idxs.push(i);
       const pgs=await d.copyPages(src,idxs);pgs.forEach(p=>d.addPage(p));
-      parts.push({name:`rango_${r.replace("-","_")}.pdf`,data:await d.save()});
+      parts.push({name:base+'_RANGO'+r.replace('-','a')+'.pdf',data:await d.save()});
     }
   }
   const zip=buildZip(parts);
-  results.split={zipBytes:zip,name:"division.zip"};
-  const btn=document.getElementById("split-download");
-  btn.classList.add("show");
-  btn.onclick=()=>downloadZip("split");
+  results.split={zipBytes:zip,name:base+'_DIVIDIDO.zip'};
+  const btn=document.getElementById('split-download');
+  btn.style.display='inline-flex';
+  btn.onclick=()=>{downloadBytes(results.split.zipBytes,results.split.name,'application/zip');};
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// EXTRACT
-// ═══════════════════════════════════════════════════════════════════════
-let extractFileData=null,extractSelected=new Set(),extractPdfJs=null;
-pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+// ── EXTRAER PÁGINAS ───────────────────────────────────────────────────
+let extractFileData=null,extractFileName='',extractSelected=new Set(),extractPdfJsDoc=null;
 async function loadExtractFile(f){
-  if(!f||f.type!=="application/pdf")return;
-  extractFileData=await readFile(f);
+  if(!f||f.type!=='application/pdf')return;
+  extractFileData=await readFile(f);extractFileName=f.name;
   extractSelected=new Set();
-  const doc=await pdfjsLib.getDocument({data:extractFileData}).promise;
-  extractPdfJs=doc;
-  const grid=document.getElementById("extract-grid");grid.innerHTML="";
-  for(let i=1;i<=doc.numPages;i++){
-    const canvas=await renderPageThumb(doc,i);
-    const div=document.createElement("div");div.className="page-thumb";div.dataset.page=i;
-    div.innerHTML=`<div class="page-check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>`;
-    div.insertBefore(canvas,div.firstChild);
-    div.innerHTML+=`<div class="page-num">Página ${i}</div>`;
-    div.onclick=()=>toggleExtract(i,div);
+  // Cargar con pdf.js para las miniaturas
+  extractPdfJsDoc=await pdfjsLib.getDocument({data:extractFileData.slice()}).promise;
+  const grid=document.getElementById('extract-grid');grid.innerHTML='';
+  for(let i=1;i<=extractPdfJsDoc.numPages;i++){
+    const canvas=await renderPageThumb(extractPdfJsDoc,i,90);
+    const div=document.createElement('div');div.className='page-thumb';div.dataset.page=i;
+    const check=document.createElement('div');check.className='page-check';
+    check.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    const label=document.createElement('div');label.className='page-num';label.textContent='Pág. '+i;
+    div.appendChild(canvas);div.appendChild(check);div.appendChild(label);
+    div.addEventListener('click',()=>toggleExtract(i,div));
     grid.appendChild(div);
   }
-  document.getElementById("extract-area").style.display="block";
+  document.getElementById('extract-area').style.display='block';
   updateExtractInfo();
 }
 function toggleExtract(n,el){
-  if(extractSelected.has(n)){extractSelected.delete(n);el.classList.remove("selected");}
-  else{extractSelected.add(n);el.classList.add("selected");}
+  if(extractSelected.has(n)){extractSelected.delete(n);el.classList.remove('selected');}
+  else{extractSelected.add(n);el.classList.add('selected');}
   updateExtractInfo();
 }
 function updateExtractInfo(){
   const n=extractSelected.size;
-  document.getElementById("extract-info").textContent=n===0?"Ninguna página seleccionada":`${n} página${n>1?"s":""} seleccionada${n>1?"s":""}`;
-  document.getElementById("extract-btn").disabled=n===0;
+  document.getElementById('extract-info').textContent=n===0?'Ninguna página seleccionada':n+' página'+(n>1?'s':'')+' seleccionada'+(n>1?'s':'');
+  document.getElementById('extract-btn').disabled=n===0;
 }
-function selectAllPages(){document.querySelectorAll("#extract-grid .page-thumb").forEach(el=>{const n=parseInt(el.dataset.page);extractSelected.add(n);el.classList.add("selected");});updateExtractInfo();}
-function clearSelection(){extractSelected.clear();document.querySelectorAll("#extract-grid .page-thumb").forEach(el=>el.classList.remove("selected"));updateExtractInfo();}
+function selectAllPages(){
+  document.querySelectorAll('#extract-grid .page-thumb').forEach(el=>{
+    const n=parseInt(el.dataset.page);extractSelected.add(n);el.classList.add('selected');
+  });updateExtractInfo();
+}
+function clearSelection(){
+  extractSelected.clear();
+  document.querySelectorAll('#extract-grid .page-thumb').forEach(el=>el.classList.remove('selected'));
+  updateExtractInfo();
+}
 async function doExtract(){
   if(!extractFileData||extractSelected.size===0)return;
   const {PDFDocument}=PDFLib;
@@ -991,97 +987,135 @@ async function doExtract(){
   const d=await PDFDocument.create();
   const idxs=[...extractSelected].sort((a,b)=>a-b).map(n=>n-1);
   const pgs=await d.copyPages(src,idxs);pgs.forEach(p=>d.addPage(p));
-  results.extract={bytes:await d.save(),name:"extraido.pdf"};
-  document.getElementById("extract-download").classList.add("show");
+  const base=extractFileName.replace(/\.pdf$/i,'').replace(/\s+/g,'-').slice(0,30);
+  const pages=[...extractSelected].sort((a,b)=>a-b).join('-');
+  results.extract={bytes:await d.save(),name:base+'_PAGS'+pages+'.pdf'};
+  showDownload('extract-download');
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// ROTATE
-// ═══════════════════════════════════════════════════════════════════════
-let rotateFileData=null,rotations={};
+// ── ROTAR ─────────────────────────────────────────────────────────────
+let rotateFileData=null,rotateFileName='',rotations={},rotatePdfJsDoc=null;
 async function loadRotateFile(f){
-  if(!f||f.type!=="application/pdf")return;
-  rotateFileData=await readFile(f);rotations={};
-  const doc=await pdfjsLib.getDocument({data:rotateFileData}).promise;
-  const grid=document.getElementById("rotate-grid");grid.innerHTML="";
-  for(let i=1;i<=doc.numPages;i++){
+  if(!f||f.type!=='application/pdf')return;
+  rotateFileData=await readFile(f);rotateFileName=f.name;rotations={};
+  rotatePdfJsDoc=await pdfjsLib.getDocument({data:rotateFileData.slice()}).promise;
+  const grid=document.getElementById('rotate-grid');grid.innerHTML='';
+  for(let i=1;i<=rotatePdfJsDoc.numPages;i++){
     rotations[i]=0;
-    const canvas=await renderPageThumb(doc,i,100);
-    const div=document.createElement("div");div.className="rot-item";div.id=`rot-${i}`;
-    div.innerHTML=`<div class="page-num">Página ${i}</div>
-    <div class="rot-controls">
-      <button class="rot-btn" onclick="addRot(${i},-90)" title="Girar izquierda"><svg viewBox="0 0 24 24" style="transform:scaleX(-1)"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
-      <button class="rot-btn" onclick="addRot(${i},90)" title="Girar derecha"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
-    </div>`;
-    div.insertBefore(canvas,div.firstChild);
-    canvas.style.transition="transform 0.2s";canvas.id=`canvas-rot-${i}`;
+    const canvas=await renderPageThumb(rotatePdfJsDoc,i,100);
+    canvas.id='canvas-rot-'+i;
+    canvas.style.transition='transform 0.25s ease';
+    const label=document.createElement('div');label.className='page-num';label.textContent='Pág. '+i;
+    const ctls=document.createElement('div');ctls.className='rot-controls';
+    ctls.innerHTML=
+      '<button class="rot-btn" onclick="addRot('+i+',-90)" title="Girar izquierda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5"/></svg></button>'+
+      '<button class="rot-btn" onclick="addRot('+i+',90)" title="Girar derecha"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>';
+    const div=document.createElement('div');div.className='rot-item';
+    div.appendChild(canvas);div.appendChild(label);div.appendChild(ctls);
     grid.appendChild(div);
   }
-  document.getElementById("rotate-area").style.display="block";
+  document.getElementById('rotate-area').style.display='block';
+  document.getElementById('rotate-download').style.display='none';
 }
-function addRot(n,deg){rotations[n]=(rotations[n]+deg+360)%360;const c=document.getElementById(`canvas-rot-${n}`);if(c)c.style.transform=`rotate(${rotations[n]}deg)`;}
+function addRot(n,deg){
+  rotations[n]=((rotations[n]||0)+deg+360)%360;
+  const c=document.getElementById('canvas-rot-'+n);
+  if(c)c.style.transform='rotate('+rotations[n]+'deg)';
+}
 function rotateAll(deg){for(const k in rotations)addRot(parseInt(k),deg);}
 async function doRotate(){
   if(!rotateFileData)return;
   const {PDFDocument,degrees}=PDFLib;
   const doc=await PDFDocument.load(rotateFileData);
   doc.getPages().forEach((p,i)=>{const r=rotations[i+1]||0;if(r)p.setRotation(degrees(r));});
-  results.rotate={bytes:await doc.save(),name:"rotado.pdf"};
-  document.getElementById("rotate-download").classList.add("show");
+  const base=rotateFileName.replace(/\.pdf$/i,'').replace(/\s+/g,'-').slice(0,30);
+  results.rotate={bytes:await doc.save(),name:base+'_ROTADO.pdf'};
+  showDownload('rotate-download');
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// COMPRESS (optimización metadata + streams)
-// ═══════════════════════════════════════════════════════════════════════
-let compressFileData=null,compressFileName="";
-async function loadCompressFile(f){
-  if(!f||f.type!=="application/pdf")return;
-  compressFileData=await readFile(f);compressFileName=f.name;
-  document.getElementById("compress-area").style.display="block";
-  document.getElementById("compress-info").textContent=`Archivo: ${f.name} — Tamaño original: ${fmtSize(f.size)}`;
+// ── COMPRIMIR — multi-archivo ─────────────────────────────────────────
+let compressFiles=[];
+function addCompressFiles(files){
+  for(const f of files){if(f.type==='application/pdf')compressFiles.push(f);}
+  renderFileList('compress-list',compressFiles,removeCompressFile);
+  document.getElementById('compress-area').style.display=compressFiles.length>0?'block':'none';
+  document.getElementById('compress-download').style.display='none';
+  document.getElementById('compress-results-list').innerHTML='';
 }
+function removeCompressFile(i){compressFiles.splice(i,1);addCompressFiles([]);}
+let compressResultFiles=[];
 async function doCompress(){
-  if(!compressFileData)return;
+  if(compressFiles.length===0)return;
+  const btn=document.getElementById('compress-btn');btn.disabled=true;btn.textContent='Procesando…';
   const {PDFDocument}=PDFLib;
-  const level=document.getElementById("compress-level").value;
-  const opts={useObjectStreams:level!=="low",addDefaultPage:false,objectsPerTick:level==="high"?100:50};
-  const doc=await PDFDocument.load(compressFileData,{ignoreEncryption:true});
-  const out=await doc.save(opts);
-  const orig=compressFileData.length,comp=out.length;
-  const pct=Math.round((1-comp/orig)*100);
-  results.compress={bytes:out,name:"comprimido_"+compressFileName};
-  const res=document.getElementById("compress-result");
-  res.style.display="block";
-  res.textContent=`Tamaño original: ${fmtSize(orig)} → Comprimido: ${fmtSize(comp)} (${pct>0?"-"+pct+"%":"+"+Math.abs(pct)+"% (ya estaba optimizado)"})`;
-  document.getElementById("compress-download").classList.add("show");
+  const level=document.getElementById('compress-level').value;
+  const opts={useObjectStreams:level!=='low',addDefaultPage:false};
+  const prog=document.getElementById('compress-progress');
+  const progBar=document.getElementById('compress-prog-bar');
+  const progLabel=document.getElementById('compress-prog-label');
+  prog.style.display='block';
+  const resList=document.getElementById('compress-results-list');
+  resList.style.display='flex';resList.innerHTML='';
+  compressResultFiles=[];
+  for(let i=0;i<compressFiles.length;i++){
+    const f=compressFiles[i];
+    progLabel.textContent='Comprimiendo '+(i+1)+'/'+compressFiles.length+': '+f.name;
+    progBar.style.width=Math.round((i/compressFiles.length)*100)+'%';
+    const bytes=await readFile(f);
+    const doc=await PDFDocument.load(bytes,{ignoreEncryption:true});
+    const out=await doc.save(opts);
+    const orig=bytes.length,comp=out.length;
+    const pct=Math.round((1-comp/orig)*100);
+    const base=f.name.replace(/\.pdf$/i,'').replace(/\s+/g,'-').slice(0,30);
+    const name=base+'_COMPRIMIDO.pdf';
+    compressResultFiles.push({data:out,name});
+    const row=document.createElement('div');
+    row.style.cssText='background:var(--green-light);border:1px solid #B6DEC9;border-radius:var(--radius);padding:10px 14px;font-size:12px;color:#155C39;display:flex;align-items:center;gap:8px';
+    row.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span><strong>'+f.name+'</strong> — '+fmtSize(orig)+' → '+fmtSize(comp)+' '+(pct>0?'(−'+pct+'%)':'(ya optimizado)')+'</span>';
+    resList.appendChild(row);
+  }
+  progBar.style.width='100%';
+  progLabel.textContent='Listo — '+compressFiles.length+' archivo'+(compressFiles.length>1?'s':'')+' comprimido'+(compressFiles.length>1?'s':'');
+  const dlBtn=document.getElementById('compress-download');
+  const dlLabel=document.getElementById('compress-download-label');
+  dlLabel.textContent=compressFiles.length===1?'Descargar PDF comprimido':'Descargar ZIP con PDFs comprimidos';
+  dlBtn.style.display='inline-flex';
+  btn.disabled=false;btn.textContent='Comprimir';
+}
+function downloadCompressResult(){
+  if(compressResultFiles.length===0)return;
+  if(compressResultFiles.length===1){
+    downloadBytes(compressResultFiles[0].data,compressResultFiles[0].name);
+  }else{
+    const zip=buildZip(compressResultFiles.map(f=>({name:f.name,data:f.data})));
+    downloadBytes(zip,'comprimidos.zip','application/zip');
+  }
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// WATERMARK
-// ═══════════════════════════════════════════════════════════════════════
-let wmFileData=null,wmFileName="";
+// ── MARCA DE AGUA ─────────────────────────────────────────────────────
+let wmFileData=null,wmFileName='';
 async function loadWmFile(f){
-  if(!f||f.type!=="application/pdf")return;
+  if(!f||f.type!=='application/pdf')return;
   wmFileData=await readFile(f);wmFileName=f.name;
-  document.getElementById("wm-area").style.display="block";
+  document.getElementById('wm-area').style.display='block';
   updateWmPreview();
 }
 function updateWmPreview(){
-  const txt=document.getElementById("wm-text").value||"";
-  const op=parseFloat(document.getElementById("wm-opacity").value);
-  const col=document.getElementById("wm-color").value;
-  const label=document.getElementById("wm-preview-label");
+  const txt=document.getElementById('wm-text').value||'';
+  const op=parseFloat(document.getElementById('wm-opacity').value);
+  const col=document.getElementById('wm-color').value;
+  const label=document.getElementById('wm-preview-label');
   label.textContent=txt;
-  const colors={gray:"rgba(100,100,100",red:"rgba(192,57,43",black:"rgba(0,0,0",blue:"rgba(44,130,201"};
-  label.style.color=`${colors[col]||"rgba(100,100,100"},${op})`;
+  const colors={gray:'rgba(100,100,100',red:'rgba(192,57,43',black:'rgba(0,0,0',blue:'rgba(44,130,201'};
+  label.style.color=(colors[col]||'rgba(100,100,100')+','+op+')';
 }
 async function doWatermark(){
   if(!wmFileData)return;
   const {PDFDocument,rgb,degrees}=PDFLib;
-  const txt=document.getElementById("wm-text").value||"CONFIDENCIAL";
-  const op=parseFloat(document.getElementById("wm-opacity").value);
-  const col=document.getElementById("wm-color").value;
-  const pos=document.getElementById("wm-pos").value;
+  const txt=document.getElementById('wm-text').value||'CONFIDENCIAL';
+  const op=parseFloat(document.getElementById('wm-opacity').value);
+  const col=document.getElementById('wm-color').value;
+  const pos=document.getElementById('wm-pos').value;
   const colorMap={gray:rgb(0.4,0.4,0.4),red:rgb(0.75,0.22,0.17),black:rgb(0,0,0),blue:rgb(0.17,0.51,0.79)};
   const doc=await PDFDocument.load(wmFileData);
   const font=await doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
@@ -1089,118 +1123,138 @@ async function doWatermark(){
     const {width,height}=page.getSize();
     const sz=Math.min(width,height)*0.12;
     let x=width/2,y=height/2,rot=degrees(-30);
-    if(pos==="top"){y=height-60;rot=degrees(0);}
-    if(pos==="bottom"){y=40;rot=degrees(0);}
-    page.drawText(txt,{x,y,size:sz,font,color:colorMap[col]||colorMap.gray,opacity:op,rotate:rot,xSkewAngle:degrees(0),ySkewAngle:degrees(0)});
+    if(pos==='top'){y=height-60;rot=degrees(0);}
+    if(pos==='bottom'){y=40;rot=degrees(0);}
+    page.drawText(txt,{x,y,size:sz,font,color:colorMap[col]||colorMap.gray,opacity:op,rotate:rot});
   });
-  results.wm={bytes:await doc.save(),name:"marcado_"+wmFileName};
-  document.getElementById("wm-download").classList.add("show");
+  const base=wmFileName.replace(/\.pdf$/i,'').replace(/\s+/g,'-').slice(0,30);
+  results.wm={bytes:await doc.save(),name:base+'_MARCA-AGUA.pdf'};
+  showDownload('wm-download');
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// NUMERACIÓN
-// ═══════════════════════════════════════════════════════════════════════
-let numFileData=null,numFileName="";
+// ── NUMERACIÓN ────────────────────────────────────────────────────────
+let numFileData=null,numFileName='';
 async function loadNumFile(f){
-  if(!f||f.type!=="application/pdf")return;
+  if(!f||f.type!=='application/pdf')return;
   numFileData=await readFile(f);numFileName=f.name;
-  document.getElementById("num-area").style.display="block";
+  document.getElementById('num-area').style.display='block';
 }
 async function doNumber(){
   if(!numFileData)return;
   const {PDFDocument,rgb}=PDFLib;
   const doc=await PDFDocument.load(numFileData);
   const font=await doc.embedFont(PDFLib.StandardFonts.Helvetica);
-  const posVal=document.getElementById("num-pos").value;
-  const startNum=parseInt(document.getElementById("num-start").value)||1;
-  const fmt=document.getElementById("num-format").value;
+  const posVal=document.getElementById('num-pos').value;
+  const startNum=parseInt(document.getElementById('num-start').value)||1;
+  const fmt=document.getElementById('num-format').value;
   const total=doc.getPageCount();
   doc.getPages().forEach((page,i)=>{
     const {width,height}=page.getSize();
     const n=i+startNum;
-    let label="";
-    if(fmt==="n")label=`${n}`;
-    else if(fmt==="n/total")label=`${n}/${total+startNum-1}`;
-    else label=`Página ${n}`;
-    let x=width/2,y=20;
-    if(posVal.includes("right"))x=width-30;
-    if(posVal.includes("left"))x=20;
-    if(posVal.includes("top"))y=height-20;
+    let label=fmt==='n'?''+n:fmt==='n/total'?n+'/'+(total+startNum-1):'Página '+n;
     const tw=font.widthOfTextAtSize(label,10);
-    if(posVal.includes("center"))x=width/2-tw/2;
+    let x=width/2-tw/2,y=18;
+    if(posVal.includes('right'))x=width-40;
+    if(posVal.includes('left'))x=20;
+    if(posVal.includes('top'))y=height-22;
     page.drawText(label,{x,y,size:10,font,color:rgb(0.3,0.3,0.3)});
   });
-  results.num={bytes:await doc.save(),name:"numerado_"+numFileName};
-  document.getElementById("num-download").classList.add("show");
+  const base=numFileName.replace(/\.pdf$/i,'').replace(/\s+/g,'-').slice(0,30);
+  results.num={bytes:await doc.save(),name:base+'_NUMERADO.pdf'};
+  showDownload('num-download');
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// IMÁGENES A PDF
-// ═══════════════════════════════════════════════════════════════════════
+// ── IMÁGENES A PDF ────────────────────────────────────────────────────
 let imgFiles=[];
 function addImgFiles(files){
   for(const f of files){if(/image\/(jpeg|jpg|png)/.test(f.type))imgFiles.push(f);}
-  renderImgList();
+  renderFileList('img-list',imgFiles,removeImg);
+  document.getElementById('img-options').style.display=imgFiles.length>0?'block':'none';
 }
-function renderImgList(){
-  const list=document.getElementById("img-list");list.innerHTML="";
-  imgFiles.forEach((f,i)=>{
-    const div=document.createElement("div");div.className="file-item";
-    div.innerHTML=`<div class="file-item-icon" style="background:var(--green-light)"><svg viewBox="0 0 24 24" stroke="#1A7A4A" fill="none" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
-    <div class="file-item-info"><div class="file-item-name">${f.name}</div><div class="file-item-meta">${fmtSize(f.size)}</div></div>
-    <span style="font-size:11px;color:var(--text-3);font-family:DM Mono,monospace">#${i+1}</span>
-    <button class="file-remove" onclick="removeImg(${i})"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
-    list.appendChild(div);
-  });
-  document.getElementById("img-options").style.display=imgFiles.length>0?"block":"none";
-}
-function removeImg(i){imgFiles.splice(i,1);renderImgList();}
+function removeImg(i){imgFiles.splice(i,1);addImgFiles([]);}
 async function doImgToPdf(){
   if(imgFiles.length===0)return;
   const {PDFDocument}=PDFLib;
   const doc=await PDFDocument.create();
-  const size=document.getElementById("img-size").value;
-  const orient=document.getElementById("img-orient").value;
+  const size=document.getElementById('img-size').value;
+  const orient=document.getElementById('img-orient').value;
   const A4=[595.28,841.89],Letter=[612,792];
   for(const f of imgFiles){
     const url=await readDataUrl(f);
-    const isJpg=f.type==="image/jpeg"||f.type==="image/jpg";
+    const isJpg=f.type==='image/jpeg'||f.type==='image/jpg';
     const img=isJpg?await doc.embedJpg(url):await doc.embedPng(url);
     const iDims=img.scale(1);
     let pw,ph;
-    if(size==="fit"){pw=iDims.width;ph=iDims.height;}
-    else{[pw,ph]=size==="A4"?A4:Letter;if(orient==="landscape")[pw,ph]=[ph,pw];}
+    if(size==='fit'){pw=iDims.width;ph=iDims.height;}
+    else{[pw,ph]=size==='A4'?A4:Letter;if(orient==='landscape')[pw,ph]=[ph,pw];}
     const page=doc.addPage([pw,ph]);
     const scale=Math.min(pw/iDims.width,ph/iDims.height)*0.95;
     const dw=iDims.width*scale,dh=iDims.height*scale;
     page.drawImage(img,{x:(pw-dw)/2,y:(ph-dh)/2,width:dw,height:dh});
   }
-  results.img={bytes:await doc.save(),name:"imagenes.pdf"};
-  document.getElementById("img-download").classList.add("show");
+  const base=imgFiles[0].name.replace(/\.(jpg|jpeg|png)$/i,'').replace(/\s+/g,'-').slice(0,30);
+  results.img={bytes:await doc.save(),name:base+'_IMAGENES.pdf'};
+  showDownload('img-download');
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// CONTRASEÑA (pdf-lib no soporta encriptación nativa — aviso honesto)
-// ═══════════════════════════════════════════════════════════════════════
-let protFileData=null,protFileName="";
-async function loadProtFile(f){
-  if(!f||f.type!=="application/pdf")return;
-  protFileData=await readFile(f);protFileName=f.name;
-  document.getElementById("prot-area").style.display="block";
-  document.getElementById("prot-info").textContent=`Archivo: ${f.name} — ${fmtSize(f.size)}`;
+// ── PDF A TEXTO ───────────────────────────────────────────────────────
+let pdftxtFileData=null,pdftxtFileName='',pdftxtContent='';
+async function loadPdftxtFile(f){
+  if(!f||f.type!=='application/pdf')return;
+  pdftxtFileData=await readFile(f);pdftxtFileName=f.name;
+  document.getElementById('pdftxt-area').style.display='block';
+  document.getElementById('pdftxt-info').textContent='Archivo: '+f.name+' — '+fmtSize(f.size);
+  document.getElementById('pdftxt-preview').value='';
+  document.getElementById('pdftxt-download').style.display='none';
+  document.getElementById('pdftxt-copy-btn').style.display='none';
 }
-async function doProtect(){
-  const p1=document.getElementById("prot-pass").value;
-  const p2=document.getElementById("prot-pass2").value;
-  const alertEl=document.getElementById("prot-alert");const msgEl=document.getElementById("prot-alert-msg");
-  alertEl.classList.remove("show");
-  if(!p1||p1.length<4){msgEl.textContent="La contraseña debe tener al menos 4 caracteres.";alertEl.classList.add("show");return;}
-  if(p1!==p2){msgEl.textContent="Las contraseñas no coinciden.";alertEl.classList.add("show");return;}
-  // pdf-lib no implementa encriptación AES — usamos metadatos personalizados como nota honesta
-  msgEl.textContent="La librería gratuita usada no soporta encriptación real de PDFs en el navegador. Para contraseña real, usa Adobe Acrobat o una herramienta de escritorio.";alertEl.classList.add("show");
+async function doPdfToText(){
+  if(!pdftxtFileData)return;
+  const btn=document.querySelector('#panel-pdftxt .btn-primary');
+  btn.disabled=true;btn.textContent='Extrayendo…';
+  try{
+    const doc=await pdfjsLib.getDocument({data:pdftxtFileData.slice()}).promise;
+    let text='';
+    for(let i=1;i<=doc.numPages;i++){
+      const page=await doc.getPage(i);
+      const content=await page.getTextContent();
+      const pageText=content.items.map(item=>item.str).join(' ');
+      text+='── Página '+i+' ──\n'+pageText+'\n\n';
+    }
+    pdftxtContent=text.trim();
+    document.getElementById('pdftxt-preview').value=pdftxtContent||"(No se pudo extraer texto — el PDF puede ser una imagen escaneada)";
+    document.getElementById('pdftxt-download').style.display=pdftxtContent?'inline-flex':'none';
+    document.getElementById('pdftxt-copy-btn').style.display=pdftxtContent?'inline-flex':'none';
+  }catch(e){document.getElementById('pdftxt-preview').value='Error: '+e.message;}
+  btn.disabled=false;btn.textContent='Extraer texto';
+}
+function copyPdfText(){
+  navigator.clipboard.writeText(pdftxtContent).then(()=>{
+    const btn=document.getElementById('pdftxt-copy-btn');
+    const orig=btn.innerHTML;btn.textContent='¡Copiado!';
+    setTimeout(()=>btn.innerHTML=orig,2000);
+  });
+}
+function downloadTxt(){
+  if(!pdftxtContent)return;
+  const base=pdftxtFileName.replace(/\.pdf$/i,'').replace(/\s+/g,'-').slice(0,40);
+  downloadBytes(new TextEncoder().encode(pdftxtContent),base+'_TEXTO.txt','text/plain;charset=utf-8');
 }
 
-function showAlert(alertId,msgId,msg){const a=document.getElementById(alertId);document.getElementById(msgId).textContent=msg;a.classList.add("show");setTimeout(()=>a.classList.remove("show"),5000);}
+// ── HELPERS UI ────────────────────────────────────────────────────────
+function showDownload(id){document.getElementById(id).style.display='inline-flex';}
+
+function renderFileList(listId, files, removeFn){
+  const list=document.getElementById(listId);list.innerHTML='';
+  files.forEach((f,i)=>{
+    const div=document.createElement('div');div.className='file-item';
+    div.innerHTML=`<div class="file-item-icon"><svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+    <div class="file-item-info"><div class="file-item-name">${f.name}</div><div class="file-item-meta">${fmtSize(f.size)}</div></div>
+    <span style="font-size:11px;color:var(--text-3);font-family:'DM Mono',monospace;flex-shrink:0">#${i+1}</span>
+    <button class="file-remove" onclick="(${removeFn.name})(${i})" title="Quitar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
+    list.appendChild(div);
+  });
+}
 </script>
 </body>
 </html>
