@@ -1650,29 +1650,62 @@ async function doUnlock(){
   try{
     const {PDFDocument} = PDFLib;
 
-    // Intentar cargar con la contraseña proporcionada
-    let doc;
+    // ── Intento 1: pdf-lib directo (RC4 / AES-128) ───────────────
+    let out = null;
     try{
-      doc = await PDFDocument.load(unlockFileData, {
+      const doc = await PDFDocument.load(unlockFileData, {
         password: pass,
         ignoreEncryption: false
       });
-    }catch(e){
-      // Si falla, la contraseña es incorrecta o el PDF no está protegido
-      if(e.message && (e.message.includes('password') || e.message.includes('encrypt') || e.message.includes('decrypt'))){
-        throw new Error('Contraseña incorrecta. Verifica e inténtalo de nuevo.');
+      out = await doc.save();
+    }catch(e1){
+      // pdf-lib no pudo — probablemente AES-256
+      // ── Intento 2: PDF.js renderiza página a página → reconstruir ──
+      let pdfJsDoc;
+      try{
+        pdfJsDoc = await pdfjsLib.getDocument({
+          data: unlockFileData.slice(),
+          password: pass
+        }).promise;
+      }catch(e2){
+        // Si PDF.js también falla la contraseña es incorrecta
+        if(e2.name==='PasswordException'||e2.message?.includes('password')||e2.message?.includes('Password')){
+          throw new Error('Contraseña incorrecta. Verifica e inténtalo de nuevo.');
+        }
+        throw new Error('No se pudo abrir el PDF: '+e2.message);
       }
-      throw new Error('No se pudo abrir el PDF: '+e.message);
+
+      // PDF.js lo abrió correctamente — reconstruir con pdf-lib
+      // renderizamos cada página a canvas y la embebemos como imagen PNG
+      const newDoc = await PDFDocument.create();
+      btn.textContent = 'Procesando páginas…';
+
+      for(let i=1; i<=pdfJsDoc.numPages; i++){
+        btn.textContent = `Procesando página ${i}/${pdfJsDoc.numPages}…`;
+        const page    = await pdfJsDoc.getPage(i);
+        const vp      = page.getViewport({scale: 2}); // escala 2x para buena calidad
+        const canvas  = document.createElement('canvas');
+        canvas.width  = vp.width;
+        canvas.height = vp.height;
+        await page.render({canvasContext: canvas.getContext('2d'), viewport: vp}).promise;
+
+        // Convertir canvas a PNG y embeber
+        const pngDataUrl = canvas.toDataURL('image/png');
+        const pngBytes   = await fetch(pngDataUrl).then(r=>r.arrayBuffer());
+        const pngImage   = await newDoc.embedPng(pngBytes);
+
+        // Crear página con las dimensiones originales (en puntos)
+        const origVp  = page.getViewport({scale:1});
+        const newPage = newDoc.addPage([origVp.width, origVp.height]);
+        newPage.drawImage(pngImage,{x:0,y:0,width:origVp.width,height:origVp.height});
+      }
+
+      out = await newDoc.save();
     }
 
-    // Guardar SIN encriptación — pdf-lib al hacer save() sin opciones de encriptación
-    // genera el PDF desprotegido
-    const out  = await doc.save();
     const base = unlockFileName.replace(/\.pdf$/i,'').replace(/\s+/g,'-').slice(0,40);
     results.unlock = { bytes: out, name: base+'_SIN-CONTRASENA.pdf' };
     showDownload('unlock-download');
-
-    // Limpiar campo de contraseña por seguridad
     document.getElementById('unlock-pass').value='';
 
   }catch(e){
