@@ -7,134 +7,131 @@
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
 <style>
 :root{
-  --bg:#0a0a0b;--surface:#111113;--surface2:#18181b;
-  --border:#27272a;--border2:#3f3f46;
-  --text:#fafafa;--text2:#a1a1aa;--text3:#52525b;
-  --gold:#cc9166;--gold2:#ae9357;--gold-light:rgba(204,145,102,0.10);
-  --radius:10px;
+  --bg:#16171a;--surface:#1e2025;--surface2:#25272d;
+  --border:#2e3038;--border2:#3a3d47;
+  --text:#f0f0f2;--text2:#9fa3b0;--text3:#5a5f70;
+  --gold:#cc9166;--gold-light:rgba(204,145,102,0.10);
+  --radius:12px;
 }
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-body{font-family:"DM Sans",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;overflow-x:auto}
+body{font-family:"DM Sans",sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased;overflow:hidden}
 
 /* NAV */
-nav{position:sticky;top:0;z-index:100;background:rgba(10,10,11,0.92);backdrop-filter:blur(24px);border-bottom:1px solid var(--border);height:60px;display:flex;align-items:center;padding:0 40px;gap:16px}
-.nav-logo img{height:26px;background:white;border-radius:6px;padding:4px 10px;display:block}
-.nav-sep{width:1px;height:18px;background:var(--border)}
-.nav-back{display:flex;align-items:center;gap:6px;color:var(--text2);text-decoration:none;font-size:0.78rem;font-weight:500;transition:color 0.2s}
+nav{flex-shrink:0;background:rgba(22,23,26,0.95);backdrop-filter:blur(24px);border-bottom:1px solid var(--border);height:56px;display:flex;align-items:center;padding:0 24px;gap:14px;z-index:100}
+.nav-logo img{height:24px;background:white;border-radius:5px;padding:3px 8px;display:block}
+.nav-sep{width:1px;height:16px;background:var(--border)}
+.nav-back{display:flex;align-items:center;gap:5px;color:var(--text2);text-decoration:none;font-size:0.75rem;font-weight:500;transition:color 0.2s}
 .nav-back:hover{color:var(--text)}
-.nav-back svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
-.nav-title{font-size:0.72rem;color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;font-family:"DM Mono",monospace}
+.nav-back svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+.nav-title{font-size:0.7rem;color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;font-family:"DM Mono",monospace}
 .nav-spacer{flex:1}
-.user-chip{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:100px}
-.user-av{width:26px;height:26px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:#000}
-.user-nm{font-size:0.78rem;font-weight:500;color:var(--text);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.user-chip{display:flex;align-items:center;gap:7px;padding:3px 10px 3px 3px;background:var(--surface2);border:1px solid var(--border);border-radius:100px}
+.user-av{width:24px;height:24px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:700;color:#000}
+.user-nm{font-size:0.75rem;color:var(--text);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-/* LOADING */
-#auth-loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999}
-.spinner{width:32px;height:32px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-#auth-loading p{font-size:14px;color:var(--text2)}
-#app-content{display:none}
-
-/* MAIN */
-main{padding:2rem}
-
-/* HERO */
-.hero{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem}
-.hero-left h1{font-size:22px;font-weight:600;letter-spacing:-0.03em}
-.hero-left p{font-size:13px;color:var(--text2);margin-top:4px}
-.hero-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-
-/* SEARCH */
-.search-box{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:0 12px;height:36px;transition:border-color 0.15s}
+/* TOOLBAR */
+.toolbar{flex-shrink:0;background:var(--surface);border-bottom:1px solid var(--border);padding:10px 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0 10px;height:32px;transition:border-color 0.15s}
 .search-box:focus-within{border-color:var(--gold)}
-.search-box svg{width:14px;height:14px;stroke:var(--text3);fill:none;stroke-width:2;stroke-linecap:round;flex-shrink:0}
-.search-box input{background:none;border:none;outline:none;font-size:13px;font-family:"DM Sans",sans-serif;color:var(--text);width:180px}
+.search-box svg{width:13px;height:13px;stroke:var(--text3);fill:none;stroke-width:2;stroke-linecap:round;flex-shrink:0}
+.search-box input{background:none;border:none;outline:none;font-size:12px;font-family:"DM Sans",sans-serif;color:var(--text);width:160px}
 .search-box input::placeholder{color:var(--text3)}
+.btn{display:flex;align-items:center;gap:5px;padding:0 12px;height:32px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text2);font-size:12px;font-weight:500;font-family:"DM Sans",sans-serif;cursor:pointer;transition:all 0.15s;white-space:nowrap}
+.btn:hover{border-color:var(--gold);color:var(--gold)}
+.btn svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+.btn.primary{background:var(--gold);border-color:var(--gold);color:#000;font-weight:600}
+.btn.primary:hover{background:#b87d55;border-color:#b87d55;color:#000}
+.btn.danger{color:#e74c3c;border-color:#e74c3c}
+.btn.danger:hover{background:rgba(231,76,60,0.1)}
+.tb-sep{width:1px;height:20px;background:var(--border);margin:0 2px}
+.stats-inline{display:flex;gap:16px;margin-left:auto}
+.stat-inline{font-size:11px;color:var(--text3);font-family:"DM Mono",monospace}
+.stat-inline strong{color:var(--gold);font-size:13px}
 
-/* CONTROLS */
-.btn-ctrl{display:flex;align-items:center;gap:5px;padding:0 12px;height:36px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text2);font-size:12px;font-weight:500;font-family:"DM Sans",sans-serif;cursor:pointer;transition:all 0.15s;white-space:nowrap}
-.btn-ctrl:hover{border-color:var(--gold);color:var(--gold)}
-.btn-ctrl svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+/* CANVAS */
+.canvas-wrap{flex:1;overflow:hidden;cursor:grab;position:relative}
+.canvas-wrap.dragging{cursor:grabbing}
+.canvas-inner{position:absolute;top:0;left:0;transform-origin:0 0;padding:60px 80px}
 
-/* STATS */
-.stats{display:flex;gap:10px;margin-bottom:1.5rem;flex-wrap:wrap}
-.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 18px}
-.stat-val{font-size:20px;font-weight:600;letter-spacing:-0.04em;color:var(--gold)}
-.stat-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;font-family:"DM Mono",monospace;margin-top:2px}
-
-/* ── ÁRBOL HORIZONTAL ────────────────────────────────────── */
-.tree-wrap{overflow-x:auto;overflow-y:auto;padding:2rem 1rem 3rem}
-
-.tree-level{display:flex;flex-direction:column;align-items:center}
-
-/* Contenedor de un nodo + sus hijos */
+/* ── ÁRBOL ───────────────────────────────────────────── */
 .tree-node-wrap{display:flex;flex-direction:column;align-items:center;position:relative}
-
-/* Línea vertical que baja del nodo a la barra horizontal */
-.tree-node-wrap.has-children > .node-card::after{
-  content:'';position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);
-  width:2px;height:20px;background:var(--border2);
-}
-
-/* Barra horizontal que conecta hijos */
-.tree-children{display:flex;flex-direction:row;align-items:flex-start;gap:0;position:relative;margin-top:20px}
-
-/* Línea horizontal encima de los hijos */
-.tree-children::before{
-  content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);
-  height:2px;background:var(--border2);
-  /* ancho se define por JS con variable CSS */
-  width:var(--bar-width, 80%);
-}
-
-/* Línea vertical que sube desde cada hijo */
-.tree-child-wrap{display:flex;flex-direction:column;align-items:center;padding:0 12px;position:relative}
-.tree-child-wrap::before{
-  content:'';width:2px;height:20px;background:var(--border2);flex-shrink:0;
-}
+.tree-children{display:flex;flex-direction:row;align-items:flex-start;gap:0;position:relative;margin-top:0}
+.tree-children::before{content:'';position:absolute;top:0;height:2px;background:var(--border2);left:var(--bar-l);width:var(--bar-w)}
+.tree-child-wrap{display:flex;flex-direction:column;align-items:center;padding:0 14px;position:relative}
+.tree-child-wrap::before{content:'';width:2px;height:24px;background:var(--border2);flex-shrink:0}
+.connector-down{width:2px;height:24px;background:var(--border2);margin:0 auto}
 
 /* NODO */
 .node-card{
   display:flex;flex-direction:column;align-items:center;
   background:var(--surface);border:1px solid var(--border);border-radius:14px;
-  padding:14px 16px 12px;cursor:pointer;
-  transition:border-color 0.15s,background 0.15s;
-  position:relative;
-  min-width:140px;max-width:170px;
-  text-align:center;
+  padding:14px 14px 11px;cursor:pointer;
+  transition:border-color 0.15s,background 0.15s,box-shadow 0.15s;
+  position:relative;width:155px;text-align:center;user-select:none;
 }
-.node-card:hover{border-color:var(--gold);background:var(--surface2)}
-.node-card.raiz{border-color:var(--gold);background:var(--gold-light)}
+.node-card:hover{border-color:var(--gold);background:var(--surface2);box-shadow:0 4px 20px rgba(0,0,0,0.3)}
+.node-card.raiz{border-color:var(--gold);background:var(--gold-light);box-shadow:0 0 0 3px rgba(204,145,102,0.15)}
 .node-card.highlight{border-color:var(--gold);background:var(--gold-light)}
-.node-card.vacante{opacity:0.5}
-.node-card.collapsed-card{border-style:dashed}
+.node-card.vacante{opacity:0.45}
+.node-card.collapsed-card{border-style:dashed;opacity:0.8}
 
-.node-avatar{width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--border2);margin-bottom:8px;flex-shrink:0}
-.node-avatar-placeholder{width:52px;height:52px;border-radius:50%;background:var(--surface2);border:2px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--gold);margin-bottom:8px;flex-shrink:0}
-.node-name{font-size:12px;font-weight:600;line-height:1.3;color:var(--text)}
+.node-av{width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid var(--border2);margin-bottom:8px;flex-shrink:0}
+.node-av-ph{width:48px;height:48px;border-radius:50%;background:var(--surface2);border:2px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:var(--gold);margin-bottom:8px;flex-shrink:0}
+.node-name{font-size:11.5px;font-weight:600;line-height:1.3;color:var(--text)}
 .node-job{font-size:10px;color:var(--text2);line-height:1.3;margin-top:3px}
 .node-div{font-size:9px;color:var(--text3);margin-top:3px;font-family:"DM Mono",monospace}
-
-/* Badge de hijos colapsados */
 .node-badge{
-  position:absolute;bottom:-10px;left:50%;transform:translateX(-50%);
+  position:absolute;bottom:-11px;left:50%;transform:translateX(-50%);
   background:var(--surface2);border:1px solid var(--border2);border-radius:100px;
-  font-size:10px;font-family:"DM Mono",monospace;color:var(--text3);
-  padding:1px 7px;white-space:nowrap;cursor:pointer;transition:all 0.15s;
+  font-size:9.5px;font-family:"DM Mono",monospace;color:var(--text3);
+  padding:1px 8px;white-space:nowrap;
 }
-.node-badge:hover{border-color:var(--gold);color:var(--gold)}
+
+/* EDIT BUTTON — solo visible en hover para admin */
+.node-edit-btn{
+  position:absolute;top:6px;right:6px;
+  width:20px;height:20px;border-radius:50%;
+  background:var(--surface2);border:1px solid var(--border2);
+  display:none;align-items:center;justify-content:center;cursor:pointer;
+  transition:all 0.15s;z-index:2;
+}
+.node-edit-btn:hover{background:var(--gold);border-color:var(--gold)}
+.node-edit-btn svg{width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+.node-card:hover .node-edit-btn.visible{display:flex}
+
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:200;display:flex;align-items:center;justify-content:center}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);padding:28px;width:440px;max-width:95vw;max-height:90vh;overflow-y:auto}
+.modal h2{font-size:16px;font-weight:600;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+.modal h2 svg{width:16px;height:16px;stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;font-size:13px;font-family:"DM Sans",sans-serif;color:var(--text);outline:none;transition:border-color 0.15s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--gold)}
+.field select option{background:var(--surface2)}
+.field textarea{resize:vertical;min-height:60px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.modal-footer{display:flex;gap:8px;margin-top:20px;justify-content:flex-end}
+.modal-footer .btn{height:36px}
+.alert-modal{background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);border-radius:8px;padding:10px 14px;font-size:12px;color:#e74c3c;margin-bottom:14px}
 
 /* TOOLTIP */
-.tooltip{position:fixed;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:10px 14px;font-size:12px;pointer-events:none;z-index:500;max-width:240px;display:none;line-height:1.5}
+.tooltip{position:fixed;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;font-size:12px;pointer-events:none;z-index:300;max-width:240px;display:none;line-height:1.5;box-shadow:0 4px 20px rgba(0,0,0,0.4)}
 .tooltip.show{display:block}
-.tooltip-name{font-weight:600;color:var(--text);margin-bottom:2px}
-.tooltip-job{color:var(--text2)}
-.tooltip-area{color:var(--text3);font-size:11px;margin-top:3px}
+.tt-name{font-weight:600;color:var(--text);margin-bottom:2px}
+.tt-job{color:var(--text2)}
+.tt-area{color:var(--text3);font-size:11px;margin-top:3px}
+
+/* LOADING */
+#auth-loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999}
+.spinner{width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#auth-loading p{font-size:13px;color:var(--text2)}
+#app-content{display:none;flex-direction:column;height:100vh}
 </style>
 </head>
 <body>
@@ -160,275 +157,523 @@ main{padding:2rem}
   <div id="auth-area"></div>
 </nav>
 
-<main>
-  <div class="hero">
-    <div class="hero-left">
-      <h1>Organigrama Grupo Baker</h1>
-      <p id="hero-sub">Cargando…</p>
-    </div>
-    <div class="hero-right">
-      <div class="search-box">
-        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input type="text" id="search-input" placeholder="Buscar persona o cargo…" oninput="buscar(this.value)">
-      </div>
-      <button class="btn-ctrl" onclick="expandirTodo()">
-        <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-        Expandir todo
-      </button>
-      <button class="btn-ctrl" onclick="colapsarTodo()">
-        <svg viewBox="0 0 24 24"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
-        Colapsar
-      </button>
-    </div>
+<div class="toolbar">
+  <div class="search-box">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="text" id="search-input" placeholder="Buscar persona o cargo…" oninput="buscar(this.value)">
   </div>
-
-  <div class="stats" id="stats-bar" style="display:none">
-    <div class="stat"><div class="stat-val" id="stat-total">—</div><div class="stat-lbl">Colaboradores</div></div>
-    <div class="stat"><div class="stat-val" id="stat-div">—</div><div class="stat-lbl">Divisiones</div></div>
+  <button class="btn" onclick="expandirTodo()">
+    <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+    Expandir todo
+  </button>
+  <button class="btn" onclick="colapsarTodo()">
+    <svg viewBox="0 0 24 24"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
+    Colapsar
+  </button>
+  <button class="btn" onclick="centrar()">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M3 12h3m12 0h3M12 3v3m0 12v3"/></svg>
+    Centrar
+  </button>
+  <div class="tb-sep"></div>
+  <button class="btn" onclick="zoom(-0.15)">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+  </button>
+  <button class="btn" onclick="zoom(0.15)">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+  </button>
+  <button id="btn-add" class="btn primary" style="display:none" onclick="abrirModalNuevo()">
+    <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Agregar persona
+  </button>
+  <div class="stats-inline">
+    <div class="stat-inline"><strong id="s-total">—</strong><br>Colaboradores</div>
+    <div class="stat-inline"><strong id="s-div">—</strong><br>Divisiones</div>
   </div>
-
-  <div class="tree-wrap" id="tree-wrap">
-    <div style="display:flex;align-items:center;gap:12px;color:var(--text2);font-size:14px">
-      <div class="spinner" style="width:20px;height:20px;border-width:2px"></div>
-      Cargando organigrama…
-    </div>
-  </div>
-</main>
-
-<div class="tooltip" id="tooltip">
-  <div class="tooltip-name" id="tt-name"></div>
-  <div class="tooltip-job"  id="tt-job"></div>
-  <div class="tooltip-area" id="tt-area"></div>
 </div>
+
+<div class="canvas-wrap" id="canvas-wrap">
+  <div class="canvas-inner" id="canvas-inner">
+    <div style="color:var(--text2);font-size:13px;display:flex;align-items:center;gap:10px">
+      <div class="spinner" style="width:18px;height:18px;border-width:2px"></div>
+      Cargando…
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- TOOLTIP -->
+<div class="tooltip" id="tooltip">
+  <div class="tt-name" id="tt-name"></div>
+  <div class="tt-job"  id="tt-job"></div>
+  <div class="tt-area" id="tt-area"></div>
+</div>
+
+<!-- MODAL EDITAR/AGREGAR -->
+<div class="modal-bg" id="modal-bg" style="display:none" onclick="if(event.target===this)cerrarModal()">
+  <div class="modal">
+    <h2>
+      <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span id="modal-title">Agregar persona</span>
+    </h2>
+    <div id="modal-alert" class="alert-modal" style="display:none"></div>
+    <div class="field-row">
+      <div class="field">
+        <label>Nombre</label>
+        <input type="text" id="f-name" placeholder="Nombre(s)">
+      </div>
+      <div class="field">
+        <label>Apellido</label>
+        <input type="text" id="f-last" placeholder="Apellido(s)">
+      </div>
+    </div>
+    <div class="field">
+      <label>Cargo (línea 1)</label>
+      <input type="text" id="f-cargo1" placeholder="Ej: Gerente de">
+    </div>
+    <div class="field">
+      <label>Cargo (línea 2, opcional)</label>
+      <input type="text" id="f-cargo2" placeholder="Ej: Construcción">
+    </div>
+    <div class="field">
+      <label>División / Empresa</label>
+      <select id="f-div">
+        <option value="Inmobiliaria Baker">Inmobiliaria Baker</option>
+        <option value="Constructora Romeral">Constructora Romeral</option>
+        <option value="CMC Romeral">CMC Romeral</option>
+        <option value="Rio Nef Spa">Rio Nef Spa</option>
+        <option value="Brotar EP">Brotar EP</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Área / Departamento</label>
+      <input type="text" id="f-area" placeholder="Ej: Área de Personas">
+    </div>
+    <div class="field">
+      <label>Reporta a (jefatura directa)</label>
+      <select id="f-jefe">
+        <option value="">— Sin jefatura (nivel raíz) —</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>URL de foto (opcional)</label>
+      <input type="text" id="f-foto" placeholder="https://…">
+    </div>
+    <div class="field">
+      <label>Estado</label>
+      <select id="f-activo">
+        <option value="true">Activo</option>
+        <option value="false">Puesto Vacante</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="cerrarModal()">Cancelar</button>
+      <button id="btn-eliminar" class="btn danger" style="display:none" onclick="eliminarNodo()">Eliminar</button>
+      <button class="btn primary" onclick="guardarNodo()">Guardar</button>
+    </div>
+  </div>
 </div>
 
 <script>
-// ── MSAL AUTH ─────────────────────────────────────────────────
-const ALLOWED = ['dvillaseca@ibaker.cl','jcumplido@ibaker.cl'];
-const msalConfig = {
+// ── MSAL ──────────────────────────────────────────────────────
+const ALLOWED  = ['dvillaseca@ibaker.cl','jcumplido@ibaker.cl'];
+const ES_ADMIN = email => email === 'dvillaseca@ibaker.cl';
+const msalCfg  = {
   auth:{clientId:'9a56ab1c-d3c4-4460-9892-1d4da768ecfb',authority:'https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26',redirectUri:window.location.origin+'/'},
   cache:{cacheLocation:'sessionStorage'}
 };
-let msalInstance = null;
-window.addEventListener('load', async () => {
-  msalInstance = new msal.PublicClientApplication(msalConfig);
-  await msalInstance.initialize();
-  await initAuth();
+let msalInst=null, currentUser=null, isAdmin=false;
+window.addEventListener('load',async()=>{
+  msalInst=new msal.PublicClientApplication(msalCfg);
+  await msalInst.initialize(); await initAuth();
 });
 async function initAuth(){
   try{
-    const resp = await msalInstance.handleRedirectPromise();
-    let account = resp ? resp.account : msalInstance.getAllAccounts()[0];
-    if(!account){ await msalInstance.loginRedirect({scopes:['User.Read']}); return; }
-    const email = account.username.toLowerCase();
+    const resp=await msalInst.handleRedirectPromise();
+    let acc=resp?resp.account:msalInst.getAllAccounts()[0];
+    if(!acc){await msalInst.loginRedirect({scopes:['User.Read']});return;}
+    const email=acc.username.toLowerCase();
     if(!ALLOWED.includes(email)){
       document.getElementById('auth-loading').innerHTML='<div style="text-align:center;padding:2rem"><h2 style="color:#C0392B">Acceso no autorizado</h2></div>';
       return;
     }
-    const ini = account.name ? account.name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase() : email[0].toUpperCase();
-    document.getElementById('auth-area').innerHTML = `<div class="user-chip"><div class="user-av">${ini}</div><div class="user-nm">${account.name||email}</div></div>`;
-    document.getElementById('auth-loading').style.display = 'none';
-    document.getElementById('app-content').style.display  = 'block';
+    currentUser=email; isAdmin=ES_ADMIN(email);
+    const ini=acc.name?acc.name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase():email[0].toUpperCase();
+    document.getElementById('auth-area').innerHTML=`<div class="user-chip"><div class="user-av">${ini}</div><div class="user-nm">${acc.name||email}</div></div>`;
+    document.getElementById('auth-loading').style.display='none';
+    document.getElementById('app-content').style.display='flex';
+    if(isAdmin) document.getElementById('btn-add').style.display='flex';
     cargarOrganigrama();
-  }catch(e){ console.error(e); }
+  }catch(e){console.error(e);}
 }
 
-// ── DATOS BUK (actualizar cuando haya cambios) ────────────────
+// ── DATOS ─────────────────────────────────────────────────────
 // Fuente: baker.buk.cl/static_pages/orgchart
+// Actualizar cuando haya cambios en BUK
 const DATOS_BUK = {"id": 2, "name": "Andres", "last_name": "Larrain", "position_first_line": "Gerente General", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Gerente General", "department_tooltip": "Gerente General (GAV-GERENCIA GENERAL)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/3/5eb4e818-4ced-4086-8c76-b611beb1c2e5-E58B6DA4-70A1-4004-8C3D-1477A0AFEEC0.jpeg", "isHonorario": false, "isActive": true, "hasChild": true, "children": [{"id": 30227, "name": "Andrea Del Carmen", "last_name": "Molina", "position_first_line": "Gerente de Personas", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Área de Personas", "department_tooltip": "Área de Personas (Área de Personas)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/25540/cf6a4a14-4f99-4713-b4d1-5e8bd0375a12-Imagen_del_perfil_(1).png", "isHonorario": false, "isActive": true, "hasChild": true, "children": [{"id": 22539, "name": "Grace Karina", "last_name": "Galvéz", "position_first_line": "Jefa de Desarrollo", "position_second_line": "Organizacional", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Área de Personas", "department_tooltip": "Área de Personas (Área de Personas)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/19403/fba5866e-c6e2-468e-84af-77805582422f-FOTO_BUK.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 23825, "name": "Constanza Belén", "last_name": "Gómez", "position_first_line": "Jefe de Personas y", "position_second_line": "Relaciones Laborales", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Área de Personas", "department_tooltip": "Área de Personas (Área de Personas)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/20491/53f1b423-36ab-40b3-ba26-54f833b53d84-Constanza.png", "isHonorario": false, "isActive": true, "hasChild": true, "children": [{"id": 18611, "name": "Puesto Vacante", "last_name": "", "position_first_line": "Administrativo RRHH", "position_second_line": "", "position_tooltip": "", "division": "Constructora Romeral", "division_tooltip": "Constructora Romeral", "department": "Obra Portal Orien...", "department_tooltip": "Obra Portal Oriente 4 (PERSONAL TÉCNICO)", "image": null, "isHonorario": false, "isActive": false, "hasChild": true, "children": [{"id": 23264, "name": "Maria Jose", "last_name": "Leon", "position_first_line": "Jornal", "position_second_line": "", "position_tooltip": "", "division": "Constructora Romeral", "division_tooltip": "Constructora Romeral", "department": "Obra Portal Orien...", "department_tooltip": "Obra Portal Oriente 4 (PERSONAL DE APOYO (RIGGERS, SEÑALEROS Y OTROS))", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/18149/c3b3b8d4-6f24-467a-abf1-be6894f01648-MARIA_JOSE_LEON.jpg", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}]}, {"id": 30128, "name": "Kimberly Betsabe", "last_name": "Astete", "position_first_line": "Administrativo RRHH", "position_second_line": "", "position_tooltip": "", "division": "Constructora Romeral", "division_tooltip": "Constructora Romeral", "department": "Obra Portal Los M...", "department_tooltip": "Obra Portal Los Maitenes I (Personal Técnico)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/25441/b899b156-b259-4abd-a727-4d3887232913-WhatsApp_Image_2026-08-19_at_13.03.03.jpeg", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 4487, "name": "Claudia Fernanda", "last_name": "Ríos", "position_first_line": "Administrativo RRHH", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Obra Los Molinos", "department_tooltip": "Obra Los Molinos (PERSONAL TÉCNICO)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/3727/337fac11-efdc-4e3c-aceb-ba2999aa3da1-Foto_Claudia_Rios.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 29963, "name": "Jose Enrique", "last_name": "Vasquez", "position_first_line": "Administrativo RRHH", "position_second_line": "", "position_tooltip": "", "division": "Constructora Romeral", "division_tooltip": "Constructora Romeral", "department": "Obra Portal Orien...", "department_tooltip": "Obra Portal Oriente 4 (PERSONAL TÉCNICO)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/25342/f75bb413-970a-4390-bf30-daf65bc5edbb-JOSE_VASQUEZ.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 9635, "name": "Stephanie Carolina", "last_name": "Díaz", "position_first_line": "Administrativo RRHH", "position_second_line": "", "position_tooltip": "", "division": "Constructora Romeral", "division_tooltip": "Constructora Romeral", "department": "Obra Portal el Ab...", "department_tooltip": "Obra Portal el Abra ET2 (Personal Profesional)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/8314/317022b7-186d-44c8-b857-b3d3dd0cdcfa-SDC_Foto.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 26333, "name": "Claudia Alejandra", "last_name": "Viera", "position_first_line": "Administrativo RRHH", "position_second_line": "", "position_tooltip": "", "division": "Constructora Romeral", "division_tooltip": "Constructora Romeral", "department": "Obra Mirador El Pino", "department_tooltip": "Obra Mirador El Pino (Personal Técnico)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/242/9d7aaef1-b25b-4c97-83bc-751a04a5a19b-Viera.jpeg", "isHonorario": false, "isActive": true, "hasChild": true, "children": []}, {"id": 28181, "name": "Iris", "last_name": "Valladolid", "position_first_line": "Personal de", "position_second_line": "Servicios Generales", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Área de Personas", "department_tooltip": "Área de Personas (Área de Personas)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/23890/72a1aad1-35c2-4797-9e29-c305538fdc4a-WhatsApp_Image_2026-06-11_at_11.51.53.jpeg", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 27556, "name": "Camila Andrea", "last_name": "Madrid", "position_first_line": "Asistente", "position_second_line": "Administrativo RRHH", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Área de Personas", "department_tooltip": "Área de Personas (Área de Personas)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/23430/dffd618b-89a1-42f8-a817-18691a7a610c-WhatsApp_Image_2026-05-27_at_10.08.34.jpeg", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}]}, {"id": 22802, "name": "Jacqueline Andrea", "last_name": "Lara", "position_first_line": "Jefa de Atracción de", "position_second_line": "Talento", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Área de Personas", "department_tooltip": "Área de Personas (Área de Personas)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/19633/7f5d008c-5b73-4c59-8c89-e2898c1787d7-FOTO_BUK.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}]}, {"id": 2646, "name": "Jorge Hernán", "last_name": "Díaz", "position_first_line": "Gerente de", "position_second_line": "Construcción", "position_tooltip": "", "division": "Constructora Romeral", "division_tooltip": "Constructora Romeral", "department": "Gestión Constructora", "department_tooltip": "Gestión Constructora (Urbanización)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/1979/5ec985e5-3878-4174-aad4-4555291882a2-WhatsApp_Image_2023-08-10_at_08.27.51-removebg-preview.png", "isHonorario": false, "isActive": true, "hasChild": true, "children": []}, {"id": 186, "name": "Pablo Andrés", "last_name": "Abufom", "position_first_line": "Subgerente", "position_second_line": "Adquisiciones", "position_tooltip": "", "division": "CMC Romeral", "division_tooltip": "CMC Romeral", "department": "GAV CMC", "department_tooltip": "GAV CMC (GAV CMC)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/198/f37809bd-f159-4d44-acfa-750ab21181af-Foto_Buk.png", "isHonorario": false, "isActive": true, "hasChild": true, "children": [{"id": 5609, "name": "Roberto Andrés", "last_name": "Barrios", "position_first_line": "Coordinador", "position_second_line": "Logístico", "position_tooltip": "", "division": "CMC Romeral", "division_tooltip": "CMC Romeral", "department": "GAV CMC", "department_tooltip": "GAV CMC (GAV CMC)", "image": "/images/perfil_hombre.svg", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 1907, "name": "Jessica Del Carmen", "last_name": "López", "position_first_line": "Encargada de", "position_second_line": "Administración y Comex", "position_tooltip": "Encargada de Administración y Comex", "division": "CMC Romeral", "division_tooltip": "CMC Romeral", "department": "GAV CMC", "department_tooltip": "GAV CMC (GAV CMC)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/1088/36fe1aab-1311-47e1-8173-7b2e224df42d-041F8515-87A0-4E94-A566-9E54363452EE.jpeg", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 1468, "name": "Marisol", "last_name": "Oropeza", "position_first_line": "Comprador", "position_second_line": "", "position_tooltip": "", "division": "Constructora Romeral", "division_tooltip": "Constructora Romeral", "department": "Adquisiciones", "department_tooltip": "Adquisiciones (GAV Adquisiciones)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/812/8e72f1c9-040b-4d44-8698-c312e178c6da-MOG_Foto_Buk.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 14057, "name": "Antony José", "last_name": "Rojas", "position_first_line": "Comprador", "position_second_line": "", "position_tooltip": "", "division": "Constructora Romeral", "division_tooltip": "Constructora Romeral", "department": "Adquisiciones", "department_tooltip": "Adquisiciones (GAV Adquisiciones)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/12340/ee21c04d-cc52-498f-92d3-58da13559561-FOTO_BUK.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 24386, "name": "Mario Eduardo", "last_name": "Tapia", "position_first_line": "Encargado de", "position_second_line": "Mantención", "position_tooltip": "", "division": "CMC Romeral", "division_tooltip": "CMC Romeral", "department": "GAV CMC", "department_tooltip": "GAV CMC (GAV CMC)", "image": "/images/perfil_hombre.svg", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}]}, {"id": 14752, "name": "Pedro José", "last_name": "Arteaga", "position_first_line": "Subgerente Comercial", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Comercial", "department_tooltip": "Comercial (GAV-GERENCIA COMERCIAL)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/12936/7959de7f-8429-4879-80a5-c0d3b3edf40e-Foto_BUK.png", "isHonorario": false, "isActive": true, "hasChild": true, "children": [{"id": 2771, "name": "Daniela Francisca", "last_name": "Zuñiga", "position_first_line": "Ejecutiva de Ventas", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Comercial", "department_tooltip": "Comercial (Baluarte 2.2)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/2143/c3af6a23-3d23-4da9-a6ea-7a4948d48d38-Foto_Daniela_Zu%C3%B1iga.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 30161, "name": "Bárbara Andrea", "last_name": "Morales", "position_first_line": "Analista de Riesgo", "position_second_line": "Comercial", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Comercial", "department_tooltip": "Comercial (GAV-GERENCIA COMERCIAL)", "image": "/images/perfil_mujer.svg", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 1682, "name": "Pía De Lourdes", "last_name": "Moraga", "position_first_line": "Jefa de Sala", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Comercial", "department_tooltip": "Comercial (Los Maitenes I)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/955/684f72af-c09f-4adf-b287-977643324117-FOTO_BUK.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 14717, "name": "Paz Carolina", "last_name": "Lagos", "position_first_line": "Ejecutiva de Ventas", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Comercial", "department_tooltip": "Comercial (Portal el Abra (PEA))", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/12901/2e87bb51-34db-4975-b038-34379f13e517-FOTO_PAZ_BUK.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 10328, "name": "Susana Andrea", "last_name": "Moraga", "position_first_line": "Ejecutiva de Ventas", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Comercial", "department_tooltip": "Comercial (Los Molinos)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/8908/8c28d747-9ce1-4426-8408-12aeecc00b86-Susana_Moraga-Photoroom.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 19040, "name": "Gloria Ximena", "last_name": "Polanco", "position_first_line": "Ejecutiva de Ventas", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Comercial", "department_tooltip": "Comercial (Los Molinos)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/9403/5ec7a715-5064-4b93-a831-5c8a38dc7a8f-FOTO_BUK.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 19073, "name": "Roxana Victoria", "last_name": "Polanco", "position_first_line": "Ejecutiva de Ventas", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Comercial", "department_tooltip": "Comercial (Portal el Abra (PEA))", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/16300/0870c8fa-7773-42eb-b5ce-e46624cab91b-FOTO_BUK.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 7761, "name": "Ignacia Catalina", "last_name": "Urtubia", "position_first_line": "Ejecutiva de Ventas", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Comercial", "department_tooltip": "Comercial (Los Maitenes I)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/6670/527821c9-9002-4cf9-8ed2-62c36ade92b3-IUP_Foto_2.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}]}, {"id": 10361, "name": "Maria Elisa", "last_name": "Bruna", "position_first_line": "Jefe de PostVenta", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Postventa IBK", "department_tooltip": "Postventa IBK (Postventa IBK Casa central)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/8944/db5b7090-1f16-44fc-a340-f73be4cc65c9-FOTO_BUK.png", "isHonorario": false, "isActive": true, "hasChild": true, "children": []}, {"id": 333, "name": "Javier Enrique Cristian", "last_name": "Cumplido", "position_first_line": "Subgerente de", "position_second_line": "Control de Gestión", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Control de gestión", "department_tooltip": "Control de gestión (Control de gestión)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/278/e46c7567-c28c-4eba-9de5-4003eed19a71-foto_jc.jpg", "isHonorario": false, "isActive": true, "hasChild": true, "children": [{"id": 1129, "name": "Carola Marcela", "last_name": "Rivera", "position_first_line": "Jefe de Control de", "position_second_line": "Gestión de Obras y Subcontratos", "position_tooltip": "Jefe de Control de Gestión de Obras y Subcontratos", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Proyectos", "department_tooltip": "Proyectos (GAV-GERENCIA PROYECTOS)", "image": "/images/perfil_mujer.svg", "isHonorario": false, "isActive": true, "hasChild": true, "children": []}, {"id": 4689, "name": "Tamara Elena", "last_name": "San Martín", "position_first_line": "Analista de Control", "position_second_line": "de Gestión", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Control de gestión", "department_tooltip": "Control de gestión (Control de gestión)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/3991/101325cb-a1e7-484d-a5f5-c2bf91dff599-TSM_Foto_Buk.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 13496, "name": "Darío Antonio", "last_name": "Villaseca", "position_first_line": "Encargado TI", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Control de gestión", "department_tooltip": "Control de gestión (Control de gestión)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/11845/5a1ec61b-bca3-4901-a16c-23d674654bdb-FOTO_BUK.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 10296, "name": "Josefina Andrea", "last_name": "Zamora", "position_first_line": "Analista de", "position_second_line": "Planificación y Control de gestión", "position_tooltip": "Analista de Planificación y Control de gestión", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Control de gestión", "department_tooltip": "Control de gestión (Control de gestión)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/8876/ac14a4e9-308d-41c1-99db-d3bffe87980b-Foto_BUK.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}]}, {"id": 14751, "name": "Carlos Raúl", "last_name": "Garcés", "position_first_line": "Gerente Proyectos", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Proyectos", "department_tooltip": "Proyectos (GAV-GERENCIA PROYECTOS)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/12935/30973f2a-35b2-43d0-b109-81071a7f2fde-FOTO_BUK_.png", "isHonorario": false, "isActive": true, "hasChild": true, "children": [{"id": 17522, "name": "Dangela Pamela", "last_name": "Paredes", "position_first_line": "Coordinadora Social", "position_second_line": "", "position_tooltip": "", "division": "Rio Nef Spa", "division_tooltip": "Rio Nef Spa", "department": "Desarrollo DS49", "department_tooltip": "Desarrollo DS49 (Gav Desarrollo DS49)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/15145/2a7fc57f-fab3-4ac5-8740-8c50b356d5ba-FOTO_BUK.png", "isHonorario": false, "isActive": true, "hasChild": true, "children": [{"id": 18612, "name": "Daniela Alejandra", "last_name": "Ponce", "position_first_line": "Trabajadora Social", "position_second_line": "", "position_tooltip": "", "division": "Rio Nef Spa", "division_tooltip": "Rio Nef Spa", "department": "Desarrollo DS49", "department_tooltip": "Desarrollo DS49 (Gav Desarrollo DS49)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/16037/b23aa077-a383-4e47-ba81-9edaa0e41c5d-PERFIL_BUK.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 24320, "name": "Verioska Nicole", "last_name": "Caris", "position_first_line": "Encargada Social", "position_second_line": "", "position_tooltip": "", "division": "Rio Nef Spa", "division_tooltip": "Rio Nef Spa", "department": "Desarrollo DS49", "department_tooltip": "Desarrollo DS49 (Gav Desarrollo DS49)", "image": "/images/perfil_mujer.svg", "isHonorario": false, "isActive": true, "hasChild": true, "children": [{"id": 24221, "name": "Nicole Del Carmen", "last_name": "Vedia", "position_first_line": "Trabajadora Social", "position_second_line": "", "position_tooltip": "", "division": "Rio Nef Spa", "division_tooltip": "Rio Nef Spa", "department": "Desarrollo DS49", "department_tooltip": "Desarrollo DS49 (Gav Desarrollo DS49)", "image": "/images/perfil_mujer.svg", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}]}]}, {"id": 19867, "name": "Nicolás Iván", "last_name": "Moreno", "position_first_line": "Coordinador Técnico", "position_second_line": "de la Entidad Patrocinante", "position_tooltip": "Coordinador Técnico de la Entidad Patrocinante", "division": "Rio Nef Spa", "division_tooltip": "Rio Nef Spa", "department": "Desarrollo DS49", "department_tooltip": "Desarrollo DS49 (Gav Desarrollo DS49)", "image": "/images/perfil_hombre.svg", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}]}, {"id": 4223, "name": "Pilar Andrea", "last_name": "Henriquez", "position_first_line": "Jefe del área", "position_second_line": "estudios", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Área de Estudio", "department_tooltip": "Área de Estudio (Área de Estudios)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/3463/a6bd5e65-7154-4e4a-a910-52ae906df1ad-IMG_9537-Photoroom.jpg", "isHonorario": false, "isActive": true, "hasChild": true, "children": []}, {"id": 14750, "name": "Benjamín", "last_name": "Silva", "position_first_line": "Subgerente de", "position_second_line": "Administración y Finanzas", "position_tooltip": "Subgerente de Administración y Finanzas", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Administración y Finanzas", "department_tooltip": "Administración y Finanzas (Administracion)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/12934/11b3d727-7672-4802-b810-95b6295ee606-FOTO_BUK.png", "isHonorario": false, "isActive": true, "hasChild": true, "children": [{"id": 5287, "name": "María José", "last_name": "Suarez", "position_first_line": "Ejecutiva de Escrituración", "position_second_line": "y recuperación", "position_tooltip": "Ejecutiva de Escrituración y recuperación", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Administración y Finanzas", "department_tooltip": "Administración y Finanzas (Escrituración)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/1386/0310bfab-f9a8-4d1c-9d7f-8f4d14f0fbbd-MSP_Foto_Buk.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 15378, "name": "Sandra Del Pilar", "last_name": "Carreño", "position_first_line": "Jefe de Contabilidad", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Administración y Finanzas", "department_tooltip": "Administración y Finanzas (Administracion)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/13496/d7053053-5027-4cd4-9610-efae80c2483c-Sandra_Carre%C3%B1o-Photoroom.png", "isHonorario": false, "isActive": true, "hasChild": true, "children": [{"id": 15946, "name": "Katherine Lucía", "last_name": "Alarcón", "position_first_line": "Analista Contable Junior", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Administración y Finanzas", "department_tooltip": "", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/13932/e172bd90-d77f-44e8-ad93-dd8d1fe48c7e-FOTO_BUK.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 23037, "name": "Patricia Marcela", "last_name": "Morales", "position_first_line": "Analista Senior Contabilidad", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Administración y Finanzas", "department_tooltip": "", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/19831/0c5ff4e3-d5f1-459c-afbe-3da699e2f652-Captura_de_pantalla_2026-03-11_153014.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 7063, "name": "Cristina Lizbeth", "last_name": "Quezada", "position_first_line": "Asistente Contable", "position_second_line": "", "position_tooltip": "", "division": "Constructora Romeral", "division_tooltip": "Constructora Romeral", "department": "Administración y Finanzas", "department_tooltip": "", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/6004/2822c10c-18c3-4783-881c-ca646f809075-Foto_Cristina.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 13430, "name": "Manuel Alejandro", "last_name": "Ramos", "position_first_line": "Analista Senior Contabilidad", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Administración y Finanzas", "department_tooltip": "", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/11779/c2429cda-bd60-4bb2-b015-2ff96b5dc122-Foto_BUK.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}]}, {"id": 2185, "name": "Moises Enrique", "last_name": "Bello", "position_first_line": "Jefe de Escrituración", "position_second_line": "y Recuperación", "position_tooltip": "Jefe de Escrituración y Recuperación", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Administración y Finanzas", "department_tooltip": "", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/1356/a3fdde97-ea6f-4171-8afe-5d9d6a468458-mia_buk.JPG", "isHonorario": false, "isActive": true, "hasChild": true, "children": [{"id": 11813, "name": "Evelyn Andrea", "last_name": "Bustamante", "position_first_line": "Ejecutiva de Escrituración", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Administración y Finanzas", "department_tooltip": "", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/10327/66d95632-4dd8-43f8-8c9b-c270416ee8fc-FOTO_BUK.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 5, "name": "Abel Andres", "last_name": "Vasquez", "position_first_line": "Coordinador de Operaciones", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Administración y Finanzas", "department_tooltip": "", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/6/61971db8-924e-4b8b-aba4-a73a996d48b5-FOTO_BUK.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 27788, "name": "Carol Odette", "last_name": "Ramos", "position_first_line": "Asistente de Gestión Inmobiliaria", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Administración y Finanzas", "department_tooltip": "", "image": "/images/perfil_mujer.svg", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}]}, {"id": 13728, "name": "Claudia Lorena", "last_name": "Campos", "position_first_line": "Jefe de Tesorería", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Administración y Finanzas", "department_tooltip": "", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/12077/ffabd926-1a44-4e04-9481-5245da3de657-Foto_Buk.png", "isHonorario": false, "isActive": true, "hasChild": true, "children": [{"id": 2375, "name": "Carolina Paz", "last_name": "Espina", "position_first_line": "Analista de Tesorería", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Administración y Finanzas", "department_tooltip": "", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/1681/f6216767-ab10-4c2b-b7ef-7b5dc8bcef57-Caro_E..jpg", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 18446, "name": "Karollihn Vanessa", "last_name": "Yépez", "position_first_line": "Recepcionista administrativa", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Administración y Finanzas", "department_tooltip": "", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/15937/92c47d8c-1f75-41ce-847f-7fa741aa7237-FOTO_BUK.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 15872, "name": "Belgica Cecilia", "last_name": "Jara", "position_first_line": "Asistente de Tesorería", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Administración y Finanzas", "department_tooltip": "", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/13858/2f7f99f6-4ed4-4417-88cb-6f2b84e8cd23-Belgica_Jara_PNG.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}]}]}, {"id": 282, "name": "Pablo Andrés", "last_name": "Zúñiga", "position_first_line": "Subgerente de Proyectos", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Proyectos", "department_tooltip": "Proyectos (GAV-GERENCIA PROYECTOS)", "image": "/images/perfil_hombre.svg", "isHonorario": false, "isActive": true, "hasChild": true, "children": [{"id": 2188, "name": "Matías Brian", "last_name": "Matamala", "position_first_line": "Jefe de Proyectos", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Proyectos", "department_tooltip": "Proyectos (GAV-GERENCIA PROYECTOS)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/783/9a1aabd0-8c53-49ed-9484-ecb8f66c57c9-WhatsApp_Image_2023-04-14_at_09.10.11-removebg-preview.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}]}, {"id": 2193, "name": "José Ignacio", "last_name": "Robledo", "position_first_line": "Jefe de Seguridad", "position_second_line": "Salud Ocupacional y medioambiente", "position_tooltip": "Jefe de Seguridad, Salud Ocupacional y medioambiente", "division": "Constructora Romeral", "division_tooltip": "Constructora Romeral", "department": "Área de Personas", "department_tooltip": "Área de Personas (Área de Personas)", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/193/5e674cbd-666c-4b3a-bb9f-6e12e6dafede-WhatsApp_Image_2026-02-04_at_14.35.36.jpeg", "isHonorario": false, "isActive": true, "hasChild": true, "children": [{"id": 17423, "name": "Catalina Paz", "last_name": "Retamales", "position_first_line": "Prevencionista de Riesgo", "position_second_line": "", "position_tooltip": "", "division": "Constructora Romeral", "division_tooltip": "Constructora Romeral", "department": "Obra Portal Oriente 4", "department_tooltip": "", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/15079/fb967627-f24a-4069-ad32-cdc210f522ce-WhatsApp_Image_2025-09-29_at_16.02.49.jpeg", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 9900, "name": "Estefani Andrea", "last_name": "Soto", "position_first_line": "Prevencionista de Riesgo", "position_second_line": "", "position_tooltip": "", "division": "Inmobiliaria Baker", "division_tooltip": "Inmobiliaria Baker", "department": "Obra Los Molinos", "department_tooltip": "", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/8579/0cb14990-2e6d-4352-9a5a-89398c88bf42-Estefani_Soto.jpeg", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 27059, "name": "Andrea Alejandra", "last_name": "Herrera", "position_first_line": "Prevencionista de Riesgo", "position_second_line": "", "position_tooltip": "", "division": "Constructora Romeral", "division_tooltip": "Constructora Romeral", "department": "Obra Mirador El Pino", "department_tooltip": "", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/23065/8d751b3f-b2de-408c-83f9-8b1d50a4bcad-AHL_Perfil.jpeg", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 14684, "name": "Nicolás Antonio", "last_name": "Avila", "position_first_line": "Prevencionista de Riesgo", "position_second_line": "", "position_tooltip": "", "division": "Constructora Romeral", "division_tooltip": "Constructora Romeral", "department": "Obra Portal el Abra ET2", "department_tooltip": "", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/12868/ec832fb5-3f17-412d-a37b-326645f8253f-Nicol%C3%A1s_Antonio_Avila_Araya.png", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}, {"id": 13597, "name": "Scarlette Alejandra", "last_name": "Caro", "position_first_line": "Prevencionista de Riesgo", "position_second_line": "", "position_tooltip": "", "division": "Constructora Romeral", "division_tooltip": "Constructora Romeral", "department": "Obra Portal Los Maitenes I", "department_tooltip": "", "image": "https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/586/3c871af3-3ee9-459f-af8f-6ce9c7af44e7-WhatsApp_Image_2025-08-20_at_16.46.34.jpeg", "isHonorario": false, "isActive": true, "hasChild": false, "children": []}]}]};
 
 // ── NORMALIZAR ────────────────────────────────────────────────
+let nextId = 900000;
 function norm(n){
-  const cargo = n.position_tooltip ||
-    [n.position_first_line, n.position_second_line].filter(Boolean).join(' ');
+  const cargo=n.position_tooltip||[n.position_first_line,n.position_second_line].filter(Boolean).join(' ');
   return {
-    id:      n.id,
-    nombre:  [n.name, n.last_name].filter(Boolean).join(' ') || 'Puesto Vacante',
-    cargo,
-    cargoL1: n.position_first_line  || '',
-    cargoL2: n.position_second_line || '',
-    area:    n.department  || '',
-    div:     n.division    || '',
-    foto:    (n.image && !n.image.startsWith('/images/')) ? n.image : null,
-    activo:  n.isActive !== false,
-    hijos:   (n.children || []).map(norm),
-    _open:   true
+    id:      n.id||(nextId++),
+    nombre:  [n.name,n.last_name].filter(Boolean).join(' ')||'Puesto Vacante',
+    cargo, cargoL1:n.position_first_line||'', cargoL2:n.position_second_line||'',
+    area:n.department||'', div:n.division||'',
+    foto:(n.image&&!n.image.startsWith('/images/'))?n.image:null,
+    activo:n.isActive!==false,
+    hijos:(n.children||[]).map(norm),
+    _open:true
   };
 }
+function contar(ns){return ns.reduce((a,n)=>a+1+contar(n.hijos),0);}
 
-function contar(ns){ return ns.reduce((a,n)=>a+1+contar(n.hijos),0); }
+// Árbol en memoria (editable)
+let raiz=null;
 
-// ── CARGAR ────────────────────────────────────────────────────
-let raiz = null;
 function cargarOrganigrama(){
-  raiz = norm(DATOS_BUK);
-  const total = 1 + contar(raiz.hijos);
-  const divs  = new Set(); const rec = n=>{ if(n.div)divs.add(n.div); n.hijos.forEach(rec); }; rec(raiz);
-  document.getElementById('stat-total').textContent = total;
-  document.getElementById('stat-div').textContent   = divs.size;
-  document.getElementById('stats-bar').style.display = 'flex';
-  document.getElementById('hero-sub').textContent    = `${total} colaboradores · Grupo Baker`;
-  renderTree();
+  // Intentar cargar desde localStorage (ediciones previas)
+  const saved=localStorage.getItem('baker_org_v1');
+  if(saved){try{raiz=JSON.parse(saved);}catch(e){raiz=norm(DATOS_BUK);}}
+  else raiz=norm(DATOS_BUK);
+  actualizarStats(); renderTree(); centrar();
 }
 
-// ── RENDER ÁRBOL HORIZONTAL ───────────────────────────────────
+function actualizarStats(){
+  const total=1+contar(raiz.hijos);
+  const divs=new Set(); const rec=n=>{if(n.div)divs.add(n.div);n.hijos.forEach(rec);}; rec(raiz);
+  document.getElementById('s-total').textContent=total;
+  document.getElementById('s-div').textContent=divs.size;
+}
+
+function guardarLocal(){
+  localStorage.setItem('baker_org_v1',JSON.stringify(raiz));
+}
+
+// ── RENDER ────────────────────────────────────────────────────
 function renderTree(){
-  const wrap = document.getElementById('tree-wrap');
-  wrap.innerHTML = '';
-  wrap.appendChild(buildNode(raiz, true));
+  const ci=document.getElementById('canvas-inner');
+  ci.innerHTML='';
+  ci.appendChild(buildNode(raiz,true));
+  // ajustar barras horizontales
+  requestAnimationFrame(ajustarBarras);
 }
 
-function buildNode(n, esRaiz=false){
-  const wrap = document.createElement('div');
-  wrap.className = 'tree-node-wrap' + (n.hijos.length && n._open ? ' has-children' : '');
-  wrap.dataset.id = n.id;
+function buildNode(n,esRaiz=false){
+  const wrap=document.createElement('div');
+  wrap.className='tree-node-wrap';
+  wrap.dataset.id=n.id;
 
-  // Tarjeta
-  const card = document.createElement('div');
-  card.className = 'node-card' + (esRaiz?' raiz':'') + (!n.activo?' vacante':'');
+  const card=document.createElement('div');
+  card.className='node-card'+(esRaiz?' raiz':'')+(n.activo?'':' vacante');
 
   // Avatar
   if(n.foto){
-    const img = document.createElement('img');
-    img.className = 'node-avatar'; img.src = n.foto; img.alt = n.nombre;
-    img.onerror = ()=>{ img.replaceWith(avatarPlaceholder(n.nombre)); };
+    const img=document.createElement('img');
+    img.className='node-av';img.src=n.foto;img.alt=n.nombre;
+    img.onerror=()=>img.replaceWith(mkAvPh(n.nombre));
     card.appendChild(img);
-  } else {
-    card.appendChild(avatarPlaceholder(n.nombre));
-  }
+  }else card.appendChild(mkAvPh(n.nombre));
 
   // Nombre
-  const nm = document.createElement('div'); nm.className='node-name';
-  nm.innerHTML = n.activo ? n.nombre : `<em style="color:var(--text3)">${n.nombre}</em>`;
+  const nm=document.createElement('div');nm.className='node-name';
+  nm.innerHTML=n.activo?n.nombre:`<em style="color:var(--text3)">${n.nombre}</em>`;
   card.appendChild(nm);
 
   // Cargo
   if(n.cargoL1){
-    const jb = document.createElement('div'); jb.className='node-job';
-    jb.textContent = n.cargoL1;
-    card.appendChild(jb);
-    if(n.cargoL2){
-      const jb2 = document.createElement('div'); jb2.className='node-job';
-      jb2.textContent = n.cargoL2;
-      card.appendChild(jb2);
-    }
+    const j1=document.createElement('div');j1.className='node-job';j1.textContent=n.cargoL1;card.appendChild(j1);
+    if(n.cargoL2){const j2=document.createElement('div');j2.className='node-job';j2.textContent=n.cargoL2;card.appendChild(j2);}
   }
 
   // División
-  if(n.div){
-    const dv = document.createElement('div'); dv.className='node-div';
-    dv.textContent = n.div; card.appendChild(dv);
+  if(n.div){const dv=document.createElement('div');dv.className='node-div';dv.textContent=n.div;card.appendChild(dv);}
+
+  // Botón editar (solo admin)
+  if(isAdmin){
+    const eb=document.createElement('div');eb.className='node-edit-btn visible';
+    eb.title='Editar';eb.innerHTML='<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+    eb.addEventListener('click',e=>{e.stopPropagation();abrirModalEditar(n);});
+    card.appendChild(eb);
   }
 
   // Tooltip
-  card.addEventListener('mouseenter', e=>showTT(e,n));
-  card.addEventListener('mousemove',  e=>moveTT(e));
-  card.addEventListener('mouseleave', ()=>hideTT());
+  card.addEventListener('mouseenter',e=>showTT(e,n));
+  card.addEventListener('mousemove',e=>moveTT(e));
+  card.addEventListener('mouseleave',()=>hideTT());
 
-  // Click → colapsar/expandir
+  // Click colapsar
   if(n.hijos.length){
-    card.style.cursor = 'pointer';
-    card.addEventListener('click', ()=>{
-      n._open = !n._open;
-      renderTree();
-    });
-
-    // Badge
+    card.addEventListener('click',()=>{n._open=!n._open;renderTree();});
     if(!n._open){
-      const badge = document.createElement('div');
-      badge.className = 'node-badge';
-      badge.textContent = `+${contar(n.hijos)+n.hijos.length} personas`;
       card.classList.add('collapsed-card');
-      wrap.appendChild(card);
-      wrap.appendChild(badge);
+      const bg=document.createElement('div');bg.className='node-badge';
+      bg.textContent=`▸ ${contar(n.hijos)+n.hijos.length} personas`;
+      wrap.appendChild(card);wrap.appendChild(bg);
       return wrap;
     }
   }
 
   wrap.appendChild(card);
 
-  // Hijos
-  if(n.hijos.length && n._open){
-    const childRow = document.createElement('div');
-    childRow.className = 'tree-children';
-
+  // Conector hacia hijos
+  if(n.hijos.length&&n._open){
+    const cd=document.createElement('div');cd.className='connector-down';
+    wrap.appendChild(cd);
+    const cr=document.createElement('div');cr.className='tree-children';
     n.hijos.forEach(h=>{
-      const cw = document.createElement('div');
-      cw.className = 'tree-child-wrap';
-      cw.appendChild(buildNode(h));
-      childRow.appendChild(cw);
+      const cw=document.createElement('div');cw.className='tree-child-wrap';
+      cw.appendChild(buildNode(h));cr.appendChild(cw);
     });
-
-    // Ancho de la barra horizontal = ancho del childRow
-    wrap.appendChild(childRow);
-
-    // Ajustar barra horizontal después de render
-    requestAnimationFrame(()=>{
-      const w = childRow.scrollWidth;
-      const firstChild = childRow.querySelector('.tree-child-wrap');
-      const lastChild  = childRow.querySelectorAll('.tree-child-wrap');
-      if(firstChild && lastChild.length > 1){
-        const fc = firstChild.getBoundingClientRect();
-        const lc = lastChild[lastChild.length-1].getBoundingClientRect();
-        const barW = lc.right - fc.left;
-        // centro de cada primer/último hijo
-        childRow.style.setProperty('--bar-width', barW+'px');
-      } else {
-        childRow.style.setProperty('--bar-width', '0px');
-      }
-    });
+    wrap.appendChild(cr);
   }
-
   return wrap;
 }
 
-function avatarPlaceholder(nombre){
-  const el = document.createElement('div');
-  el.className = 'node-avatar-placeholder';
-  el.textContent = nombre.split(' ').filter(Boolean).slice(0,2).map(p=>p[0].toUpperCase()).join('');
+function mkAvPh(nombre){
+  const el=document.createElement('div');el.className='node-av-ph';
+  el.textContent=nombre.split(' ').filter(Boolean).slice(0,2).map(p=>p[0]?.toUpperCase()||'').join('');
   return el;
 }
 
-// ── EXPANDIR / COLAPSAR ───────────────────────────────────────
-function setOpen(n, val){ n._open = val; n.hijos.forEach(h=>setOpen(h,val)); }
-function expandirTodo(){ if(raiz){setOpen(raiz,true); renderTree();} }
-function colapsarTodo(){
-  if(!raiz) return;
-  raiz._open = true; // raíz siempre visible
-  raiz.hijos.forEach(h=>setOpen(h,false));
-  renderTree();
+function ajustarBarras(){
+  document.querySelectorAll('.tree-children').forEach(cr=>{
+    const hijos=[...cr.querySelectorAll(':scope > .tree-child-wrap')];
+    if(hijos.length<2){cr.style.setProperty('--bar-w','0px');cr.style.setProperty('--bar-l','50%');return;}
+    const crRect=cr.getBoundingClientRect();
+    const fc=hijos[0].getBoundingClientRect();
+    const lc=hijos[hijos.length-1].getBoundingClientRect();
+    const L=fc.left+fc.width/2-crRect.left;
+    const R=lc.left+lc.width/2-crRect.left;
+    cr.style.setProperty('--bar-l',L+'px');
+    cr.style.setProperty('--bar-w',(R-L)+'px');
+  });
 }
 
+// ── EXPANDIR / COLAPSAR ───────────────────────────────────────
+function setOpen(n,v){n._open=v;n.hijos.forEach(h=>setOpen(h,v));}
+function expandirTodo(){if(raiz){setOpen(raiz,true);renderTree();}}
+function colapsarTodo(){if(!raiz)return;raiz._open=true;raiz.hijos.forEach(h=>setOpen(h,false));renderTree();}
+
+// ── DRAG & PAN ────────────────────────────────────────────────
+const canvasWrap=document.getElementById('canvas-wrap');
+const canvasInner=document.getElementById('canvas-inner');
+let panX=40,panY=40,scale=1,isDragging=false,startX=0,startY=0;
+
+function applyTransform(){
+  canvasInner.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`;
+}
+
+canvasWrap.addEventListener('mousedown',e=>{
+  if(e.button!==0)return;
+  if(e.target.closest('.node-card')||e.target.closest('.node-edit-btn'))return;
+  isDragging=true;startX=e.clientX-panX;startY=e.clientY-panY;
+  canvasWrap.classList.add('dragging');
+});
+window.addEventListener('mousemove',e=>{
+  if(!isDragging)return;
+  panX=e.clientX-startX;panY=e.clientY-startY;applyTransform();
+});
+window.addEventListener('mouseup',()=>{isDragging=false;canvasWrap.classList.remove('dragging');});
+
+// Zoom rueda
+canvasWrap.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const delta=e.deltaY>0?-0.1:0.1;
+  zoom(delta,e.clientX,e.clientY);
+},{passive:false});
+
+function zoom(delta,cx,cy){
+  const wrap=canvasWrap.getBoundingClientRect();
+  cx=cx??wrap.left+wrap.width/2;cy=cy??wrap.top+wrap.height/2;
+  const newScale=Math.min(2,Math.max(0.2,scale+delta));
+  const ratio=newScale/scale;
+  panX=cx-(cx-panX)*ratio;panY=cy-(cy-panY)*ratio;
+  scale=newScale;applyTransform();
+}
+
+function centrar(){
+  const wrap=canvasWrap.getBoundingClientRect();
+  scale=0.75;
+  requestAnimationFrame(()=>{
+    const iw=canvasInner.scrollWidth*scale;
+    panX=Math.max(40,(wrap.width-iw)/2);panY=40;applyTransform();
+  });
+}
+
+// Touch pan
+let t0=null;
+canvasWrap.addEventListener('touchstart',e=>{if(e.touches.length===1){t0={x:e.touches[0].clientX-panX,y:e.touches[0].clientY-panY};}},{passive:true});
+canvasWrap.addEventListener('touchmove',e=>{if(e.touches.length===1&&t0){panX=e.touches[0].clientX-t0.x;panY=e.touches[0].clientY-t0.y;applyTransform();}},{passive:true});
+
 // ── BÚSQUEDA ──────────────────────────────────────────────────
-let searchTO;
+let sTO;
 function buscar(q){
-  clearTimeout(searchTO);
-  searchTO = setTimeout(()=>{
-    const t = q.toLowerCase().trim();
+  clearTimeout(sTO);sTO=setTimeout(()=>{
+    const t=q.toLowerCase().trim();
     document.querySelectorAll('.node-card').forEach(c=>{
-      const wrap = c.closest('.tree-node-wrap');
-      if(!t){ c.classList.remove('highlight'); if(wrap)wrap.style.opacity='1'; return; }
-      const nm  = (c.querySelector('.node-name')?.textContent||'').toLowerCase();
-      const job = (c.querySelector('.node-job')?.textContent||'').toLowerCase();
-      if(nm.includes(t)||job.includes(t)){
-        c.classList.add('highlight'); if(wrap)wrap.style.opacity='1';
-      } else {
-        c.classList.remove('highlight'); if(wrap)wrap.style.opacity='0.25';
-      }
+      const nw=c.closest('.tree-node-wrap');
+      if(!t){c.classList.remove('highlight');if(nw)nw.style.opacity='1';return;}
+      const txt=(c.querySelector('.node-name')?.textContent||'').toLowerCase()+(c.querySelector('.node-job')?.textContent||'').toLowerCase();
+      if(txt.includes(t)){c.classList.add('highlight');if(nw)nw.style.opacity='1';}
+      else{c.classList.remove('highlight');if(nw)nw.style.opacity='0.2';}
     });
-  }, 200);
+  },200);
 }
 
 // ── TOOLTIP ───────────────────────────────────────────────────
-const tt = document.getElementById('tooltip');
+const tt=document.getElementById('tooltip');
 function showTT(e,n){
-  document.getElementById('tt-name').textContent = n.nombre;
-  document.getElementById('tt-job').textContent  = n.cargo||'';
-  document.getElementById('tt-area').textContent = [n.div, n.area].filter(Boolean).join(' · ');
-  tt.classList.add('show'); moveTT(e);
+  document.getElementById('tt-name').textContent=n.nombre;
+  document.getElementById('tt-job').textContent=n.cargo||'';
+  document.getElementById('tt-area').textContent=[n.div,n.area].filter(Boolean).join(' · ');
+  tt.classList.add('show');moveTT(e);
 }
-function moveTT(e){ tt.style.left=(e.clientX+14)+'px'; tt.style.top=(e.clientY-10)+'px'; }
-function hideTT(){ tt.classList.remove('show'); }
+function moveTT(e){tt.style.left=(e.clientX+14)+'px';tt.style.top=(e.clientY-10)+'px';}
+function hideTT(){tt.classList.remove('show');}
+
+// ── MODAL EDITAR/AGREGAR ──────────────────────────────────────
+let editandoId=null;
+
+function todasLasPersonas(n,lista=[]){
+  lista.push({id:n.id,nombre:n.nombre,cargo:n.cargoL1});
+  n.hijos.forEach(h=>todasLasPersonas(h,lista));
+  return lista;
+}
+
+function poblarSelectJefe(excluirId=null){
+  const sel=document.getElementById('f-jefe');
+  sel.innerHTML='<option value="">— Sin jefatura (nivel raíz) —</option>';
+  todasLasPersonas(raiz).forEach(p=>{
+    if(p.id==excluirId)return;
+    const opt=document.createElement('option');
+    opt.value=p.id;
+    opt.textContent=`${p.nombre} — ${p.cargo||'sin cargo'}`;
+    sel.appendChild(opt);
+  });
+}
+
+function abrirModalNuevo(){
+  editandoId=null;
+  document.getElementById('modal-title').textContent='Agregar persona';
+  document.getElementById('btn-eliminar').style.display='none';
+  document.getElementById('modal-alert').style.display='none';
+  ['f-name','f-last','f-cargo1','f-cargo2','f-area','f-foto'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-div').value='Inmobiliaria Baker';
+  document.getElementById('f-activo').value='true';
+  poblarSelectJefe();
+  document.getElementById('f-jefe').value='';
+  document.getElementById('modal-bg').style.display='flex';
+}
+
+function abrirModalEditar(n){
+  editandoId=n.id;
+  document.getElementById('modal-title').textContent='Editar persona';
+  document.getElementById('btn-eliminar').style.display='flex';
+  document.getElementById('modal-alert').style.display='none';
+  document.getElementById('f-name').value=n.nombre.split(' ').slice(0,-1).join(' ')||'';
+  document.getElementById('f-last').value=n.nombre.split(' ').pop()||'';
+  document.getElementById('f-cargo1').value=n.cargoL1||'';
+  document.getElementById('f-cargo2').value=n.cargoL2||'';
+  document.getElementById('f-div').value=n.div||'';
+  document.getElementById('f-area').value=n.area||'';
+  document.getElementById('f-foto').value=n.foto||'';
+  document.getElementById('f-activo').value=n.activo?'true':'false';
+  poblarSelectJefe(n.id);
+  // Encontrar el padre actual
+  const padre=encontrarPadre(raiz,n.id);
+  document.getElementById('f-jefe').value=padre?padre.id:'';
+  document.getElementById('modal-bg').style.display='flex';
+}
+
+function cerrarModal(){document.getElementById('modal-bg').style.display='none';}
+
+function encontrarNodo(n,id){if(n.id==id)return n;for(const h of n.hijos){const r=encontrarNodo(h,id);if(r)return r;}return null;}
+function encontrarPadre(n,id){for(const h of n.hijos){if(h.id==id)return n;const r=encontrarPadre(h,id);if(r)return r;}return null;}
+
+function eliminarDeArbol(n,id){
+  n.hijos=n.hijos.filter(h=>h.id!=id);
+  n.hijos.forEach(h=>eliminarDeArbol(h,id));
+}
+
+function guardarNodo(){
+  const nombre=(document.getElementById('f-name').value.trim()+' '+document.getElementById('f-last').value.trim()).trim();
+  const cargo1=document.getElementById('f-cargo1').value.trim();
+  if(!nombre||!cargo1){
+    const al=document.getElementById('modal-alert');
+    al.textContent='Nombre y cargo son obligatorios.';al.style.display='block';return;
+  }
+  const foto=document.getElementById('f-foto').value.trim();
+  const jefeId=document.getElementById('f-jefe').value;
+  const activo=document.getElementById('f-activo').value==='true';
+  const cargo2=document.getElementById('f-cargo2').value.trim();
+  const cargo=[cargo1,cargo2].filter(Boolean).join(' ');
+
+  if(editandoId!==null){
+    // Editar existente
+    const nodo=encontrarNodo(raiz,editandoId);
+    if(!nodo)return;
+    const viejoPadre=encontrarPadre(raiz,editandoId);
+    const nuevoPadreId=jefeId?parseInt(jefeId):null;
+    const mismoJefe=viejoPadre?(viejoPadre.id==nuevoPadreId):!nuevoPadreId;
+
+    nodo.nombre=nombre;nodo.cargoL1=cargo1;nodo.cargoL2=cargo2;nodo.cargo=cargo;
+    nodo.div=document.getElementById('f-div').value;
+    nodo.area=document.getElementById('f-area').value.trim();
+    nodo.foto=foto||null;nodo.activo=activo;
+
+    // Mover si cambió el jefe
+    if(!mismoJefe){
+      // Quitar del padre viejo
+      eliminarDeArbol(raiz,editandoId);
+      // Reinsertar (con sus hijos intactos, ya guardados en nodo)
+      // nodo sigue siendo el mismo objeto
+      if(nuevoPadreId){
+        const nuevoPadre=encontrarNodo(raiz,nuevoPadreId);
+        if(nuevoPadre){nuevoPadre.hijos.push(nodo);nuevoPadre._open=true;}
+      } else {
+        // Hacerlo hijo de la raíz
+        raiz.hijos.push(nodo);
+      }
+    }
+  } else {
+    // Nuevo nodo
+    const nodo={
+      id:nextId++,
+      nombre,cargo,cargoL1:cargo1,cargoL2:cargo2,
+      div:document.getElementById('f-div').value,
+      area:document.getElementById('f-area').value.trim(),
+      foto:foto||null,activo,hijos:[],_open:true
+    };
+    const jefeIdInt=jefeId?parseInt(jefeId):null;
+    if(jefeIdInt){
+      const padre=encontrarNodo(raiz,jefeIdInt);
+      if(padre){padre.hijos.push(nodo);padre._open=true;}
+    } else {
+      raiz.hijos.push(nodo);
+    }
+  }
+
+  guardarLocal();actualizarStats();renderTree();cerrarModal();
+}
+
+function eliminarNodo(){
+  if(!editandoId)return;
+  if(!confirm('¿Eliminar esta persona del organigrama? Sus subordinados quedarán sin jefatura.'))return;
+  const nodo=encontrarNodo(raiz,editandoId);
+  if(!nodo)return;
+  const padre=encontrarPadre(raiz,editandoId);
+  // Los hijos del nodo eliminado pasan al padre
+  if(padre){
+    padre.hijos=padre.hijos.filter(h=>h.id!=editandoId);
+    nodo.hijos.forEach(h=>padre.hijos.push(h));
+  } else {
+    // Era hijo directo de raíz
+    raiz.hijos=raiz.hijos.filter(h=>h.id!=editandoId);
+    nodo.hijos.forEach(h=>raiz.hijos.push(h));
+  }
+  guardarLocal();actualizarStats();renderTree();cerrarModal();
+}
 </script>
 </body>
 </html>
