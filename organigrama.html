@@ -225,21 +225,17 @@ const API = 'https://api.ibaker.cl';
 let arbolGlobal = [];
 let totalGlobal = 0;
 
-async function cargarOrganigrama(){
-  document.getElementById('tree-root').innerHTML = '<div class="tree-loading"><div class="spinner"></div>Cargando organigrama desde BUK…</div>';
+// ── DATOS DEL ORGANIGRAMA ─────────────────────────────────────
+// Fuente: BUK (baker.buk.cl/static_pages/orgchart)
+// Actualizar manualmente cuando haya cambios en la estructura
+const DATOS_BUK = {"id":2,"name":"Andres","last_name":"Larrain","position_first_line":"Gerente General","position_second_line":"","position_tooltip":"","division":"Inmobiliaria Baker","division_tooltip":"Inmobiliaria Baker","department":"Gerente General","department_tooltip":"Gerente General (GAV-GERENCIA GENERAL)","image":"https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/3/5eb4e818-4ced-4086-8c76-b611beb1c2e5-E58B6DA4-70A1-4004-8C3D-1477A0AFEEC0.jpeg","isHonorario":false,"isActive":true,"hasChild":true,"children":[{"id":30227,"name":"Andrea Del Carmen","last_name":"Molina","position_first_line":"Gerente de Personas","position_second_line":"","position_tooltip":"","division":"Inmobiliaria Baker","division_tooltip":"Inmobiliaria Baker","department":"Área de Personas","department_tooltip":"Área de Personas (Área de Personas)","image":"https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/25540/cf6a4a14-4f99-4713-b4d1-5e8bd0375a12-Imagen_del_perfil_(1).png","isHonorario":false,"isActive":true,"hasChild":true,"children":[{"id":22539,"name":"Grace Karina","last_name":"Galvéz","position_first_line":"Jefa de Desarrollo","position_second_line":"Organizacional","position_tooltip":"","division":"Inmobiliaria Baker","division_tooltip":"Inmobiliaria Baker","department":"Área de Personas","department_tooltip":"Área de Personas (Área de Personas)","image":"https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/19403/fba5866e-c6e2-468e-84af-77805582422f-FOTO_BUK.png","isHonorario":false,"isActive":true,"hasChild":false,"children":[]},{"id":23825,"name":"Constanza Belén","last_name":"Gómez","position_first_line":"Jefe de Personas y","position_second_line":"Relaciones Laborales","position_tooltip":"","division":"Inmobiliaria Baker","division_tooltip":"Inmobiliaria Baker","department":"Área de Personas","department_tooltip":"Área de Personas (Área de Personas)","image":"https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/20491/53f1b423-36ab-40b3-ba26-54f833b53d84-Constanza.png","isHonorario":false,"isActive":true,"hasChild":true,"children":[]},{"id":22802,"name":"Jacqueline Andrea","last_name":"Lara","position_first_line":"Jefa de Atracción de","position_second_line":"Talento","position_tooltip":"","division":"Inmobiliaria Baker","division_tooltip":"Inmobiliaria Baker","department":"Área de Personas","department_tooltip":"Área de Personas (Área de Personas)","image":"https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/19633/7f5d008c-5b73-4c59-8c89-e2898c1787d7-FOTO_BUK.png","isHonorario":false,"isActive":true,"hasChild":false,"children":[]}]},{"id":2646,"name":"Jorge Hernán","last_name":"Díaz","position_first_line":"Gerente de","position_second_line":"Construcción","position_tooltip":"","division":"Constructora Romeral","division_tooltip":"Constructora Romeral","department":"Gestión Constructora","department_tooltip":"Gestión Constructora (Urbanización)","image":"https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/1979/5ec985e5-3878-4174-aad4-4555291882a2-WhatsApp_Image_2023-08-10_at_08.27.51-removebg-preview.png","isHonorario":false,"isActive":true,"hasChild":true,"children":[]},{"id":186,"name":"Pablo Andrés","last_name":"Abufom","position_first_line":"Subgerente","position_second_line":"Adquisiciones","position_tooltip":"","division":"CMC Romeral","division_tooltip":"CMC Romeral","department":"GAV CMC","department_tooltip":"GAV CMC (GAV CMC)","image":"https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/198/f37809bd-f159-4d44-acfa-750ab21181af-Foto_Buk.png","isHonorario":false,"isActive":true,"hasChild":true,"children":[]},{"id":14752,"name":"Pedro José","last_name":"Arteaga","position_first_line":"Subgerente Comercial","position_second_line":"","position_tooltip":"","division":"Inmobiliaria Baker","division_tooltip":"Inmobiliaria Baker","department":"Comercial","department_tooltip":"Comercial (GAV-GERENCIA COMERCIAL)","image":"https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/12936/7959de7f-8429-4879-80a5-c0d3b3edf40e-Foto_BUK.png","isHonorario":false,"isActive":true,"hasChild":true,"children":[]},{"id":10361,"name":"Maria Elisa","last_name":"Bruna","position_first_line":"Jefe de PostVenta","position_second_line":"","position_tooltip":"","division":"Inmobiliaria Baker","division_tooltip":"Inmobiliaria Baker","department":"Postventa IBK","department_tooltip":"Postventa IBK (Postventa IBK Casa central)","image":"https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/8944/db5b7090-1f16-44fc-a340-f73be4cc65c9-FOTO_BUK.png","isHonorario":false,"isActive":true,"hasChild":true,"children":[]},{"id":333,"name":"Javier Enrique Cristian","last_name":"Cumplido","position_first_line":"Subgerente de","position_second_line":"Control de Gestión","position_tooltip":"","division":"Inmobiliaria Baker","division_tooltip":"Inmobiliaria Baker","department":"Control de gestión","department_tooltip":"Control de gestión (Control de gestión)","image":"https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/278/e46c7567-c28c-4eba-9de5-4003eed19a71-foto_jc.jpg","isHonorario":false,"isActive":true,"hasChild":true,"children":[]},{"id":14751,"name":"Carlos Raúl","last_name":"Garcés","position_first_line":"Gerente Proyectos","position_second_line":"","position_tooltip":"","division":"Inmobiliaria Baker","division_tooltip":"Inmobiliaria Baker","department":"Proyectos","department_tooltip":"Proyectos (GAV-GERENCIA PROYECTOS)","image":"https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/12935/30973f2a-35b2-43d0-b109-81071a7f2fde-FOTO_BUK_.png","isHonorario":false,"isActive":true,"hasChild":true,"children":[]},{"id":4223,"name":"Pilar Andrea","last_name":"Henriquez","position_first_line":"Jefe del área","position_second_line":"estudios","position_tooltip":"","division":"Inmobiliaria Baker","division_tooltip":"Inmobiliaria Baker","department":"Área de Estudio","department_tooltip":"Área de Estudio (Área de Estudios)","image":"https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/3463/a6bd5e65-7154-4e4a-a910-52ae906df1ad-IMG_9537-Photoroom.jpg","isHonorario":false,"isActive":true,"hasChild":true,"children":[]},{"id":14750,"name":"Benjamín","last_name":"Silva","position_first_line":"Subgerente de","position_second_line":"Administración y Finanzas","position_tooltip":"Subgerente de Administración y Finanzas","division":"Inmobiliaria Baker","division_tooltip":"Inmobiliaria Baker","department":"Administración y Finanzas","department_tooltip":"Administración y Finanzas (Administracion)","image":"https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/12934/11b3d727-7672-4802-b810-95b6295ee606-FOTO_BUK.png","isHonorario":false,"isActive":true,"hasChild":true,"children":[]},{"id":282,"name":"Pablo Andrés","last_name":"Zúñiga","position_first_line":"Subgerente de","position_second_line":"Proyectos","position_tooltip":"","division":"Inmobiliaria Baker","division_tooltip":"Inmobiliaria Baker","department":"Proyectos","department_tooltip":"Proyectos (GAV-GERENCIA PROYECTOS)","image":"/images/perfil_hombre.svg","isHonorario":false,"isActive":true,"hasChild":true,"children":[]},{"id":2193,"name":"José Ignacio","last_name":"Robledo","position_first_line":"Jefe de Seguridad,","position_second_line":"Salud Ocupacional y medioambiente","position_tooltip":"Jefe de Seguridad, Salud Ocupacional y medioambiente","division":"Constructora Romeral","division_tooltip":"Constructora Romeral","department":"Área de Personas","department_tooltip":"Área de Personas (Área de Personas)","image":"https://bukwebapp-enterprise-chile.s3.amazonaws.com/baker/person/picture_url/193/5e674cbd-666c-4b3a-bb9f-6e12e6dafede-WhatsApp_Image_2026-02-04_at_14.35.36.jpeg","isHonorario":false,"isActive":true,"hasChild":true,"children":[]}]};
+
+function cargarOrganigrama(){
+  document.getElementById('tree-root').innerHTML = '<div class="tree-loading"><div class="spinner"></div>Cargando organigrama…</div>';
+
   try{
-    // Llamamos directamente a BUK desde el navegador con el token
-    // BUK ya devuelve el árbol completo con children anidados
-    const r = await fetch('https://baker.buk.cl/api/v1/chile/organigrama', {
-      headers: { 'auth_token': 't7YpZiTyZCFJzpjTCH9CbCv1', 'Accept': 'application/json' }
-    });
-
-    if(!r.ok) throw new Error('Error BUK: ' + r.status);
-    const data = await r.json();
-
-    // BUK puede devolver array o un objeto raíz
-    const arbolRaw = Array.isArray(data) ? data : [data];
-    arbolGlobal = arbolRaw.map(normalizarNodo);
+    // Árbol estático desde BUK — actualizar manualmente cuando sea necesario
+    arbolGlobal = [normalizarNodo(DATOS_BUK)];
     totalGlobal = contarNodos(arbolGlobal);
 
     // Stats
@@ -256,17 +252,19 @@ async function cargarOrganigrama(){
     document.getElementById('stat-areas').textContent    = divisiones.size || '—';
     document.getElementById('stat-empresas').textContent = areas.size || '—';
     document.getElementById('stats-bar').style.display   = 'flex';
-    document.getElementById('hero-sub').textContent = `${totalGlobal} colaboradores · actualizado ahora`;
+    document.getElementById('hero-sub').textContent      = `${totalGlobal} colaboradores`;
 
     renderArbol(arbolGlobal);
   }catch(e){
     document.getElementById('tree-root').innerHTML = `
       <div class="empty-state">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <p>Error al cargar el organigrama: ${e.message}</p>
+        <p>Error: ${e.message}</p>
       </div>`;
   }
 }
+
+function recargar(){ cargarOrganigrama(); }
 
 function normalizarNodo(n){
   const cargo = n.position_tooltip ||
@@ -288,8 +286,6 @@ function normalizarNodo(n){
 function contarNodos(nodos){
   return nodos.reduce((acc, n) => acc + 1 + contarNodos(n.hijos), 0);
 }
-
-function recargar(){ cargarOrganigrama(); }
 
 // ── RENDER ────────────────────────────────────────────────────
 function renderArbol(nodos){
