@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Organigrama — Baker</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+  <style>
+    :root {
+      --bg:#0a0a0b; --surface:#111113; --surface2:#18181b;
+      --border:#27272a; --border2:#3f3f46;
+      --text:#fafafa; --text2:#a1a1aa; --text3:#52525b;
+      --gold:#cc9166; --gold2:#ae9357; --gold-light:rgba(204,145,102,0.08);
+      --radius:10px; --radius-lg:16px;
+    }
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:"DM Sans",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+
+    /* NAV */
+    nav{position:sticky;top:0;z-index:100;background:rgba(10,10,11,0.92);backdrop-filter:blur(24px);border-bottom:1px solid var(--border);height:60px;display:flex;align-items:center;padding:0 40px;gap:16px}
+    .nav-logo img{height:26px;background:white;border-radius:6px;padding:4px 10px;display:block}
+    .nav-sep{width:1px;height:18px;background:var(--border)}
+    .nav-back{display:flex;align-items:center;gap:6px;color:var(--text2);text-decoration:none;font-size:0.78rem;font-weight:500;transition:color 0.2s}
+    .nav-back:hover{color:var(--text)}
+    .nav-back svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+    .nav-title{font-size:0.72rem;color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;font-family:"DM Mono",monospace}
+    .nav-spacer{flex:1}
+    .user-chip{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:100px}
+    .user-av{width:26px;height:26px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:#000}
+    .user-nm{font-size:0.78rem;font-weight:500;color:var(--text);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+    /* LOADING */
+    #auth-loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999}
+    #auth-loading .spinner{width:32px;height:32px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    #auth-loading p{font-size:14px;color:var(--text2)}
+    #app-content{display:none}
+
+    /* MAIN */
+    main{max-width:1400px;margin:0 auto;padding:2.5rem 2rem}
+
+    /* HERO */
+    .hero{display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem;flex-wrap:wrap;gap:1rem}
+    .hero-left h1{font-size:24px;font-weight:600;letter-spacing:-0.03em}
+    .hero-left p{font-size:14px;color:var(--text2);margin-top:4px}
+    .hero-right{display:flex;gap:8px;align-items:center}
+
+    /* SEARCH */
+    .search-box{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:0 12px;height:38px;transition:border-color 0.15s}
+    .search-box:focus-within{border-color:var(--gold)}
+    .search-box svg{width:15px;height:15px;stroke:var(--text3);fill:none;stroke-width:2;stroke-linecap:round;flex-shrink:0}
+    .search-box input{background:none;border:none;outline:none;font-size:13px;font-family:"DM Sans",sans-serif;color:var(--text);width:200px}
+    .search-box input::placeholder{color:var(--text3)}
+
+    /* CONTROLS */
+    .btn-ctrl{display:flex;align-items:center;gap:6px;padding:0 14px;height:38px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text2);font-size:13px;font-weight:500;font-family:"DM Sans",sans-serif;cursor:pointer;transition:all 0.15s}
+    .btn-ctrl:hover{border-color:var(--gold);color:var(--gold)}
+    .btn-ctrl svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+
+    /* STATS */
+    .stats{display:flex;gap:12px;margin-bottom:1.5rem}
+    .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 20px;display:flex;flex-direction:column;gap:2px}
+    .stat-val{font-size:22px;font-weight:600;letter-spacing:-0.04em;color:var(--gold)}
+    .stat-lbl{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;font-family:"DM Mono",monospace}
+
+    /* TREE */
+    .tree-container{overflow-x:auto;padding-bottom:2rem}
+    .tree{display:flex;flex-direction:column;gap:0}
+
+    /* NODO */
+    .org-node{position:relative}
+    .org-node-inner{display:flex;flex-direction:column;align-items:flex-start}
+    .node-card{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;cursor:pointer;transition:all 0.15s;position:relative;min-width:260px;max-width:340px}
+    .node-card:hover{border-color:var(--gold);background:var(--surface2)}
+    .node-card.highlight{border-color:var(--gold);background:var(--gold-light)}
+    .node-card.root-card{border-color:var(--gold);background:var(--gold-light)}
+    .node-avatar{width:42px;height:42px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid var(--border2)}
+    .node-avatar-placeholder{width:42px;height:42px;border-radius:50%;background:var(--surface2);border:2px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--gold);flex-shrink:0}
+    .node-info{flex:1;min-width:0}
+    .node-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .node-job{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+    .node-area{font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;font-family:"DM Mono",monospace}
+    .node-toggle{width:22px;height:22px;border-radius:50%;border:1px solid var(--border2);background:var(--bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.2s;color:var(--text3)}
+    .node-toggle svg{width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;transition:transform 0.2s}
+    .node-toggle.open svg{transform:rotate(90deg)}
+    .node-toggle.hidden{visibility:hidden}
+    .node-count{font-size:10px;font-family:"DM Mono",monospace;color:var(--text3);background:var(--bg);border:1px solid var(--border);border-radius:100px;padding:1px 6px;margin-left:4px}
+
+    /* CHILDREN */
+    .node-children{display:flex;flex-direction:column;gap:6px;margin-top:6px;margin-left:30px;padding-left:18px;border-left:1px solid var(--border);position:relative}
+    .node-children.collapsed{display:none}
+
+    /* NIVEL TOP */
+    .level-top{display:flex;flex-wrap:wrap;gap:12px}
+    .level-top > .org-node{flex-shrink:0}
+
+    /* EMPTY / ERROR */
+    .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem 2rem;color:var(--text3);gap:12px}
+    .empty-state svg{width:40px;height:40px;stroke:var(--text3);fill:none;stroke-width:1.5;stroke-linecap:round}
+    .empty-state p{font-size:14px}
+
+    /* LOADING TREE */
+    .tree-loading{display:flex;align-items:center;gap:12px;padding:2rem;color:var(--text2);font-size:14px}
+    .tree-loading .spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite}
+
+    /* TOOLTIP */
+    .tooltip{position:fixed;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:10px 14px;font-size:12px;pointer-events:none;z-index:500;max-width:220px;display:none}
+    .tooltip.show{display:block}
+    .tooltip-name{font-weight:600;color:var(--text);margin-bottom:2px}
+    .tooltip-job{color:var(--text2)}
+    .tooltip-email{color:var(--text3);font-family:"DM Mono",monospace;font-size:11px;margin-top:4px}
+
+    @media(max-width:768px){main{padding:1.5rem 1rem}nav{padding:0 16px}.search-box input{width:140px}}
+  </style>
+</head>
+<body>
+
+<div id="auth-loading">
+  <div class="spinner"></div>
+  <p>Verificando acceso…</p>
+</div>
+
+<div id="app-content">
+<nav>
+  <a class="nav-logo" href="index.html">
+    <img src="LOGO_BAKER.png" alt="Baker" onerror="this.outerHTML='<span style=\'font-weight:900;color:white\'>BAKER</span>'">
+  </a>
+  <div class="nav-sep"></div>
+  <a class="nav-back" href="index.html">
+    <svg viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    Inicio
+  </a>
+  <div class="nav-sep"></div>
+  <div class="nav-title">Organigrama</div>
+  <div class="nav-spacer"></div>
+  <div id="auth-area"></div>
+</nav>
+
+<main>
+  <div class="hero">
+    <div class="hero-left">
+      <h1>Organigrama Grupo Baker</h1>
+      <p id="hero-sub">Cargando estructura organizacional…</p>
+    </div>
+    <div class="hero-right">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="search-input" placeholder="Buscar persona o cargo…" oninput="buscar(this.value)">
+      </div>
+      <button class="btn-ctrl" onclick="expandirTodo()">
+        <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+        Expandir todo
+      </button>
+      <button class="btn-ctrl" onclick="colapsarTodo()">
+        <svg viewBox="0 0 24 24"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
+        Colapsar
+      </button>
+      <button class="btn-ctrl" onclick="recargar()">
+        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        Actualizar
+      </button>
+    </div>
+  </div>
+
+  <div class="stats" id="stats-bar" style="display:none">
+    <div class="stat"><div class="stat-val" id="stat-total">—</div><div class="stat-lbl">Colaboradores</div></div>
+    <div class="stat"><div class="stat-val" id="stat-areas">—</div><div class="stat-lbl">Áreas</div></div>
+    <div class="stat"><div class="stat-val" id="stat-empresas">—</div><div class="stat-lbl">Empresas</div></div>
+  </div>
+
+  <div class="tree-container">
+    <div id="tree-root">
+      <div class="tree-loading">
+        <div class="spinner"></div>
+        Cargando organigrama desde BUK…
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="tooltip" id="tooltip">
+  <div class="tooltip-name" id="tt-name"></div>
+  <div class="tooltip-job" id="tt-job"></div>
+  <div class="tooltip-email" id="tt-email"></div>
+</div>
+</div>
+
+<script>
+// ── MSAL AUTH ─────────────────────────────────────────────────
+const msalConfig = {
+  auth:{clientId:'9a56ab1c-d3c4-4460-9892-1d4da768ecfb',authority:'https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26',redirectUri:window.location.origin+'/'},
+  cache:{cacheLocation:'sessionStorage'}
+};
+let msalInstance = null;
+window.addEventListener('load', async () => {
+  msalInstance = new msal.PublicClientApplication(msalConfig);
+  await msalInstance.initialize();
+  await initAuth();
+});
+const ALLOWED = ['dvillaseca@ibaker.cl','jcumplido@ibaker.cl'];
+async function initAuth(){
+  try{
+    const resp = await msalInstance.handleRedirectPromise();
+    let account = resp ? resp.account : msalInstance.getAllAccounts()[0];
+    if(!account){ await msalInstance.loginRedirect({scopes:['User.Read']}); return; }
+    const email = account.username.toLowerCase();
+    if(!ALLOWED.includes(email)){
+      document.getElementById('auth-loading').innerHTML='<div style="text-align:center;padding:2rem"><h2 style="color:#C0392B">Acceso no autorizado</h2><p style="margin-top:8px;color:#a1a1aa">Tu cuenta no tiene permiso para ver el organigrama.</p></div>';
+      return;
+    }
+    const initials = account.name ? account.name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase() : email[0].toUpperCase();
+    document.getElementById('auth-area').innerHTML = `<div class="user-chip"><div class="user-av">${initials}</div><div class="user-nm">${account.name||email}</div></div>`;
+    document.getElementById('auth-loading').style.display = 'none';
+    document.getElementById('app-content').style.display = 'block';
+    cargarOrganigrama();
+  }catch(e){ console.error(e); }
+}
+
+// ── DATA ──────────────────────────────────────────────────────
+const API = 'https://api.ibaker.cl';
+let arbolGlobal = [];
+let totalGlobal = 0;
+
+async function cargarOrganigrama(){
+  document.getElementById('tree-root').innerHTML = '<div class="tree-loading"><div class="spinner"></div>Cargando organigrama desde BUK…</div>';
+  try{
+    const r = await fetch(API + '/organigrama');
+    if(!r.ok) throw new Error('Error ' + r.status);
+    const d = await r.json();
+    arbolGlobal = d.arbol || [];
+    totalGlobal = d.total || 0;
+
+    // Stats
+    const areas    = new Set();
+    const empresas = new Set();
+    const recorrer = n => { if(n.area)n.area.split(',').forEach(a=>areas.add(a.trim())); if(n.empresa)empresas.add(n.empresa); n.hijos.forEach(recorrer); };
+    arbolGlobal.forEach(recorrer);
+
+    document.getElementById('stat-total').textContent    = totalGlobal;
+    document.getElementById('stat-areas').textContent    = areas.size || '—';
+    document.getElementById('stat-empresas').textContent = empresas.size || '—';
+    document.getElementById('stats-bar').style.display   = 'flex';
+    document.getElementById('hero-sub').textContent = `${totalGlobal} colaboradores · actualizado ahora`;
+
+    renderArbol(arbolGlobal);
+  }catch(e){
+    document.getElementById('tree-root').innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <p>Error al cargar el organigrama: ${e.message}</p>
+      </div>`;
+  }
+}
+
+function recargar(){ cargarOrganigrama(); }
+
+// ── RENDER ────────────────────────────────────────────────────
+function renderArbol(nodos){
+  const container = document.getElementById('tree-root');
+  if(!nodos.length){
+    container.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg><p>Sin datos</p></div>';
+    return;
+  }
+  container.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'level-top';
+  nodos.forEach(n => wrap.appendChild(crearNodo(n, true)));
+  container.appendChild(wrap);
+}
+
+function iniciales(nombre){
+  return nombre.split(' ').filter(Boolean).slice(0,2).map(p=>p[0].toUpperCase()).join('');
+}
+
+function crearNodo(nodo, esRaiz = false){
+  const div = document.createElement('div');
+  div.className = 'org-node';
+  div.dataset.id = nodo.id;
+  div.dataset.nombre = nodo.nombre.toLowerCase();
+  div.dataset.cargo  = (nodo.cargo||'').toLowerCase();
+
+  const inner = document.createElement('div');
+  inner.className = 'org-node-inner';
+
+  // Card
+  const card = document.createElement('div');
+  card.className = 'node-card' + (esRaiz ? ' root-card' : '');
+
+  // Avatar
+  if(nodo.foto){
+    const img = document.createElement('img');
+    img.className = 'node-avatar';
+    img.src = nodo.foto;
+    img.alt = nodo.nombre;
+    img.onerror = () => { img.outerHTML = `<div class="node-avatar-placeholder">${iniciales(nodo.nombre)}</div>`; };
+    card.appendChild(img);
+  } else {
+    const av = document.createElement('div');
+    av.className = 'node-avatar-placeholder';
+    av.textContent = iniciales(nodo.nombre);
+    card.appendChild(av);
+  }
+
+  // Info
+  const info = document.createElement('div');
+  info.className = 'node-info';
+  info.innerHTML = `
+    <div class="node-name">${nodo.nombre}</div>
+    <div class="node-job">${nodo.cargo||'Sin cargo'}</div>
+    ${nodo.area ? `<div class="node-area">${nodo.area}</div>` : ''}
+  `;
+  card.appendChild(info);
+
+  // Toggle
+  const toggle = document.createElement('div');
+  toggle.className = 'node-toggle' + (nodo.hijos.length ? ' open' : ' hidden');
+  if(nodo.hijos.length){
+    toggle.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+    <span class="node-count">${nodo.hijos.length}</span>`;
+    toggle.onclick = e => { e.stopPropagation(); toggleHijos(div, toggle, children); };
+  }
+  card.appendChild(toggle);
+
+  // Tooltip
+  card.addEventListener('mouseenter', e => mostrarTooltip(e, nodo));
+  card.addEventListener('mousemove',  e => moverTooltip(e));
+  card.addEventListener('mouseleave', () => ocultarTooltip());
+
+  inner.appendChild(card);
+
+  // Children
+  const children = document.createElement('div');
+  children.className = 'node-children';
+  nodo.hijos.forEach(h => children.appendChild(crearNodo(h)));
+  inner.appendChild(children);
+
+  div.appendChild(inner);
+  return div;
+}
+
+function toggleHijos(div, toggle, children){
+  const collapsed = children.classList.toggle('collapsed');
+  toggle.classList.toggle('open', !collapsed);
+}
+
+// ── EXPANDIR / COLAPSAR TODO ──────────────────────────────────
+function expandirTodo(){
+  document.querySelectorAll('.node-children').forEach(c => c.classList.remove('collapsed'));
+  document.querySelectorAll('.node-toggle:not(.hidden)').forEach(t => t.classList.add('open'));
+}
+function colapsarTodo(){
+  document.querySelectorAll('.node-children').forEach(c => c.classList.add('collapsed'));
+  document.querySelectorAll('.node-toggle:not(.hidden)').forEach(t => t.classList.remove('open'));
+}
+
+// ── BÚSQUEDA ──────────────────────────────────────────────────
+let searchTimeout;
+function buscar(q){
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    const term = q.toLowerCase().trim();
+    document.querySelectorAll('.org-node').forEach(n => {
+      const nombre = n.dataset.nombre || '';
+      const cargo  = n.dataset.cargo  || '';
+      if(!term){
+        n.style.opacity = '1';
+        n.querySelector('.node-card')?.classList.remove('highlight');
+      } else if(nombre.includes(term) || cargo.includes(term)){
+        n.style.opacity = '1';
+        n.querySelector('.node-card')?.classList.add('highlight');
+        // Expandir ancestros
+        let parent = n.parentElement;
+        while(parent){
+          if(parent.classList.contains('node-children')) parent.classList.remove('collapsed');
+          parent = parent.parentElement;
+        }
+      } else {
+        n.style.opacity = '0.2';
+        n.querySelector('.node-card')?.classList.remove('highlight');
+      }
+    });
+  }, 200);
+}
+
+// ── TOOLTIP ───────────────────────────────────────────────────
+const tooltip = document.getElementById('tooltip');
+function mostrarTooltip(e, n){
+  document.getElementById('tt-name').textContent  = n.nombre;
+  document.getElementById('tt-job').textContent   = n.cargo || '';
+  document.getElementById('tt-email').textContent = n.email || '';
+  tooltip.classList.add('show');
+  moverTooltip(e);
+}
+function moverTooltip(e){
+  tooltip.style.left = (e.clientX + 14) + 'px';
+  tooltip.style.top  = (e.clientY - 10) + 'px';
+}
+function ocultarTooltip(){ tooltip.classList.remove('show'); }
+</script>
+</body>
+</html>
