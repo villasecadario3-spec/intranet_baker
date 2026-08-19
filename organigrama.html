@@ -228,21 +228,33 @@ let totalGlobal = 0;
 async function cargarOrganigrama(){
   document.getElementById('tree-root').innerHTML = '<div class="tree-loading"><div class="spinner"></div>Cargando organigrama desde BUK…</div>';
   try{
-    const r = await fetch(API + '/organigrama');
-    if(!r.ok) throw new Error('Error ' + r.status);
-    const d = await r.json();
-    arbolGlobal = d.arbol || [];
-    totalGlobal = d.total || 0;
+    // Llamamos directamente a BUK desde el navegador con el token
+    // BUK ya devuelve el árbol completo con children anidados
+    const r = await fetch('https://baker.buk.cl/api/v1/chile/organigrama', {
+      headers: { 'auth_token': 't7YpZiTyZCFJzpjTCH9CbCv1', 'Accept': 'application/json' }
+    });
+
+    if(!r.ok) throw new Error('Error BUK: ' + r.status);
+    const data = await r.json();
+
+    // BUK puede devolver array o un objeto raíz
+    const arbolRaw = Array.isArray(data) ? data : [data];
+    arbolGlobal = arbolRaw.map(normalizarNodo);
+    totalGlobal = contarNodos(arbolGlobal);
 
     // Stats
-    const areas    = new Set();
-    const empresas = new Set();
-    const recorrer = n => { if(n.area)n.area.split(',').forEach(a=>areas.add(a.trim())); if(n.empresa)empresas.add(n.empresa); n.hijos.forEach(recorrer); };
+    const divisiones = new Set();
+    const areas      = new Set();
+    const recorrer = n => {
+      if(n.division) divisiones.add(n.division);
+      if(n.area) areas.add(n.area);
+      n.hijos.forEach(recorrer);
+    };
     arbolGlobal.forEach(recorrer);
 
     document.getElementById('stat-total').textContent    = totalGlobal;
-    document.getElementById('stat-areas').textContent    = areas.size || '—';
-    document.getElementById('stat-empresas').textContent = empresas.size || '—';
+    document.getElementById('stat-areas').textContent    = divisiones.size || '—';
+    document.getElementById('stat-empresas').textContent = areas.size || '—';
     document.getElementById('stats-bar').style.display   = 'flex';
     document.getElementById('hero-sub').textContent = `${totalGlobal} colaboradores · actualizado ahora`;
 
@@ -254,6 +266,27 @@ async function cargarOrganigrama(){
         <p>Error al cargar el organigrama: ${e.message}</p>
       </div>`;
   }
+}
+
+function normalizarNodo(n){
+  const cargo = n.position_tooltip ||
+    [n.position_first_line, n.position_second_line].filter(Boolean).join(' ');
+  return {
+    id:       n.id,
+    nombre:   [n.name, n.last_name].filter(Boolean).join(' ') || 'Puesto Vacante',
+    cargo:    cargo,
+    cargoL1:  n.position_first_line || '',
+    cargoL2:  n.position_second_line || '',
+    area:     n.department || '',
+    division: n.division || '',
+    foto:     (n.image && !n.image.startsWith('/images/')) ? n.image : null,
+    activo:   n.isActive !== false,
+    hijos:    (n.children || []).map(normalizarNodo)
+  };
+}
+
+function contarNodos(nodos){
+  return nodos.reduce((acc, n) => acc + 1 + contarNodos(n.hijos), 0);
 }
 
 function recargar(){ cargarOrganigrama(); }
@@ -308,10 +341,11 @@ function crearNodo(nodo, esRaiz = false){
   // Info
   const info = document.createElement('div');
   info.className = 'node-info';
+  const nombreDisplay = nodo.activo ? nodo.nombre : '<span style="color:var(--text3);font-style:italic">Puesto Vacante</span>';
   info.innerHTML = `
-    <div class="node-name">${nodo.nombre}</div>
-    <div class="node-job">${nodo.cargo||'Sin cargo'}</div>
-    ${nodo.area ? `<div class="node-area">${nodo.area}</div>` : ''}
+    <div class="node-name">${nombreDisplay}</div>
+    <div class="node-job">${nodo.cargoL1||nodo.cargo||'Sin cargo'}${nodo.cargoL2?'<br><span style="font-size:10px">'+nodo.cargoL2+'</span>':''}</div>
+    ${nodo.division ? `<div class="node-area">${nodo.division}</div>` : ''}
   `;
   card.appendChild(info);
 
@@ -391,7 +425,7 @@ const tooltip = document.getElementById('tooltip');
 function mostrarTooltip(e, n){
   document.getElementById('tt-name').textContent  = n.nombre;
   document.getElementById('tt-job').textContent   = n.cargo || '';
-  document.getElementById('tt-email').textContent = n.email || '';
+  document.getElementById('tt-email').textContent = [n.division, n.area].filter(Boolean).join(' · ');
   tooltip.classList.add('show');
   moverTooltip(e);
 }
