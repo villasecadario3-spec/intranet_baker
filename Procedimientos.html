@@ -223,15 +223,10 @@ const API = 'https://api.ibaker.cl';
 const APROBADORES = ['dvillaseca@ibaker.cl', 'jcumplido@ibaker.cl'];
 const GITHUB_RAW  = 'https://raw.githubusercontent.com/villasecadario3-spec/intranet_baker/main/docs/';
 
-// Documentos publicados (lista estática + GitHub raw)
-const DOCUMENTOS_FIJOS = [
-    {
-        nombre: 'Procedimientos Fondo por Rendir y Fijo 2026',
-        archivo: 'docs/PROCEDIMIENTOS_FONDO_POR_RENDIR_Y_FIJO_2026.pdf',
-        tipo: 'PDF',
-        fecha: '2026'
-    },
-];
+// Documentos publicados: la lista real se arma leyendo la carpeta docs/ de GitHub
+// (ver cargarDocsGithub más abajo). No se necesita ninguna entrada fija/de prueba aquí —
+// se dejó una hace tiempo para probar el flujo y quedó duplicando al documento real.
+const DOCUMENTOS_FIJOS = [];
 
 let emailActual = '';
 let archivoBase64 = '';
