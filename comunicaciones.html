@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comunicaciones Internas — Baker</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+<style>
+    :root{
+        --color-red:        #FF002E;
+        --color-red-dark:   #C60023;
+        --color-red-soft:   #FCE9EB;
+        --color-obsidian:   #050506;
+        --color-nav-blend:  #050506;
+        --color-iron-dark:  #24252b;
+        --color-fog-dark:   #8b8d97;
+        --color-page:       #F7F6F5;
+        --color-surface:    #FFFFFF;
+        --color-border:     #E7E4E1;
+        --color-ink:        #111113;
+        --color-mute:       #8A8C93;
+        --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px; --radius-full: 9999px;
+        --font: 'Montserrat', system-ui, sans-serif;
+    }
+    *,*::before,*::after{ margin:0; padding:0; box-sizing:border-box; }
+    body{ font-family:var(--font); background:var(--color-page); color:var(--color-ink); min-height:100vh; -webkit-font-smoothing:antialiased; }
+
+    nav{
+        position:sticky; top:0; z-index:200;
+        background:var(--color-nav-blend);
+        height:60px; display:flex; align-items:center;
+        padding:0 40px; gap:16px;
+    }
+    .nav-back{ display:flex; align-items:center; gap:6px; color:#fff; text-decoration:none; font-size:13px; font-weight:600; }
+    .nav-back svg{ width:16px; height:16px; }
+    .nav-sep{ width:1px; height:18px; background:var(--color-iron-dark); }
+    .nav-title{ font-size:12px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--color-fog-dark); }
+    .nav-spacer{ flex:1; }
+    .user-chip{ display:flex; align-items:center; gap:8px; padding:4px 12px 4px 4px; background:var(--color-iron-dark); border-radius:var(--radius-full); }
+    .user-av{ width:26px; height:26px; border-radius:50%; background:var(--color-red); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#fff; }
+    .user-nm{ font-size:13px; font-weight:600; color:#fff; }
+
+    .hero{ padding:48px 40px 36px; border-bottom:1px solid var(--color-border); background:var(--color-surface); }
+    .hero-eyebrow{ font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-red); margin-bottom:14px; display:flex; align-items:center; gap:10px; }
+    .hero-eyebrow::before{ content:''; width:18px; height:2px; background:var(--color-red); }
+    .hero h1{ font-size:clamp(28px,3.4vw,38px); font-weight:800; letter-spacing:-0.02em; margin-bottom:10px; }
+    .hero-sub{ font-size:14px; color:var(--color-mute); max-width:560px; line-height:1.55; }
+
+    .main{ padding:36px 40px 90px; max-width:960px; margin:0 auto; }
+
+    .upload-card{
+        background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg);
+        padding:24px 26px; margin-bottom:36px; display:none;
+    }
+    .upload-card.visible{ display:block; }
+    .upload-titulo{ font-size:15px; font-weight:700; margin-bottom:4px; display:flex; align-items:center; gap:8px; }
+    .upload-titulo svg{ width:18px; height:18px; color:var(--color-red); }
+    .upload-sub{ font-size:12.5px; color:var(--color-mute); margin-bottom:20px; }
+    .upload-grid{ display:grid; grid-template-columns:1.4fr 1fr; gap:14px; margin-bottom:16px; }
+    .field{ display:flex; flex-direction:column; gap:6px; }
+    .field label{ font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--color-mute); }
+    .field input[type=text], .field input[type=date]{
+        font-family:var(--font); font-size:13.5px; padding:9px 12px;
+        border:1px solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-page); color:var(--color-ink);
+    }
+    .field input:focus{ outline:2px solid var(--color-red); outline-offset:1px; background:#fff; }
+    .file-drop{
+        border:1.5px dashed var(--color-border); border-radius:var(--radius-md);
+        padding:20px; text-align:center; cursor:pointer; transition:border-color 0.15s, background 0.15s;
+        margin-bottom:16px;
+    }
+    .file-drop:hover, .file-drop.dragover{ border-color:var(--color-red); background:var(--color-red-soft); }
+    .file-drop svg{ width:24px; height:24px; color:var(--color-mute); margin-bottom:8px; }
+    .file-drop-text{ font-size:13px; color:var(--color-mute); }
+    .file-drop-text strong{ color:var(--color-red); }
+    .file-drop-name{ font-size:13px; font-weight:600; color:var(--color-ink); margin-top:6px; }
+    .btn-primary{
+        background:var(--color-red); color:#fff; border:none; border-radius:var(--radius-sm);
+        padding:11px 22px; font-family:var(--font); font-size:13.5px; font-weight:700; cursor:pointer;
+        transition:background 0.15s; display:inline-flex; align-items:center; gap:8px;
+    }
+    .btn-primary:hover{ background:var(--color-red-dark); }
+    .btn-primary:disabled{ opacity:0.5; cursor:default; }
+    .upload-msg{ font-size:12.5px; margin-top:12px; display:none; }
+    .upload-msg.ok{ color:#2E6B4F; display:block; }
+    .upload-msg.err{ color:var(--color-red-dark); display:block; }
+
+    .sec-header{ display:flex; align-items:center; gap:14px; margin-bottom:18px; }
+    .sec-titulo{ font-size:12px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; }
+    .sec-count{ font-size:11px; color:var(--color-mute); background:var(--color-border); padding:2px 9px; border-radius:var(--radius-full); }
+
+    .news-list{ display:flex; flex-direction:column; gap:12px; }
+    .news-card{
+        background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg);
+        padding:18px 20px; display:flex; align-items:center; gap:16px; text-decoration:none; color:inherit;
+        transition:box-shadow 0.2s, border-color 0.2s;
+    }
+    .news-card:hover{ box-shadow:0 8px 24px rgba(20,20,25,0.06); border-color:#c9c6c2; }
+    .news-icon{
+        width:44px; height:44px; flex-shrink:0; border-radius:var(--radius-sm); background:var(--color-page);
+        border:1px solid var(--color-border); display:flex; align-items:center; justify-content:center; color:var(--color-red);
+    }
+    .news-icon svg{ width:22px; height:22px; }
+    .news-body{ flex:1; min-width:0; }
+    .news-titulo{ font-size:14.5px; font-weight:700; }
+    .news-fecha{ font-size:12px; color:var(--color-mute); margin-top:3px; }
+    .news-open{ font-size:12px; font-weight:700; color:var(--color-red); display:flex; align-items:center; gap:6px; flex-shrink:0; white-space:nowrap; }
+    .news-open svg{ width:14px; height:14px; }
+    .news-del{
+        width:30px; height:30px; border-radius:50%; border:none; background:transparent; color:var(--color-mute);
+        cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background 0.15s, color 0.15s;
+    }
+    .news-del:hover{ background:var(--color-red-soft); color:var(--color-red-dark); }
+    .news-del svg{ width:15px; height:15px; }
+
+    .empty{ text-align:center; padding:60px 20px; color:var(--color-mute); font-size:13.5px; }
+    .empty svg{ width:32px; height:32px; margin:0 auto 12px; display:block; color:var(--color-border); }
+
+    .spinner{ width:22px; height:22px; border:2.5px solid var(--color-border); border-top-color:var(--color-red); border-radius:50%; animation:spin 0.7s linear infinite; margin:40px auto; }
+    @keyframes spin{ to{ transform:rotate(360deg); } }
+
+    .toast{
+        position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px);
+        background:var(--color-obsidian); color:#fff; padding:11px 20px; border-radius:8px;
+        font-size:13px; font-weight:600; opacity:0; pointer-events:none;
+        transition:opacity 0.2s ease, transform 0.2s ease; z-index:999;
+    }
+    .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+    @media(max-width:640px){
+        nav{ padding:0 18px; } .hero{ padding:32px 18px 28px; } .main{ padding:28px 18px 60px; }
+        .upload-grid{ grid-template-columns:1fr; }
+        .news-card{ flex-wrap:wrap; }
+    }
+</style>
+</head>
+<body>
+
+<nav>
+    <a class="nav-back" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        Inicio
+    </a>
+    <div class="nav-sep"></div>
+    <div class="nav-title">Comunicaciones Internas</div>
+    <div class="nav-spacer"></div>
+    <div id="auth-area"></div>
+</nav>
+
+<div class="hero">
+    <div class="hero-eyebrow">Recursos Humanos</div>
+    <h1>Newsletter Baker</h1>
+    <p class="hero-sub">Novedades, actividades y comunicados internos del grupo Baker. Revisa las últimas ediciones o descárgalas para leer más tarde.</p>
+</div>
+
+<div class="main">
+
+    <div class="upload-card" id="uploadCard">
+        <div class="upload-titulo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            Subir nuevo newsletter
+        </div>
+        <div class="upload-sub">Visible solo para Recursos Humanos.</div>
+        <div class="upload-grid">
+            <div class="field">
+                <label for="fTitulo">Título</label>
+                <input type="text" id="fTitulo" placeholder="Ej: Newsletter Agosto 2026">
+            </div>
+            <div class="field">
+                <label for="fFecha">Fecha</label>
+                <input type="date" id="fFecha">
+            </div>
+        </div>
+        <div class="file-drop" id="fileDrop">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div class="file-drop-text">Arrastra el PDF aquí o <strong>haz clic para elegirlo</strong></div>
+            <div class="file-drop-name" id="fileDropName"></div>
+            <input type="file" id="fPdf" accept="application/pdf" style="display:none;">
+        </div>
+        <button class="btn-primary" id="btnSubir">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+            Publicar newsletter
+        </button>
+        <div class="upload-msg" id="uploadMsg"></div>
+    </div>
+
+    <div class="sec-header">
+        <div class="sec-titulo">Ediciones</div>
+        <div class="sec-count" id="newsCount">—</div>
+    </div>
+
+    <div id="newsList">
+        <div class="spinner"></div>
+    </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API_BASE = 'https://api.ibaker.cl';
+const RRHH_EMAILS = ['jlara@ibaker.cl','ggalvez@ibaker.cl','dvillaseca@ibaker.cl','cmadrid@ibaker.cl','cgomez@ibaker.cl'];
+const DOMINIOS = ['@ibaker.cl', '@cmcromeral.cl', '@epbrotar.cl'];
+
+let emailSesion = null;
+let esRRHH = false;
+let archivoSeleccionado = null;
+
+const msalConfig = {
+    auth: {
+        clientId: "9a56ab1c-d3c4-4460-9892-1d4da768ecfb",
+        authority: "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
+        redirectUri: window.location.origin,
+    },
+    cache: { cacheLocation: "sessionStorage" }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+function toast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(()=> t.classList.remove('show'), 2600);
+}
+
+async function initAuth(){
+    try{
+        await msalInstance.initialize();
+        const accounts = msalInstance.getAllAccounts();
+        if(accounts.length === 0){ window.location.href = 'index.html'; return; }
+        const usuario = accounts[0];
+        emailSesion = (usuario.username || '').toLowerCase();
+
+        if(!DOMINIOS.some(d => emailSesion.endsWith(d))){
+            window.location.href = 'index.html';
+            return;
+        }
+
+        const nombre = usuario.name || usuario.username;
+        const iniciales = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+        document.getElementById('auth-area').innerHTML = `
+            <div class="user-chip">
+                <div class="user-av">${iniciales}</div>
+                <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
+            </div>`;
+
+        esRRHH = RRHH_EMAILS.includes(emailSesion);
+        if(esRRHH) document.getElementById('uploadCard').classList.add('visible');
+
+        cargarNewsletters();
+    }catch(e){
+        console.error('Error auth:', e);
+        window.location.href = 'index.html';
+    }
+}
+
+function iconoDoc(){
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+}
+
+function formatFecha(f){
+    if(!f) return '';
+    const d = new Date(f + (f.length<=10 ? 'T00:00:00' : ''));
+    if(isNaN(d)) return f;
+    return d.toLocaleDateString('es-CL', { day:'numeric', month:'long', year:'numeric' });
+}
+
+async function cargarNewsletters(){
+    const list = document.getElementById('newsList');
+    const count = document.getElementById('newsCount');
+    try{
+        const res = await fetch(`${API_BASE}/comunicaciones/lista`);
+        if(!res.ok) throw new Error('Error al cargar (' + res.status + ')');
+        const items = await res.json();
+        items.sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
+
+        count.textContent = items.length + (items.length===1 ? ' edición' : ' ediciones');
+
+        if(items.length === 0){
+            list.innerHTML = `
+                <div class="empty">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    Todavía no hay newsletters publicados.
+                </div>`;
+            return;
+        }
+
+        list.innerHTML = `<div class="news-list">${items.map(it => `
+            <a class="news-card" href="${it.url}" target="_blank" rel="noopener">
+                <div class="news-icon">${iconoDoc()}</div>
+                <div class="news-body">
+                    <div class="news-titulo">${it.titulo}</div>
+                    <div class="news-fecha">${formatFecha(it.fecha)}</div>
+                </div>
+                <div class="news-open">Ver PDF
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </div>
+                ${esRRHH ? `<button class="news-del" title="Eliminar" onclick="eliminarNewsletter(event, '${it.id}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+                </button>` : ''}
+            </a>`).join('')}</div>`;
+    }catch(e){
+        console.error(e);
+        list.innerHTML = `<div class="empty">No se pudo cargar el listado. Intenta recargar la página.</div>`;
+        count.textContent = '—';
+    }
+}
+
+async function eliminarNewsletter(ev, id){
+    ev.preventDefault();
+    ev.stopPropagation();
+    if(!confirm('¿Eliminar este newsletter? Esta acción no se puede deshacer.')) return;
+    try{
+        const res = await fetch(`${API_BASE}/comunicaciones/${id}`, { method:'DELETE' });
+        if(!res.ok) throw new Error('Error al eliminar');
+        toast('Newsletter eliminado');
+        cargarNewsletters();
+    }catch(e){
+        toast('No se pudo eliminar: ' + e.message);
+    }
+}
+
+// ── Subida (solo RRHH) ────────────────────────────────────────
+const fileDrop = document.getElementById('fileDrop');
+const fPdf = document.getElementById('fPdf');
+
+fileDrop.addEventListener('click', () => fPdf.click());
+fileDrop.addEventListener('dragover', e => { e.preventDefault(); fileDrop.classList.add('dragover'); });
+fileDrop.addEventListener('dragleave', () => fileDrop.classList.remove('dragover'));
+fileDrop.addEventListener('drop', e => {
+    e.preventDefault();
+    fileDrop.classList.remove('dragover');
+    if(e.dataTransfer.files[0]) seleccionarArchivo(e.dataTransfer.files[0]);
+});
+fPdf.addEventListener('change', () => { if(fPdf.files[0]) seleccionarArchivo(fPdf.files[0]); });
+
+function seleccionarArchivo(file){
+    if(file.type !== 'application/pdf'){
+        toast('Solo se aceptan archivos PDF');
+        return;
+    }
+    archivoSeleccionado = file;
+    document.getElementById('fileDropName').textContent = file.name;
+}
+
+document.getElementById('btnSubir').addEventListener('click', async () => {
+    const titulo = document.getElementById('fTitulo').value.trim();
+    const fecha = document.getElementById('fFecha').value;
+    const msg = document.getElementById('uploadMsg');
+    msg.className = 'upload-msg';
+
+    if(!titulo){ msg.textContent = 'Ingresa un título.'; msg.className='upload-msg err'; return; }
+    if(!fecha){ msg.textContent = 'Ingresa una fecha.'; msg.className='upload-msg err'; return; }
+    if(!archivoSeleccionado){ msg.textContent = 'Selecciona un archivo PDF.'; msg.className='upload-msg err'; return; }
+
+    const btn = document.getElementById('btnSubir');
+    btn.disabled = true;
+    btn.textContent = 'Subiendo…';
+
+    try{
+        const formData = new FormData();
+        formData.append('titulo', titulo);
+        formData.append('fecha', fecha);
+        formData.append('pdf', archivoSeleccionado);
+        formData.append('subidoPor', emailSesion);
+
+        const res = await fetch(`${API_BASE}/comunicaciones/subir`, { method:'POST', body: formData });
+        if(!res.ok) throw new Error('Error del servidor (' + res.status + ')');
+
+        msg.textContent = '✓ Newsletter publicado correctamente.';
+        msg.className = 'upload-msg ok';
+        document.getElementById('fTitulo').value = '';
+        document.getElementById('fFecha').value = '';
+        document.getElementById('fileDropName').textContent = '';
+        archivoSeleccionado = null;
+        fPdf.value = '';
+        cargarNewsletters();
+    }catch(e){
+        msg.textContent = 'No se pudo publicar: ' + e.message;
+        msg.className = 'upload-msg err';
+    }finally{
+        btn.disabled = false;
+        btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M12 19V5M5 12l7-7 7 7"/></svg> Publicar newsletter`;
+    }
+});
+
+initAuth();
+</script>
+</body>
+</html>
