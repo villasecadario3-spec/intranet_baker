@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Obras en Construcción — Baker</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+    :root{
+        --color-red:#FF002E; --color-red-dark:#C60023; --color-red-soft:#FCE9EB;
+        --color-obsidian:#050506; --color-nav-blend:#050506; --color-iron-dark:#24252b; --color-fog-dark:#8b8d97;
+        --color-page:#F7F6F5; --color-surface:#FFFFFF; --color-border:#E7E4E1;
+        --color-ink:#111113; --color-mute:#8A8C93;
+        --radius-sm:4px; --radius-md:8px; --radius-lg:12px; --radius-full:9999px;
+        --font:'Montserrat', system-ui, sans-serif;
+    }
+    *,*::before,*::after{ margin:0; padding:0; box-sizing:border-box; }
+    body{ font-family:var(--font); background:var(--color-page); color:var(--color-ink); min-height:100vh; -webkit-font-smoothing:antialiased; }
+
+    nav{ position:sticky; top:0; z-index:400; background:var(--color-nav-blend); height:60px; display:flex; align-items:center; padding:0 32px; gap:16px; }
+    .nav-back{ display:flex; align-items:center; gap:6px; color:#fff; text-decoration:none; font-size:13px; font-weight:600; }
+    .nav-back svg{ width:16px; height:16px; }
+    .nav-sep{ width:1px; height:18px; background:var(--color-iron-dark); }
+    .nav-title{ font-size:12px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--color-fog-dark); }
+    .nav-spacer{ flex:1; }
+    .user-chip{ display:flex; align-items:center; gap:8px; padding:4px 12px 4px 4px; background:var(--color-iron-dark); border-radius:var(--radius-full); }
+    .user-av{ width:26px; height:26px; border-radius:50%; background:var(--color-red); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#fff; }
+    .user-nm{ font-size:13px; font-weight:600; color:#fff; }
+    .btn-agregar{
+        display:flex; align-items:center; gap:7px; background:var(--color-red); color:#fff; border:none;
+        padding:9px 16px; border-radius:var(--radius-sm); font-family:var(--font); font-size:13px; font-weight:700; cursor:pointer;
+        transition:background 0.15s;
+    }
+    .btn-agregar:hover{ background:var(--color-red-dark); }
+    .btn-agregar svg{ width:14px; height:14px; }
+
+    .hero{ padding:26px 32px 20px; background:var(--color-surface); border-bottom:1px solid var(--color-border); }
+    .hero-eyebrow{ font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-red); margin-bottom:8px; display:flex; align-items:center; gap:10px; }
+    .hero-eyebrow::before{ content:''; width:18px; height:2px; background:var(--color-red); }
+    .hero h1{ font-size:26px; font-weight:800; letter-spacing:-0.02em; }
+    .hero-tag{ display:inline-flex; align-items:center; gap:6px; margin-top:8px; font-size:11.5px; color:var(--color-mute); background:var(--color-page); border:1px solid var(--color-border); padding:4px 10px; border-radius:var(--radius-full); }
+
+    .layout{ display:grid; grid-template-columns: 380px 1fr; height:calc(100vh - 60px - 90px); }
+    .panel-lista{ background:var(--color-surface); border-right:1px solid var(--color-border); overflow-y:auto; padding:16px; }
+    .lista-count{ font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--color-mute); margin-bottom:12px; padding:0 4px; }
+    .obra-card{
+        background:var(--color-page); border:1px solid var(--color-border); border-radius:var(--radius-lg);
+        padding:16px; margin-bottom:10px; cursor:pointer; transition:border-color 0.15s, box-shadow 0.15s;
+    }
+    .obra-card:hover, .obra-card.activa{ border-color:var(--color-red); box-shadow:0 4px 14px rgba(255,0,46,0.08); }
+    .obra-card-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:6px; }
+    .obra-nombre{ font-size:14px; font-weight:700; line-height:1.3; }
+    .obra-estado{ font-size:10px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; padding:2px 8px; border-radius:var(--radius-full); white-space:nowrap; flex-shrink:0; }
+    .estado-construccion{ background:#FEF1E0; color:#B5690A; }
+    .estado-terminada{ background:#E1F3EA; color:#2E6B4F; }
+    .estado-inicio{ background:#EAEAF7; color:#4A4A9E; }
+    .obra-comuna{ font-size:12px; color:var(--color-mute); margin-bottom:8px; display:flex; align-items:center; gap:5px; }
+    .obra-comuna svg{ width:12px; height:12px; flex-shrink:0; }
+    .obra-stats{ display:flex; gap:14px; font-size:11.5px; color:var(--color-ink); }
+    .obra-stat{ display:flex; align-items:center; gap:5px; }
+    .obra-stat svg{ width:13px; height:13px; color:var(--color-red); }
+    .obra-card-acciones{ display:flex; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid var(--color-border); }
+    .btn-card-accion{
+        flex:1; display:flex; align-items:center; justify-content:center; gap:5px;
+        background:#fff; border:1px solid var(--color-border); border-radius:var(--radius-sm);
+        padding:6px 8px; font-family:var(--font); font-size:11.5px; font-weight:600; color:var(--color-mute);
+        cursor:pointer; transition:border-color 0.15s, color 0.15s;
+    }
+    .btn-card-accion svg{ width:12px; height:12px; }
+    .btn-card-accion:hover{ border-color:var(--color-ink); color:var(--color-ink); }
+    .btn-card-eliminar:hover{ border-color:var(--color-red); color:var(--color-red-dark); }
+
+    #mapa{ height:100%; width:100%; background:#e5e3df; }
+    .leaflet-popup-content-wrapper{ border-radius:var(--radius-md); font-family:var(--font); }
+    .popup-nombre{ font-size:14px; font-weight:700; margin-bottom:4px; }
+    .popup-comuna{ font-size:12px; color:var(--color-mute); margin-bottom:8px; }
+    .popup-row{ font-size:12px; margin-bottom:3px; }
+    .popup-row strong{ font-weight:600; }
+
+    .empty-lista{ text-align:center; padding:50px 16px; color:var(--color-mute); font-size:13px; }
+
+    /* Modal agregar obra */
+    .modal-overlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:600; align-items:center; justify-content:center; padding:20px; }
+    .modal-overlay.visible{ display:flex; }
+    .modal{ background:#fff; border-radius:var(--radius-lg); padding:26px; width:100%; max-width:460px; max-height:90vh; overflow-y:auto; }
+    .modal-titulo{ font-size:17px; font-weight:800; margin-bottom:18px; }
+    .field{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+    .field label{ font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--color-mute); }
+    .field input, .field select{
+        font-family:var(--font); font-size:13.5px; padding:9px 12px; border:1px solid var(--color-border);
+        border-radius:var(--radius-sm); background:var(--color-page); color:var(--color-ink);
+    }
+    .field input:focus, .field select:focus{ outline:2px solid var(--color-red); outline-offset:1px; background:#fff; }
+    .field-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .modal-btns{ display:flex; gap:10px; margin-top:8px; }
+    .btn-modal-primario{ flex:1; background:var(--color-red); color:#fff; border:none; border-radius:var(--radius-sm); padding:11px; font-family:var(--font); font-size:13.5px; font-weight:700; cursor:pointer; }
+    .btn-modal-primario:hover{ background:var(--color-red-dark); }
+    .btn-modal-secundario{ padding:11px 18px; background:#fff; border:1px solid var(--color-border); border-radius:var(--radius-sm); font-family:var(--font); font-size:13.5px; color:var(--color-mute); cursor:pointer; }
+    .modal-hint{ font-size:11.5px; color:var(--color-mute); margin-top:-6px; margin-bottom:14px; line-height:1.4; }
+
+    .toast{
+        position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px);
+        background:var(--color-obsidian); color:#fff; padding:11px 20px; border-radius:8px;
+        font-size:13px; font-weight:600; opacity:0; pointer-events:none;
+        transition:opacity 0.2s ease, transform 0.2s ease; z-index:999;
+    }
+    .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+    @media(max-width:860px){
+        .layout{ grid-template-columns:1fr; grid-template-rows:auto 1fr; height:auto; }
+        .panel-lista{ border-right:none; border-bottom:1px solid var(--color-border); max-height:340px; }
+        #mapa{ height:420px; }
+    }
+</style>
+</head>
+<body>
+
+<nav>
+    <a class="nav-back" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        Inicio
+    </a>
+    <div class="nav-sep"></div>
+    <div class="nav-title">Obras en Construcción</div>
+    <div class="nav-spacer"></div>
+    <button class="btn-agregar" id="btnAgregar" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+        Agregar obra
+    </button>
+    <div id="auth-area"></div>
+</nav>
+
+<div class="hero">
+    <div class="hero-eyebrow">Grupo Baker</div>
+    <h1>Mapa de Obras</h1>
+    <div class="hero-tag">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        Prototipo de prueba — los datos que agregues aquí se guardan solo en este navegador, todavía no hay respaldo en servidor
+    </div>
+</div>
+
+<div class="layout">
+    <div class="panel-lista">
+        <div class="lista-count" id="listaCount">— obras</div>
+        <div id="listaObras"></div>
+    </div>
+    <div id="mapa"></div>
+</div>
+
+<!-- Modal agregar obra -->
+<div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+        <div class="modal-titulo" id="modalTitulo">Agregar obra</div>
+        <div class="field">
+            <label for="fNombre">Nombre del proyecto</label>
+            <input type="text" id="fNombre" placeholder="Ej: Proyecto Mirador El Águila">
+        </div>
+        <div class="field">
+            <label for="fComuna">Comuna / Ciudad</label>
+            <input type="text" id="fComuna" placeholder="Ej: Machalí">
+        </div>
+        <div class="field">
+            <label for="fDireccion">Dirección o referencia</label>
+            <input type="text" id="fDireccion" placeholder="Ej: Cam. El Recreo 236, Machalí">
+        </div>
+        <div class="modal-hint">Se usa para ubicar el punto en el mapa automáticamente (no hace falta coordenadas).</div>
+        <div class="field-row">
+            <div class="field">
+                <label for="fCasas">N° de casas</label>
+                <input type="text" id="fCasas" placeholder="Ej: 250">
+            </div>
+            <div class="field">
+                <label for="fEstado">Estado</label>
+                <select id="fEstado">
+                    <option value="por_iniciar">Por iniciar</option>
+                    <option value="construccion" selected>En construcción</option>
+                    <option value="terminada">Terminada</option>
+                </select>
+            </div>
+        </div>
+        <div class="field-row">
+            <div class="field">
+                <label for="fInicio">Fecha inicio</label>
+                <input type="text" id="fInicio" placeholder="Ej: Julio 2026">
+            </div>
+            <div class="field">
+                <label for="fTermino">Término estimado</label>
+                <input type="text" id="fTermino" placeholder="Ej: Noviembre 2027">
+            </div>
+        </div>
+        <div class="modal-btns">
+            <button class="btn-modal-secundario" onclick="cerrarModal()">Cancelar</button>
+            <button class="btn-modal-primario" id="btnGuardarObra">Guardar y ubicar en el mapa</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const ACCESO_PERMITIDO = ['dvillaseca@ibaker.cl', 'jcumplido@ibaker.cl'];
+const EDITOR_PERMITIDO = ['dvillaseca@ibaker.cl'];
+const STORAGE_KEY = 'obras_baker_prototipo';
+
+const OBRAS_SEED = [
+    {
+        id: 'seed-1',
+        nombre: 'Proyecto Mirador El Águila',
+        comuna: 'Machalí',
+        direccion: 'Cam. El Recreo 236, Machalí',
+        casas: '250',
+        estado: 'construccion',
+        inicio: 'Julio 2026',
+        termino: 'Noviembre 2027',
+        lat: null, lng: null
+    }
+];
+
+let obras = [];
+let map, markers = {};
+let emailSesion = null;
+
+const msalConfig = {
+    auth: {
+        clientId: "9a56ab1c-d3c4-4460-9892-1d4da768ecfb",
+        authority: "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
+        redirectUri: window.location.origin,
+    },
+    cache: { cacheLocation: "sessionStorage" }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+function toast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(()=> t.classList.remove('show'), 2800);
+}
+
+async function initAuth(){
+    try{
+        await msalInstance.initialize();
+        const accounts = msalInstance.getAllAccounts();
+        if(accounts.length === 0){ window.location.href = 'index.html'; return; }
+        const usuario = accounts[0];
+        emailSesion = (usuario.username || '').toLowerCase();
+
+        if(!ACCESO_PERMITIDO.includes(emailSesion)){
+            window.location.href = 'index.html?acceso=denegado';
+            return;
+        }
+
+        const nombre = usuario.name || usuario.username;
+        const iniciales = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+        document.getElementById('auth-area').innerHTML = `
+            <div class="user-chip">
+                <div class="user-av">${iniciales}</div>
+                <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
+            </div>`;
+
+        if(EDITOR_PERMITIDO.includes(emailSesion)){
+            document.getElementById('btnAgregar').style.display = 'flex';
+        }
+
+        iniciarMapa();
+        cargarObras();
+    }catch(e){
+        console.error(e);
+        window.location.href = 'index.html';
+    }
+}
+
+function iniciarMapa(){
+    map = L.map('mapa').setView([-33.45, -70.9], 7); // centro aprox Chile central
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+    }).addTo(map);
+}
+
+const iconoObra = (estado) => L.divIcon({
+    className: '',
+    html: `<div style="width:26px;height:26px;border-radius:50% 50% 50% 0;background:${estado==='terminada'?'#2E6B4F':estado==='por_iniciar'?'#4A4A9E':'#FF002E'};transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.35)"></div>`,
+    iconSize: [26,26], iconAnchor: [13,26], popupAnchor: [0,-24]
+});
+
+function cargarObras(){
+    let guardadas = [];
+    try{ guardadas = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }catch(e){}
+    obras = guardadas.length ? guardadas : OBRAS_SEED;
+    renderLista();
+    obras.forEach(o => geocodificarYUbicar(o));
+}
+
+function guardarObras(){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(obras));
+}
+
+function estadoLabel(e){
+    return e === 'terminada' ? 'Terminada' : e === 'por_iniciar' ? 'Por iniciar' : 'En construcción';
+}
+function estadoClase(e){
+    return e === 'terminada' ? 'estado-terminada' : e === 'por_iniciar' ? 'estado-inicio' : 'estado-construccion';
+}
+
+function renderLista(){
+    const cont = document.getElementById('listaObras');
+    document.getElementById('listaCount').textContent = obras.length + (obras.length===1?' obra':' obras');
+    const puedeEditar = EDITOR_PERMITIDO.includes(emailSesion);
+
+    if(obras.length === 0){
+        cont.innerHTML = `<div class="empty-lista">No hay obras cargadas todavía.</div>`;
+        return;
+    }
+
+    cont.innerHTML = obras.map(o => `
+        <div class="obra-card" id="card-${o.id}">
+            <div onclick="enfocarObra('${o.id}')" style="cursor:pointer;">
+                <div class="obra-card-top">
+                    <div class="obra-nombre">${o.nombre}</div>
+                    <div class="obra-estado ${estadoClase(o.estado)}">${estadoLabel(o.estado)}</div>
+                </div>
+                <div class="obra-comuna">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    ${o.comuna}
+                </div>
+                <div class="obra-stats">
+                    <div class="obra-stat">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+                        ${o.casas} casas
+                    </div>
+                    <div class="obra-stat">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        ${o.inicio} → ${o.termino}
+                    </div>
+                </div>
+            </div>
+            ${puedeEditar ? `
+            <div class="obra-card-acciones">
+                <button class="btn-card-accion" onclick="event.stopPropagation(); abrirEdicion('${o.id}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    Editar
+                </button>
+                <button class="btn-card-accion btn-card-eliminar" onclick="event.stopPropagation(); eliminarObra('${o.id}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+                    Eliminar
+                </button>
+            </div>` : ''}
+        </div>`).join('');
+}
+
+async function geocodificarYUbicar(o){
+    if(o.lat && o.lng){ colocarMarcador(o); return; }
+    try{
+        const q = encodeURIComponent(o.direccion + ', Chile');
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&countrycodes=cl`);
+        const data = await res.json();
+        if(data && data[0]){
+            o.lat = parseFloat(data[0].lat);
+            o.lng = parseFloat(data[0].lon);
+            guardarObras();
+            colocarMarcador(o);
+        }
+    }catch(e){
+        console.error('Error geocodificando', o.nombre, e);
+    }
+}
+
+function colocarMarcador(o){
+    if(markers[o.id]) map.removeLayer(markers[o.id]);
+    const m = L.marker([o.lat, o.lng], { icon: iconoObra(o.estado) }).addTo(map);
+    m.bindPopup(`
+        <div class="popup-nombre">${o.nombre}</div>
+        <div class="popup-comuna">${o.comuna}</div>
+        <div class="popup-row"><strong>N° casas:</strong> ${o.casas}</div>
+        <div class="popup-row"><strong>Inicio:</strong> ${o.inicio}</div>
+        <div class="popup-row"><strong>Término estimado:</strong> ${o.termino}</div>
+        <div class="popup-row"><strong>Estado:</strong> ${estadoLabel(o.estado)}</div>
+    `);
+    markers[o.id] = m;
+
+    // Si es la única obra, centra el mapa ahí
+    if(obras.length === 1) map.setView([o.lat, o.lng], 13);
+}
+
+function enfocarObra(id){
+    document.querySelectorAll('.obra-card').forEach(c => c.classList.remove('activa'));
+    document.getElementById('card-'+id)?.classList.add('activa');
+    const o = obras.find(x => x.id === id);
+    if(o && o.lat && o.lng){
+        map.setView([o.lat, o.lng], 14, { animate: true });
+        markers[id]?.openPopup();
+    }else{
+        toast('Ubicando esta obra en el mapa, un momento…');
+    }
+}
+
+// ── Modal agregar / editar ────────────────────────────────────
+let idEnEdicion = null;
+
+document.getElementById('btnAgregar').addEventListener('click', () => {
+    idEnEdicion = null;
+    document.getElementById('modalTitulo').textContent = 'Agregar obra';
+    document.getElementById('btnGuardarObra').textContent = 'Guardar y ubicar en el mapa';
+    document.getElementById('modalOverlay').classList.add('visible');
+});
+
+function abrirEdicion(id){
+    const o = obras.find(x => x.id === id);
+    if(!o) return;
+    idEnEdicion = id;
+    document.getElementById('modalTitulo').textContent = 'Editar obra';
+    document.getElementById('btnGuardarObra').textContent = 'Guardar cambios';
+    document.getElementById('fNombre').value = o.nombre;
+    document.getElementById('fComuna').value = o.comuna;
+    document.getElementById('fDireccion').value = o.direccion;
+    document.getElementById('fCasas').value = o.casas;
+    document.getElementById('fEstado').value = o.estado;
+    document.getElementById('fInicio').value = o.inicio;
+    document.getElementById('fTermino').value = o.termino;
+    document.getElementById('modalOverlay').classList.add('visible');
+}
+
+function eliminarObra(id){
+    const o = obras.find(x => x.id === id);
+    if(!o) return;
+    if(!confirm(`¿Eliminar "${o.nombre}"? Esta acción no se puede deshacer.`)) return;
+    if(markers[id]){ map.removeLayer(markers[id]); delete markers[id]; }
+    obras = obras.filter(x => x.id !== id);
+    guardarObras();
+    renderLista();
+    toast('Obra eliminada');
+}
+
+function cerrarModal(){
+    document.getElementById('modalOverlay').classList.remove('visible');
+    ['fNombre','fComuna','fDireccion','fCasas','fInicio','fTermino'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('fEstado').value = 'construccion';
+    idEnEdicion = null;
+}
+
+document.getElementById('btnGuardarObra').addEventListener('click', () => {
+    const nombre = document.getElementById('fNombre').value.trim();
+    const comuna = document.getElementById('fComuna').value.trim();
+    const direccion = document.getElementById('fDireccion').value.trim();
+    const casas = document.getElementById('fCasas').value.trim();
+    const estado = document.getElementById('fEstado').value;
+    const inicio = document.getElementById('fInicio').value.trim();
+    const termino = document.getElementById('fTermino').value.trim();
+
+    if(!nombre || !comuna || !direccion){
+        toast('Completa al menos nombre, comuna y dirección');
+        return;
+    }
+
+    if(idEnEdicion){
+        // Editar obra existente
+        const o = obras.find(x => x.id === idEnEdicion);
+        const direccionCambio = o.direccion !== direccion;
+        o.nombre = nombre; o.comuna = comuna; o.direccion = direccion;
+        o.casas = casas; o.estado = estado; o.inicio = inicio; o.termino = termino;
+        if(direccionCambio){
+            // Si cambió la dirección, hay que volver a ubicarla en el mapa
+            o.lat = null; o.lng = null;
+            if(markers[o.id]){ map.removeLayer(markers[o.id]); delete markers[o.id]; }
+        }
+        guardarObras();
+        renderLista();
+        if(direccionCambio) geocodificarYUbicar(o);
+        else colocarMarcador(o);
+        cerrarModal();
+        toast('Obra actualizada');
+    }else{
+        // Agregar obra nueva
+        const nueva = {
+            id: 'obra-' + Date.now(),
+            nombre, comuna, direccion, casas, estado, inicio, termino,
+            lat: null, lng: null
+        };
+        obras.push(nueva);
+        guardarObras();
+        renderLista();
+        geocodificarYUbicar(nueva);
+        cerrarModal();
+        toast('Obra agregada — ubicándola en el mapa…');
+    }
+});
+
+initAuth();
+</script>
+</body>
+</html>
