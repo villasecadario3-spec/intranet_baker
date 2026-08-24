@@ -102,6 +102,33 @@
     .btn-modal-primario:hover{ background:var(--color-red-dark); }
     .btn-modal-secundario{ padding:11px 18px; background:#fff; border:1px solid var(--color-border); border-radius:var(--radius-sm); font-family:var(--font); font-size:13.5px; color:var(--color-mute); cursor:pointer; }
     .modal-hint{ font-size:11.5px; color:var(--color-mute); margin-top:-6px; margin-bottom:14px; line-height:1.4; }
+    .btn-ubicar-manual{
+        display:flex; align-items:center; justify-content:center; gap:7px; width:100%;
+        background:var(--color-page); border:1px dashed var(--color-border); border-radius:var(--radius-sm);
+        padding:9px; font-family:var(--font); font-size:13px; font-weight:600; color:var(--color-ink);
+        cursor:pointer; margin-bottom:12px; transition:border-color 0.15s, background 0.15s;
+    }
+    .btn-ubicar-manual:hover{ border-color:var(--color-red); background:var(--color-red-soft); }
+    .btn-ubicar-manual svg{ width:14px; height:14px; color:var(--color-red); }
+    .manual-status{
+        display:flex; align-items:center; justify-content:space-between; gap:10px;
+        background:#E1F3EA; color:#2E6B4F; border:1px solid #C3E5D3; border-radius:var(--radius-sm);
+        padding:8px 12px; font-size:12.5px; font-weight:600; margin-bottom:12px;
+    }
+    .btn-quitar-manual{ background:none; border:none; color:#2E6B4F; text-decoration:underline; font-size:11.5px; font-weight:600; cursor:pointer; padding:0; font-family:var(--font); }
+
+    /* Modo "elegir ubicación en el mapa" */
+    .modo-ubicando #mapa{ cursor:crosshair; }
+    .banner-ubicando{
+        display:none; position:fixed; top:76px; left:50%; transform:translateX(-50%); z-index:550;
+        background:var(--color-obsidian); color:#fff; padding:12px 18px; border-radius:var(--radius-md);
+        font-size:13px; font-weight:600; display:none; align-items:center; gap:14px;
+        box-shadow:0 10px 30px rgba(0,0,0,0.25);
+    }
+    .banner-ubicando.visible{ display:flex; }
+    .banner-ubicando svg{ width:16px; height:16px; color:var(--color-red); flex-shrink:0; }
+    .btn-banner{ background:var(--color-red); border:none; color:#fff; padding:6px 14px; border-radius:var(--radius-sm); font-family:var(--font); font-size:12.5px; font-weight:700; cursor:pointer; }
+    .btn-banner-cancelar{ background:transparent; border:1px solid rgba(255,255,255,0.3); color:#fff; padding:6px 14px; border-radius:var(--radius-sm); font-family:var(--font); font-size:12.5px; font-weight:600; cursor:pointer; }
 
     .toast{
         position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px);
@@ -168,7 +195,15 @@
             <label for="fDireccion">Dirección o referencia</label>
             <input type="text" id="fDireccion" placeholder="Ej: Cam. El Recreo 236, Machalí">
         </div>
-        <div class="modal-hint">Se usa para ubicar el punto en el mapa automáticamente (no hace falta coordenadas).</div>
+        <div class="modal-hint">Se usa para ubicar el punto en el mapa automáticamente. Si la dirección todavía no existe (obra nueva), usa el botón de abajo para marcarla tú mismo.</div>
+        <button type="button" class="btn-ubicar-manual" id="btnUbicarManual">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            Ubicar en el mapa
+        </button>
+        <div class="manual-status" id="manualStatus" style="display:none;">
+            ✓ Ubicación marcada manualmente en el mapa
+            <button type="button" class="btn-quitar-manual" id="btnQuitarManual">Quitar</button>
+        </div>
         <div class="field-row">
             <div class="field">
                 <label for="fCasas">N° de casas</label>
@@ -198,6 +233,12 @@
             <button class="btn-modal-primario" id="btnGuardarObra">Guardar y ubicar en el mapa</button>
         </div>
     </div>
+</div>
+
+<div class="banner-ubicando" id="bannerUbicando">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    <span>Haz clic en el mapa donde está la obra</span>
+    <button class="btn-banner-cancelar" onclick="cancelarUbicacionManual()">Cancelar</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -403,9 +444,15 @@ function enfocarObra(id){
 
 // ── Modal agregar / editar ────────────────────────────────────
 let idEnEdicion = null;
+let latManual = null;
+let lngManual = null;
+let markerTemporal = null;
+let clickHandlerUbicar = null;
 
 document.getElementById('btnAgregar').addEventListener('click', () => {
     idEnEdicion = null;
+    latManual = null; lngManual = null;
+    document.getElementById('manualStatus').style.display = 'none';
     document.getElementById('modalTitulo').textContent = 'Agregar obra';
     document.getElementById('btnGuardarObra').textContent = 'Guardar y ubicar en el mapa';
     document.getElementById('modalOverlay').classList.add('visible');
@@ -415,6 +462,7 @@ function abrirEdicion(id){
     const o = obras.find(x => x.id === id);
     if(!o) return;
     idEnEdicion = id;
+    latManual = null; lngManual = null;
     document.getElementById('modalTitulo').textContent = 'Editar obra';
     document.getElementById('btnGuardarObra').textContent = 'Guardar cambios';
     document.getElementById('fNombre').value = o.nombre;
@@ -424,6 +472,13 @@ function abrirEdicion(id){
     document.getElementById('fEstado').value = o.estado;
     document.getElementById('fInicio').value = o.inicio;
     document.getElementById('fTermino').value = o.termino;
+    // Si esta obra ya tenía una ubicación puesta a mano, mostrar el estado confirmado
+    if(o.manual && o.lat && o.lng){
+        latManual = o.lat; lngManual = o.lng;
+        document.getElementById('manualStatus').style.display = 'flex';
+    }else{
+        document.getElementById('manualStatus').style.display = 'none';
+    }
     document.getElementById('modalOverlay').classList.add('visible');
 }
 
@@ -442,8 +497,50 @@ function cerrarModal(){
     document.getElementById('modalOverlay').classList.remove('visible');
     ['fNombre','fComuna','fDireccion','fCasas','fInicio','fTermino'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('fEstado').value = 'construccion';
+    document.getElementById('manualStatus').style.display = 'none';
     idEnEdicion = null;
+    latManual = null; lngManual = null;
 }
+
+// ── Ubicar manualmente en el mapa (clic directo) ───────────────
+document.getElementById('btnUbicarManual').addEventListener('click', () => {
+    document.getElementById('modalOverlay').classList.remove('visible');
+    document.getElementById('bannerUbicando').classList.add('visible');
+    document.body.classList.add('modo-ubicando');
+    clickHandlerUbicar = (e) => confirmarPuntoManual(e.latlng);
+    map.on('click', clickHandlerUbicar);
+});
+
+function confirmarPuntoManual(latlng){
+    latManual = latlng.lat;
+    lngManual = latlng.lng;
+
+    if(markerTemporal) map.removeLayer(markerTemporal);
+    markerTemporal = L.marker(latlng, { icon: iconoObra('construccion') }).addTo(map);
+
+    salirModoUbicando();
+    document.getElementById('modalOverlay').classList.add('visible');
+    document.getElementById('manualStatus').style.display = 'flex';
+    toast('Punto marcado — se usará esta ubicación al guardar');
+}
+
+function cancelarUbicacionManual(){
+    salirModoUbicando();
+    document.getElementById('modalOverlay').classList.add('visible');
+}
+
+function salirModoUbicando(){
+    document.getElementById('bannerUbicando').classList.remove('visible');
+    document.body.classList.remove('modo-ubicando');
+    if(clickHandlerUbicar){ map.off('click', clickHandlerUbicar); clickHandlerUbicar = null; }
+}
+
+document.getElementById('btnQuitarManual').addEventListener('click', () => {
+    latManual = null; lngManual = null;
+    if(markerTemporal){ map.removeLayer(markerTemporal); markerTemporal = null; }
+    document.getElementById('manualStatus').style.display = 'none';
+    toast('Ubicación manual quitada — se usará la dirección escrita');
+});
 
 document.getElementById('btnGuardarObra').addEventListener('click', () => {
     const nombre = document.getElementById('fNombre').value.trim();
@@ -459,21 +556,34 @@ document.getElementById('btnGuardarObra').addEventListener('click', () => {
         return;
     }
 
+    if(markerTemporal){ map.removeLayer(markerTemporal); markerTemporal = null; }
+
     if(idEnEdicion){
         // Editar obra existente
         const o = obras.find(x => x.id === idEnEdicion);
         const direccionCambio = o.direccion !== direccion;
         o.nombre = nombre; o.comuna = comuna; o.direccion = direccion;
         o.casas = casas; o.estado = estado; o.inicio = inicio; o.termino = termino;
-        if(direccionCambio){
-            // Si cambió la dirección, hay que volver a ubicarla en el mapa
-            o.lat = null; o.lng = null;
+
+        if(latManual !== null && lngManual !== null){
+            // Se marcó (o se mantuvo) una ubicación manual
+            o.lat = latManual; o.lng = lngManual; o.manual = true;
             if(markers[o.id]){ map.removeLayer(markers[o.id]); delete markers[o.id]; }
+            guardarObras();
+            renderLista();
+            colocarMarcador(o);
+        }else if(direccionCambio || !o.lat){
+            // Cambió la dirección (o nunca se ubicó): volver a geocodificar
+            o.lat = null; o.lng = null; o.manual = false;
+            if(markers[o.id]){ map.removeLayer(markers[o.id]); delete markers[o.id]; }
+            guardarObras();
+            renderLista();
+            geocodificarYUbicar(o);
+        }else{
+            guardarObras();
+            renderLista();
+            colocarMarcador(o);
         }
-        guardarObras();
-        renderLista();
-        if(direccionCambio) geocodificarYUbicar(o);
-        else colocarMarcador(o);
         cerrarModal();
         toast('Obra actualizada');
     }else{
@@ -481,14 +591,15 @@ document.getElementById('btnGuardarObra').addEventListener('click', () => {
         const nueva = {
             id: 'obra-' + Date.now(),
             nombre, comuna, direccion, casas, estado, inicio, termino,
-            lat: null, lng: null
+            lat: latManual, lng: lngManual, manual: latManual !== null
         };
         obras.push(nueva);
         guardarObras();
         renderLista();
-        geocodificarYUbicar(nueva);
+        if(nueva.manual) colocarMarcador(nueva);
+        else geocodificarYUbicar(nueva);
         cerrarModal();
-        toast('Obra agregada — ubicándola en el mapa…');
+        toast(nueva.manual ? 'Obra agregada en el punto marcado' : 'Obra agregada — ubicándola en el mapa…');
     }
 });
 
