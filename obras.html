@@ -167,6 +167,7 @@
     <h1>Mapa de Obras</h1>
     <div class="hero-tag">
         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        Prototipo de prueba — los datos que agregues aquí se guardan solo en este navegador, todavía no hay respaldo en servidor
     </div>
 </div>
 
@@ -245,21 +246,7 @@
 <script>
 const DOMINIOS_PERMITIDOS = ['@ibaker.cl', '@cmcromeral.cl', '@epbrotar.cl'];
 const EDITOR_PERMITIDO = ['dvillaseca@ibaker.cl'];
-const STORAGE_KEY = 'obras_baker_prototipo';
-
-const OBRAS_SEED = [
-    {
-        id: 'seed-1',
-        nombre: 'Proyecto Mirador El Águila',
-        comuna: 'Machalí',
-        direccion: 'Cam. El Recreo 236, Machalí',
-        casas: '250',
-        estado: 'construccion',
-        inicio: 'Julio 2026',
-        termino: 'Noviembre 2027',
-        lat: null, lng: null
-    }
-];
+const API_BASE = 'https://api.ibaker.cl';
 
 let obras = [];
 let map, markers = {};
@@ -330,16 +317,31 @@ const iconoObra = (estado) => L.divIcon({
     iconSize: [26,26], iconAnchor: [13,26], popupAnchor: [0,-24]
 });
 
-function cargarObras(){
-    let guardadas = [];
-    try{ guardadas = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }catch(e){}
-    obras = guardadas.length ? guardadas : OBRAS_SEED;
+async function cargarObras(){
+    try{
+        const res = await fetch(`${API_BASE}/obras`);
+        if(!res.ok) throw new Error('Error al cargar (' + res.status + ')');
+        obras = await res.json();
+    }catch(e){
+        console.error('Error cargando obras:', e);
+        toast('No se pudo cargar el listado de obras');
+        obras = [];
+    }
     renderLista();
     obras.forEach(o => geocodificarYUbicar(o));
 }
 
-function guardarObras(){
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(obras));
+// Guarda un cambio puntual de coordenadas (por geocodificación automática) sin pasar por el modal
+async function actualizarCoordenadas(o){
+    try{
+        await fetch(`${API_BASE}/obras/${o.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lat: o.lat, lng: o.lng })
+        });
+    }catch(e){
+        console.error('Error guardando coordenadas:', e);
+    }
 }
 
 function estadoLabel(e){
@@ -404,7 +406,7 @@ async function geocodificarYUbicar(o){
         if(data && data[0]){
             o.lat = parseFloat(data[0].lat);
             o.lng = parseFloat(data[0].lon);
-            guardarObras();
+            actualizarCoordenadas(o);
             colocarMarcador(o);
         }
     }catch(e){
@@ -481,15 +483,20 @@ function abrirEdicion(id){
     document.getElementById('modalOverlay').classList.add('visible');
 }
 
-function eliminarObra(id){
+async function eliminarObra(id){
     const o = obras.find(x => x.id === id);
     if(!o) return;
     if(!confirm(`¿Eliminar "${o.nombre}"? Esta acción no se puede deshacer.`)) return;
-    if(markers[id]){ map.removeLayer(markers[id]); delete markers[id]; }
-    obras = obras.filter(x => x.id !== id);
-    guardarObras();
-    renderLista();
-    toast('Obra eliminada');
+    try{
+        const res = await fetch(`${API_BASE}/obras/${id}`, { method: 'DELETE' });
+        if(!res.ok) throw new Error('Error al eliminar');
+        if(markers[id]){ map.removeLayer(markers[id]); delete markers[id]; }
+        obras = obras.filter(x => x.id !== id);
+        renderLista();
+        toast('Obra eliminada');
+    }catch(e){
+        toast('No se pudo eliminar: ' + e.message);
+    }
 }
 
 function cerrarModal(){
@@ -541,7 +548,7 @@ document.getElementById('btnQuitarManual').addEventListener('click', () => {
     toast('Ubicación manual quitada — se usará la dirección escrita');
 });
 
-document.getElementById('btnGuardarObra').addEventListener('click', () => {
+document.getElementById('btnGuardarObra').addEventListener('click', async () => {
     const nombre = document.getElementById('fNombre').value.trim();
     const comuna = document.getElementById('fComuna').value.trim();
     const direccion = document.getElementById('fDireccion').value.trim();
@@ -557,48 +564,64 @@ document.getElementById('btnGuardarObra').addEventListener('click', () => {
 
     if(markerTemporal){ map.removeLayer(markerTemporal); markerTemporal = null; }
 
-    if(idEnEdicion){
-        // Editar obra existente
-        const o = obras.find(x => x.id === idEnEdicion);
-        const direccionCambio = o.direccion !== direccion;
-        o.nombre = nombre; o.comuna = comuna; o.direccion = direccion;
-        o.casas = casas; o.estado = estado; o.inicio = inicio; o.termino = termino;
+    const btn = document.getElementById('btnGuardarObra');
+    const textoOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Guardando…';
 
-        if(latManual !== null && lngManual !== null){
-            // Se marcó (o se mantuvo) una ubicación manual
-            o.lat = latManual; o.lng = lngManual; o.manual = true;
+    try{
+        if(idEnEdicion){
+            // Editar obra existente
+            const o = obras.find(x => x.id === idEnEdicion);
+            const direccionCambio = o.direccion !== direccion;
+            const cambios = { nombre, comuna, direccion, casas, estado, inicio, termino };
+
+            if(latManual !== null && lngManual !== null){
+                cambios.lat = latManual; cambios.lng = lngManual; cambios.manual = true;
+            }else if(direccionCambio || !o.lat){
+                cambios.lat = null; cambios.lng = null; cambios.manual = false;
+            }
+
+            const res = await fetch(`${API_BASE}/obras/${o.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(cambios)
+            });
+            if(!res.ok) throw new Error('Error del servidor (' + res.status + ')');
+            const actualizada = await res.json();
+            Object.assign(o, actualizada);
+
             if(markers[o.id]){ map.removeLayer(markers[o.id]); delete markers[o.id]; }
-            guardarObras();
             renderLista();
-            colocarMarcador(o);
-        }else if(direccionCambio || !o.lat){
-            // Cambió la dirección (o nunca se ubicó): volver a geocodificar
-            o.lat = null; o.lng = null; o.manual = false;
-            if(markers[o.id]){ map.removeLayer(markers[o.id]); delete markers[o.id]; }
-            guardarObras();
-            renderLista();
-            geocodificarYUbicar(o);
+            if(o.lat && o.lng) colocarMarcador(o);
+            else geocodificarYUbicar(o);
+            cerrarModal();
+            toast('Obra actualizada');
         }else{
-            guardarObras();
+            // Agregar obra nueva
+            const cuerpo = {
+                nombre, comuna, direccion, casas, estado, inicio, termino,
+                lat: latManual, lng: lngManual, manual: latManual !== null
+            };
+            const res = await fetch(`${API_BASE}/obras`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(cuerpo)
+            });
+            if(!res.ok) throw new Error('Error del servidor (' + res.status + ')');
+            const nueva = await res.json();
+            obras.push(nueva);
             renderLista();
-            colocarMarcador(o);
+            if(nueva.manual) colocarMarcador(nueva);
+            else geocodificarYUbicar(nueva);
+            cerrarModal();
+            toast(nueva.manual ? 'Obra agregada en el punto marcado' : 'Obra agregada — ubicándola en el mapa…');
         }
-        cerrarModal();
-        toast('Obra actualizada');
-    }else{
-        // Agregar obra nueva
-        const nueva = {
-            id: 'obra-' + Date.now(),
-            nombre, comuna, direccion, casas, estado, inicio, termino,
-            lat: latManual, lng: lngManual, manual: latManual !== null
-        };
-        obras.push(nueva);
-        guardarObras();
-        renderLista();
-        if(nueva.manual) colocarMarcador(nueva);
-        else geocodificarYUbicar(nueva);
-        cerrarModal();
-        toast(nueva.manual ? 'Obra agregada en el punto marcado' : 'Obra agregada — ubicándola en el mapa…');
+    }catch(e){
+        toast('No se pudo guardar: ' + e.message);
+    }finally{
+        btn.disabled = false;
+        btn.textContent = textoOriginal;
     }
 });
 
