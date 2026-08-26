@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control de Bodega — Baker</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+<style>
+    :root{
+        --color-red:#FF002E; --color-red-dark:#C60023; --color-red-soft:#FCE9EB;
+        --color-obsidian:#050506; --color-nav-blend:#050506; --color-iron-dark:#24252b; --color-fog-dark:#8b8d97;
+        --color-page:#F7F6F5; --color-surface:#FFFFFF; --color-border:#E7E4E1;
+        --color-ink:#111113; --color-mute:#8A8C93;
+        --radius-sm:4px; --radius-md:8px; --radius-lg:12px; --radius-full:9999px;
+        --font:'Montserrat', system-ui, sans-serif;
+    }
+    *,*::before,*::after{ margin:0; padding:0; box-sizing:border-box; }
+    body{ font-family:var(--font); background:var(--color-page); color:var(--color-ink); min-height:100vh; -webkit-font-smoothing:antialiased; }
+
+    nav{ position:sticky; top:0; z-index:200; background:var(--color-nav-blend); height:60px; display:flex; align-items:center; padding:0 32px; gap:16px; }
+    .nav-back{ display:flex; align-items:center; gap:6px; color:#fff; text-decoration:none; font-size:13px; font-weight:600; }
+    .nav-back svg{ width:16px; height:16px; }
+    .nav-sep{ width:1px; height:18px; background:var(--color-iron-dark); }
+    .nav-title{ font-size:12px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--color-fog-dark); }
+    .nav-spacer{ flex:1; }
+    .user-chip{ display:flex; align-items:center; gap:8px; padding:4px 12px 4px 4px; background:var(--color-iron-dark); border-radius:var(--radius-full); }
+    .user-av{ width:26px; height:26px; border-radius:50%; background:var(--color-red); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#fff; }
+    .user-nm{ font-size:13px; font-weight:600; color:#fff; }
+
+    .hero{ padding:48px 32px 36px; background:var(--color-surface); border-bottom:1px solid var(--color-border); }
+    .hero-eyebrow{ font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-red); margin-bottom:14px; display:flex; align-items:center; gap:10px; }
+    .hero-eyebrow::before{ content:''; width:18px; height:2px; background:var(--color-red); }
+    .hero h1{ font-size:clamp(28px,3.4vw,38px); font-weight:800; letter-spacing:-0.02em; margin-bottom:10px; }
+    .hero-sub{ font-size:14px; color:var(--color-mute); max-width:560px; line-height:1.55; }
+
+    .main{ padding:40px 32px 90px; max-width:1000px; margin:0 auto; }
+    .sec-titulo{ font-size:12px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:18px; }
+
+    .grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; }
+    .acceso-card{
+        background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg);
+        padding:26px 24px; text-decoration:none; color:inherit; display:flex; flex-direction:column; gap:16px;
+        transition:box-shadow 0.2s, border-color 0.2s;
+    }
+    .acceso-card:hover{ box-shadow:0 10px 28px rgba(20,20,25,0.08); border-color:#c9c6c2; }
+    .acceso-icon{
+        width:48px; height:48px; border-radius:var(--radius-md); background:var(--color-red-soft);
+        display:flex; align-items:center; justify-content:center; color:var(--color-red);
+    }
+    .acceso-icon svg{ width:26px; height:26px; }
+    .acceso-nombre{ font-size:16px; font-weight:700; letter-spacing:-0.01em; }
+    .acceso-desc{ font-size:12.5px; color:var(--color-mute); line-height:1.5; flex:1; }
+    .acceso-link{ font-size:11.5px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:var(--color-red); display:flex; align-items:center; gap:6px; }
+    .acceso-link svg{ width:13px; height:13px; transition:transform 0.15s; }
+    .acceso-card:hover .acceso-link svg{ transform:translateX(3px); }
+
+    @media(max-width:860px){ .grid{ grid-template-columns:1fr; } }
+    @media(max-width:640px){ nav{ padding:0 18px; } .hero{ padding:32px 18px 28px; } .main{ padding:28px 18px 60px; } }
+</style>
+</head>
+<body>
+
+<nav>
+    <a class="nav-back" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        Inicio
+    </a>
+    <div class="nav-sep"></div>
+    <div class="nav-title">Control de Bodega</div>
+    <div class="nav-spacer"></div>
+    <div id="auth-area"></div>
+</nav>
+
+<div class="hero">
+    <div class="hero-eyebrow">Bodega y Materiales</div>
+    <h1>Control de Bodega</h1>
+    <p class="hero-sub">Accesos directos a las herramientas de gestión de bodega y materiales del grupo Baker.</p>
+</div>
+
+<div class="main">
+    <div class="sec-titulo">Accesos</div>
+    <div class="grid">
+
+        <a class="acceso-card" href="https://materialesbodega.netlify.app/" target="_blank" rel="noopener">
+            <div class="acceso-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            </div>
+            <div>
+                <div class="acceso-nombre">App Móvil Sobrante Material</div>
+                <div class="acceso-desc">Registro de material sobrante de bodega desde el celular, con foto.</div>
+            </div>
+            <div class="acceso-link">Abrir <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></div>
+        </a>
+
+        <a class="acceso-card" href="https://materialesbodega.netlify.app/visor" target="_blank" rel="noopener">
+            <div class="acceso-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0H5a2 2 0 01-2-2v-4m6 6h10a2 2 0 002-2v-4"/></svg>
+            </div>
+            <div>
+                <div class="acceso-nombre">Registro Materiales</div>
+                <div class="acceso-desc">Visor con el registro completo de materiales cargados por obra.</div>
+            </div>
+            <div class="acceso-link">Abrir <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></div>
+        </a>
+
+        <a class="acceso-card" href="https://ibaker.sharepoint.com/:f:/s/SoporteTI-Informtica/IgAHiXF0rg7gTaJrg7zTA8igATZquihS8YPAtny3IT4oU2Q?e=zHgYXF" target="_blank" rel="noopener">
+            <div class="acceso-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+            </div>
+            <div>
+                <div class="acceso-nombre">Base de Datos y Evidencia</div>
+                <div class="acceso-desc">Carpeta compartida en SharePoint con respaldo de datos y evidencia fotográfica.</div>
+            </div>
+            <div class="acceso-link">Abrir <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></div>
+        </a>
+
+    </div>
+</div>
+
+<script>
+const ACCESO_PERMITIDO = ['dvillaseca@ibaker.cl', 'jcumplido@ibaker.cl', 'phenriquez@ibaker.cl'];
+
+const msalConfig = {
+    auth: {
+        clientId: "9a56ab1c-d3c4-4460-9892-1d4da768ecfb",
+        authority: "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
+        redirectUri: window.location.origin,
+    },
+    cache: { cacheLocation: "sessionStorage" }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+async function initAuth(){
+    try{
+        await msalInstance.initialize();
+        const accounts = msalInstance.getAllAccounts();
+        if(accounts.length === 0){ window.location.href = 'index.html'; return; }
+        const usuario = accounts[0];
+        const email = (usuario.username || '').toLowerCase();
+
+        if(!ACCESO_PERMITIDO.includes(email)){
+            window.location.href = 'index.html?acceso=denegado';
+            return;
+        }
+
+        const nombre = usuario.name || usuario.username;
+        const iniciales = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+        document.getElementById('auth-area').innerHTML = `
+            <div class="user-chip">
+                <div class="user-av">${iniciales}</div>
+                <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
+            </div>`;
+    }catch(e){
+        console.error(e);
+        window.location.href = 'index.html';
+    }
+}
+
+initAuth();
+</script>
+</body>
+</html>
