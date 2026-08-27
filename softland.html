@@ -629,6 +629,13 @@
                 </div>
                 <div class="form-hint" id="partida-hint">Opcional — filtra por cuenta contable</div>
             </div>
+            <div class="form-group">
+                <label class="form-label">Obra / GAV</label>
+                <select class="form-input" id="f-obra">
+                    <option value="">Todas</option>
+                </select>
+                <div class="form-hint">Trae todas las partidas de esa obra/GAV</div>
+            </div>
         </div>
         <div style="padding:0 24px 20px;display:flex;gap:10px;align-items:center">
             <button class="btn-buscar" id="btn-buscar" onclick="buscar()">
@@ -928,6 +935,8 @@ function seleccionarPartida(codigo) {
     partidaInput.value = `${p[0]} — ${p[1] || '(sin descripción)'}`;
     partidaDropdown.classList.remove('abierto');
     partidaClearBtn.classList.add('visible');
+    // Elegir una partida puntual anula el filtro de obra/GAV (son excluyentes)
+    obraSelect.value = '';
 }
 
 function limpiarPartida() {
@@ -951,6 +960,28 @@ document.addEventListener('click', (e) => {
     if (!e.target.closest('.partida-wrap')) partidaDropdown.classList.remove('abierto');
 });
 
+// ── Obra / GAV: selector que agrupa varias partidas ─────────────
+const obraSelect = document.getElementById('f-obra');
+
+// Mapa inverso: obra/GAV -> lista de códigos de partida que le pertenecen
+const OBRA_CODIGOS = {};
+Object.entries(OBRA_MAP).forEach(([codigo, obra]) => {
+    if (!OBRA_CODIGOS[obra]) OBRA_CODIGOS[obra] = [];
+    OBRA_CODIGOS[obra].push(codigo);
+});
+
+Object.keys(OBRA_CODIGOS).sort().forEach(obra => {
+    const opt = document.createElement('option');
+    opt.value = obra;
+    opt.textContent = `${obra} (${OBRA_CODIGOS[obra].length})`;
+    obraSelect.appendChild(opt);
+});
+
+obraSelect.addEventListener('change', () => {
+    // Elegir una obra/GAV anula cualquier partida puntual seleccionada (son excluyentes)
+    if (obraSelect.value) limpiarPartida();
+});
+
 // ── Buscar ─────────────────────────────────────────────────────
 async function buscar() {
     const empresa = document.getElementById('f-empresa').value.trim();
@@ -960,6 +991,10 @@ async function buscar() {
     const mes   = meses.join(',');
     const voucher = document.getElementById('f-voucher').value.trim();
     const rut     = document.getElementById('f-rut').value.trim();
+
+    // Filtro de partida: o una específica, o todas las de la obra/GAV elegida
+    const obraElegida = obraSelect.value;
+    const partidaFiltro = obraElegida ? OBRA_CODIGOS[obraElegida].join(',') : partidaSeleccionada;
 
     ocultarError();
 
@@ -984,7 +1019,7 @@ async function buscar() {
         const res = await fetch(`${API}/asientos`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ empresa, ano: anos, mes: meses, voucher, rut, partida: partidaSeleccionada })
+            body: JSON.stringify({ empresa, ano: anos, mes: meses, voucher, rut, partida: partidaFiltro })
         });
         const data = await res.json();
 
@@ -1107,6 +1142,7 @@ function limpiar() {
     document.getElementById('f-voucher').value = '';
     document.getElementById('f-rut').value     = '';
     limpiarPartida();
+    obraSelect.value = '';
     datosActuales = [];
     ocultarError();
     document.getElementById('resultados-contenido').style.display = 'none';
