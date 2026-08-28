@@ -99,7 +99,15 @@
         .btn-doc svg{width:13px;height:13px}
 
         /* ── PENDIENTES ──────────────────────── */
-        .pend-card{background:white;border:1px solid var(--gris-2);border-radius:12px;padding:16px 20px;margin-bottom:10px}
+        .pend-card{background:white;border:1px solid var(--gris-2);border-radius:12px;padding:16px 20px;margin-bottom:10px;display:flex;gap:14px;align-items:flex-start}
+        .pend-check{margin-top:3px;width:16px;height:16px;accent-color:var(--rojo);cursor:pointer;flex-shrink:0}
+        .pend-body{flex:1;min-width:0}
+        .pend-bulk-bar{display:flex;align-items:center;justify-content:space-between;background:white;border:1px solid var(--gris-2);border-radius:12px;padding:12px 18px;margin-bottom:14px}
+        .pend-check-todos{display:flex;align-items:center;gap:9px;font-size:0.84rem;color:var(--txt-mid);cursor:pointer;user-select:none}
+        .pend-check-todos input{width:16px;height:16px;accent-color:var(--rojo);cursor:pointer}
+        .btn-aprobar-masivo{padding:9px 18px;background:var(--verde);color:white;border:none;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:0.85rem;font-weight:600;cursor:pointer;transition:all 0.15s}
+        .btn-aprobar-masivo:hover:not(:disabled){background:#1e8449}
+        .btn-aprobar-masivo:disabled{opacity:0.4;cursor:not-allowed}
         .pend-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
         .pend-nombre{font-size:0.9rem;font-weight:600;color:var(--txt)}
         .pend-meta{font-size:0.76rem;color:var(--txt-dim);margin-top:3px}
@@ -200,6 +208,15 @@
 
     <!-- TAB: PENDIENTES (solo aprobadores) -->
     <div class="tab-panel" id="panel-pendientes">
+        <div class="pend-bulk-bar" id="pend-bulk-bar" style="display:none">
+            <label class="pend-check-todos">
+                <input type="checkbox" id="chk-todos" onchange="toggleTodos(this.checked)">
+                <span id="pend-bulk-count">0 seleccionados</span>
+            </label>
+            <button class="btn-aprobar-masivo" id="btn-aprobar-masivo" onclick="aprobarSeleccionados()" disabled>
+                ✓ Aprobar seleccionados
+            </button>
+        </div>
         <div id="pend-list"></div>
     </div>
 
@@ -439,12 +456,18 @@ async function cargarPendientes() {
 
 function renderPendientes(lista) {
     const div = document.getElementById('pend-list');
+    const barra = document.getElementById('pend-bulk-bar');
+    pendientesSeleccionados.clear();
     if (lista.length === 0) {
+        barra.style.display = 'none';
         div.innerHTML = `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><div>No hay documentos pendientes</div></div>`;
         return;
     }
+    barra.style.display = 'flex';
     div.innerHTML = lista.map(doc => `
         <div class="pend-card" id="pend-${doc.id}">
+            <input type="checkbox" class="pend-check" data-id="${doc.id}" onchange="toggleSeleccion('${doc.id}', this.checked)">
+            <div class="pend-body">
             <div class="pend-header">
                 <div>
                     <div class="pend-nombre">${doc.nombre}</div>
@@ -462,7 +485,9 @@ function renderPendientes(lista) {
                 <button class="btn-aprobar" onclick="aprobar('${doc.id}')">✓ Aprobar y publicar</button>
                 <button class="btn-rechazar" onclick="rechazar('${doc.id}')">✗ Rechazar</button>
             </div>
+            </div>
         </div>`).join('');
+    actualizarBarraMasiva();
 }
 
 async function previsualizarDoc(id) {
@@ -487,21 +512,83 @@ async function previsualizarDoc(id) {
     }
 }
 
+async function aprobarUno(id) {
+    const res = await fetch(`${API}/docs/aprobar/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailActual })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error desconocido');
+    return data;
+}
+
 async function aprobar(id) {
     if (!confirm('¿Aprobar y publicar este documento?')) return;
     try {
-        const res = await fetch(`${API}/docs/aprobar/${id}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: emailActual })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
+        await aprobarUno(id);
         mostrarToast('Documento publicado correctamente', 'ok');
         cargarPendientes();
         if (carpetaActual) abrirCarpeta(carpetaActual); else renderCarpetas();
     } catch(e) {
         mostrarToast('Error al aprobar: ' + e.message, 'err');
+    }
+}
+
+// ── Aprobación masiva ─────────────────────────────────────────
+let pendientesSeleccionados = new Set();
+
+function toggleSeleccion(id, checked) {
+    if (checked) pendientesSeleccionados.add(id);
+    else pendientesSeleccionados.delete(id);
+    actualizarBarraMasiva();
+}
+
+function toggleTodos(checked) {
+    document.querySelectorAll('.pend-check').forEach(chk => {
+        chk.checked = checked;
+        if (checked) pendientesSeleccionados.add(chk.dataset.id);
+        else pendientesSeleccionados.delete(chk.dataset.id);
+    });
+    actualizarBarraMasiva();
+}
+
+function actualizarBarraMasiva() {
+    const n = pendientesSeleccionados.size;
+    document.getElementById('pend-bulk-count').textContent = n === 1 ? '1 seleccionado' : `${n} seleccionados`;
+    document.getElementById('btn-aprobar-masivo').disabled = n === 0;
+    const total = document.querySelectorAll('.pend-check').length;
+    document.getElementById('chk-todos').checked = total > 0 && n === total;
+}
+
+async function aprobarSeleccionados() {
+    const ids = Array.from(pendientesSeleccionados);
+    if (ids.length === 0) return;
+    if (!confirm(`¿Aprobar y publicar ${ids.length} documento${ids.length > 1 ? 's' : ''}?`)) return;
+
+    const btn = document.getElementById('btn-aprobar-masivo');
+    btn.disabled = true;
+    let ok = 0, fallidos = [];
+
+    for (let i = 0; i < ids.length; i++) {
+        btn.innerHTML = `<span class="spinner-sm"></span> Aprobando ${i+1} de ${ids.length}…`;
+        try {
+            await aprobarUno(ids[i]);
+            ok++;
+        } catch(e) {
+            fallidos.push(e.message);
+        }
+    }
+
+    pendientesSeleccionados.clear();
+    btn.innerHTML = '✓ Aprobar seleccionados';
+    cargarPendientes();
+    if (carpetaActual) abrirCarpeta(carpetaActual); else renderCarpetas();
+
+    if (fallidos.length === 0) {
+        mostrarToast(`${ok} documento${ok>1?'s':''} publicado${ok>1?'s':''} correctamente`, 'ok');
+    } else {
+        mostrarToast(`${ok} publicados, ${fallidos.length} con error — revísalos de nuevo`, 'err');
     }
 }
 
