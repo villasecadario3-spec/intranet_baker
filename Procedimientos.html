@@ -411,6 +411,7 @@ function renderDocs() {
 
     lista.innerHTML = filtrados.map(doc => {
         const url = doc.githubUrl || doc.archivo;
+        const esPdf = doc.tipo.toLowerCase() === 'pdf';
         return `
         <div class="doc-card">
             <div class="doc-icon">
@@ -421,10 +422,11 @@ function renderDocs() {
                 <div class="doc-meta">${doc.tipo}${doc.fecha ? ' · ' + doc.fecha : ''}</div>
             </div>
             <div class="doc-acciones">
-                <a class="btn-doc btn-ver" href="${url}" target="_blank">
+                ${esPdf ? `
+                <button class="btn-doc btn-ver" onclick="verDocumento('${url}', '${(doc.nombre+'.'+doc.tipo).replace(/'/g,"\\'")}')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                     Ver
-                </a>
+                </button>` : ''}
                 <a class="btn-doc btn-dl" href="${url}" download>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     Descargar
@@ -432,6 +434,20 @@ function renderDocs() {
             </div>
         </div>`;
     }).join('');
+}
+
+async function verDocumento(url, nombreArchivo) {
+    try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('No se pudo cargar el documento');
+        const blob = await res.blob();
+        const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        window.open(blobUrl, '_blank');
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+    } catch(e) {
+        mostrarToast('No se pudo abrir el documento: ' + e.message, 'err');
+    }
 }
 
 function filtrar() { carpetaActual ? renderDocs() : renderCarpetas(); }
