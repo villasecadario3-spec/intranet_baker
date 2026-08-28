@@ -74,6 +74,28 @@
         .btn-ver:hover{background:#a93226;border-color:#a93226}
         .btn-dl{background:white;border-color:var(--gris-2);color:var(--txt-mid)}
         .btn-dl:hover{border-color:var(--gris-3);color:var(--txt)}
+
+        /* ── Carpetas ────────────────────────── */
+        .carpetas-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+        .carpeta-card{background:white;border:1px solid var(--gris-2);border-radius:14px;padding:20px;cursor:pointer;transition:all 0.15s;display:flex;flex-direction:column;gap:10px}
+        .carpeta-card:hover{border-color:var(--rojo);box-shadow:0 6px 20px rgba(192,57,43,0.1);transform:translateY(-1px)}
+        .carpeta-icon{width:44px;height:44px;border-radius:10px;background:rgba(192,57,43,0.08);border:1px solid rgba(192,57,43,0.15);display:flex;align-items:center;justify-content:center}
+        .carpeta-icon svg{width:22px;height:22px;color:var(--rojo)}
+        .carpeta-nombre{font-size:0.92rem;font-weight:700;color:var(--txt)}
+        .carpeta-count{font-size:0.74rem;color:var(--txt-dim)}
+        .breadcrumb{display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:0.82rem}
+        .breadcrumb a{color:var(--txt-mid);text-decoration:none;cursor:pointer}
+        .breadcrumb a:hover{color:var(--rojo)}
+        .breadcrumb .actual{color:var(--txt);font-weight:600}
+        .breadcrumb .sep{color:var(--txt-dim)}
+        .carpeta-badge{display:inline-block;padding:2px 9px;border-radius:100px;font-size:0.68rem;font-weight:600;background:rgba(192,57,43,0.08);color:var(--rojo);margin-top:4px}
+
+        /* ── Subida masiva ───────────────────── */
+        .archivos-lista{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+        .archivo-item{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--crema);border-radius:7px;font-size:0.78rem;color:var(--txt)}
+        .archivo-item svg{width:14px;height:14px;color:var(--verde);flex-shrink:0}
+        .archivo-item .nombre-archivo{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .archivo-item .peso{color:var(--txt-dim);flex-shrink:0}
         .btn-doc svg{width:13px;height:13px}
 
         /* ── PENDIENTES ──────────────────────── */
@@ -170,8 +192,9 @@
     <div class="tab-panel activo" id="panel-publicados">
         <div class="search-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input class="search-input" id="search" type="text" placeholder="Buscar documentos…" oninput="filtrar()">
+            <input class="search-input" id="search" type="text" placeholder="Buscar carpetas…" oninput="filtrar()">
         </div>
+        <div class="breadcrumb" id="breadcrumb" style="display:none"></div>
         <div class="doc-list" id="doc-list"></div>
     </div>
 
@@ -187,27 +210,33 @@
     <div class="modal">
         <div class="modal-titulo">Subir documento</div>
         <div class="modal-form-group">
+            <label class="modal-label">Carpeta *</label>
+            <select class="modal-input" id="m-carpeta">
+                <option value="">Selecciona una carpeta…</option>
+            </select>
+        </div>
+        <div class="modal-form-group" id="grupo-nombre">
             <label class="modal-label">Nombre del documento *</label>
             <input class="modal-input" id="m-nombre" type="text" placeholder="Ej: Procedimiento de Compras 2026">
         </div>
-        <div class="modal-form-group">
+        <div class="modal-form-group" id="grupo-desc">
             <label class="modal-label">Descripción (opcional)</label>
             <textarea class="modal-textarea" id="m-desc" placeholder="Breve descripción del contenido…"></textarea>
         </div>
         <div class="modal-form-group">
-            <label class="modal-label">Archivo *</label>
+            <label class="modal-label">Archivo(s) *</label>
             <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()"
                 ondragover="event.preventDefault();this.classList.add('dragover')"
                 ondragleave="this.classList.remove('dragover')"
                 ondrop="handleDrop(event)">
                 <div class="drop-zone-txt">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px;color:var(--txt-dim);margin:0 auto 8px;display:block"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    Arrastra un archivo aquí o <strong>haz clic para seleccionar</strong><br>
-                    <span style="font-size:0.75rem">PDF, Word, Excel — máx. 10 MB</span>
+                    Arrastra uno o varios archivos aquí o <strong>haz clic para seleccionar</strong><br>
+                    <span style="font-size:0.75rem">PDF, Word, Excel — máx. 10 MB por archivo</span>
                 </div>
-                <div class="archivo-sel" id="archivo-sel" style="display:none"></div>
+                <div class="archivos-lista" id="archivos-lista" style="display:none"></div>
             </div>
-            <input type="file" id="file-input" accept=".pdf,.doc,.docx,.xls,.xlsx" style="display:none" onchange="handleFile(this.files[0])">
+            <input type="file" id="file-input" accept=".pdf,.doc,.docx,.xls,.xlsx" multiple style="display:none" onchange="handleFiles(this.files)">
         </div>
         <div class="modal-btns">
             <button class="btn-cancelar-modal" onclick="cerrarModal()">Cancelar</button>
@@ -223,15 +252,16 @@ const API = 'https://api.ibaker.cl';
 const APROBADORES = ['dvillaseca@ibaker.cl', 'jcumplido@ibaker.cl'];
 const GITHUB_RAW  = 'https://raw.githubusercontent.com/villasecadario3-spec/intranet_baker/main/docs/';
 
-// Documentos publicados: la lista real se arma leyendo la carpeta docs/ de GitHub
-// (ver cargarDocsGithub más abajo). No se necesita ninguna entrada fija/de prueba aquí —
-// se dejó una hace tiempo para probar el flujo y quedó duplicando al documento real.
-const DOCUMENTOS_FIJOS = [];
+const CARPETAS = [
+    'Compliance', 'Procedimientos Generales', 'Administración y Finanzas',
+    'Control de Gestión y TI', 'Proyectos', 'Estudios',
+    'Adquisiciones', 'Entidades Patrocinantes', 'Personas'
+];
 
 let emailActual = '';
-let archivoBase64 = '';
-let archivoTipo = '';
+let archivosSeleccionados = []; // [{file, base64, tipo}]
 let docsGithub = [];
+let carpetaActual = null; // null = viendo la grilla de carpetas
 
 // ── MSAL ──────────────────────────────────────────────────────
 const msalConfig = {
@@ -262,46 +292,107 @@ async function initAuth() {
                 document.getElementById('tabs-wrap').style.display = 'flex';
                 cargarPendientes();
             }
-            cargarDocsGithub();
+            poblarSelectorCarpetas();
+            renderCarpetas();
         } else {
             window.location.href = 'index.html';
         }
     } catch(e) { window.location.href = 'index.html'; }
 }
 
-// ── DOCUMENTOS PUBLICADOS ─────────────────────────────────────
-async function cargarDocsGithub() {
+function poblarSelectorCarpetas() {
+    const sel = document.getElementById('m-carpeta');
+    CARPETAS.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c; opt.textContent = c;
+        sel.appendChild(opt);
+    });
+}
+
+// ── DOCUMENTOS PUBLICADOS: navegación por carpetas ─────────────
+function renderCarpetas() {
+    document.getElementById('breadcrumb').style.display = 'none';
+    document.getElementById('search').placeholder = 'Buscar carpetas…';
+    const query = document.getElementById('search').value.toLowerCase();
+    const carpetas = query ? CARPETAS.filter(c => c.toLowerCase().includes(query)) : CARPETAS;
+
+    const lista = document.getElementById('doc-list');
+    if (carpetas.length === 0) {
+        lista.innerHTML = `<div class="empty">No hay carpetas que coincidan</div>`;
+        return;
+    }
+    lista.innerHTML = `<div class="carpetas-grid">${carpetas.map(c => `
+        <div class="carpeta-card" onclick="abrirCarpeta('${c.replace(/'/g,"\\'")}')">
+            <div class="carpeta-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+            </div>
+            <div class="carpeta-nombre">${c}</div>
+            <div class="carpeta-count" id="count-${c.replace(/[^a-zA-Z0-9]/g,'')}">Cargando…</div>
+        </div>`).join('')}</div>`;
+
+    // Cuenta de archivos por carpeta (en paralelo, no bloquea el render)
+    CARPETAS.forEach(async c => {
+        try {
+            const res = await fetch(`https://api.github.com/repos/villasecadario3-spec/intranet_baker/contents/docs/${encodeURIComponent(c)}`);
+            const el = document.getElementById(`count-${c.replace(/[^a-zA-Z0-9]/g,'')}`);
+            if (!el) return;
+            if (!res.ok) { el.textContent = '0 documentos'; return; }
+            const files = await res.json();
+            const n = Array.isArray(files) ? files.filter(f => f.type === 'file' && !f.name.startsWith('.')).length : 0;
+            el.textContent = n === 1 ? '1 documento' : `${n} documentos`;
+        } catch(e) {}
+    });
+}
+
+async function abrirCarpeta(nombre) {
+    carpetaActual = nombre;
+    document.getElementById('search').value = '';
+    document.getElementById('search').placeholder = `Buscar en ${nombre}…`;
+    document.getElementById('breadcrumb').style.display = 'flex';
+    document.getElementById('breadcrumb').innerHTML = `
+        <a onclick="volverACarpetas()">Carpetas</a>
+        <span class="sep">/</span>
+        <span class="actual">${nombre}</span>`;
+
+    const lista = document.getElementById('doc-list');
+    lista.innerHTML = `<div class="empty">Cargando documentos…</div>`;
+
     try {
-        // Leer la carpeta docs/ del repo via GitHub API (público)
-        const res = await fetch('https://api.github.com/repos/villasecadario3-spec/intranet_baker/contents/docs');
-        if (!res.ok) throw new Error('Error GitHub');
-        const files = await res.json();
-        docsGithub = files
-            .filter(f => f.type === 'file' && !f.name.startsWith('.'))
-            .map(f => ({
-                nombre: f.name.replace(/_/g, ' ').replace(/\.[^.]+$/, ''),
-                archivo: `docs/${f.name}`,
-                tipo:    f.name.split('.').pop().toUpperCase(),
-                fecha:   '',
-                githubUrl: f.download_url,
-            }));
+        const res = await fetch(`https://api.github.com/repos/villasecadario3-spec/intranet_baker/contents/docs/${encodeURIComponent(nombre)}`);
+        if (res.status === 404) { docsGithub = []; }
+        else if (!res.ok) { throw new Error('Error GitHub'); }
+        else {
+            const files = await res.json();
+            docsGithub = files
+                .filter(f => f.type === 'file' && !f.name.startsWith('.'))
+                .map(f => ({
+                    nombre: f.name.replace(/\.[^.]+$/, ''),
+                    archivo: `docs/${nombre}/${f.name}`,
+                    tipo:    f.name.split('.').pop().toUpperCase(),
+                    fecha:   '',
+                    githubUrl: f.download_url,
+                }));
+        }
     } catch(e) {
-        console.error('Error cargando docs GitHub:', e);
+        console.error('Error cargando docs de carpeta:', e);
+        docsGithub = [];
     }
     renderDocs();
 }
 
+function volverACarpetas() {
+    carpetaActual = null;
+    document.getElementById('search').value = '';
+    renderCarpetas();
+}
+
 function renderDocs() {
     const query = document.getElementById('search').value.toLowerCase();
-    // Combinar fijos + GitHub (evitar duplicados)
-    const nombresGithub = docsGithub.map(d => d.archivo);
-    const fijos = DOCUMENTOS_FIJOS.filter(d => !nombresGithub.includes(d.archivo));
-    const todos = [...fijos, ...docsGithub];
-    const filtrados = query ? todos.filter(d => d.nombre.toLowerCase().includes(query)) : todos;
+    const filtrados = query ? docsGithub.filter(d => d.nombre.toLowerCase().includes(query)) : docsGithub;
 
     const lista = document.getElementById('doc-list');
     if (filtrados.length === 0) {
-        lista.innerHTML = `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div>No hay documentos</div></div>`;
+        lista.innerHTML = `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div>No hay documentos en esta carpeta todavía</div></div>`;
         return;
     }
 
@@ -330,7 +421,7 @@ function renderDocs() {
     }).join('');
 }
 
-function filtrar() { renderDocs(); }
+function filtrar() { carpetaActual ? renderDocs() : renderCarpetas(); }
 
 // ── PENDIENTES (aprobadores) ──────────────────────────────────
 async function cargarPendientes() {
@@ -361,6 +452,7 @@ function renderPendientes(lista) {
             <div class="pend-header">
                 <div>
                     <div class="pend-nombre">${doc.nombre}</div>
+                    ${doc.carpeta ? `<span class="carpeta-badge">${doc.carpeta}</span>` : ''}
                     <div class="pend-meta">
                         Subido por <strong>${doc.subidoPor}</strong> · 
                         ${new Date(doc.fecha).toLocaleDateString('es-CL', {day:'numeric', month:'long', year:'numeric'})}
@@ -411,7 +503,7 @@ async function aprobar(id) {
         if (!res.ok) throw new Error(data.error);
         mostrarToast('Documento publicado correctamente', 'ok');
         cargarPendientes();
-        cargarDocsGithub();
+        if (carpetaActual) abrirCarpeta(carpetaActual); else renderCarpetas();
     } catch(e) {
         mostrarToast('Error al aprobar: ' + e.message, 'err');
     }
@@ -444,61 +536,125 @@ function cambiarTab(tab) {
 function abrirModal() { document.getElementById('modal-overlay').classList.add('visible'); }
 function cerrarModal() {
     document.getElementById('modal-overlay').classList.remove('visible');
+    document.getElementById('m-carpeta').value = '';
     document.getElementById('m-nombre').value = '';
     document.getElementById('m-desc').value = '';
-    document.getElementById('archivo-sel').style.display = 'none';
-    document.getElementById('archivo-sel').textContent = '';
-    archivoBase64 = ''; archivoTipo = '';
+    document.getElementById('archivos-lista').style.display = 'none';
+    document.getElementById('archivos-lista').innerHTML = '';
+    document.getElementById('grupo-nombre').style.display = '';
+    document.getElementById('grupo-desc').style.display = '';
+    document.getElementById('file-input').value = '';
+    archivosSeleccionados = [];
     const btn = document.getElementById('btn-enviar-modal');
     btn.disabled = false;
     btn.textContent = 'Enviar para aprobación';
 }
 
-function handleFile(file) {
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) { alert('El archivo no puede superar 10 MB'); return; }
-    archivoTipo = file.name.split('.').pop().toLowerCase();
-    const reader = new FileReader();
-    reader.onload = e => {
-        archivoBase64 = e.target.result.split(',')[1];
-        document.getElementById('archivo-sel').style.display = 'block';
-        document.getElementById('archivo-sel').textContent = `✓ ${file.name} (${(file.size/1024).toFixed(0)} KB)`;
-    };
-    reader.readAsDataURL(file);
+function handleFiles(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+
+    let pendientes = files.length;
+    files.forEach(file => {
+        if (file.size > 10 * 1024 * 1024) {
+            mostrarToast(`"${file.name}" supera los 10 MB — se omitió`, 'err');
+            pendientes--;
+            if (pendientes === 0) renderArchivosSeleccionados();
+            return;
+        }
+        const tipo = file.name.split('.').pop().toLowerCase();
+        const reader = new FileReader();
+        reader.onload = e => {
+            archivosSeleccionados.push({
+                nombreOriginal: file.name,
+                base64: e.target.result.split(',')[1],
+                tipo,
+                peso: file.size
+            });
+            pendientes--;
+            if (pendientes === 0) renderArchivosSeleccionados();
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function renderArchivosSeleccionados() {
+    const cont = document.getElementById('archivos-lista');
+    if (archivosSeleccionados.length === 0) {
+        cont.style.display = 'none';
+        cont.innerHTML = '';
+        return;
+    }
+    cont.style.display = 'flex';
+    cont.innerHTML = archivosSeleccionados.map((a, i) => `
+        <div class="archivo-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            <span class="nombre-archivo">${a.nombreOriginal}</span>
+            <span class="peso">${(a.peso/1024).toFixed(0)} KB</span>
+        </div>`).join('');
+
+    // Con 1 solo archivo se puede personalizar título y descripción;
+    // con varios (subida masiva) se usa el nombre de cada archivo tal cual.
+    const esMasivo = archivosSeleccionados.length > 1;
+    document.getElementById('grupo-nombre').style.display = esMasivo ? 'none' : '';
+    document.getElementById('grupo-desc').style.display = esMasivo ? 'none' : '';
+    document.getElementById('btn-enviar-modal').textContent = esMasivo
+        ? `Enviar ${archivosSeleccionados.length} documentos para aprobación`
+        : 'Enviar para aprobación';
 }
 
 function handleDrop(e) {
     e.preventDefault();
     document.getElementById('drop-zone').classList.remove('dragover');
-    const file = e.dataTransfer.files[0];
-    if (file) handleFile(file);
+    handleFiles(e.dataTransfer.files);
 }
 
 async function enviarDocumento() {
-    const nombre = document.getElementById('m-nombre').value.trim();
-    const desc   = document.getElementById('m-desc').value.trim();
-    if (!nombre) { alert('Ingresa el nombre del documento'); return; }
-    if (!archivoBase64) { alert('Selecciona un archivo'); return; }
+    const carpeta = document.getElementById('m-carpeta').value;
+    if (!carpeta) { alert('Selecciona una carpeta'); return; }
+    if (archivosSeleccionados.length === 0) { alert('Selecciona uno o más archivos'); return; }
+
+    const esMasivo = archivosSeleccionados.length > 1;
+    if (!esMasivo) {
+        const nombre = document.getElementById('m-nombre').value.trim();
+        if (!nombre) { alert('Ingresa el nombre del documento'); return; }
+    }
 
     const btn = document.getElementById('btn-enviar-modal');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-sm"></span> Enviando...';
 
     try {
-        const res = await fetch(`${API}/docs/pendiente`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                nombre,
-                descripcion: desc,
-                archivo: archivoBase64,
-                tipo: archivoTipo,
-                subidoPor: emailActual
-            })
-        });
-        if (!res.ok) throw new Error('Error al enviar');
+        let enviados = 0;
+        for (const a of archivosSeleccionados) {
+            enviados++;
+            if (esMasivo) btn.innerHTML = `<span class="spinner-sm"></span> Enviando ${enviados} de ${archivosSeleccionados.length}…`;
+            else btn.innerHTML = '<span class="spinner-sm"></span> Enviando...';
+
+            const nombreDoc = esMasivo
+                ? a.nombreOriginal.replace(/\.[^.]+$/, '')
+                : document.getElementById('m-nombre').value.trim();
+            const desc = esMasivo ? '' : document.getElementById('m-desc').value.trim();
+
+            const res = await fetch(`${API}/docs/pendiente`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nombre: nombreDoc,
+                    descripcion: desc,
+                    archivo: a.base64,
+                    tipo: a.tipo,
+                    archivoNombreOriginal: a.nombreOriginal,
+                    carpeta,
+                    subidoPor: emailActual
+                })
+            });
+            if (!res.ok) throw new Error(`Error al enviar "${a.nombreOriginal}"`);
+        }
         cerrarModal();
-        mostrarToast('Documento enviado — quedará visible una vez aprobado por TI', 'ok');
+        mostrarToast(
+            esMasivo ? `${enviados} documentos enviados — quedarán visibles al ser aprobados por TI` : 'Documento enviado — quedará visible una vez aprobado por TI',
+            'ok'
+        );
         if (APROBADORES.includes(emailActual)) cargarPendientes();
     } catch(e) {
         mostrarToast('Error al enviar: ' + e.message, 'err');
