@@ -333,12 +333,12 @@ function renderCarpetas() {
     // Cuenta de archivos por carpeta (en paralelo, no bloquea el render)
     CARPETAS.forEach(async c => {
         try {
-            const res = await fetch(`https://api.github.com/repos/villasecadario3-spec/intranet_baker/contents/docs/${encodeURIComponent(c)}`);
+            const res = await fetch(`${API}/docs/carpeta/${encodeURIComponent(c)}`);
             const el = document.getElementById(`count-${c.replace(/[^a-zA-Z0-9]/g,'')}`);
             if (!el) return;
             if (!res.ok) { el.textContent = '0 documentos'; return; }
             const files = await res.json();
-            const n = Array.isArray(files) ? files.filter(f => f.type === 'file' && !f.name.startsWith('.')).length : 0;
+            const n = Array.isArray(files) ? files.length : 0;
             el.textContent = n === 1 ? '1 documento' : `${n} documentos`;
         } catch(e) {}
     });
@@ -358,21 +358,17 @@ async function abrirCarpeta(nombre) {
     lista.innerHTML = `<div class="empty">Cargando documentos…</div>`;
 
     try {
-        const res = await fetch(`https://api.github.com/repos/villasecadario3-spec/intranet_baker/contents/docs/${encodeURIComponent(nombre)}`);
-        if (res.status === 404) { docsGithub = []; }
-        else if (!res.ok) { throw new Error('Error GitHub'); }
-        else {
-            const files = await res.json();
-            docsGithub = files
-                .filter(f => f.type === 'file' && !f.name.startsWith('.'))
-                .map(f => ({
-                    nombre: f.name.replace(/\.[^.]+$/, ''),
-                    archivo: `docs/${nombre}/${f.name}`,
-                    tipo:    f.name.split('.').pop().toUpperCase(),
-                    fecha:   '',
-                    githubUrl: f.download_url,
-                }));
-        }
+        const res = await fetch(`${API}/docs/carpeta/${encodeURIComponent(nombre)}`);
+        if (!res.ok) { throw new Error('Error del servidor'); }
+        const files = await res.json();
+        docsGithub = (Array.isArray(files) ? files : [])
+            .map(f => ({
+                nombre: f.nombre.replace(/\.[^.]+$/, ''),
+                archivo: `docs/${nombre}/${f.nombre}`,
+                tipo:    f.nombre.split('.').pop().toUpperCase(),
+                fecha:   '',
+                githubUrl: f.url,
+            }));
     } catch(e) {
         console.error('Error cargando docs de carpeta:', e);
         docsGithub = [];
