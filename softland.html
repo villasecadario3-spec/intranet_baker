@@ -636,6 +636,16 @@
                 </select>
                 <div class="form-hint">Trae todas las partidas de esa obra/GAV</div>
             </div>
+            <div class="form-group">
+                <label class="form-label">Cuenta Contable</label>
+                <div class="partida-wrap">
+                    <input class="form-input" id="f-cuenta-buscar" type="text" autocomplete="off"
+                           placeholder="Selecciona empresa primero…" disabled>
+                    <button type="button" class="partida-clear" id="cuenta-clear" onclick="limpiarCuenta()">✕</button>
+                    <div class="partida-dropdown" id="cuenta-dropdown"></div>
+                </div>
+                <div class="form-hint">Opcional — filtra por código del plan de cuentas</div>
+            </div>
         </div>
         <div style="padding:0 24px 20px;display:flex;gap:10px;align-items:center">
             <button class="btn-buscar" id="btn-buscar" onclick="buscar()">
@@ -756,6 +766,16 @@
             <div class="form-group">
                 <label class="form-label">Mes (opcional — vacío = año completo)</label>
                 <div class="r8-chips" id="r8-chips"></div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Cuenta Contable</label>
+                <div class="partida-wrap">
+                    <input class="form-input" id="r8-cuenta-buscar" type="text" autocomplete="off"
+                           placeholder="Selecciona sociedad primero…" disabled style="min-width:220px;">
+                    <button type="button" class="partida-clear" id="r8-cuenta-clear" onclick="r8LimpiarCuenta()">✕</button>
+                    <div class="partida-dropdown" id="r8-cuenta-dropdown"></div>
+                </div>
+                <div class="form-hint">Opcional — filtra la tabla a una sola cuenta</div>
             </div>
             <div style="flex:1"></div>
             <button class="btn-buscar" id="r8-btn" onclick="generarR8()">
@@ -982,6 +1002,92 @@ obraSelect.addEventListener('change', () => {
     if (obraSelect.value) limpiarPartida();
 });
 
+// ── Cuenta Contable (Pestaña 1): buscador con autocompletado ────
+// Se carga desde /cuentas/:empresa apenas se elige la empresa (misma
+// fuente que usa el Reporte 8 Columnas: cwpctas, nivel 3).
+let CUENTAS = [];
+let cuentaSeleccionada = '';
+let cuentasEmpresaActual = '';
+const cuentaInput    = document.getElementById('f-cuenta-buscar');
+const cuentaDropdown = document.getElementById('cuenta-dropdown');
+const cuentaClearBtn = document.getElementById('cuenta-clear');
+
+async function cargarCuentas(empresa) {
+    if (!empresa) {
+        CUENTAS = [];
+        cuentasEmpresaActual = '';
+        cuentaInput.disabled = true;
+        cuentaInput.placeholder = 'Selecciona empresa primero…';
+        return;
+    }
+    if (empresa === cuentasEmpresaActual) return; // ya cargadas
+    cuentaInput.disabled = true;
+    cuentaInput.placeholder = 'Cargando cuentas…';
+    try {
+        const res = await fetch(`${API}/cuentas/${encodeURIComponent(empresa)}`);
+        if (!res.ok) throw new Error('Error al cargar cuentas');
+        CUENTAS = await res.json();
+        cuentasEmpresaActual = empresa;
+        cuentaInput.disabled = false;
+        cuentaInput.placeholder = 'Buscar código o descripción…';
+    } catch(e) {
+        console.error('Error cargando cuentas:', e);
+        CUENTAS = [];
+        cuentaInput.placeholder = 'No se pudo cargar — reintenta';
+    }
+}
+
+function renderCuentaDropdown(query) {
+    const q = query.trim().toLowerCase();
+    if (!q) { cuentaDropdown.classList.remove('abierto'); return; }
+    const coincidencias = CUENTAS.filter(c =>
+        c.codigo.toLowerCase().includes(q) || (c.descripcion||'').toLowerCase().includes(q)
+    ).slice(0, 50);
+    if (coincidencias.length === 0) {
+        cuentaDropdown.innerHTML = `<div class="partida-vacio">Sin resultados</div>`;
+    } else {
+        cuentaDropdown.innerHTML = coincidencias.map(c => `
+            <div class="partida-item" onclick="seleccionarCuenta('${c.codigo}')">
+                <span class="cod">${c.codigo}</span><span class="desc">${c.descripcion || '(sin descripción)'}</span>
+            </div>`).join('');
+    }
+    cuentaDropdown.classList.add('abierto');
+}
+
+function seleccionarCuenta(codigo) {
+    const c = CUENTAS.find(x => x.codigo === codigo);
+    if (!c) return;
+    cuentaSeleccionada = codigo;
+    cuentaInput.value = `${c.codigo} — ${c.descripcion || '(sin descripción)'}`;
+    cuentaDropdown.classList.remove('abierto');
+    cuentaClearBtn.classList.add('visible');
+}
+
+function limpiarCuenta() {
+    cuentaSeleccionada = '';
+    cuentaInput.value = '';
+    cuentaClearBtn.classList.remove('visible');
+    cuentaDropdown.classList.remove('abierto');
+}
+
+cuentaInput.addEventListener('input', () => {
+    cuentaSeleccionada = '';
+    cuentaClearBtn.classList.remove('visible');
+    renderCuentaDropdown(cuentaInput.value);
+});
+cuentaInput.addEventListener('focus', () => {
+    if (cuentaInput.value && !cuentaSeleccionada) renderCuentaDropdown(cuentaInput.value);
+});
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('#f-cuenta-buscar') && !e.target.closest('#cuenta-dropdown')) {
+        cuentaDropdown.classList.remove('abierto');
+    }
+});
+document.getElementById('f-empresa').addEventListener('change', (e) => {
+    limpiarCuenta();
+    cargarCuentas(e.target.value);
+});
+
 // ── Buscar ─────────────────────────────────────────────────────
 async function buscar() {
     const empresa = document.getElementById('f-empresa').value.trim();
@@ -1019,7 +1125,7 @@ async function buscar() {
         const res = await fetch(`${API}/asientos`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ empresa, ano: anos, mes: meses, voucher, rut, partida: partidaFiltro })
+            body: JSON.stringify({ empresa, ano: anos, mes: meses, voucher, rut, partida: partidaFiltro, cuenta: cuentaSeleccionada })
         });
         const data = await res.json();
 
@@ -1143,6 +1249,7 @@ function limpiar() {
     document.getElementById('f-rut').value     = '';
     limpiarPartida();
     obraSelect.value = '';
+    limpiarCuenta();
     datosActuales = [];
     ocultarError();
     document.getElementById('resultados-contenido').style.display = 'none';
@@ -1341,6 +1448,92 @@ function r8ToggleMes(el, mes) {
     else r8MesesActivos.push(mes);
 }
 
+// ── Cuenta Contable (Pestaña 2) — filtra la tabla ya generada, sin ir al server ──
+let CUENTAS_R8 = [];
+let r8CuentaSeleccionada = '';
+let r8CuentasEmpresaActual = '';
+const r8CuentaInput    = document.getElementById('r8-cuenta-buscar');
+const r8CuentaDropdown = document.getElementById('r8-cuenta-dropdown');
+const r8CuentaClearBtn = document.getElementById('r8-cuenta-clear');
+
+async function r8CargarCuentas(empresa) {
+    if (!empresa) {
+        CUENTAS_R8 = [];
+        r8CuentasEmpresaActual = '';
+        r8CuentaInput.disabled = true;
+        r8CuentaInput.placeholder = 'Selecciona sociedad primero…';
+        return;
+    }
+    if (empresa === r8CuentasEmpresaActual) return;
+    r8CuentaInput.disabled = true;
+    r8CuentaInput.placeholder = 'Cargando cuentas…';
+    try {
+        const res = await fetch(`${API}/cuentas/${encodeURIComponent(empresa)}`);
+        if (!res.ok) throw new Error('Error al cargar cuentas');
+        CUENTAS_R8 = await res.json();
+        r8CuentasEmpresaActual = empresa;
+        r8CuentaInput.disabled = false;
+        r8CuentaInput.placeholder = 'Buscar código o descripción…';
+    } catch(e) {
+        console.error('Error cargando cuentas r8:', e);
+        CUENTAS_R8 = [];
+        r8CuentaInput.placeholder = 'No se pudo cargar — reintenta';
+    }
+}
+
+function r8RenderCuentaDropdown(query) {
+    const q = query.trim().toLowerCase();
+    if (!q) { r8CuentaDropdown.classList.remove('abierto'); return; }
+    const coincidencias = CUENTAS_R8.filter(c =>
+        c.codigo.toLowerCase().includes(q) || (c.descripcion||'').toLowerCase().includes(q)
+    ).slice(0, 50);
+    if (coincidencias.length === 0) {
+        r8CuentaDropdown.innerHTML = `<div class="partida-vacio">Sin resultados</div>`;
+    } else {
+        r8CuentaDropdown.innerHTML = coincidencias.map(c => `
+            <div class="partida-item" onclick="r8SeleccionarCuenta('${c.codigo}')">
+                <span class="cod">${c.codigo}</span><span class="desc">${c.descripcion || '(sin descripción)'}</span>
+            </div>`).join('');
+    }
+    r8CuentaDropdown.classList.add('abierto');
+}
+
+function r8SeleccionarCuenta(codigo) {
+    const c = CUENTAS_R8.find(x => x.codigo === codigo);
+    if (!c) return;
+    r8CuentaSeleccionada = codigo;
+    r8CuentaInput.value = `${c.codigo} — ${c.descripcion || '(sin descripción)'}`;
+    r8CuentaDropdown.classList.remove('abierto');
+    r8CuentaClearBtn.classList.add('visible');
+    if (r8Datos) renderR8(r8Datos); // re-filtra la tabla ya cargada, sin nueva consulta
+}
+
+function r8LimpiarCuenta() {
+    r8CuentaSeleccionada = '';
+    r8CuentaInput.value = '';
+    r8CuentaClearBtn.classList.remove('visible');
+    r8CuentaDropdown.classList.remove('abierto');
+    if (r8Datos) renderR8(r8Datos);
+}
+
+r8CuentaInput.addEventListener('input', () => {
+    r8CuentaSeleccionada = '';
+    r8CuentaClearBtn.classList.remove('visible');
+    r8RenderCuentaDropdown(r8CuentaInput.value);
+});
+r8CuentaInput.addEventListener('focus', () => {
+    if (r8CuentaInput.value && !r8CuentaSeleccionada) r8RenderCuentaDropdown(r8CuentaInput.value);
+});
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('#r8-cuenta-buscar') && !e.target.closest('#r8-cuenta-dropdown')) {
+        r8CuentaDropdown.classList.remove('abierto');
+    }
+});
+document.getElementById('r8-empresa').addEventListener('change', (e) => {
+    r8LimpiarCuenta();
+    r8CargarCuentas(e.target.value);
+});
+
 async function generarR8() {
     const empresa = document.getElementById('r8-empresa').value;
     const ano     = document.getElementById('r8-ano').value;
@@ -1383,9 +1576,12 @@ function clpR8(n) {
 }
 
 function renderR8(data) {
-    const { filas, totales, empresa, ano, mes } = data;
+    const { filas: filasOriginales, totales, empresa, ano, mes } = data;
+    const filas = r8CuentaSeleccionada
+        ? filasOriginales.filter(f => f.cuenta === r8CuentaSeleccionada)
+        : filasOriginales;
     const periodo = mes === 'todos' ? `Año ${ano}` : `${ano} · meses seleccionados`;
-    document.getElementById('r8-titulo').textContent = `${empresa} — ${periodo} · ${filas.length} cuentas`;
+    document.getElementById('r8-titulo').textContent = `${empresa} — ${periodo} · ${filas.length} cuentas${r8CuentaSeleccionada ? ' (filtrado)' : ''}`;
 
     const utilidad = totales.ganancia - totales.perdida;
     const resultado = totales.resultadoEjercicio || (totales.ganancia - totales.perdida);
@@ -1412,23 +1608,27 @@ function renderR8(data) {
         </div>`;
     document.getElementById('r8-stats').style.display = 'grid';
 
-    document.getElementById('r8-body').innerHTML = filas.map(f => `
-        <tr>
-            <td>${f.cuenta}</td>
-            <td>${f.descripcion}</td>
-            <td class="r8num">${clpR8(f.debe)}</td>
-            <td class="r8num">${clpR8(f.haber)}</td>
-            <td class="r8num r8sep pos">${clpR8(f.deudor)}</td>
-            <td class="r8num">${clpR8(f.acreedor)}</td>
-            <td class="r8num r8sep pos">${clpR8(f.activo)}</td>
-            <td class="r8num">${clpR8(f.pasivo)}</td>
-            <td class="r8num r8sep neg">${clpR8(f.perdida)}</td>
-            <td class="r8num">${clpR8(f.ganancia)}</td>
-        </tr>`).join('');
+    if (filas.length === 0) {
+        document.getElementById('r8-body').innerHTML = `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--txt-dim);">Esa cuenta no tiene movimientos en este período</td></tr>`;
+    } else {
+        document.getElementById('r8-body').innerHTML = filas.map(f => `
+            <tr>
+                <td>${f.cuenta}</td>
+                <td>${f.descripcion}</td>
+                <td class="r8num">${clpR8(f.debe)}</td>
+                <td class="r8num">${clpR8(f.haber)}</td>
+                <td class="r8num r8sep pos">${clpR8(f.deudor)}</td>
+                <td class="r8num">${clpR8(f.acreedor)}</td>
+                <td class="r8num r8sep pos">${clpR8(f.activo)}</td>
+                <td class="r8num">${clpR8(f.pasivo)}</td>
+                <td class="r8num r8sep neg">${clpR8(f.perdida)}</td>
+                <td class="r8num">${clpR8(f.ganancia)}</td>
+            </tr>`).join('');
+    }
 
     document.getElementById('r8-foot').innerHTML = `
         <tr>
-            <td colspan="2">TOTALES</td>
+            <td colspan="2">TOTALES${r8CuentaSeleccionada ? ' (sociedad completa)' : ''}</td>
             <td>$${Math.round(totales.debe).toLocaleString('es-CL')}</td>
             <td>$${Math.round(totales.haber).toLocaleString('es-CL')}</td>
             <td>$${Math.round(totales.deudor).toLocaleString('es-CL')}</td>
@@ -1454,14 +1654,17 @@ function renderR8(data) {
 
 function exportarR8Excel() {
     if (!r8Datos) return;
-    const { filas, totales, empresa, ano, mes } = r8Datos;
+    const { filas: filasOriginales, totales, empresa, ano, mes } = r8Datos;
+    const filas = r8CuentaSeleccionada
+        ? filasOriginales.filter(f => f.cuenta === r8CuentaSeleccionada)
+        : filasOriginales;
     const header = ['Cuenta','Descripción','Debe','Haber','Deudor','Acreedor','Activo','Pasivo','Pérdida','Ganancia'];
     const rows = filas.map(f => [
         f.cuenta, f.descripcion,
         f.debe, f.haber, f.deudor, f.acreedor,
         f.activo, f.pasivo, f.perdida, f.ganancia
     ]);
-    rows.push(['TOTALES','',
+    rows.push(['TOTALES (sociedad completa)','',
         totales.debe, totales.haber, totales.deudor, totales.acreedor,
         totales.activo, totales.pasivo, totales.perdida, totales.ganancia
     ]);
