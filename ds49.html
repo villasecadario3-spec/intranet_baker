@@ -236,6 +236,12 @@
             <option value="ENTIDAD PATROCINANTE BROTAR" selected>Entidad Patrocinante Brotar</option>
           </select>
         </div>
+        <div class="field field-full"><label>Formato de generación</label>
+          <select id="cfgFormato">
+            <option value="RM">Formato Región Metropolitana</option>
+            <option value="OHIGGINS">Formato Región de O'Higgins</option>
+          </select>
+        </div>
       </div>
     </div>
   </div>
@@ -408,8 +414,16 @@ function cfg() {
     comuna: document.getElementById('cfgComuna').value,
     nFamilias: document.getElementById('cfgFamilias').value,
     entidad: document.getElementById('cfgEntidad').value,
+    formato: document.getElementById('cfgFormato').value,
   };
 }
+
+// Al elegir la región, sugiere el formato correspondiente (el usuario
+// igual puede cambiarlo aparte si necesita generar con el otro formato).
+document.getElementById('cfgRegion').addEventListener('change', (e) => {
+  const cfgFormato = document.getElementById('cfgFormato');
+  cfgFormato.value = e.target.value === "O'HIGGINS" ? 'OHIGGINS' : 'RM';
+});
  
 
 
@@ -596,6 +610,19 @@ const EQUIP_LABELS = [
   'Estacionamientos de Automóviles','Juegos infantiles','Juegos de mesa','Luminarias','Mesa de ping-pong',
   'Sala multiuso','Canil para mascotas','Otros. ¿Cuál/es?',
 ];
+// Formato Región de O'Higgins: la tabla simple de equipamiento NO incluye
+// "Canil para mascotas" (verificado contra la plantilla real SERVIU O'Higgins).
+const EQUIP_LABELS_OHIGGINS = EQUIP_LABELS.filter(l => l !== 'Canil para mascotas');
+// Formato Región de O'Higgins: la tabla de equipamiento por tipo de usuario
+// tampoco tiene "Canil para mascotas", pero sí agrega "Bibliotecas" e
+// "Infocentro" (y el ping-pong es "Mesa de ping-pong metálica empotrada").
+// Solo un "Otros" (a diferencia del armado genérico que duplicaba la fila).
+const EQUIP_LABELS_OHIGGINS_USUARIO = [
+  'Áreas verdes adicionales','Plaza Activa (Máquinas de ejercicio)','Contenedores de basura diferenciado por tipo de desecho',
+  'Huertos Urbanos','Multicancha','Ciclo vías','Estacionamientos de Bicicletas','Escenario o anfiteatro',
+  'Estacionamientos de Automóviles','Juegos infantiles','Juegos de mesa','Luminarias',
+  'Mesa de ping-pong metálica empotrada','Sala multiuso','Bibliotecas','Infocentro','Otros. ¿Cuál/es?',
+];
 const TEMAS_LIST = [
   {a:'Vivienda y Barrio',t:'Ampliación de la vivienda'},{a:'',t:'Cuidado del medio ambiente y reciclaje'},
   {a:'',t:'Cuidado y mantención de la vivienda'},{a:'',t:'Mejoramiento de la vivienda y el entorno'},
@@ -641,6 +668,11 @@ function resolveColumns(headerRow) {
 
   const equsrCols = {};
   EQUIP_LABELS.forEach(l => { equsrCols[l] = idxBracket(l); });
+  // "Bibliotecas" e "Infocentro" solo existen en la tabla de equipamiento
+  // por usuario (no en la lista simple EQUIP_LABELS) — antes no se buscaban
+  // en el Excel, así que esas filas nunca se llenaban.
+  equsrCols['Bibliotecas'] = idxBracket('Bibliotecas');
+  equsrCols['Infocentro']  = idxBracket('Infocentro');
 
   const cols = {
     sitHab: idxExact('1.1.- Situación Habitacional:'),
@@ -927,8 +959,9 @@ function buildDoc(row, pd, folio, logoBuffer, COLS) {
   // ── Sección V ──
   const rawAtrib = val(row[COLS.atribRaw]);
   const rawEquip = val(row[COLS.equipRaw]);
+  const esOHiggins = pd.formato === 'OHIGGINS';
   const ATRIB = ATRIB_LABELS.map(l => ({ l }));
-  const EQUIP = EQUIP_LABELS.map(l => ({ l }));
+  const EQUIP = (esOHiggins ? EQUIP_LABELS_OHIGGINS : EQUIP_LABELS).map(l => ({ l }));
  
   const cX=1200,cL=W_L-cX;
   const atribTable = new Table({width:{size:W_L,type:WidthType.DXA},columnWidths:[cL,cX],rows:[
@@ -943,7 +976,9 @@ function buildDoc(row, pd, folio, logoBuffer, COLS) {
  
   function parseUsr(s){if(!s)return{n:false,j:false,m:false,h:false,a:false};const lo=s.toLowerCase();return{n:lo.includes('niñ')||lo.includes('nin'),j:lo.includes('jóven')||lo.includes('joven'),m:lo.includes('mujer'),h:lo.includes('hombre'),a:lo.includes('mayor')};}
   const cE=Math.round(W_L*0.30),cU=Math.floor((W_L-cE)/5),adjU=[cE,cU,cU,cU,cU,W_L-cE-cU*4];
-  const allEquip=[...EQUIP,{l:'Bibliotecas'},{l:'Infocentro'},{l:'Otros'}];
+  const allEquip = esOHiggins
+    ? EQUIP_LABELS_OHIGGINS_USUARIO.map(l => ({ l }))
+    : [...EQUIP,{l:'Bibliotecas'},{l:'Infocentro'},{l:'Otros'}];
   const usrTable = new Table({width:{size:W_L,type:WidthType.DXA},columnWidths:adjU,rows:[
     new TableRow({children:[hCell('Equipamiento',{width:adjU[0],fontSize:16}),hCell('Niñas/niños',{width:adjU[1],align:AlignmentType.CENTER,fontSize:16}),hCell('Jóvenes',{width:adjU[2],align:AlignmentType.CENTER,fontSize:16}),hCell('Mujeres',{width:adjU[3],align:AlignmentType.CENTER,fontSize:16}),hCell('Hombres',{width:adjU[4],align:AlignmentType.CENTER,fontSize:16}),hCell('Ad. Mayores',{width:adjU[5],align:AlignmentType.CENTER,fontSize:16})]}),
     ...allEquip.map(e=>{const col=COLS.equsrCols[e.l];const usrRaw=(col!==undefined&&col>=0)?val(row[col]):'';const u=parseUsr(usrRaw);return new TableRow({children:[cell(e.l,{width:adjU[0],fontSize:16}),cell(u.n?'X':'',{width:adjU[1],align:AlignmentType.CENTER,bold:true}),cell(u.j?'X':'',{width:adjU[2],align:AlignmentType.CENTER,bold:true}),cell(u.m?'X':'',{width:adjU[3],align:AlignmentType.CENTER,bold:true}),cell(u.h?'X':'',{width:adjU[4],align:AlignmentType.CENTER,bold:true}),cell(u.a?'X':'',{width:adjU[5],align:AlignmentType.CENTER,bold:true})]});})
