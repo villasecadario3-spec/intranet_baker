@@ -774,6 +774,7 @@ function extractMembers(row) {
 function buildDoc(row, pd, folio, logoBuffer, COLS) {
   const members = extractMembers(row);
   const W_L = CONTENT_L;
+  const esOHiggins = pd.formato === 'OHIGGINS';
  
   // ── Encabezado ──
   const logoW = Math.round(W_L * 0.08), tituloW = Math.round(W_L * 0.52), folioW = W_L - logoW - tituloW;
@@ -870,16 +871,36 @@ function buildDoc(row, pd, folio, logoBuffer, COLS) {
       children: [new Paragraph({ children: [new TextRun({ text: String(txt||''), bold, size: 16, font: 'Arial' })] })]
     });
   }
-  function fhc(txt, w, cs=1) { return famCell(txt, w, { bold: true, shade: 'D9D9D9', colspan: cs }); }
+  // Formato O'Higgins: encabezado sin sombreado (transparente), verificado
+  // contra la plantilla real — Formato RM: mantiene el gris D9D9D9 de siempre.
+  const shadeHdr = esOHiggins ? null : 'D9D9D9';
+  function fhc(txt, w, cs=1) { return famCell(txt, w, { bold: true, shade: shadeHdr, colspan: cs }); }
  
-  const header1 = new TableRow({ children: [
+  // El agrupamiento de columnas 12-18 es distinto entre formatos:
+  //  RM:        Ascend.Indígena(CUAL+Nac, 2col) | Extranjero(SI/NO+CUAL, 2col) | Enf.Cat.(SI/NO+CUAL, 2col) | Valech
+  //  O'Higgins: Ascend.Indígena(CUAL, 1col)     | Extranjero(Nacionalidad, 1col) | Enf.Cat.(SI/NO+CUAL,2col) | Discapacidad(SI/NO+CUAL,2col) | Valech
+  const header1 = esOHiggins ? new TableRow({ children: [
+    fhc('N°',adjF[0]), fhc('Nombre',adjF[1]), fhc('Primer Apellido',adjF[2]), fhc('Segundo Apellido',adjF[3]),
+    fhc('RUT',adjF[4]), fhc('Estado civil',adjF[5]), fhc('Género',adjF[6]), fhc('Parentesco',adjF[7]),
+    fhc('Edad',adjF[8]), fhc('Ad. Mayor',adjF[9]), fhc('Estudios',adjF[10]), fhc('Sit. Laboral',adjF[11]),
+    fhc('Ascend. Indígena', adjF[12], 1), fhc('Extranjero', adjF[13], 1),
+    fhc('Enf. Cat.', adjF[14]+adjF[15], 2), fhc('Discapacidad', adjF[16]+adjF[17], 2), fhc('Valech', adjF[18]),
+  ]}) : new TableRow({ children: [
     fhc('N°',adjF[0]), fhc('Nombre',adjF[1]), fhc('Primer Apellido',adjF[2]), fhc('Segundo Apellido',adjF[3]),
     fhc('RUT',adjF[4]), fhc('Estado civil',adjF[5]), fhc('Género',adjF[6]), fhc('Parentesco',adjF[7]),
     fhc('Edad',adjF[8]), fhc('Ad. Mayor',adjF[9]), fhc('Estudios',adjF[10]), fhc('Sit. Laboral',adjF[11]),
     fhc('Ascend. Indígena', adjF[12]+adjF[13], 2), fhc('Extranjero', adjF[14]+adjF[15], 2),
     fhc('Enf. Cat.', adjF[16]+adjF[17], 2), fhc('Valech', adjF[18]),
   ]});
-  const header2 = new TableRow({ children: [
+  const header2 = esOHiggins ? new TableRow({ children: [
+    famCell('',adjF[0]),famCell('',adjF[1]),famCell('',adjF[2]),famCell('',adjF[3]),famCell('',adjF[4]),
+    famCell('',adjF[5]),famCell('',adjF[6]),famCell('',adjF[7]),famCell('',adjF[8]),famCell('',adjF[9]),
+    famCell('',adjF[10]),famCell('',adjF[11]),
+    fhc('CUAL',adjF[12]), fhc('Nacionalidad',adjF[13]),
+    fhc('SI/NO',adjF[14]), fhc('CUAL',adjF[15]),
+    fhc('SI/NO',adjF[16]), fhc('CUAL',adjF[17]),
+    famCell('',adjF[18]),
+  ]}) : new TableRow({ children: [
     famCell('',adjF[0]),famCell('',adjF[1]),famCell('',adjF[2]),famCell('',adjF[3]),famCell('',adjF[4]),
     famCell('',adjF[5]),famCell('',adjF[6]),famCell('',adjF[7]),famCell('',adjF[8]),famCell('',adjF[9]),
     famCell('',adjF[10]),famCell('',adjF[11]),
@@ -894,8 +915,22 @@ function buildDoc(row, pd, folio, logoBuffer, COLS) {
     const m = members[i] || {};
     const has = !!(m.nombre || m.apellido1);
     const enfSN = has ? (val(m.enfermedad).toLowerCase()==='si'?'SI':'NO') : '';
+    const discSN = has ? (val(m.discapacidad).toLowerCase()==='si'?'SI':'NO') : '';
     const valech = has ? val(m.valech).toUpperCase() : '';
     const esExtranjero = has && val(m.nacionalidad) && !val(m.nacionalidad).toLowerCase().startsWith('chilen') ? 'SI' : (has?'NO':'');
+    const colsExtra = esOHiggins ? [
+      // Ascendencia(CUAL) | Extranjero(Nacionalidad) | Enf.Cat.(SI/NO,CUAL) | Discapacidad(SI/NO,CUAL) | Valech
+      famCell(val(m.puebloOriginario),adjF[12]), famCell(capitalize(val(m.nacionalidad)),adjF[13]),
+      famCell(enfSN,adjF[14]), famCell(val(m.enfermedadCual),adjF[15]),
+      famCell(discSN,adjF[16]), famCell(val(m.discapacidadCual),adjF[17]),
+      famCell(valech,adjF[18]),
+    ] : [
+      // Ascendencia(CUAL,Nac) | Extranjero(SI/NO,CUAL) | Enf.Cat.(SI/NO,CUAL) | Valech — comportamiento RM sin cambios
+      famCell(val(m.puebloOriginario),adjF[12]), famCell(capitalize(val(m.nacionalidad)),adjF[13]),
+      famCell(esExtranjero,adjF[14]), famCell(val(m.discapacidadCual),adjF[15]),
+      famCell(enfSN,adjF[16]), famCell(val(m.enfermedadCual),adjF[17]),
+      famCell(valech,adjF[18]),
+    ];
     dataRows.push(new TableRow({ children: [
       famCell(String(i+1),adjF[0]), famCell(capitalize(val(m.nombre)),adjF[1]),
       famCell(capitalize(val(m.apellido1)),adjF[2]), famCell(capitalize(val(m.apellido2)),adjF[3]),
@@ -903,10 +938,7 @@ function buildDoc(row, pd, folio, logoBuffer, COLS) {
       famCell(val(m.genero),adjF[6]), famCell(val(m.parentesco),adjF[7]),
       famCell(val(m.edad),adjF[8]), famCell(has?val(m.adultoMayor).toUpperCase():'',adjF[9]),
       famCell(val(m.estudios),adjF[10]), famCell(val(m.situacionLaboral),adjF[11]),
-      famCell(val(m.puebloOriginario),adjF[12]), famCell(capitalize(val(m.nacionalidad)),adjF[13]),
-      famCell(esExtranjero,adjF[14]), famCell(val(m.discapacidadCual),adjF[15]),
-      famCell(enfSN,adjF[16]), famCell(val(m.enfermedadCual),adjF[17]),
-      famCell(valech,adjF[18]),
+      ...colsExtra,
     ]}));
   }
  
@@ -959,7 +991,6 @@ function buildDoc(row, pd, folio, logoBuffer, COLS) {
   // ── Sección V ──
   const rawAtrib = val(row[COLS.atribRaw]);
   const rawEquip = val(row[COLS.equipRaw]);
-  const esOHiggins = pd.formato === 'OHIGGINS';
   const ATRIB = ATRIB_LABELS.map(l => ({ l }));
   const EQUIP = (esOHiggins ? EQUIP_LABELS_OHIGGINS : EQUIP_LABELS).map(l => ({ l }));
  
