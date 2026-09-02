@@ -59,8 +59,6 @@
     .estado-construccion{ background:#FEF1E0; color:#B5690A; }
     .estado-terminada{ background:#E1F3EA; color:#2E6B4F; }
     .estado-inicio{ background:#EAEAF7; color:#4A4A9E; }
-    .estado-desarrollo{ background:#E8F0FE; color:#3568B8; }
-    .estado-postular{ background:#F3E8FF; color:#7A3E9D; }
     .obra-comuna{ font-size:12px; color:var(--color-mute); margin-bottom:8px; display:flex; align-items:center; gap:5px; }
     .obra-comuna svg{ width:12px; height:12px; flex-shrink:0; }
     .obra-stats{ display:flex; gap:14px; font-size:11.5px; color:var(--color-ink); }
@@ -167,9 +165,6 @@
 <div class="hero">
     <div class="hero-eyebrow">Grupo Baker</div>
     <h1>Mapa de Obras</h1>
-    <div class="hero-tag">
-        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-    </div>
 </div>
 
 <div class="layout">
@@ -213,8 +208,6 @@
             <div class="field">
                 <label for="fEstado">Estado</label>
                 <select id="fEstado">
-                    <option value="por_postular">Por postular</option>
-                    <option value="en_desarrollo">En desarrollo</option>
                     <option value="por_iniciar">Por iniciar</option>
                     <option value="construccion" selected>En construcción</option>
                     <option value="terminada">Terminada</option>
@@ -312,6 +305,10 @@ function iniciarMapa(){
         attribution: '&copy; OpenStreetMap contributors',
         maxZoom: 19
     }).addTo(map);
+    // Leaflet a veces calcula el tamaño del mapa antes de que el layout de la
+    // página termine de acomodarse, y eso descuadra el centrado posterior.
+    // Forzamos un recálculo apenas se asienta el layout.
+    setTimeout(() => map.invalidateSize(), 200);
 }
 
 const iconoObra = (estado) => L.divIcon({
@@ -348,22 +345,12 @@ async function actualizarCoordenadas(o){
 }
 
 function estadoLabel(e){
-    if(e === 'terminada') return 'Terminada';
-    if(e === 'construccion') return 'En construcción';
-    if(e === 'por_iniciar') return 'Por iniciar';
-    if(e === 'en_desarrollo') return 'En desarrollo';
-    if(e === 'por_postular') return 'Por postular';
-    return 'En construcción';
+    return e === 'terminada' ? 'Terminada' : e === 'por_iniciar' ? 'Por iniciar' : 'En construcción';
+}
+function estadoClase(e){
+    return e === 'terminada' ? 'estado-terminada' : e === 'por_iniciar' ? 'estado-inicio' : 'estado-construccion';
 }
 
-function estadoClase(e){
-    if(e === 'terminada') return 'estado-terminada';
-    if(e === 'construccion') return 'estado-construccion';
-    if(e === 'por_iniciar') return 'estado-inicio';
-    if(e === 'en_desarrollo') return 'estado-desarrollo';
-    if(e === 'por_postular') return 'estado-postular';
-    return 'estado-construccion';
-}
 function renderLista(){
     const cont = document.getElementById('listaObras');
     document.getElementById('listaCount').textContent = obras.length + (obras.length===1?' obra':' obras');
@@ -449,6 +436,7 @@ function enfocarObra(id){
     document.getElementById('card-'+id)?.classList.add('activa');
     const o = obras.find(x => x.id === id);
     if(o && o.lat && o.lng){
+        map.invalidateSize();
         map.setView([o.lat, o.lng], 14, { animate: true });
         markers[id]?.openPopup();
     }else{
