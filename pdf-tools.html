@@ -1017,7 +1017,7 @@ async function doMerge(){
     const merged=await PDFDocument.create();
     for(const f of mergeFiles){
       const bytes=await readFile(f);
-      const src=await PDFDocument.load(bytes);
+      const src=await PDFDocument.load(bytes,{ignoreEncryption:true,throwOnInvalidObject:false});
       const pages=await merged.copyPages(src,src.getPageIndices());
       pages.forEach(p=>merged.addPage(p));
     }
@@ -1035,7 +1035,7 @@ async function loadSplitFile(f){
   if(!f||f.type!=='application/pdf')return;
   splitFileData=await readFile(f);splitFileName=f.name;
   const {PDFDocument}=PDFLib;
-  const doc=await PDFDocument.load(splitFileData);
+  const doc=await PDFDocument.load(splitFileData,{ignoreEncryption:true,throwOnInvalidObject:false});
   splitTotalPages=doc.getPageCount();
   document.getElementById('split-options').style.display='block';
   document.getElementById('split-info').textContent='El PDF tiene '+splitTotalPages+' páginas.';
@@ -1050,7 +1050,7 @@ function setSplitMode(mode,el){
 async function doSplit(){
   if(!splitFileData)return;
   const {PDFDocument}=PDFLib;
-  const src=await PDFDocument.load(splitFileData);
+  const src=await PDFDocument.load(splitFileData,{ignoreEncryption:true,throwOnInvalidObject:false});
   const base=splitFileName.replace(/\.pdf$/i,'').replace(/\s+/g,'-').slice(0,30);
   const parts=[];
   if(splitMode==='all'){
@@ -1092,6 +1092,9 @@ async function loadExtractFile(f){
   if(!f||f.type!=='application/pdf')return;
   extractFileData=await readFile(f);extractFileName=f.name;
   extractSelected=new Set();
+  // Limpiar resultado anterior
+  results.extract=null;
+  document.getElementById('extract-download').style.display='none';
   // Cargar con pdf.js para las miniaturas
   extractPdfJsDoc=await pdfjsLib.getDocument({data:extractFileData.slice()}).promise;
   const grid=document.getElementById('extract-grid');grid.innerHTML='';
@@ -1111,6 +1114,9 @@ async function loadExtractFile(f){
 function toggleExtract(n,el){
   if(extractSelected.has(n)){extractSelected.delete(n);el.classList.remove('selected');}
   else{extractSelected.add(n);el.classList.add('selected');}
+  // Ocultar descarga anterior al cambiar selección
+  document.getElementById('extract-download').style.display='none';
+  results.extract=null;
   updateExtractInfo();
 }
 function updateExtractInfo(){
@@ -1131,14 +1137,21 @@ function clearSelection(){
 async function doExtract(){
   if(!extractFileData||extractSelected.size===0)return;
   const {PDFDocument}=PDFLib;
-  const src=await PDFDocument.load(extractFileData);
-  const d=await PDFDocument.create();
-  const idxs=[...extractSelected].sort((a,b)=>a-b).map(n=>n-1);
-  const pgs=await d.copyPages(src,idxs);pgs.forEach(p=>d.addPage(p));
-  const base=extractFileName.replace(/\.pdf$/i,'').replace(/\s+/g,'-').slice(0,30);
-  const pages=[...extractSelected].sort((a,b)=>a-b).join('-');
-  results.extract={bytes:await d.save(),name:base+'_PAGS'+pages+'.pdf'};
-  showDownload('extract-download');
+  const btn=document.getElementById('extract-btn');
+  btn.disabled=true;btn.textContent='Extrayendo…';
+  try{
+    const src=await PDFDocument.load(extractFileData,{ignoreEncryption:true,throwOnInvalidObject:false});
+    const d=await PDFDocument.create();
+    const idxs=[...extractSelected].sort((a,b)=>a-b).map(n=>n-1);
+    const pgs=await d.copyPages(src,idxs);pgs.forEach(p=>d.addPage(p));
+    const base=extractFileName.replace(/\.pdf$/i,'').replace(/\s+/g,'-').slice(0,30);
+    const pages=[...extractSelected].sort((a,b)=>a-b).join('-');
+    results.extract={bytes:await d.save(),name:base+'_PAGS'+pages+'.pdf'};
+    showDownload('extract-download');
+  }catch(e){
+    alert('Error al extraer: '+e.message+'\n\nIntenta primero pasar el PDF por "Comprimir" y luego extrae desde ese archivo.');
+  }
+  btn.disabled=false;btn.textContent='Extraer selección';
 }
 
 // ── ROTAR ─────────────────────────────────────────────────────────────
@@ -1174,7 +1187,7 @@ function rotateAll(deg){for(const k in rotations)addRot(parseInt(k),deg);}
 async function doRotate(){
   if(!rotateFileData)return;
   const {PDFDocument,degrees}=PDFLib;
-  const doc=await PDFDocument.load(rotateFileData);
+  const doc=await PDFDocument.load(rotateFileData,{ignoreEncryption:true,throwOnInvalidObject:false});
   doc.getPages().forEach((p,i)=>{const r=rotations[i+1]||0;if(r)p.setRotation(degrees(r));});
   const base=rotateFileName.replace(/\.pdf$/i,'').replace(/\s+/g,'-').slice(0,30);
   results.rotate={bytes:await doc.save(),name:base+'_ROTADO.pdf'};
@@ -1265,7 +1278,7 @@ async function doWatermark(){
   const col=document.getElementById('wm-color').value;
   const pos=document.getElementById('wm-pos').value;
   const colorMap={gray:rgb(0.4,0.4,0.4),red:rgb(0.75,0.22,0.17),black:rgb(0,0,0),blue:rgb(0.17,0.51,0.79)};
-  const doc=await PDFDocument.load(wmFileData);
+  const doc=await PDFDocument.load(wmFileData,{ignoreEncryption:true,throwOnInvalidObject:false});
   const font=await doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
   doc.getPages().forEach(page=>{
     const {width,height}=page.getSize();
@@ -1290,7 +1303,7 @@ async function loadNumFile(f){
 async function doNumber(){
   if(!numFileData)return;
   const {PDFDocument,rgb}=PDFLib;
-  const doc=await PDFDocument.load(numFileData);
+  const doc=await PDFDocument.load(numFileData,{ignoreEncryption:true,throwOnInvalidObject:false});
   const font=await doc.embedFont(PDFLib.StandardFonts.Helvetica);
   const posVal=document.getElementById('num-pos').value;
   const startNum=parseInt(document.getElementById('num-start').value)||1;
