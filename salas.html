@@ -247,7 +247,7 @@
             <div class="form-group">
                 <label class="form-label">Asistentes</label>
                 <div style="position:relative">
-                    <input class="form-input" id="f-buscar-asistente" type="text" placeholder="Buscar por nombre…" autocomplete="off" oninput="buscarAsistentes(this.value)">
+                    <input class="form-input" id="f-buscar-asistente" type="text" placeholder="Buscar por nombre, o escribe un correo completo para invitar externos…" autocomplete="off" oninput="buscarAsistentes(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();intentarAgregarExternoDesdeInput();}">
                     <div id="sugerencias" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#2a2a2a;border:1px solid #444;border-radius:9px;margin-top:4px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.4);"></div>
                 </div>
                 <div id="asistentes-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
@@ -268,6 +268,16 @@
             <div class="form-row">
                 <div class="form-group"><label class="form-label">Hora inicio</label><input class="form-input" id="f-inicio" type="time" step="900"></div>
                 <div class="form-group"><label class="form-label">Hora fin</label><input class="form-input" id="f-fin" type="time" step="900"></div>
+            </div>
+            <div class="form-group">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="f-recurrente" onchange="toggleRecurrencia()" style="width:16px;height:16px;accent-color:#C0392B;cursor:pointer;">
+                    <span class="form-label" style="margin:0;">Repetir semanalmente</span>
+                </label>
+                <div id="recurrencia-hasta-wrap" style="display:none;margin-top:10px;">
+                    <label class="form-label">Repetir hasta (inclusive)</label>
+                    <input class="form-input" id="f-recurrente-hasta" type="date">
+                </div>
             </div>
         </div>
         <div class="modal-msg" id="modal-msg"></div>
@@ -372,22 +382,59 @@ async function intentarLoginSilencioso() {
 }
  
 let asistentesSeleccionados=[], buscarTimeout=null;
+const REGEX_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 async function buscarAsistentes(query) {
     const sugs=document.getElementById('sugerencias');
     if (!query||query.length<2) { sugs.style.display='none'; return; }
     clearTimeout(buscarTimeout);
     buscarTimeout=setTimeout(async()=>{
         const token=await getToken(); if(!token) return;
+        let htmlExterno='';
+        const q=query.trim();
+        if(REGEX_EMAIL.test(q) && !asistentesSeleccionados.find(a=>a.email.toLowerCase()===q.toLowerCase())){
+            htmlExterno=`<div class="sug-item" onclick="agregarAsistenteExterno('${q.replace(/'/g,"\\'")}')" style="border-bottom:1px solid #444;">
+                <div class="sug-nombre">➕ Invitar como externo</div>
+                <div class="sug-email">${q}</div>
+            </div>`;
+        }
         try {
             const res=await fetch(`https://graph.microsoft.com/v1.0/users?$filter=startswith(displayName,'${encodeURIComponent(query)}')&$select=displayName,mail&$top=6`,{headers:{Authorization:`Bearer ${token}`}});
             const data=await res.json();
             const DOMINIOS=['@ibaker.cl','@cmcromeral.cl','@epbrotar.cl'];
             const usuarios=(data.value||[]).filter(u=>u.mail&&DOMINIOS.some(d=>u.mail.endsWith(d))&&!asistentesSeleccionados.find(a=>a.email===u.mail));
-            if(!usuarios.length){sugs.style.display='none';return;}
-            sugs.innerHTML=usuarios.map(u=>`<div class="sug-item" onclick="agregarAsistente('${u.displayName}','${u.mail}')"><div class="sug-nombre">${u.displayName}</div><div class="sug-email">${u.mail}</div></div>`).join('');
+            const htmlInternos = usuarios.map(u=>`<div class="sug-item" onclick="agregarAsistente('${u.displayName}','${u.mail}')"><div class="sug-nombre">${u.displayName}</div><div class="sug-email">${u.mail}</div></div>`).join('');
+            const htmlTotal = htmlExterno + htmlInternos;
+            if(!htmlTotal){sugs.style.display='none';return;}
+            sugs.innerHTML=htmlTotal;
             sugs.style.display='block';
-        } catch(e){}
+        } catch(e){
+            // Si falla la búsqueda interna (ej. sin conexión a Graph), igual deja invitar externo si el texto es un correo válido.
+            if(htmlExterno){sugs.innerHTML=htmlExterno;sugs.style.display='block';}
+        }
     },300);
+}
+function agregarAsistenteExterno(email) {
+    if(asistentesSeleccionados.find(a=>a.email.toLowerCase()===email.toLowerCase())) return;
+    asistentesSeleccionados.push({nombre:email,email,externo:true});
+    document.getElementById('f-buscar-asistente').value='';
+    document.getElementById('sugerencias').style.display='none';
+    renderChips();
+}
+function intentarAgregarExternoDesdeInput() {
+    const input=document.getElementById('f-buscar-asistente');
+    const q=input.value.trim();
+    if(REGEX_EMAIL.test(q)) agregarAsistenteExterno(q);
+}
+function toggleRecurrencia() {
+    const activo=document.getElementById('f-recurrente').checked;
+    const wrap=document.getElementById('recurrencia-hasta-wrap');
+    wrap.style.display=activo?'block':'none';
+    if(activo && !document.getElementById('f-recurrente-hasta').value){
+        // Sugiere por defecto 4 semanas hacia adelante desde la fecha elegida
+        const base=document.getElementById('f-fecha').value?new Date(document.getElementById('f-fecha').value+'T00:00:00'):new Date();
+        base.setDate(base.getDate()+28);
+        document.getElementById('f-recurrente-hasta').value=isoDateLocal(base);
+    }
 }
 function agregarAsistente(nombre,email) {
     if(asistentesSeleccionados.find(a=>a.email===email)) return;
@@ -398,7 +445,7 @@ function agregarAsistente(nombre,email) {
 }
 function quitarAsistente(email) { asistentesSeleccionados=asistentesSeleccionados.filter(a=>a.email!==email); renderChips(); }
 function renderChips() {
-    document.getElementById('asistentes-chips').innerHTML=asistentesSeleccionados.map(a=>`<div class="chip">${a.nombre.split(' ').slice(0,2).join(' ')}<button class="chip-remove" onclick="quitarAsistente('${a.email}')">×</button></div>`).join('');
+    document.getElementById('asistentes-chips').innerHTML=asistentesSeleccionados.map(a=>`<div class="chip"${a.externo?' style="border-color:#C0392B;color:#C0392B;"':''} title="${a.email}">${a.externo?'✉ '+a.email:a.nombre.split(' ').slice(0,2).join(' ')}<button class="chip-remove" onclick="quitarAsistente('${a.email}')">×</button></div>`).join('');
 }
 document.addEventListener('click',e=>{if(!e.target.closest('#f-buscar-asistente')&&!e.target.closest('#sugerencias')){const s=document.getElementById('sugerencias');if(s)s.style.display='none';}});
  
@@ -411,6 +458,9 @@ function abrirModal({salaEmail,salaNombre,fecha,horaIni,horaFin}) {
     document.getElementById('f-fin').value=horaFin||'10:00';
     document.getElementById('f-asunto').value='';
     document.getElementById('f-buscar-asistente').value='';
+    document.getElementById('f-recurrente').checked=false;
+    document.getElementById('f-recurrente-hasta').value='';
+    document.getElementById('recurrencia-hasta-wrap').style.display='none';
     asistentesSeleccionados=[];renderChips();
     document.getElementById('modal-msg').className='modal-msg';
     document.getElementById('btn-agendar').disabled=false;
@@ -424,20 +474,30 @@ async function confirmarReserva() {
     const salaEmail=document.getElementById('f-sala').value;
     const inicio=document.getElementById('f-inicio').value;
     const fin=document.getElementById('f-fin').value;
+    const esRecurrente=document.getElementById('f-recurrente').checked;
+    const recurrenteHasta=document.getElementById('f-recurrente-hasta').value;
     if(!asunto){mostrarMsgModal('err','Ingresa un asunto.');return;}
     if(!fecha){mostrarMsgModal('err','Selecciona una fecha.');return;}
     if(!inicio||!fin||inicio>=fin){mostrarMsgModal('err','Horario no válido.');return;}
+    if(esRecurrente && !recurrenteHasta){mostrarMsgModal('err','Indica hasta cuándo se repite.');return;}
+    if(esRecurrente && recurrenteHasta<fecha){mostrarMsgModal('err','La fecha límite de repetición debe ser posterior a la fecha de inicio.');return;}
     const token=await getToken();
     if(!token){mostrarMsgModal('err','Error de autenticación.');return;}
     document.getElementById('btn-agendar').disabled=true;
-    document.getElementById('btn-agendar-txt').innerText='Agendando…';
+    document.getElementById('btn-agendar-txt').innerText=esRecurrente?'Agendando serie…':'Agendando…';
     try {
         const res=await fetch('https://salasbaker.netlify.app/.netlify/functions/agendar',{
             method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({token,salaEmail,asunto,inicio:`${fecha}T${inicio}:00`,fin:`${fecha}T${fin}:00`,asistentes:asistentesSeleccionados.map(a=>a.email)})
+            body:JSON.stringify({
+                token,salaEmail,asunto,
+                inicio:`${fecha}T${inicio}:00`,fin:`${fecha}T${fin}:00`,
+                asistentes:asistentesSeleccionados.map(a=>a.email),
+                recurrente:esRecurrente,
+                recurrenciaHasta:esRecurrente?recurrenteHasta:null
+            })
         });
         const data=await res.json();
-        if(res.ok){mostrarMsgModal('ok','✓ Reserva creada correctamente.');cache={};setTimeout(()=>{cerrarModal(null);render();},2000);}
+        if(res.ok){mostrarMsgModal('ok',esRecurrente?'✓ Serie de reuniones creada correctamente.':'✓ Reserva creada correctamente.');cache={};setTimeout(()=>{cerrarModal(null);render();},2000);}
         else{mostrarMsgModal('err',data.error||'No se pudo crear la reserva.');document.getElementById('btn-agendar').disabled=false;document.getElementById('btn-agendar-txt').innerText='Confirmar reserva';}
     } catch(e){mostrarMsgModal('err','Error de conexión.');document.getElementById('btn-agendar').disabled=false;document.getElementById('btn-agendar-txt').innerText='Confirmar reserva';}
 }
