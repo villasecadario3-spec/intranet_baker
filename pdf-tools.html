@@ -1139,17 +1139,45 @@ async function doExtract(){
   const {PDFDocument}=PDFLib;
   const btn=document.getElementById('extract-btn');
   btn.disabled=true;btn.textContent='Extrayendo…';
+  const base=extractFileName.replace(/\.pdf$/i,'').replace(/\s+/g,'-').slice(0,30);
+  const pages=[...extractSelected].sort((a,b)=>a-b).join('-');
+
   try{
+    // Intento 1: pdf-lib directo
     const src=await PDFDocument.load(extractFileData,{ignoreEncryption:true,throwOnInvalidObject:false});
     const d=await PDFDocument.create();
     const idxs=[...extractSelected].sort((a,b)=>a-b).map(n=>n-1);
-    const pgs=await d.copyPages(src,idxs);pgs.forEach(p=>d.addPage(p));
-    const base=extractFileName.replace(/\.pdf$/i,'').replace(/\s+/g,'-').slice(0,30);
-    const pages=[...extractSelected].sort((a,b)=>a-b).join('-');
+    const pgs=await d.copyPages(src,idxs);
+    pgs.forEach(p=>d.addPage(p));
     results.extract={bytes:await d.save(),name:base+'_PAGS'+pages+'.pdf'};
     showDownload('extract-download');
-  }catch(e){
-    alert('Error al extraer: '+e.message+'\n\nIntenta primero pasar el PDF por "Comprimir" y luego extrae desde ese archivo.');
+  }catch(e1){
+    // Intento 2: renderizar con PDF.js página a página → reconstruir con pdf-lib
+    try{
+      btn.textContent='Procesando páginas…';
+      const pdfJsDoc=await pdfjsLib.getDocument({data:extractFileData.slice()}).promise;
+      const d=await PDFDocument.create();
+      const idxs=[...extractSelected].sort((a,b)=>a-b);
+      for(let i=0;i<idxs.length;i++){
+        btn.textContent=`Procesando página ${i+1}/${idxs.length}…`;
+        const pageNum=idxs[i];
+        const page=await pdfJsDoc.getPage(pageNum);
+        const vp=page.getViewport({scale:2});
+        const canvas=document.createElement('canvas');
+        canvas.width=Math.round(vp.width);
+        canvas.height=Math.round(vp.height);
+        await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+        const pngBytes=await fetch(canvas.toDataURL('image/png')).then(r=>r.arrayBuffer());
+        const pngImg=await d.embedPng(pngBytes);
+        const origVp=page.getViewport({scale:1});
+        const newPage=d.addPage([origVp.width,origVp.height]);
+        newPage.drawImage(pngImg,{x:0,y:0,width:origVp.width,height:origVp.height});
+      }
+      results.extract={bytes:await d.save(),name:base+'_PAGS'+pages+'.pdf'};
+      showDownload('extract-download');
+    }catch(e2){
+      alert('Error al extraer: '+e2.message);
+    }
   }
   btn.disabled=false;btn.textContent='Extraer selección';
 }
