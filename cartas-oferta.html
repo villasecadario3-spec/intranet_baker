@@ -266,6 +266,17 @@ input[type=file] { display: none; }
         </button>
       </div>
       <div class="cartas-lista" id="conciliacionLista"></div>
+      <div style="margin:0 20px 20px;padding-top:16px;border-top:1px solid var(--border2);">
+        <div style="font-size:0.78rem;font-weight:600;color:var(--ink2);margin-bottom:8px;">Enviar todos por correo (uno por uno) al mismo destinatario</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <input type="email" id="correoDestinoMasivo" placeholder="correo@banco.cl" style="flex:1;min-width:220px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--panel2,#fff);color:var(--ink);">
+          <button class="btn btn-primary" id="btnEnviarCorreos" onclick="enviarCorreosMasivo()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            Enviar todos
+          </button>
+        </div>
+        <div id="envioProgreso" style="display:none;margin-top:10px;font-size:0.8rem;color:var(--ink2);"></div>
+      </div>
     </div>
 
   </div><!-- /panelConciliacion -->
@@ -798,6 +809,92 @@ function resetearConciliacion() {
   document.getElementById('warnBoxConciliacion').classList.remove('visible');
   document.getElementById('resultadoConciliacionCard').classList.remove('visible');
   checkHabilitarProcesarConciliacion();
+}
+
+// ── ENVÍO MASIVO DE CORREOS (uno por uno, mismo destinatario) ──
+async function getTokenCorreo() {
+  const accounts = msalInstance.getAllAccounts();
+  if (!accounts.length) return null;
+  try {
+    const res = await msalInstance.acquireTokenSilent({ scopes: ['Mail.Send'], account: accounts[0] });
+    return res.accessToken;
+  } catch(e) {
+    try {
+      const res = await msalInstance.acquireTokenPopup({ scopes: ['Mail.Send'] });
+      return res.accessToken;
+    } catch(e2) {
+      toast('No se pudo autorizar el envío de correo: ' + e2.message, true);
+      return null;
+    }
+  }
+}
+
+function arrayBufferABase64(buffer) {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+async function enviarCorreosMasivo() {
+  const destino = document.getElementById('correoDestinoMasivo').value.trim();
+  if (!destino || !destino.includes('@')) { toast('Ingresa un correo de destino válido', true); return; }
+  if (!resultadosConciliacion.length) return;
+  if (!confirm(`Se van a enviar ${resultadosConciliacion.length} correos individuales a ${destino}, cada uno con 1 PDF adjunto. ¿Confirmas?`)) return;
+
+  const token = await getTokenCorreo();
+  if (!token) return;
+
+  const btn = document.getElementById('btnEnviarCorreos');
+  btn.disabled = true;
+  const progreso = document.getElementById('envioProgreso');
+  progreso.style.display = 'block';
+
+  let enviados = 0, fallidos = [];
+  for (let i = 0; i < resultadosConciliacion.length; i++) {
+    const r = resultadosConciliacion[i];
+    progreso.textContent = `Enviando ${i + 1} de ${resultadosConciliacion.length}: ${r.nuevo}`;
+    try {
+      const buf = await r.file.arrayBuffer();
+      const base64 = arrayBufferABase64(buf);
+      const mensaje = {
+        message: {
+          subject: r.nuevo.replace(/\.pdf$/i, ''),
+          body: { contentType: 'Text', content: `Se adjunta el documento ${r.nuevo}.` },
+          toRecipients: [{ emailAddress: { address: destino } }],
+          attachments: [{
+            '@odata.type': '#microsoft.graph.fileAttachment',
+            name: r.nuevo,
+            contentType: 'application/pdf',
+            contentBytes: base64,
+          }],
+        },
+        saveToSentItems: true,
+      };
+      const res = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(mensaje),
+      });
+      if (res.ok || res.status === 202) enviados++;
+      else {
+        const err = await res.json().catch(() => ({}));
+        fallidos.push(`${r.nuevo}: ${err.error?.message || res.status}`);
+      }
+    } catch(e) {
+      fallidos.push(`${r.nuevo}: ${e.message}`);
+    }
+    // Pequeña pausa entre envíos para no saturar Graph API
+    await new Promise(res => setTimeout(res, 400));
+  }
+
+  btn.disabled = false;
+  progreso.textContent = `Listo — ${enviados} enviados${fallidos.length ? `, ${fallidos.length} con error (ver consola)` : ''}.`;
+  if (fallidos.length) console.error('Correos que fallaron:', fallidos);
+  toast(fallidos.length ? `${enviados} enviados, ${fallidos.length} fallaron` : `${enviados} correos enviados correctamente`, fallidos.length > 0);
 }
 
 // ── INIT ──────────────────────────────────────────────────────
