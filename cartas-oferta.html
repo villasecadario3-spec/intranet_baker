@@ -844,8 +844,8 @@ async function enviarCorreosMasivo() {
   if (!destino || !destino.includes('@')) { toast('Ingresa un correo de destino válido', true); return; }
   if (!resultadosConciliacion.length) return;
   const n = resultadosConciliacion.length;
-  const minEstimados = Math.ceil((n * 2.2) / 60);
-  if (!confirm(`Se van a enviar ${n} correos individuales a ${destino}, cada uno con 1 PDF adjunto.\n\nMicrosoft limita el envío a 30 correos por minuto, así que esto va a tardar aprox. ${minEstimados} minuto(s). ¿Confirmas?`)) return;
+  const minEstimados = Math.ceil((n * 4) / 60);
+  if (!confirm(`Se van a enviar ${n} correos individuales a ${destino}, cada uno con 1 PDF adjunto.\n\nPara evitar que Microsoft los rechace por exceso de velocidad, van espaciados — esto va a tardar aprox. ${minEstimados} minuto(s), más si Microsoft pide pausas extra en el camino. ¿Confirmas?`)) return;
 
   const token = await getTokenCorreo();
   if (!token) return;
@@ -879,10 +879,13 @@ async function enviarCorreosMasivo() {
       body: JSON.stringify(mensaje),
     });
     if (res.ok || res.status === 202) return { ok: true };
-    if (res.status === 429 && intento <= 3) {
-      // Microsoft pide esperar — respeta el tiempo que indica (o 30s por defecto) y reintenta.
-      const espera = parseInt(res.headers.get('Retry-After'), 10) || 30;
-      progreso.textContent = `Microsoft pidió pausar — reintentando "${r.nuevo}" en ${espera}s (intento ${intento + 1})…`;
+    if (res.status === 429 && intento <= 5) {
+      // El 429 de Graph no siempre trae "Retry-After" legible desde el navegador
+      // (CORS puede bloquearlo), y 30s resultó insuficiente en la práctica —
+      // usamos espera creciente: 60s, 120s, 240s, 480s, 960s.
+      const headerEspera = parseInt(res.headers.get('Retry-After'), 10);
+      const espera = headerEspera && headerEspera > 0 ? headerEspera : 60 * Math.pow(2, intento - 1);
+      progreso.textContent = `Microsoft frenó el envío — esperando ${espera}s antes de reintentar "${r.nuevo}" (intento ${intento + 1} de 6)…`;
       await new Promise(res2 => setTimeout(res2, espera * 1000));
       return enviarUno(r, intento + 1);
     }
@@ -901,8 +904,9 @@ async function enviarCorreosMasivo() {
     } catch(e) {
       fallidos.push(`${r.nuevo}: ${e.message}`);
     }
-    // Ritmo seguro: máx. ~27 correos/min, bajo el límite real de Microsoft (30/min).
-    if (i < resultadosConciliacion.length - 1) await new Promise(res => setTimeout(res, 2200));
+    // Ritmo mucho más conservador que el límite oficial (30/min de Exchange),
+    // porque en la práctica el limitador propio de Graph resultó más estricto.
+    if (i < resultadosConciliacion.length - 1) await new Promise(res => setTimeout(res, 4000));
   }
 
   btn.disabled = false;
