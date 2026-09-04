@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Divisor Cartas Oferta — Baker</title>
+<title>Escrituración, Gestor de Documentos — Baker</title>
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -11,6 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root {
   --bg: #0f1923;
@@ -150,7 +151,7 @@ input[type=file] { display: none; }
     Inicio
   </a>
   <div class="nav-sep"></div>
-  <div class="nav-title">Cartas Oferta</div>
+  <div class="nav-title">Escrituración, Gestor de Documentos</div>
   <div class="nav-spacer"></div>
   <div id="auth-area"></div>
 </nav>
@@ -158,9 +159,20 @@ input[type=file] { display: none; }
 <div class="wrap" id="main-wrap" style="display:none;">
   <div class="page-header">
     <div class="eyebrow">iBaker · Escrituración</div>
-    <h1 class="page-title">Divisor de Cartas Oferta</h1>
-    <p class="page-sub">Sube el PDF unificado con todas las cartas oferta. El sistema las detecta automáticamente, extrae el nombre de cada cliente y genera PDFs individuales listos para descargar.</p>
+    <h1 class="page-title">Escrituración, Gestor de Documentos</h1>
+    <p class="page-sub">Herramientas de apoyo para el equipo de escrituración: división de cartas oferta y conciliación energética.</p>
   </div>
+
+  <div class="tabs-nav" style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;">
+    <button class="tab-btn tab-btn-activa" id="tabBtnCartas" onclick="cambiarTab('cartas')" style="padding:12px 22px;font-family:inherit;font-size:0.86rem;font-weight:600;background:transparent;border:none;border-bottom:2px solid var(--cyan);margin-bottom:-2px;cursor:pointer;color:var(--cyan);">
+      Divisor Cartas Oferta
+    </button>
+    <button class="tab-btn" id="tabBtnConciliacion" onclick="cambiarTab('conciliacion')" style="padding:12px 22px;font-family:inherit;font-size:0.86rem;font-weight:600;background:transparent;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;color:var(--ink2);">
+      Conciliación Energético
+    </button>
+  </div>
+
+  <div id="panelCartas">
 
   <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
     <input type="file" id="fileInput" accept=".pdf" onchange="procesarArchivo(event)">
@@ -203,6 +215,61 @@ input[type=file] { display: none; }
     </div>
     <div class="cartas-lista" id="cartasLista"></div>
   </div>
+
+  </div><!-- /panelCartas -->
+
+  <div id="panelConciliacion" style="display:none;">
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+      <div class="dropzone" id="dropzoneExcel" onclick="document.getElementById('inputExcel').click()" style="margin-bottom:0;">
+        <input type="file" id="inputExcel" accept=".xlsx,.xls" onchange="cargarExcelConciliacion(event)">
+        <div class="dropzone-icon">📊</div>
+        <div class="dropzone-title" id="excelTitle">Sube el Excel con Producto y Cliente</div>
+        <div class="dropzone-sub">Columnas <span>PRODUCTO</span> y <span>CLIENTE</span> · .xlsx / .xls</div>
+      </div>
+      <div class="dropzone" id="dropzonePdfs" onclick="document.getElementById('inputPdfs').click()" style="margin-bottom:0;">
+        <input type="file" id="inputPdfs" accept=".pdf" multiple onchange="cargarPdfsConciliacion(event)">
+        <div class="dropzone-icon">📁</div>
+        <div class="dropzone-title" id="pdfsTitle">Sube los PDF por lote</div>
+        <div class="dropzone-sub">Varios archivos <span>.pdf</span> a la vez</div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:center;margin-bottom:20px;">
+      <button class="btn btn-primary" id="btnProcesarConciliacion" onclick="procesarConciliacion()" disabled>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+        Cruzar información y renombrar
+      </button>
+    </div>
+
+    <div class="warn-box" id="warnBoxConciliacion">
+      <div class="warn-box-title">⚠️ PDF sin coincidencia en el Excel</div>
+      <ul id="warnListConciliacion"></ul>
+    </div>
+
+    <div class="resultado-card" id="resultadoConciliacionCard">
+      <div class="resultado-header">
+        <div class="resultado-titulo">Documentos renombrados</div>
+        <div class="resultado-stats">
+          <div class="stat"><div class="stat-n" id="statConciliados">0</div><div class="stat-l">Con cliente</div></div>
+          <div class="stat"><div class="stat-n" id="statSinMatch">0</div><div class="stat-l">Sin coincidencia</div></div>
+        </div>
+      </div>
+      <div class="resultado-acciones">
+        <button class="btn btn-primary" id="btnZipConciliacion" onclick="descargarZipConciliacion()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Descargar todo en ZIP
+        </button>
+        <button class="btn btn-secondary" onclick="resetearConciliacion()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+          Empezar de nuevo
+        </button>
+      </div>
+      <div class="cartas-lista" id="conciliacionLista"></div>
+    </div>
+
+  </div><!-- /panelConciliacion -->
+
 </div>
 
 <div class="acceso-denegado" id="accesoDenegado">
@@ -595,6 +662,144 @@ async function cargarHistorial() {
   } catch(e) {
     card.style.display = 'none';
   }
+}
+
+// ── PESTAÑAS ──────────────────────────────────────────────────
+function cambiarTab(tab) {
+  document.getElementById('panelCartas').style.display = tab === 'cartas' ? 'block' : 'none';
+  document.getElementById('panelConciliacion').style.display = tab === 'conciliacion' ? 'block' : 'none';
+  const btnC = document.getElementById('tabBtnCartas'), btnE = document.getElementById('tabBtnConciliacion');
+  btnC.style.color = tab === 'cartas' ? 'var(--cyan)' : 'var(--ink2)';
+  btnC.style.borderBottomColor = tab === 'cartas' ? 'var(--cyan)' : 'transparent';
+  btnE.style.color = tab === 'conciliacion' ? 'var(--cyan)' : 'var(--ink2)';
+  btnE.style.borderBottomColor = tab === 'conciliacion' ? 'var(--cyan)' : 'transparent';
+}
+
+// ── CONCILIACIÓN ENERGÉTICO ──────────────────────────────────
+let excelDataConciliacion = [];   // [{producto:Number, cliente:String}]
+let pdfsConciliacion      = [];   // [File]
+let resultadosConciliacion = [];  // [{original, nuevo, cliente, numero, match, file}]
+
+function cargarExcelConciliacion(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const filas = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      excelDataConciliacion = filas.map(f => {
+        // Busca las columnas sin importar mayúsculas/espacios exactos
+        const keys = Object.keys(f);
+        const kProd = keys.find(k => k.trim().toUpperCase() === 'PRODUCTO');
+        const kCli  = keys.find(k => k.trim().toUpperCase() === 'CLIENTE');
+        return { producto: parseInt(String(f[kProd]).trim(), 10), cliente: String(f[kCli] || '').trim() };
+      }).filter(r => !isNaN(r.producto) && r.cliente);
+      document.getElementById('excelTitle').textContent = `✓ ${file.name} (${excelDataConciliacion.length} clientes)`;
+      checkHabilitarProcesarConciliacion();
+    } catch(err) {
+      toast('No se pudo leer el Excel: ' + err.message, true);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function cargarPdfsConciliacion(event) {
+  pdfsConciliacion = Array.from(event.target.files);
+  document.getElementById('pdfsTitle').textContent = `✓ ${pdfsConciliacion.length} PDF seleccionados`;
+  checkHabilitarProcesarConciliacion();
+}
+
+function checkHabilitarProcesarConciliacion() {
+  document.getElementById('btnProcesarConciliacion').disabled = !(excelDataConciliacion.length && pdfsConciliacion.length);
+}
+
+// Extrae el número correlativo del nombre del archivo, ej:
+// "Informe_CEV - 001 - A.pdf" -> 1
+function extraerNumeroPdf(nombreArchivo) {
+  const m = nombreArchivo.match(/-\s*(\d+)\s*-/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function procesarConciliacion() {
+  resultadosConciliacion = pdfsConciliacion.map(file => {
+    const numero = extraerNumeroPdf(file.name);
+    const match = numero !== null ? excelDataConciliacion.find(r => r.producto === numero) : null;
+    const extIdx = file.name.lastIndexOf('.');
+    const base = extIdx > -1 ? file.name.slice(0, extIdx) : file.name;
+    const ext  = extIdx > -1 ? file.name.slice(extIdx) : '.pdf';
+    const nuevo = match ? `${base} - ${match.cliente}${ext}` : file.name;
+    return { original: file.name, nuevo, cliente: match ? match.cliente : '', numero, match: !!match, file };
+  });
+
+  const conMatch  = resultadosConciliacion.filter(r => r.match);
+  const sinMatch  = resultadosConciliacion.filter(r => !r.match);
+
+  document.getElementById('statConciliados').textContent = conMatch.length;
+  document.getElementById('statSinMatch').textContent = sinMatch.length;
+
+  const warnBox = document.getElementById('warnBoxConciliacion');
+  if (sinMatch.length) {
+    document.getElementById('warnListConciliacion').innerHTML = sinMatch.map(r =>
+      `<li>${r.original}${r.numero !== null ? ` — producto N°${r.numero} no está en el Excel` : ' — no se encontró un número correlativo en el nombre'}</li>`
+    ).join('');
+    warnBox.classList.add('visible');
+  } else {
+    warnBox.classList.remove('visible');
+  }
+
+  const lista = document.getElementById('conciliacionLista');
+  lista.innerHTML = resultadosConciliacion.map((r, i) => `
+    <div class="carta-item">
+      <div class="carta-icon">${r.match ? '📋' : '⚠️'}</div>
+      <div class="carta-info">
+        <div class="carta-nombre">${r.nuevo}</div>
+        <div class="carta-pages">${r.match ? `Producto N°${r.numero} · ${r.cliente}` : 'Sin coincidencia — se descarga con el nombre original'}</div>
+      </div>
+      <div class="carta-dl">
+        <button class="btn-dl" onclick="descargarIndividualConciliacion(${i})">↓ PDF</button>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('resultadoConciliacionCard').classList.add('visible');
+}
+
+async function descargarIndividualConciliacion(idx) {
+  const r = resultadosConciliacion[idx];
+  const url = URL.createObjectURL(r.file);
+  const a = document.createElement('a');
+  a.href = url; a.download = r.nuevo;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function descargarZipConciliacion() {
+  if (!resultadosConciliacion.length) return;
+  const zip = new JSZip();
+  for (const r of resultadosConciliacion) {
+    const buf = await r.file.arrayBuffer();
+    zip.file(r.nuevo, buf);
+  }
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'Conciliacion_Energetico.zip';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function resetearConciliacion() {
+  excelDataConciliacion = [];
+  pdfsConciliacion = [];
+  resultadosConciliacion = [];
+  document.getElementById('inputExcel').value = '';
+  document.getElementById('inputPdfs').value = '';
+  document.getElementById('excelTitle').textContent = 'Sube el Excel con Producto y Cliente';
+  document.getElementById('pdfsTitle').textContent = 'Sube los PDF por lote';
+  document.getElementById('warnBoxConciliacion').classList.remove('visible');
+  document.getElementById('resultadoConciliacionCard').classList.remove('visible');
+  checkHabilitarProcesarConciliacion();
 }
 
 // ── INIT ──────────────────────────────────────────────────────
