@@ -225,7 +225,7 @@ input[type=file] { display: none; }
         <input type="file" id="inputExcel" accept=".xlsx,.xls" onchange="cargarExcelConciliacion(event)">
         <div class="dropzone-icon">📊</div>
         <div class="dropzone-title" id="excelTitle">Sube el Excel con Producto y Cliente</div>
-        <div class="dropzone-sub">Columnas <span>PRODUCTO</span> y <span>CLIENTE</span> · .xlsx / .xls</div>
+        <div class="dropzone-sub">Columna <span>A</span> = N° lote, columna <span>B</span> = cliente · .xlsx / .xls</div>
       </div>
       <div class="dropzone" id="dropzonePdfs" onclick="document.getElementById('inputPdfs').click()" style="margin-bottom:0;">
         <input type="file" id="inputPdfs" accept=".pdf" multiple onchange="cargarPdfsConciliacion(event)">
@@ -688,14 +688,12 @@ function cargarExcelConciliacion(event) {
     try {
       const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const filas = XLSX.utils.sheet_to_json(ws, { defval: '' });
-      excelDataConciliacion = filas.map(f => {
-        // Busca las columnas sin importar mayúsculas/espacios exactos
-        const keys = Object.keys(f);
-        const kProd = keys.find(k => k.trim().toUpperCase() === 'PRODUCTO');
-        const kCli  = keys.find(k => k.trim().toUpperCase() === 'CLIENTE');
-        return { producto: parseInt(String(f[kProd]).trim(), 10), cliente: String(f[kCli] || '').trim() };
-      }).filter(r => !isNaN(r.producto) && r.cliente);
+      // Se lee por posición (columna A = número de lote, columna B = nombre del
+      // cliente), sin importar cómo se llamen los encabezados en el Excel.
+      const filas = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      excelDataConciliacion = filas.slice(1) // se salta la fila 1 (encabezados)
+        .map(f => ({ producto: parseInt(String(f[0]).trim(), 10), cliente: String(f[1] || '').trim() }))
+        .filter(r => !isNaN(r.producto) && r.cliente);
       document.getElementById('excelTitle').textContent = `✓ ${file.name} (${excelDataConciliacion.length} clientes)`;
       checkHabilitarProcesarConciliacion();
     } catch(err) {
