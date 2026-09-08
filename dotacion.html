@@ -601,7 +601,11 @@ async function sincronizarBUK() {
       headers.forEach((h, i) => { obj[h] = row[i] !== undefined ? row[i] : ''; });
       return obj;
     });
+    console.log('[BUK] Encabezados encontrados en el Excel:', headers);
+    console.log('[BUK] Filas totales leídas (antes de filtrar):', filas.length);
+    if (filas.length) console.log('[BUK] Ejemplo de la primera fila:', filas[0]);
     workersBUK = filas.map(excelRowToWorker).filter(w => w.name);
+    console.log('[BUK] Personas después de filtrar (con nombre):', workersBUK.length);
     renderComparacionBUK();
     toast(`Comparación cargada — ${workersBUK.length} personas en el Excel de BUK`);
   } catch(e) {
