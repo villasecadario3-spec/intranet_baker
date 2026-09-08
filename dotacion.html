@@ -523,6 +523,15 @@ async function graphGet(url) {
   return res.json();
 }
 
+// No asumimos que la hoja se llama "Sheet1" — un Excel en español normalmente
+// trae su primera hoja como "Hoja1" (o cualquier otro nombre), así que se
+// pide la lista de hojas y se usa la primera, sea cual sea su nombre.
+async function obtenerPrimeraHoja() {
+  const data = await graphGet(`https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets`);
+  if (!data.value || !data.value.length) throw new Error('El archivo no tiene hojas');
+  return data.value[0].id;
+}
+
 async function resolverExcelItem() {
   if (excelDriveId && excelItemId) return true;
   try {
@@ -580,8 +589,9 @@ async function sincronizarBUK() {
   try {
     const ok = await resolverExcelItem();
     if (!ok) throw new Error('No se pudo acceder al Excel de SharePoint');
+    const hojaId = await obtenerPrimeraHoja();
     const data = await graphGet(
-      `https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets/Sheet1/usedRange`
+      `https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets/${encodeURIComponent(hojaId)}/usedRange`
     );
     const values = data.values;
     if (!values || values.length < 2) throw new Error('El Excel está vacío o no tiene datos');
