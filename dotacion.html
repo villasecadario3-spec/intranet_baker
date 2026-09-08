@@ -589,6 +589,8 @@ async function sincronizarBUK() {
   try {
     const ok = await resolverExcelItem();
     if (!ok) throw new Error('No se pudo acceder al Excel de SharePoint');
+    const listaHojas = await graphGet(`https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets`);
+    console.log('[BUK] Pestañas encontradas en el archivo:', listaHojas.value.map(h => h.name));
     const hojaId = await obtenerPrimeraHoja();
     const data = await graphGet(
       `https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets/${encodeURIComponent(hojaId)}/usedRange`
