@@ -523,13 +523,13 @@ async function graphGet(url) {
   return res.json();
 }
 
-// No asumimos que la hoja se llama "Sheet1" — un Excel en español normalmente
-// trae su primera hoja como "Hoja1" (o cualquier otro nombre), así que se
-// pide la lista de hojas y se usa la primera, sea cual sea su nombre.
-async function obtenerPrimeraHoja() {
-  const data = await graphGet(`https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets`);
-  if (!data.value || !data.value.length) throw new Error('El archivo no tiene hojas');
-  return data.value[0].id;
+// Busca la pestaña "MO" (Mano de Obra) — es la única con el consolidado real
+// de todas las obras y todos los meses. Las demás pestañas del archivo son
+// reportes puntuales de un mes, o resúmenes tipo tabla dinámica.
+async function obtenerHojaMO(listaHojas) {
+  const hoja = listaHojas.value.find(h => h.name.trim().toUpperCase() === 'MO');
+  if (!hoja) throw new Error(`No se encontró la pestaña "MO" — las pestañas del archivo son: ${listaHojas.value.map(h=>h.name).join(', ')}`);
+  return hoja.id;
 }
 
 async function resolverExcelItem() {
@@ -560,19 +560,34 @@ function parseFechaExcel(val) {
   return null;
 }
 
+// Encabezados reales del export de BUK (pestaña "MO"), verificados contra el
+// archivo real: no vienen en la fila 1 — antes hay varias filas de metadata
+// del reporte ("Libro:", "Fecha Generación:", etc.), así que se busca la fila
+// que contiene el encabezado exacto en vez de asumir una posición fija.
+const COL_AREA   = 'Trabajo - Nombre Área';
+const COL_NOMBRE = 'Colaborador(a) - Nombre Completo';
+const COL_RUT    = 'Colaborador(a) - Número de Documento';
+const COL_CARGO  = 'Trabajo - Cargo';
+const COL_CC     = 'Trabajo - Centro de Costo';
+const COL_GASTO  = 'Liquidación - Gasto Empresa';
+const COL_FING   = 'Trabajo - Fecha Ingreso Compañía';
+const COL_FTERM  = 'Trabajo - Fecha Término Trabajo';
+const COL_PERIODO= 'Liquidación - Período';
+const OBRA_FILTRO = 'Obra Mirador El Pino';
+
 function excelRowToWorker(r) {
-  const cc   = String(r.job_cost_center || '').trim();
-  const name = String(r.full_name || '').trim();
-  const rut  = String(r.rut || '').trim();
-  const role = String(r.role_name || '').trim();
-  const fs   = parseFechaExcel(r.job_end_date);
-  const fc   = parseFechaExcel(r.job_start_date);
-  const motivo = String(r.termination_reason || '').trim() || null;
+  const cc   = String(r[COL_CC] || '').trim();
+  const name = String(r[COL_NOMBRE] || '').trim();
+  const rut  = String(r[COL_RUT] || '').trim();
+  const role = String(r[COL_CARGO] || '').trim();
+  const fs   = parseFechaExcel(r[COL_FTERM]);
+  const fc   = parseFechaExcel(r[COL_FING]);
+  const periodo = parseFechaExcel(r[COL_PERIODO]);
+  const gasto = Number(r[COL_GASTO]) || null;
   const rutlimpio = rut.replace(/[^0-9kK]/g,'').toUpperCase();
-  const id = (r.ID || `${rutlimpio}#${cc}#${role}`).toString().trim();
   return {
-    id, rutlimpio, cc, role, name, rut,
-    fc: fc || null, fs: fs || null, motivo: motivo || null,
+    id: `${rutlimpio}#${cc}`, rutlimpio, cc, role, name, rut,
+    fc: fc || null, fs: fs || null, motivo: null, periodo, gasto,
     status: (fs && new Date(fs) <= new Date()) ? 'finiquitado' : 'activo',
     source: 'excel',
   };
@@ -591,25 +606,40 @@ async function sincronizarBUK() {
     if (!ok) throw new Error('No se pudo acceder al Excel de SharePoint');
     const listaHojas = await graphGet(`https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets`);
     console.log('[BUK] Pestañas encontradas en el archivo:', listaHojas.value.map(h => h.name));
-    const hojaId = await obtenerPrimeraHoja();
+    const hojaId = await obtenerHojaMO(listaHojas);
     const data = await graphGet(
       `https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets/${encodeURIComponent(hojaId)}/usedRange`
     );
     const values = data.values;
-    if (!values || values.length < 2) throw new Error('El Excel está vacío o no tiene datos');
-    const headers = values[0].map(h => String(h).trim());
-    const filas = values.slice(1).map(row => {
+    if (!values || values.length < 2) throw new Error('La pestaña MO está vacía');
+
+    // La fila de encabezado no está en una posición fija — se busca la fila
+    // que contiene el texto exacto de la columna del nombre completo.
+    const idxHeader = values.findIndex(row => row.includes(COL_NOMBRE));
+    if (idxHeader === -1) throw new Error('No se encontró la fila de encabezados en la pestaña MO');
+    const headers = values[idxHeader].map(h => String(h).trim());
+    const filas = values.slice(idxHeader + 1).map(row => {
       const obj = {};
       headers.forEach((h, i) => { obj[h] = row[i] !== undefined ? row[i] : ''; });
       return obj;
     });
-    console.log('[BUK] Encabezados encontrados en el Excel:', headers);
-    console.log('[BUK] Filas totales leídas (antes de filtrar):', filas.length);
-    if (filas.length) console.log('[BUK] Ejemplo de la primera fila:', filas[0]);
-    workersBUK = filas.map(excelRowToWorker).filter(w => w.name);
-    console.log('[BUK] Personas después de filtrar (con nombre):', workersBUK.length);
+    console.log('[BUK] Fila de encabezados encontrada en índice:', idxHeader);
+    console.log('[BUK] Filas totales leídas (todas las obras, todos los meses):', filas.length);
+
+    // Filtra solo Mirador El Pino, y dedupe por RUT (una persona puede
+    // aparecer varias veces, una por cada mes trabajado) — se queda con
+    // la fila del período más reciente por persona.
+    const deObra = filas.filter(r => String(r[COL_AREA] || '').trim() === OBRA_FILTRO);
+    console.log(`[BUK] Filas de "${OBRA_FILTRO}":`, deObra.length);
+    const porRut = new Map();
+    deObra.map(excelRowToWorker).filter(w => w.name).forEach(w => {
+      const actual = porRut.get(w.rutlimpio);
+      if (!actual || (w.periodo && (!actual.periodo || w.periodo > actual.periodo))) porRut.set(w.rutlimpio, w);
+    });
+    workersBUK = [...porRut.values()];
+    console.log('[BUK] Personas únicas de Mirador El Pino:', workersBUK.length);
     renderComparacionBUK();
-    toast(`Comparación cargada — ${workersBUK.length} personas en el Excel de BUK`);
+    toast(`Comparación cargada — ${workersBUK.length} personas de Mirador El Pino en BUK`);
   } catch(e) {
     console.error('Error cargando comparación BUK:', e);
     toast('Error al cargar: ' + e.message);
