@@ -148,7 +148,7 @@ input[type=file] { display: none; }
 <nav class="nav">
   <a class="nav-back" href="index.html">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-    Inicio
+    Volver a la intranet
   </a>
   <div class="nav-sep"></div>
   <div class="nav-title">Escrituración, Gestor de Documentos</div>
@@ -267,19 +267,14 @@ input[type=file] { display: none; }
       </div>
       <div class="cartas-lista" id="conciliacionLista"></div>
       <div style="margin:0 20px 20px;padding-top:16px;border-top:1px solid var(--border2);">
-        <div style="font-size:0.78rem;font-weight:600;color:var(--ink2);margin-bottom:8px;">Enviar todos por correo al mismo destinatario, agrupados en lotes</div>
+        <div style="font-size:0.78rem;font-weight:600;color:var(--ink2);margin-bottom:8px;">Enviar por correo (1 PDF por envío) al mismo destinatario — solo los que tienen coincidencia</div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-          <input type="email" id="correoDestinoMasivo" placeholder="correo@banco.cl" style="flex:1;min-width:220px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--panel2,#fff);color:var(--ink);">
-          <div style="display:flex;align-items:center;gap:6px;">
-            <label style="font-size:0.78rem;color:var(--ink2);white-space:nowrap;">PDF por correo:</label>
-            <input type="number" id="pdfsPorCorreo" value="10" min="1" max="30" style="width:60px;padding:10px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--panel2,#fff);color:var(--ink);text-align:center;">
-          </div>
+          <input type="email" id="correoDestinoMasivo" placeholder="correo@banco.cl" style="flex:1;min-width:220px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:#fff;color:#111;">
           <button class="btn btn-primary" id="btnEnviarCorreos" onclick="enviarCorreosMasivo()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
             Enviar todos
           </button>
         </div>
-        <div style="font-size:0.72rem;color:var(--ink3,#999);margin-top:6px;">Menos correos con varios PDF cada uno reduce el riesgo de que el banco lo marque como sospechoso. Si algún lote pesa mucho, se divide solo para no pasar los ~3MB por correo.</div>
         <div id="envioProgreso" style="display:none;margin-top:10px;font-size:0.8rem;color:var(--ink2);"></div>
       </div>
     </div>
@@ -856,28 +851,9 @@ async function enviarCorreosMasivo() {
   const sinMatch = resultadosConciliacion.length - paraEnviar.length;
   if (!paraEnviar.length) { toast('Ningún documento tiene coincidencia con el Excel — no hay nada que enviar', true); return; }
 
-  let porCorreo = parseInt(document.getElementById('pdfsPorCorreo').value, 10);
-  if (!porCorreo || porCorreo < 1) porCorreo = 10;
-  if (porCorreo > 30) porCorreo = 30;
-
-  // Agrupa en lotes por cantidad, pero además corta el lote si el peso total
-  // en bytes crudos supera ~2MB (al pasar a base64 pesa ~33% más, así que
-  // esto deja margen bajo el límite práctico de ~3MB por correo de Graph).
-  const MAX_BYTES_LOTE = 2_000_000;
-  const lotes = [];
-  let loteActual = [], bytesActual = 0;
-  for (const r of paraEnviar) {
-    if (loteActual.length && (loteActual.length >= porCorreo || bytesActual + r.file.size > MAX_BYTES_LOTE)) {
-      lotes.push(loteActual);
-      loteActual = []; bytesActual = 0;
-    }
-    loteActual.push(r); bytesActual += r.file.size;
-  }
-  if (loteActual.length) lotes.push(loteActual);
-
-  const n = lotes.length;
+  const n = paraEnviar.length;
   const minEstimados = Math.ceil((n * 4) / 60);
-  if (!confirm(`Se van a enviar ${n} correo(s) a ${destino}, con hasta ${porCorreo} PDF adjuntos cada uno (${paraEnviar.length} documentos con coincidencia).${sinMatch ? `\n\n${sinMatch} documento(s) sin coincidencia NO se van a enviar.` : ''}\n\nEsto va a tardar aprox. ${minEstimados} minuto(s), más si Microsoft pide pausas extra en el camino. ¿Confirmas?`)) return;
+  if (!confirm(`Se van a enviar ${n} correo(s) individuales a ${destino}, cada uno con 1 PDF adjunto.${sinMatch ? `\n\n${sinMatch} documento(s) sin coincidencia NO se van a enviar.` : ''}\n\nEsto va a tardar aprox. ${minEstimados} minuto(s), más si Microsoft pide pausas extra en el camino. ¿Confirmas?`)) return;
 
   const token = await getTokenCorreo();
   if (!token) return;
@@ -887,25 +863,21 @@ async function enviarCorreosMasivo() {
   const progreso = document.getElementById('envioProgreso');
   progreso.style.display = 'block';
 
-  // Envía UN correo (con varios PDF adjuntos), con reintentos si Microsoft lo frena por exceso de velocidad (429).
-  async function enviarLote(lote, intento = 1) {
-    const attachments = [];
-    for (const r of lote) {
-      const buf = await r.file.arrayBuffer();
-      attachments.push({
-        '@odata.type': '#microsoft.graph.fileAttachment',
-        name: r.nuevo,
-        contentType: 'application/pdf',
-        contentBytes: arrayBufferABase64(buf),
-      });
-    }
-    const listaTxt = lote.map(r => `• ${r.nuevo}`).join('\n');
+  // Envía UN correo con 1 PDF, con reintentos si Microsoft lo frena por exceso de velocidad (429).
+  async function enviarUno(r, intento = 1) {
+    const buf = await r.file.arrayBuffer();
+    const asunto = r.nuevo.replace(/\.pdf$/i, '');
     const mensaje = {
       message: {
-        subject: `Documentos (${lote.length})`,
-        body: { contentType: 'Text', content: `Se adjuntan los siguientes documentos:\n\n${listaTxt}` },
+        subject: asunto,
+        body: { contentType: 'Text', content: `Se adjunta el documento ${r.nuevo}.` },
         toRecipients: [{ emailAddress: { address: destino } }],
-        attachments,
+        attachments: [{
+          '@odata.type': '#microsoft.graph.fileAttachment',
+          name: r.nuevo,
+          contentType: 'application/pdf',
+          contentBytes: arrayBufferABase64(buf),
+        }],
       },
       saveToSentItems: true,
     };
@@ -921,33 +893,33 @@ async function enviarCorreosMasivo() {
       // usamos espera creciente: 60s, 120s, 240s, 480s, 960s.
       const headerEspera = parseInt(res.headers.get('Retry-After'), 10);
       const espera = headerEspera && headerEspera > 0 ? headerEspera : 60 * Math.pow(2, intento - 1);
-      progreso.textContent = `Microsoft frenó el envío — esperando ${espera}s antes de reintentar este lote (intento ${intento + 1} de 6)…`;
+      progreso.textContent = `Microsoft frenó el envío — esperando ${espera}s antes de reintentar "${r.nuevo}" (intento ${intento + 1} de 6)…`;
       await new Promise(res2 => setTimeout(res2, espera * 1000));
-      return enviarLote(lote, intento + 1);
+      return enviarUno(r, intento + 1);
     }
     const err = await res.json().catch(() => ({}));
     return { ok: false, error: err.error?.message || `HTTP ${res.status}` };
   }
 
   let enviados = 0, fallidos = [];
-  for (let i = 0; i < lotes.length; i++) {
-    const lote = lotes[i];
-    progreso.textContent = `Enviando correo ${i + 1} de ${n} (${lote.length} PDF)…`;
+  for (let i = 0; i < paraEnviar.length; i++) {
+    const r = paraEnviar[i];
+    progreso.textContent = `Enviando ${i + 1} de ${n}: ${r.nuevo}`;
     try {
-      const resultado = await enviarLote(lote);
+      const resultado = await enviarUno(r);
       if (resultado.ok) enviados++;
-      else fallidos.push(`Correo ${i + 1} (${lote.map(r=>r.nuevo).join(', ')}): ${resultado.error}`);
+      else fallidos.push(`${r.nuevo}: ${resultado.error}`);
     } catch(e) {
-      fallidos.push(`Correo ${i + 1}: ${e.message}`);
+      fallidos.push(`${r.nuevo}: ${e.message}`);
     }
     // Ritmo conservador entre correos, para no gatillar el limitador de Graph.
-    if (i < lotes.length - 1) await new Promise(res => setTimeout(res, 4000));
+    if (i < paraEnviar.length - 1) await new Promise(res => setTimeout(res, 4000));
   }
 
   btn.disabled = false;
-  progreso.textContent = `Listo — ${enviados} de ${n} correo(s) enviados${fallidos.length ? `, ${fallidos.length} con error (ver consola)` : ''}.`;
+  progreso.textContent = `Listo — ${enviados} de ${n} enviados${fallidos.length ? `, ${fallidos.length} con error (ver consola)` : ''}.`;
   if (fallidos.length) console.error('Correos que fallaron:', fallidos);
-  toast(fallidos.length ? `${enviados}/${n} correos enviados, ${fallidos.length} fallaron` : `${enviados} correo(s) enviados correctamente`, fallidos.length > 0);
+  toast(fallidos.length ? `${enviados}/${n} enviados, ${fallidos.length} fallaron` : `${enviados} correo(s) enviados correctamente`, fallidos.length > 0);
 }
 
 // ── INIT ──────────────────────────────────────────────────────
