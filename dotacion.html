@@ -3,11 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Control de Dotación</title>
+<title>Control de Dotación — Mirador El Pino</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
 <style>
   :root{
     --ink:#16263A;
@@ -43,7 +42,7 @@
     color:#fff;
     padding:22px 28px 20px;
   }
-  .topbar-inner{ max-width:1180px; margin:0 auto; }
+  .topbar-inner{ max-width:1600px; margin:0 auto; }
   .eyebrow{
     font-family:var(--font-mono);
     font-size:11px;
@@ -83,7 +82,7 @@
   .legend-swatch{ width:12px; height:12px; border-radius:3px; flex:none; }
 
   /* ---------- Layout ---------- */
-  .wrap{ max-width:1180px; margin:0 auto; padding:24px 28px 80px; }
+  .wrap{ max-width:1600px; margin:0 auto; padding:24px 28px 80px; }
   .toolbar{
     display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;
     background:var(--panel);
@@ -148,13 +147,14 @@
     background:var(--panel);
     border:1px solid var(--line);
     border-radius:10px;
-    overflow:hidden;
+    overflow-x:auto;
   }
+  .roster-inner{ min-width:1300px; }
   .roster-head{
     display:grid;
-    grid-template-columns: 1.7fr 1.2fr 1fr 105px 168px 190px 200px;
-    gap:10px;
-    padding:11px 16px;
+    grid-template-columns: 1.6fr 1.2fr 0.85fr 110px 140px 140px 160px 185px 210px;
+    gap:0;
+    padding:0;
     background:var(--gray-soft);
     font-size:11px;
     text-transform:uppercase;
@@ -163,14 +163,31 @@
     font-weight:700;
     border-bottom:1px solid var(--line);
   }
+  .roster-head > div{
+    padding:11px 12px;
+    border-right:1px solid var(--line);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .roster-head > div:last-child{ border-right:none; }
   .row{
     display:grid;
-    grid-template-columns: 1.7fr 1.2fr 1fr 105px 168px 190px 200px;
-    gap:10px;
-    padding:12px 16px;
-    align-items:center;
+    grid-template-columns: 1.6fr 1.2fr 0.85fr 110px 140px 140px 160px 185px 210px;
+    gap:0;
+    padding:0;
+    align-items:stretch;
     border-bottom:1px solid var(--line);
   }
+  .row > div{
+    padding:11px 12px;
+    border-right:1px solid var(--line);
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    min-width:0;
+  }
+  .row > div:last-child{ border-right:none; }
   .row:last-child{ border-bottom:none; }
   .row:hover{ background:#FAF8F3; }
   .row.is-out{ opacity:.55; }
@@ -197,7 +214,7 @@
   .mini i.auto{ background:var(--ink); }
   .mini i.manual-on{ background:var(--green); }
   .mini i.manual-out{ background:var(--red); }
-  .mini-wrap{ display:flex; flex-direction:column; gap:3px; width:154px; }
+  .mini-wrap{ display:flex; flex-direction:column; gap:3px; width:210px; }
   .mini-caption{ font-size:9.5px; color:var(--steel); font-family:var(--font-mono); display:flex; justify-content:space-between; align-items:center; width:100%; }
   .mini-caption .mid{ flex:1; text-align:center; color:var(--line-strong); }
 
@@ -221,6 +238,51 @@
   .empty{
     padding:40px 20px; text-align:center; color:var(--steel); font-size:13.5px;
   }
+
+  .resumen-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:6px 0 2px; margin-bottom:18px; overflow:hidden;
+  }
+  table.resumen{ width:100%; border-collapse:collapse; font-size:13px; }
+  table.resumen th{
+    text-align:right; padding:10px 16px; font-size:11px; text-transform:uppercase;
+    letter-spacing:.05em; color:var(--steel); font-weight:700; background:var(--gray-soft);
+    border-bottom:1px solid var(--line);
+  }
+  table.resumen th.cc-col{ text-align:left; }
+  table.resumen td{ text-align:right; padding:9px 16px; border-bottom:1px solid var(--line); }
+  table.resumen td.cc-col{ text-align:left; font-weight:600; }
+  table.resumen tr:last-child td{ border-bottom:none; }
+  table.resumen tr.total-row td{ font-weight:700; background:var(--gray-soft); border-top:2px solid var(--line-strong); }
+  table.resumen .cuenta-name{ display:block; font-size:11px; color:var(--steel); font-weight:400; margin-top:1px; }
+
+  .monthly-table-title{
+    font-family:var(--font-display); font-size:16px; font-weight:700; color:var(--ink);
+    padding:14px 16px 6px;
+  }
+  .monthly-table-scroll{ overflow-x:auto; padding-bottom:8px; }
+  table.monthly-table{ width:100%; min-width:820px; border-collapse:collapse; font-size:12px; }
+  table.monthly-table th{
+    text-align:right; padding:7px 10px; font-size:10px; text-transform:uppercase;
+    letter-spacing:.04em; color:var(--steel); font-weight:700; background:var(--gray-soft);
+    border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  table.monthly-table th.cc-col{ text-align:left; min-width:110px; }
+  table.monthly-table td{ text-align:right; padding:7px 10px; border-bottom:1px solid var(--line); font-family:var(--font-mono); white-space:nowrap; }
+  table.monthly-table td.cc-col{ text-align:left; font-weight:600; font-family:var(--font-body); }
+  table.monthly-table tr:last-child td{ border-bottom:none; }
+  table.monthly-table tr.total-row td{ font-weight:700; background:var(--gray-soft); border-top:2px solid var(--line-strong); }
+  table.monthly-table .total-col{ font-weight:700; background:var(--gray-soft); border-left:2px solid var(--line-strong) !important; }
+  table.monthly-table tr.sub-row td{ color:var(--steel); font-size:11.5px; }
+  table.monthly-table tr.sub-row td.cc-col{ padding-left:26px; font-weight:400; font-style:italic; }
+  table.monthly-table td.cc-col.sub-indent{ padding-left:34px; font-style:italic; }
+  table.monthly-table tr.cc-parent-row td.cc-col{ display:flex; align-items:center; gap:8px; }
+  .toggle-sub{
+    flex:none; width:18px; height:18px; border-radius:4px; border:1px solid var(--line-strong);
+    background:#fff; color:var(--ink); font-size:12px; line-height:1; cursor:pointer; padding:0;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .toggle-sub:hover{ background:var(--gray-soft); }
 
   /* ---------- Sections ---------- */
   .section-title{
@@ -254,6 +316,27 @@
   .ingreso-grid .field{ width:100%; }
   .ingreso-grid select, .ingreso-grid input{ width:100%; }
 
+  .sugerencias-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    overflow:hidden; margin-bottom:18px;
+  }
+  .sugerencias-head{
+    display:flex; align-items:center; gap:12px; padding:14px 18px;
+    background:var(--gray-soft); border-bottom:1px solid var(--line); flex-wrap:wrap;
+  }
+  .sugerencias-list{ max-height:420px; overflow-y:auto; }
+  .sugerencia-row{
+    display:grid; grid-template-columns: 1.6fr 1fr 1fr 110px 90px 100px;
+    gap:10px; padding:10px 18px; align-items:center; border-bottom:1px solid var(--line);
+    font-size:13px;
+  }
+  .sugerencia-row:last-child{ border-bottom:none; }
+  .sugerencia-row .rut-sm{ font-family:var(--font-mono); font-size:11px; color:var(--steel); }
+  .mes-badge{
+    font-family:var(--font-mono); font-size:10px; padding:2px 7px; border-radius:8px;
+    background:var(--orange-soft); color:var(--orange); text-transform:uppercase;
+  }
+
   .toast{
     position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px);
     background:var(--ink); color:#fff; padding:11px 20px; border-radius:8px;
@@ -280,6 +363,53 @@
   table.preview tr td.on{ background:var(--green-soft); color:var(--green); font-weight:700; }
   table.preview tr td.off{ color:var(--line-strong); }
 
+  .tree-wrap{ margin-top:14px; font-size:13px; }
+  .tree-cc{
+    border:1px solid var(--line); border-radius:8px; margin-bottom:8px; overflow:hidden;
+  }
+  .tree-cc-head{
+    display:flex; align-items:center; gap:10px; padding:10px 14px;
+    background:var(--gray-soft); cursor:pointer; user-select:none;
+    font-weight:700; font-size:13px; border-bottom:1px solid var(--line);
+  }
+  .tree-cc-head .tog{ font-family:var(--font-mono); font-size:13px; color:var(--steel); flex:none; }
+  .tree-cc-head .cc-label{ font-family:var(--font-mono); color:var(--steel); font-size:11px; }
+  .tree-cc-body{ display:none; }
+  .tree-cc-body.open{ display:block; }
+
+  .tree-cargo{
+    border-bottom:1px solid var(--line);
+  }
+  .tree-cargo:last-child{ border-bottom:none; }
+  .tree-cargo-head{
+    display:grid; align-items:center; gap:0;
+    padding:0; padding-left:14px;
+    cursor:pointer; user-select:none; background:#fafaf8;
+    font-weight:600; font-size:12.5px; border-bottom:1px solid var(--line);
+    min-height:36px;
+  }
+  .tree-cargo-head .tog{ font-family:var(--font-mono); font-size:12px; color:var(--steel); flex:none; }
+  .tree-cargo-body{ display:none; }
+  .tree-cargo-body.open{ display:block; }
+
+  .tree-person{
+    display:grid;
+    font-size:12px; border-bottom:1px solid var(--line); align-items:center;
+  }
+  .tree-person:last-child{ border-bottom:none; }
+  .tree-person .p-name{ padding:7px 14px 7px 44px; color:var(--ink); }
+  .tree-person .p-rut{ font-family:var(--font-mono); font-size:10.5px; color:var(--steel); padding:7px 14px; }
+  .tree-person .p-cell{ padding:7px 10px; text-align:center; border-left:1px solid var(--line); font-family:var(--font-mono); }
+  .tree-person .p-cell.on{ background:var(--green-soft); color:var(--green); font-weight:700; }
+  .tree-person .p-cell.off{ color:var(--line-strong); }
+  .tree-months-head{
+    display:grid; font-size:10px; text-transform:uppercase; letter-spacing:.04em;
+    background:var(--gray-soft); border-bottom:1px solid var(--line);
+  }
+  .tree-months-head .mh{ padding:5px 10px; text-align:center; border-left:1px solid var(--line);
+    font-family:var(--font-mono); font-weight:700; color:var(--steel); }
+  .tree-months-head .mh-name{ padding:5px 14px 5px 44px; color:var(--steel); font-weight:700; }
+
   .modal-backdrop{
     position:fixed; inset:0; background:rgba(22,38,58,.45);
     display:none; align-items:center; justify-content:center; z-index:60;
@@ -295,17 +425,35 @@
 
   @media (max-width: 900px){
     .roster-head{ display:none; }
-    .row{ grid-template-columns:1fr; gap:8px; padding:14px 16px; }
-    .ingreso-grid{ grid-template-columns:1fr 1fr; }
+    .row{ grid-template-columns:1fr; gap:8px; }
+    .row > div{ border-right:none; }
   }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
 </head>
 <body>
 
+<nav style="background:#111;display:flex;align-items:center;gap:16px;padding:0 32px;height:56px;position:sticky;top:0;z-index:200;">
+  <a href="index.html" style="display:flex;align-items:center;gap:6px;color:#B5B0AA;text-decoration:none;font-size:0.8rem;font-weight:500;">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    Volver a la intranet
+  </a>
+  <div style="width:1px;height:18px;background:#333;"></div>
+  <div style="font-family:monospace;font-size:0.72rem;color:#B5B0AA;letter-spacing:0.08em;text-transform:uppercase;">Control de Dotación — Mirador El Pino</div>
+  <div style="flex:1;"></div>
+  <div id="auth-area"></div>
+</nav>
+
+<div id="acceso-denegado" style="display:none;max-width:480px;margin:80px auto;text-align:center;padding:32px;">
+  <h2 style="font-family:inherit;">Acceso restringido</h2>
+  <p style="color:var(--steel);">Este módulo está disponible solo para el equipo autorizado.</p>
+</div>
+
+<div id="main-wrap" style="display:none;">
 <div class="topbar">
   <div class="topbar-inner">
     <p class="eyebrow">iBaker · Control de Gestión</p>
-    <h1 class="h1">Control de <span>Dotación</span></h1>
+    <h1 class="h1">Control de <span>Dotación</span> · Mirador El Pino</h1>
     <p class="sub">Confirma mensualmente quién sigue en obra, registra salidas y agrega ingresos. Esto alimenta la proyección de MO de <strong>Base Proyeccion</strong>.</p>
     <div class="legend-strip" id="legendStrip"></div>
   </div>
@@ -327,7 +475,8 @@
       <input type="text" id="searchBox" placeholder="Nombre, rut o cargo...">
     </div>
     <div class="spacer"></div>
-    <button class="btn btn-primary btn-sm" id="syncBukBtn">Ver comparación con BUK</button>
+    <button class="btn btn-primary btn-sm" id="syncBukBtn">Sincronizar con Excel BUK</button>
+    <button class="btn btn-ghost btn-sm" id="resetBtn" style="border-color:var(--red);color:var(--red);">Reiniciar desde el Excel original</button>
     <button class="btn btn-ghost btn-sm" id="loadBackupBtn">Cargar respaldo (JSON)</button>
     <button class="btn btn-ghost btn-sm" id="downloadBackupBtn">Descargar respaldo (JSON)</button>
     <input type="file" id="backupFileInput" accept="application/json" style="display:none;">
@@ -335,84 +484,76 @@
   </div>
   <p id="storageModeNote" style="font-size:11.5px;color:var(--steel);margin:-8px 0 18px;"></p>
 
+  <div class="section-title">Costo Proyectado <span class="n">por centro de costo</span></div>
+  <div class="resumen-card" id="resumenCard"></div>
+
   <div class="section-title">Dotación activa <span class="n" id="activeCount">0</span></div>
   <div class="roster">
+    <div class="roster-inner">
     <div class="roster-head">
       <div>Nombre</div>
       <div>Cargo</div>
       <div>Centro gestión</div>
       <div>Fecha contrato</div>
+      <div>Costo mensual</div>
+      <div>Costo anterior</div>
+      <div>Finiquito proyectado</div>
       <div>Estado</div>
       <div>Detalle salida</div>
       <div>Línea del año (Ene–Dic)</div>
     </div>
     <div id="rosterBody"></div>
+    </div>
   </div>
 
-  <div class="section-title">Agregar ingreso</div>
+
+  <div class="section-title">Agregar personal proyectado</div>
   <div class="ingreso-card">
-    <div class="ingreso-grid">
+    <div class="ingreso-grid" style="grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:12px;">
       <div class="field">
-        <label for="inName">Nombre completo</label>
-        <input type="text" id="inName" placeholder="Nombre y apellidos">
+        <label for="pName">Nombre completo</label>
+        <input type="text" id="pName" placeholder="Nombre y apellidos">
       </div>
       <div class="field">
-        <label for="inRut">RUT</label>
-        <input type="text" id="inRut" placeholder="12.345.678-9">
+        <label for="pRut">RUT (sin puntos ni guión)</label>
+        <input type="text" id="pRut" placeholder="123456789" maxlength="9">
+        <div id="pRutHint" style="font-size:10.5px;margin-top:3px;"></div>
       </div>
       <div class="field">
-        <label for="inRole">Cargo</label>
-        <input type="text" id="inRole" placeholder="Ej: Jornal">
+        <label for="pRole">Cargo</label>
+        <select id="pRole"><option value="">Selecciona un cargo…</option></select>
       </div>
       <div class="field">
-        <label for="inCC">Centro de gestión</label>
-        <input type="text" id="inCC" placeholder="Ej: CG0158201">
+        <label for="pCC">Centro de gestión</label>
+        <select id="pCC"><option value="">Selecciona un centro…</option></select>
       </div>
       <div class="field">
-        <label for="inFC">Fecha de contratación</label>
-        <input type="date" id="inFC">
+        <label for="pDesde">Periodo desde</label>
+        <input type="date" id="pDesde" min="2026-01-01" max="2027-10-31">
       </div>
       <div class="field">
-        <label for="inCosto">Costo empresa (opcional)</label>
-        <input type="text" id="inCosto" placeholder="Ej: 950000">
+        <label for="pHasta">Periodo hasta</label>
+        <input type="date" id="pHasta" min="2026-01-01" max="2027-10-31">
       </div>
     </div>
-    <button class="btn btn-primary btn-sm" id="addIngresoBtn">+ Agregar a la dotación</button>
-    <div id="ingresoCostPreview" style="margin-top:10px;font-size:12.5px;color:var(--steel);"></div>
-  </div>
-
-  <div class="section-title">Comparación con Excel BUK <span class="n" id="bukCount">0</span></div>
-  <p style="font-size:11.5px;color:var(--steel);margin:-8px 0 12px;">
-    Solo lectura — esto NO modifica tu dotación manual ni se guarda en el servidor. Es una vista aparte para
-    comparar visualmente contra lo que registraste arriba.
-  </p>
-  <div id="bukRosterWrap" style="display:none;overflow-x:auto;border:1px solid var(--line,#e2e2e2);border-radius:10px;margin-bottom:24px;">
-    <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
-      <thead>
-        <tr style="background:var(--gray-soft);text-align:left;">
-          <th style="padding:10px 14px;">Nombre</th><th style="padding:10px 14px;">RUT</th>
-          <th style="padding:10px 14px;">Cargo</th><th style="padding:10px 14px;">Centro de gestión</th>
-          <th style="padding:10px 14px;">Ingreso</th><th style="padding:10px 14px;">Término</th>
-        </tr>
-      </thead>
-      <tbody id="bukRosterBody"></tbody>
-    </table>
+    <button class="btn btn-primary btn-sm" id="addProyectadoBtn">+ Agregar a proyección</button>
+    <div id="proyectadoCostPreview" style="margin-top:10px;font-size:12.5px;color:var(--steel);"></div>
   </div>
 
   <div class="section-title">Exportar</div>
   <div class="export-card">
     <div class="export-row">
       <p class="export-note">
-        <strong>Excel (ConsolidadoPersonal):</strong> genera un .xlsx con las mismas columnas de esa pestaña
-        (job_cost_center, role_name, full_name, rut, Rutlimpio, fin permanencia), completando "fin permanencia"
-        con la fecha que hayas registrado en "Con término".<br><br>
+        <strong>Excel (ConsolidadoPersonal):</strong> genera un .xlsx con 3 pestañas — ConsolidadoPersonal (roster completo),
+        Ingresos Nuevos, y Resumen Costo-Finiquito (por centro de costo).<br><br>
         <strong>CSV (permanencia manual):</strong> descarga solo los meses posteriores al último mes con costo real,
-        listo para pegar sobre las columnas de Permanencia (N:Y) que aún no tienen costo real cargado en
-        Base Proyeccion — esos meses siguen calculándose solos con la fórmula existente.
+        listo para pegar sobre las columnas de Permanencia (N:Y) en Base Proyeccion.<br><br>
+        <strong>JSON (costo y finiquito):</strong> el mismo resumen por centro de costo del widget de arriba, en formato JSON.
       </p>
       <div class="spacer"></div>
       <button class="btn btn-ghost" id="exportExcelBtn">Descargar Excel (ConsolidadoPersonal)</button>
       <button class="btn btn-ghost" id="exportBtn">Descargar CSV (permanencia manual)</button>
+      <button class="btn btn-ghost" id="exportJsonResumenBtn">Descargar JSON (costo y finiquito)</button>
     </div>
     <div id="previewWrap"></div>
   </div>
@@ -425,7 +566,7 @@
     <p id="exitModalName"></p>
     <div class="field" style="margin-bottom:10px;">
       <label for="exitDate">Fecha de término (pasada o futura)</label>
-      <input type="date" id="exitDate" style="width:100%;">
+      <input type="date" id="exitDate" min="2026-01-01" max="2027-10-31" style="width:100%;">
     </div>
     <div class="field" style="margin-bottom:10px;">
       <label for="exitMotivo">Motivo</label>
@@ -434,6 +575,7 @@
         <option value="vencimiento_plazo">Vencimiento de plazo</option>
         <option value="necesidades_empresa">Necesidades de la empresa</option>
         <option value="no_concurrencia">No concurrencia</option>
+        <option value="cambio_obra">Cambio de obra</option>
         <option value="muerte">Fallecimiento</option>
         <option value="otro">Otro</option>
       </select>
@@ -453,27 +595,14 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const YEAR = 2026;
-const MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-const STORAGE_KEY = 'dotacion:state';
-
-const API = 'https://api.ibaker.cl';
-// Excel de BUK -- SOLO LECTURA. Nunca se escribe de vuelta a este archivo.
-const EXCEL_SHARING_URL = 'https://ibaker.sharepoint.com/:x:/s/BAKER/IQDYH1dYWHwzS7edBbx9E__xARGb-1YP2B8Z9CIw1_mbzlg?e=PyjHKw';
-const EXCEL_SHARING_ENCODED = 'u!' + btoa(EXCEL_SHARING_URL).replace(/=+$/,'').replace(/\//g,'_').replace(/\+/g,'-');
-let excelDriveId = null, excelItemId = null;
-
-const SEED_WORKERS = [];
-const COSTOS = [];
-
 // ── MSAL / acceso ────────────────────────────────────────────
 const msalConfig = {
   auth: {
-    clientId: '9a56ab1c-d3c4-4460-9892-1d4da768ecfb',
-    authority: 'https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26',
-    redirectUri: window.location.origin,
+    clientId: "9a56ab1c-d3c4-4460-9892-1d4da768ecfb",
+    authority: "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
+    redirectUri: window.location.origin + window.location.pathname,
   },
-  cache: { cacheLocation: 'sessionStorage' }
+  cache: { cacheLocation: "sessionStorage" }
 };
 const msalInstance = new msal.PublicClientApplication(msalConfig);
 let usuarioActual = null;
@@ -487,16 +616,25 @@ async function initAuth() {
       usuarioActual = accounts[0];
       const email = usuarioActual.username.toLowerCase();
       if (!ACCESO_DOTACION.includes(email)) {
-        window.location.href = 'index.html?acceso=dotacion';
+        document.getElementById('acceso-denegado').style.display = 'block';
         return;
       }
+      renderUserChip();
+      document.getElementById('main-wrap').style.display = 'block';
       await init();
     } else {
-      window.location.href = 'index.html';
+      await msalInstance.loginRedirect({ scopes: ['User.Read'] });
     }
-  } catch(e) { window.location.href = 'index.html'; }
+  } catch(e) {
+    console.error('Error de autenticación:', e);
+    document.getElementById('acceso-denegado').style.display = 'block';
+  }
 }
-
+function renderUserChip() {
+  if (!usuarioActual) return;
+  const nombre = usuarioActual.name || usuarioActual.username;
+  document.getElementById('auth-area').innerHTML = `<span style="color:#fff;font-size:0.78rem;">${nombre}</span>`;
+}
 async function getToken() {
   const accounts = msalInstance.getAllAccounts();
   if (!accounts.length) return null;
@@ -514,22 +652,18 @@ async function getToken() {
   }
 }
 
-// ── Excel de BUK (solo lectura) ─────────────────────────────
+// ── Excel de BUK (misma planilla que ya conectamos antes) ──────
+const API = 'https://api.ibaker.cl';
+const EXCEL_SHARING_URL = 'https://ibaker.sharepoint.com/:x:/s/BAKER/IQDYH1dYWHwzS7edBbx9E__xARGb-1YP2B8Z9CIw1_mbzlg?e=PyjHKw';
+const EXCEL_SHARING_ENCODED = 'u!' + btoa(EXCEL_SHARING_URL).replace(/=+$/,'').replace(/\//g,'_').replace(/\+/g,'-');
+let excelDriveId = null, excelItemId = null;
+
 async function graphGet(url) {
   const token = await getToken();
   if (!token) throw new Error('Sin token de acceso');
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) throw new Error(`Graph ${res.status}: ${await res.text()}`);
   return res.json();
-}
-
-// Busca la pestaña "MO" (Mano de Obra) — es la única con el consolidado real
-// de todas las obras y todos los meses. Las demás pestañas del archivo son
-// reportes puntuales de un mes, o resúmenes tipo tabla dinámica.
-async function obtenerHojaMO(listaHojas) {
-  const hoja = listaHojas.value.find(h => h.name.trim().toUpperCase() === 'MO');
-  if (!hoja) throw new Error(`No se encontró la pestaña "MO" — las pestañas del archivo son: ${listaHojas.value.map(h=>h.name).join(', ')}`);
-  return hoja.id;
 }
 
 async function resolverExcelItem() {
@@ -545,7 +679,10 @@ async function resolverExcelItem() {
   }
 }
 
-function parseFechaExcel(val) {
+// Obras identificadas por prefijo de Centro de Costo — CG019 = Mirador El Pino.
+const PREFIJO_OBRA = 'CG019';
+
+function parseFechaExcelBUK(val) {
   if (!val) return null;
   const s = String(val).trim();
   if (!s || s === '0') return null;
@@ -553,124 +690,283 @@ function parseFechaExcel(val) {
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
   const n = Number(s);
   if (Number.isFinite(n) && n > 20000) {
-    // Fecha serial de Excel
     const d = new Date(Math.round((n - 25569) * 86400 * 1000));
     return d.toISOString().slice(0,10);
   }
   return null;
 }
 
-// Encabezados reales del export de BUK (pestaña "MO"), verificados contra el
-// archivo real: no vienen en la fila 1 — antes hay varias filas de metadata
-// del reporte ("Libro:", "Fecha Generación:", etc.), así que se busca la fila
-// que contiene el encabezado exacto en vez de asumir una posición fija.
-const COL_AREA   = 'Trabajo - Nombre Área';
-const COL_NOMBRE = 'Colaborador(a) - Nombre Completo';
-const COL_RUT    = 'Colaborador(a) - Número de Documento';
-const COL_CARGO  = 'Trabajo - Cargo';
-const COL_CC     = 'Trabajo - Centro de Costo';
-const COL_GASTO  = 'Liquidación - Gasto Empresa';
-const COL_FING   = 'Trabajo - Fecha Ingreso Compañía';
-const COL_FTERM  = 'Trabajo - Fecha Término Trabajo';
-const COL_PERIODO= 'Liquidación - Período';
-const OBRA_FILTRO = 'Obra Mirador El Pino';
+const COL_NOMBRE_BUK = 'Colaborador(a) - Nombre Completo';
+const COL_RUT_BUK    = 'Colaborador(a) - Número de Documento';
+const COL_CARGO_BUK  = 'Trabajo - Cargo';
+const COL_CC_BUK     = 'Trabajo - Centro de Costo';
+const COL_GASTO_BUK  = 'Liquidación - Gasto Empresa';
+const COL_FING_BUK   = 'Trabajo - Fecha Ingreso Compañía';
+const COL_FTERM_BUK  = 'Trabajo - Fecha Término Trabajo';
+const COL_PERIODO_BUK= 'Liquidación - Período';
 
-function excelRowToWorker(r) {
-  const cc   = String(r[COL_CC] || '').trim();
-  const name = String(r[COL_NOMBRE] || '').trim();
-  const rut  = String(r[COL_RUT] || '').trim();
-  const role = String(r[COL_CARGO] || '').trim();
-  const fs   = parseFechaExcel(r[COL_FTERM]);
-  const fc   = parseFechaExcel(r[COL_FING]);
-  const periodo = parseFechaExcel(r[COL_PERIODO]);
-  const gasto = Number(r[COL_GASTO]) || null;
-  const rutlimpio = rut.replace(/[^0-9kK]/g,'').toUpperCase();
-  return {
-    id: `${rutlimpio}#${cc}`, rutlimpio, cc, role, name, rut,
-    fc: fc || null, fs: fs || null, motivo: null, periodo, gasto,
-    status: (fs && new Date(fs) <= new Date()) ? 'finiquitado' : 'activo',
-    source: 'excel',
-  };
+// Lee la pestaña "MO" del Excel de BUK, filtra a Mirador El Pino (CG019...) y
+// deriva TODAS las tablas de costo (GASTO_MES, PRIMER_PERIODO, ULTIMO_COSTO,
+// ULTIMO_COSTO_MAX, COSTOS promedio, REAL_MONTHLY) directamente de los datos
+// reales, en vez de usar los valores fijos que traía este archivo antes.
+async function cargarDesdeBUK() {
+  const ok = await resolverExcelItem();
+  if (!ok) throw new Error('No se pudo acceder al Excel de SharePoint');
+  const listaHojas = await graphGet(`https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets`);
+  const hojaMO = listaHojas.value.find(h => h.name.trim().toUpperCase() === 'MO');
+  if (!hojaMO) throw new Error(`No se encontró la pestaña "MO" — pestañas disponibles: ${listaHojas.value.map(h=>h.name).join(', ')}`);
+  const data = await graphGet(`https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets/${encodeURIComponent(hojaMO.id)}/usedRange`);
+  const values = data.values;
+  if (!values || values.length < 2) throw new Error('La pestaña MO está vacía');
+
+  const idxHeader = values.findIndex(row => row.includes(COL_NOMBRE_BUK));
+  if (idxHeader === -1) throw new Error('No se encontró la fila de encabezados en la pestaña MO');
+  const headers = values[idxHeader].map(h => String(h).trim());
+  const filas = values.slice(idxHeader + 1).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = row[i] !== undefined ? row[i] : ''; });
+    return obj;
+  });
+
+  const deObra = filas.filter(r => String(r[COL_CC_BUK] || '').trim().startsWith(PREFIJO_OBRA));
+  console.log(`[BUK] Filas de ${PREFIJO_OBRA}* (Mirador El Pino):`, deObra.length, 'de', filas.length, 'totales');
+
+  const gastoMes = {};       // id -> {mes: gasto}
+  const porPersonaCC = {};   // rutlimpio#cc -> [{mes, gasto}]
+  const porCCRole = {};      // cc#role -> [gasto]
+  const porCCMes = {};       // cc#mes -> {total, personas:Set}
+  const nuevosWorkers = new Map(); // id -> worker
+
+  deObra.forEach(r => {
+    const rut = String(r[COL_RUT_BUK] || '').trim();
+    const rutlimpio = rut.replace(/[^0-9kK]/g,'').toUpperCase();
+    const cc = String(r[COL_CC_BUK] || '').trim();
+    const role = String(r[COL_CARGO_BUK] || '').trim();
+    const name = String(r[COL_NOMBRE_BUK] || '').trim();
+    if (!rutlimpio || !cc || !name) return;
+    const id = `${rutlimpio}#${cc}#${role}`;
+    const periodoStr = parseFechaExcelBUK(r[COL_PERIODO_BUK]);
+    const mes = periodoStr ? Number(periodoStr.slice(5,7)) : null;
+    const gasto = Number(r[COL_GASTO_BUK]);
+    const fc = parseFechaExcelBUK(r[COL_FING_BUK]);
+    const fs = parseFechaExcelBUK(r[COL_FTERM_BUK]);
+
+    if (mes && Number.isFinite(gasto)) {
+      gastoMes[id] = gastoMes[id] || {};
+      gastoMes[id][mes] = Math.round(gasto);
+      const keyPC = `${rutlimpio}#${cc}`;
+      porPersonaCC[keyPC] = porPersonaCC[keyPC] || [];
+      porPersonaCC[keyPC].push({ mes, gasto: Math.round(gasto) });
+      const keyCM = `${cc}#${mes}`;
+      porCCMes[keyCM] = porCCMes[keyCM] || { total: 0, personas: new Set() };
+      porCCMes[keyCM].total += Math.round(gasto);
+      porCCMes[keyCM].personas.add(rutlimpio);
+    }
+    if (Number.isFinite(gasto)) {
+      const keyCR = `${cc}#${role}`;
+      porCCRole[keyCR] = porCCRole[keyCR] || [];
+      porCCRole[keyCR].push(Math.round(gasto));
+    }
+
+    const existente = nuevosWorkers.get(id);
+    if (!existente || (fc && (!existente.fc || fc < existente.fc))) {
+      nuevosWorkers.set(id, {
+        id, rutlimpio, cc, role, name, rut,
+        fc: (existente && existente.fc && (!fc || existente.fc < fc)) ? existente.fc : (fc || (existente && existente.fc) || null),
+        status: fs ? 'finiquitado' : 'activo',
+        fs: fs || null,
+        motivo: null,
+        source: 'excel',
+      });
+    }
+  });
+
+  // PRIMER_PERIODO: primer mes visto por persona+cc (cualquier cargo)
+  const primerPeriodo = {};
+  Object.entries(porPersonaCC).forEach(([key, regs]) => {
+    primerPeriodo[key] = Math.min(...regs.map(r => r.mes));
+  });
+
+  // ULTIMO_COSTO_MAX: costo más alto registrado por persona+cc
+  const ultimoCostoMax = [];
+  Object.entries(porPersonaCC).forEach(([key, regs]) => {
+    ultimoCostoMax.push({ key, amt: Math.max(...regs.map(r => r.gasto)) });
+  });
+
+  // ULTIMO_COSTO: costo del mes más reciente registrado por persona+cc
+  const ultimoCosto = [];
+  Object.entries(porPersonaCC).forEach(([key, regs]) => {
+    const masReciente = regs.reduce((a,b) => b.mes > a.mes ? b : a);
+    ultimoCosto.push({ key, amt: masReciente.gasto });
+  });
+
+  // COSTOS: promedio por cc+cargo (respaldo cuando no hay registro directo de la persona)
+  const costosArr = Object.entries(porCCRole).map(([key, vals]) => {
+    const [cc, ...roleParts] = key.split('#');
+    return { cc, role: roleParts.join('#'), amt: Math.round(vals.reduce((s,v)=>s+v,0) / vals.length) };
+  });
+
+  // REAL_MONTHLY: total y cantidad de personas por cc+mes (para Costo Proyectado)
+  const realMonthlyArr = Object.entries(porCCMes).map(([key, v]) => {
+    const [cc, mes] = key.split('#');
+    return { cc, month: Number(mes), costo: v.total, personas: v.personas.size };
+  });
+
+  GASTO_MES = gastoMes;
+  PRIMER_PERIODO = primerPeriodo;
+  ULTIMO_COSTO = ultimoCosto;
+  ULTIMO_COSTO_MAX = ultimoCostoMax;
+  COSTOS = costosArr;
+  REAL_MONTHLY = realMonthlyArr;
+
+  return [...nuevosWorkers.values()];
 }
 
-// Trae el listado del Excel de BUK y lo muestra en su propia tabla, aparte
-// de la dotación manual — NUNCA toca `workers` ni se guarda en el servidor.
-// Es solo para comparar visualmente.
-let workersBUK = [];
-
-async function sincronizarBUK() {
-  const btn = document.getElementById('syncBukBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Cargando...'; }
+// ── Guardado en servidor (compartido entre todo el equipo) ─────
+async function cargarDesdeServidor() {
   try {
-    const ok = await resolverExcelItem();
-    if (!ok) throw new Error('No se pudo acceder al Excel de SharePoint');
-    const listaHojas = await graphGet(`https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets`);
-    console.log('[BUK] Pestañas encontradas en el archivo:', listaHojas.value.map(h => h.name));
-    const hojaId = await obtenerHojaMO(listaHojas);
-    const data = await graphGet(
-      `https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets/${encodeURIComponent(hojaId)}/usedRange`
-    );
-    const values = data.values;
-    if (!values || values.length < 2) throw new Error('La pestaña MO está vacía');
-
-    // La fila de encabezado no está en una posición fija — se busca la fila
-    // que contiene el texto exacto de la columna del nombre completo.
-    const idxHeader = values.findIndex(row => row.includes(COL_NOMBRE));
-    if (idxHeader === -1) throw new Error('No se encontró la fila de encabezados en la pestaña MO');
-    const headers = values[idxHeader].map(h => String(h).trim());
-    const filas = values.slice(idxHeader + 1).map(row => {
-      const obj = {};
-      headers.forEach((h, i) => { obj[h] = row[i] !== undefined ? row[i] : ''; });
-      return obj;
-    });
-    console.log('[BUK] Fila de encabezados encontrada en índice:', idxHeader);
-    console.log('[BUK] Filas totales leídas (todas las obras, todos los meses):', filas.length);
-
-    // Filtra solo Mirador El Pino, y dedupe por RUT (una persona puede
-    // aparecer varias veces, una por cada mes trabajado) — se queda con
-    // la fila del período más reciente por persona.
-    const deObra = filas.filter(r => String(r[COL_AREA] || '').trim() === OBRA_FILTRO);
-    console.log(`[BUK] Filas de "${OBRA_FILTRO}":`, deObra.length);
-    const porRut = new Map();
-    deObra.map(excelRowToWorker).filter(w => w.name).forEach(w => {
-      const actual = porRut.get(w.rutlimpio);
-      if (!actual || (w.periodo && (!actual.periodo || w.periodo > actual.periodo))) porRut.set(w.rutlimpio, w);
-    });
-    workersBUK = [...porRut.values()];
-    console.log('[BUK] Personas únicas de Mirador El Pino:', workersBUK.length);
-    renderComparacionBUK();
-    toast(`Comparación cargada — ${workersBUK.length} personas de Mirador El Pino en BUK`);
+    const res = await fetch(`${API}/dotacion`);
+    if (!res.ok) return null;
+    return await res.json();
   } catch(e) {
-    console.error('Error cargando comparación BUK:', e);
-    toast('Error al cargar: ' + e.message);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Ver comparación con BUK'; }
+    console.error('Error cargando desde servidor:', e);
+    return null;
+  }
+}
+async function guardarEnServidor(showToast) {
+  try {
+    const res = await fetch(`${API}/dotacion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workers, meta }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (showToast) toast('Cambios guardados en el servidor');
+  } catch(e) {
+    console.error('guardarEnServidor error:', e);
+    toast('No se pudo guardar en el servidor (' + e.message + '). Usa "Descargar respaldo (JSON)" para no perder el trabajo.');
   }
 }
 
-function renderComparacionBUK() {
-  document.getElementById('bukCount').textContent = workersBUK.length;
-  document.getElementById('bukRosterWrap').style.display = workersBUK.length ? 'block' : 'none';
-  document.getElementById('bukRosterBody').innerHTML = workersBUK.map(w => `
-    <tr style="border-top:1px solid var(--line,#e2e2e2);">
-      <td style="padding:9px 14px;">${w.name}</td>
-      <td style="padding:9px 14px;">${w.rut || '—'}</td>
-      <td style="padding:9px 14px;">${w.role || '—'}</td>
-      <td style="padding:9px 14px;">${w.cc || '—'}</td>
-      <td style="padding:9px 14px;">${w.fc || '—'}</td>
-      <td style="padding:9px 14px;">${w.fs || '—'}</td>
-    </tr>`).join('');
+// Trae datos frescos del Excel y los combina con lo que ya está guardado:
+// las personas que ya tienen una salida confirmada a mano (motivo/estado)
+// NO se pisan — solo se agregan las que son nuevas o se actualiza gente que
+// sigue "activo" sin confirmar salida.
+async function sincronizarConBUK() {
+  const btn = document.getElementById('syncBukBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando...'; }
+  try {
+    const desdeExcel = await cargarDesdeBUK();
+    const porId = new Map(workers.map(w => [w.id, w]));
+    let nuevos = 0, actualizados = 0;
+    desdeExcel.forEach(w => {
+      const existente = porId.get(w.id);
+      if (!existente) {
+        porId.set(w.id, w);
+        nuevos++;
+      } else if (existente.source === 'excel' && existente.motivo === null && existente.status === 'activo') {
+        // Solo se refresca si la persona sigue activa y sin una salida
+        // confirmada a mano — así nunca se pisa un finiquito ya registrado.
+        porId.set(w.id, { ...existente, fc: w.fc, fs: w.fs, status: w.fs ? existente.status : w.status });
+        actualizados++;
+      }
+    });
+    workers = [...porId.values()];
+    await guardarEnServidor(false);
+    renderMesRealSelect();
+    renderAll();
+    toast(`Sincronizado — ${nuevos} nuevos, ${actualizados} actualizados, ${desdeExcel.length} personas de Mirador El Pino en el Excel`);
+  } catch(e) {
+    console.error('Error sincronizando con BUK:', e);
+    toast('Error al sincronizar: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Sincronizar con Excel BUK'; }
+  }
 }
 
+const YEAR = 2026;
+const MONTH_NAMES_BASE = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const HORIZON = 22;              // Ene 2026 .. Oct 2027
+// idx 0-based -> {y,m}
+function idxToYM(i){ return { y: YEAR + Math.floor(i/12), m: (i%12)+1 }; }
+function ymToIdx(y,m){ return (y - YEAR)*12 + (m-1); }
+const MONTH_NAMES = Array.from({length:HORIZON},(_,i)=>{
+  const {y,m}=idxToYM(i); return MONTH_NAMES_BASE[m-1] + (y!==YEAR ? " "+String(y).slice(2) : "");
+});
+const STORAGE_KEY = 'dotacion:state';
 
-function costoMensual(w){
+const SEED_WORKERS = [{"id": "154731644#CG0198131#Jefe de Terreno", "rutlimpio": "154731644", "cc": "CG0198131", "role": "Jefe de Terreno", "name": "Herrera Medina Luis Rene", "rut": "15.473.164-4", "fc": "2026-01-05", "status": "finiquitado", "fs": "2026-02-09", "motivo": "vencimiento_plazo", "source": "base"}, {"id": "165705904#CG0198201#Maestro Multifuncional", "rutlimpio": "165705904", "cc": "CG0198201", "role": "Maestro Multifuncional", "name": "Rojas Vilches Alan Jonathan", "rut": "16.570.590-4", "fc": "2025-12-16", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "121753200#CG0198201#Maestro Multifuncional", "rutlimpio": "121753200", "cc": "CG0198201", "role": "Maestro Multifuncional", "name": "Manriquez Rojas Cristian Rodrigo", "rut": "12.175.320-0", "fc": "2025-12-16", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "137117649#CG0198201#Maestro Multifuncional", "rutlimpio": "137117649", "cc": "CG0198201", "role": "Maestro Multifuncional", "name": "Henriquez Zambrano Cristian Andres", "rut": "13.711.764-9", "fc": "2025-12-16", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "215011569#CG0198191#Jornal", "rutlimpio": "215011569", "cc": "CG0198191", "role": "Jornal", "name": "Pedraza Araya Cristian Patricio", "rut": "21.501.156-9", "fc": "2026-04-21", "status": "finiquitado", "fs": "2026-05-31", "motivo": "vencimiento_plazo", "source": "base"}, {"id": "131997221#CG0198201#Maestro Multifuncional", "rutlimpio": "131997221", "cc": "CG0198201", "role": "Maestro Multifuncional", "name": "Garrido Henriquez Raul Andres", "rut": "13.199.722-1", "fc": "2025-12-16", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "154022899#CG0198201#Maestro Multifuncional", "rutlimpio": "154022899", "cc": "CG0198201", "role": "Maestro Multifuncional", "name": "Burgos Santis Alfredo Rodrigo", "rut": "15.402.289-9", "fc": "2025-12-16", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "163422026#CG0198201#Maestro Multifuncional", "rutlimpio": "163422026", "cc": "CG0198201", "role": "Maestro Multifuncional", "name": "Escalante Moran Patricio Guillermo", "rut": "16.342.202-6", "fc": "2025-12-17", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "224236093#CG0198191#Jornal", "rutlimpio": "224236093", "cc": "CG0198191", "role": "Jornal", "name": "Hueche Serey Mauro Alexi", "rut": "22.423.609-3", "fc": "2026-04-13", "status": "finiquitado", "fs": "2026-04-14", "motivo": "vencimiento_plazo", "source": "base"}, {"id": "14129248K#CG0198131#Administrador de Obra", "rutlimpio": "14129248K", "cc": "CG0198131", "role": "Administrador de Obra", "name": "Maqueira Jaque Johan Eduardo", "rut": "14.129.248-k", "fc": "2025-09-01", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "175623744#CG0198201#Maestro Multifuncional", "rutlimpio": "175623744", "cc": "CG0198201", "role": "Maestro Multifuncional", "name": "Toledo Perez Oscar Antonio", "rut": "17.562.374-4", "fc": "2025-12-17", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "118044495#CG0198201#Carpintero", "rutlimpio": "118044495", "cc": "CG0198201", "role": "Carpintero", "name": "Salazar García José Eduardo", "rut": "11.804.449-5", "fc": "2026-05-01", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "279833961#CG0196071#Jornal", "rutlimpio": "279833961", "cc": "CG0196071", "role": "Jornal", "name": "Augustin  Jean Berris", "rut": "27.983.396-1", "fc": "2026-05-18", "status": "finiquitado", "fs": "2026-05-31", "motivo": "vencimiento_plazo", "source": "base"}, {"id": "203117019#CG0198201#Ayudante de Trazador", "rutlimpio": "203117019", "cc": "CG0198201", "role": "Ayudante de Trazador", "name": "Diaz Villa Victor Andres", "rut": "20.311.701-9", "fc": "2026-05-01", "status": "finiquitado", "fs": "2026-06-30", "motivo": "vencimiento_plazo", "source": "base"}, {"id": "175192204#CG0198131#Prevencionista de Riesgo", "rutlimpio": "175192204", "cc": "CG0198131", "role": "Prevencionista de Riesgo", "name": "Herrera Lara Andrea Alejandra", "rut": "17.519.220-4", "fc": "2026-05-11", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "20127513K#CG0198191#Carpintero", "rutlimpio": "20127513K", "cc": "CG0198191", "role": "Carpintero", "name": "Campos Cautivo Sergio Enrique", "rut": "20.127.513-k", "fc": "2026-05-18", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "193132251#CG0198201#Albañil", "rutlimpio": "193132251", "cc": "CG0198201", "role": "Albañil", "name": "Cisterna Castillo Juan Carlos", "rut": "19.313.225-1", "fc": "2026-05-01", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "161860492#CG0198201#Albañil", "rutlimpio": "161860492", "cc": "CG0198201", "role": "Albañil", "name": "Ramirez Rubilar Victor Alfonso", "rut": "16.186.049-2", "fc": "2026-05-01", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "279833961#CG0198201#Jornal", "rutlimpio": "279833961", "cc": "CG0198201", "role": "Jornal", "name": "Augustin  Jean Berris", "rut": "27.983.396-1", "fc": "2026-05-18", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "187002125#CG0198201#Trazador", "rutlimpio": "187002125", "cc": "CG0198201", "role": "Trazador", "name": "Antileo Antileo Luis Heriberto", "rut": "18.700.212-5", "fc": "2026-05-01", "status": "finiquitado", "fs": "2026-06-30", "motivo": "vencimiento_plazo", "source": "base"}, {"id": "158943646#CG0198131#Encargado de Oficina Técnica", "rutlimpio": "158943646", "cc": "CG0198131", "role": "Encargado de Oficina Técnica", "name": "Hernández Friz Cristian Felipe", "rut": "15.894.364-6", "fc": "2026-04-09", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "151169236#CG0198201#Jornal", "rutlimpio": "151169236", "cc": "CG0198201", "role": "Jornal", "name": "Ramírez Celis Carlos Antonio", "rut": "15.116.923-6", "fc": "2026-05-01", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "103832713#CG0198201#Carpintero", "rutlimpio": "103832713", "cc": "CG0198201", "role": "Carpintero", "name": "Gallardo Chacón Carlos Amador", "rut": "10.383.271-3", "fc": "2026-05-01", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "143118479#CG0198201#Jornal", "rutlimpio": "143118479", "cc": "CG0198201", "role": "Jornal", "name": "Rivera Reyes Roberto Carlos", "rut": "14.311.847-9", "fc": "2026-06-09", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "168563086#CG0198201#Jornal", "rutlimpio": "168563086", "cc": "CG0198201", "role": "Jornal", "name": "Carrasco Cáceres José Miguel", "rut": "16.856.308-6", "fc": "2026-06-09", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "170823214#CG0198201#Albañil", "rutlimpio": "170823214", "cc": "CG0198201", "role": "Albañil", "name": "González Adasme Eduardo Antonio", "rut": "17.082.321-4", "fc": "2026-06-08", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "154064907#CG0198201#Jornal", "rutlimpio": "154064907", "cc": "CG0198201", "role": "Jornal", "name": "Castro Parra Pedro Humberto", "rut": "15.406.490-7", "fc": "2026-06-01", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "162418467#CG0198191#Jornal", "rutlimpio": "162418467", "cc": "CG0198191", "role": "Jornal", "name": "Navarro Silva Paulina Beatriz", "rut": "16.241.846-7", "fc": "2026-06-01", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "218559077#CG0198201#Jornal", "rutlimpio": "218559077", "cc": "CG0198201", "role": "Jornal", "name": "Muñoz Quintana Diego Eduardo", "rut": "21.855.907-7", "fc": "2026-06-08", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "211656018#CG0198201#Jornal", "rutlimpio": "211656018", "cc": "CG0198201", "role": "Jornal", "name": "Maulén Labra Cristopher Alexander", "rut": "21.165.601-8", "fc": "2026-06-01", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "142462850#CG0198191#Encargado de Mantención", "rutlimpio": "142462850", "cc": "CG0198191", "role": "Encargado de Mantención", "name": "Vásquez Villalobos Luis Alberto", "rut": "14.246.285-0", "fc": "2026-06-15", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "10829020K#CG0198201#Albañil", "rutlimpio": "10829020K", "cc": "CG0198201", "role": "Albañil", "name": "Araya Escalante Pablo Del Rosario", "rut": "10.829.020-k", "fc": "2026-06-01", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "189615108#CG0198191#Encargado de Mantención", "rutlimpio": "189615108", "cc": "CG0198191", "role": "Encargado de Mantención", "name": "Sepúlveda Plaza John Axl", "rut": "18.961.510-8", "fc": "2026-06-03", "status": "finiquitado", "fs": "2026-06-30", "motivo": "vencimiento_plazo", "source": "base"}, {"id": "132501386#CG0198191#Operador de Maquinaria", "rutlimpio": "132501386", "cc": "CG0198191", "role": "Operador de Maquinaria", "name": "Sanchez Cantillana Mauricio Daniel", "rut": "13.250.138-6", "fc": "2026-06-17", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "116081164#CG0198201#Carpintero", "rutlimpio": "116081164", "cc": "CG0198201", "role": "Carpintero", "name": "Pérez Serrano Osvaldo Rafael", "rut": "11.608.116-4", "fc": "2026-06-01", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "128777156#CG0198201#Carpintero", "rutlimpio": "128777156", "cc": "CG0198201", "role": "Carpintero", "name": "Andaur Fuentes Juan Carlos", "rut": "12.877.715-6", "fc": "2026-06-08", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "124122414#CG0198201#Jornal", "rutlimpio": "124122414", "cc": "CG0198201", "role": "Jornal", "name": "Núñez Alarcón Luis Armando", "rut": "12.412.241-4", "fc": "2026-06-09", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "157005243#CG0198131#Encargado de Calidad", "rutlimpio": "157005243", "cc": "CG0198131", "role": "Encargado de Calidad", "name": "Pino Navarro Bernardo Augusto", "rut": "15.700.524-3", "fc": "2026-06-08", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "17084615K#CG0198201#Maestro Multifuncional", "rutlimpio": "17084615K", "cc": "CG0198201", "role": "Maestro Multifuncional", "name": "Galleguillos Torrealba Pablo Ignacio", "rut": "17.084.615-k", "fc": "2026-06-16", "status": "finiquitado", "fs": "2026-07-02", "motivo": "vencimiento_plazo", "source": "base"}, {"id": "118326121#CG0198131#Jefe de Terreno", "rutlimpio": "118326121", "cc": "CG0198131", "role": "Jefe de Terreno", "name": "Ramirez Salas Emilio Dionisio", "rut": "11.832.612-1", "fc": "2026-02-03", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "20604246K#CG0198191#Pañolero", "rutlimpio": "20604246K", "cc": "CG0198191", "role": "Pañolero", "name": "Carimán Díaz Enrique Ignacio", "rut": "20.604.246-k", "fc": "2026-06-15", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "97514410#CG0198201#Jornal Canguero", "rutlimpio": "97514410", "cc": "CG0198201", "role": "Jornal Canguero", "name": "Valdovinos Soto Hernán Fernando", "rut": "9.751.441-0", "fc": "2026-07-08", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "97199604#CG0198201#Jornal", "rutlimpio": "97199604", "cc": "CG0198201", "role": "Jornal", "name": "Marambio Fontt José Domingo", "rut": "9.719.960-4", "fc": "2026-07-01", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "169513015#CG0198201#Andamiero", "rutlimpio": "169513015", "cc": "CG0198201", "role": "Andamiero", "name": "Abarca Aguayo Carlos Javier", "rut": "16.951.301-5", "fc": "2026-07-20", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "187002125#CG0198191#Trazador", "rutlimpio": "187002125", "cc": "CG0198191", "role": "Trazador", "name": "Antileo Antileo Luis Heriberto", "rut": "18.700.212-5", "fc": "2026-05-01", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "201242142#CG0198191#Jornal", "rutlimpio": "201242142", "cc": "CG0198191", "role": "Jornal", "name": "Galdames Sandoval Cristian Andres", "rut": "20.124.214-2", "fc": "2026-07-21", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "111695903#CG0198191#Carpintero", "rutlimpio": "111695903", "cc": "CG0198191", "role": "Carpintero", "name": "Toro Céspedes Carlos Humberto", "rut": "11.169.590-3", "fc": "2026-07-01", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "201248345#CG0198191#Jornal", "rutlimpio": "201248345", "cc": "CG0198191", "role": "Jornal", "name": "Castro Aparicio Victor Manuel", "rut": "20.124.834-5", "fc": "2026-07-21", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "20870740K#CG0198191#Ayudante de Trazador", "rutlimpio": "20870740K", "cc": "CG0198191", "role": "Ayudante de Trazador", "name": "Allende Retamal Renato Antonio", "rut": "20.870.740-k", "fc": "2026-07-20", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "156224987#CG0198201#Albañil", "rutlimpio": "156224987", "cc": "CG0198201", "role": "Albañil", "name": "Rivera Menares Víctor Alfredo", "rut": "15.622.498-7", "fc": "2026-07-01", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "116975890#CG0198191#Trazador", "rutlimpio": "116975890", "cc": "CG0198191", "role": "Trazador", "name": "Esperguez Valdés Carlos Alberto", "rut": "11.697.589-0", "fc": "2026-07-13", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "191841743#CG0198191#Asistente de Bodega", "rutlimpio": "191841743", "cc": "CG0198191", "role": "Asistente de Bodega", "name": "Lillo Rodríguez Oliver Alan", "rut": "19.184.174-3", "fc": "2024-10-01", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "203117019#CG0198191#Ayudante de Trazador", "rutlimpio": "203117019", "cc": "CG0198191", "role": "Ayudante de Trazador", "name": "Diaz Villa Victor Andres", "rut": "20.311.701-9", "fc": "2026-05-01", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "184550164#CG0198201#Andamiero", "rutlimpio": "184550164", "cc": "CG0198201", "role": "Andamiero", "name": "Parraguez Aguayo Rafael Antonio", "rut": "18.455.016-4", "fc": "2026-07-20", "status": "activo", "fs": null, "motivo": null, "source": "base"}, {"id": "202420117#CG0198201#Jornal", "rutlimpio": "202420117", "cc": "CG0198201", "role": "Jornal", "name": "Maulen Labra Cleversson Hernan", "rut": "20.242.011-7", "fc": "2026-07-01", "status": "activo", "fs": null, "motivo": null, "source": "base"}];
+let COSTOS = [{"cc": "CG0196071", "role": "Jornal", "amt": 342694.0}, {"cc": "CG0198131", "role": "Administrador de Obra", "amt": 0.0}, {"cc": "CG0198131", "role": "Encargado de Calidad", "amt": 1715680.0}, {"cc": "CG0198131", "role": "Encargado de Oficina Técnica", "amt": 3279624.5}, {"cc": "CG0198131", "role": "Jefe de Terreno", "amt": 2138229.6666666665}, {"cc": "CG0198131", "role": "Prevencionista de Riesgo", "amt": 1945415.5}, {"cc": "CG0198191", "role": "Asistente de Bodega", "amt": 1052931.0}, {"cc": "CG0198191", "role": "Ayudante de Trazador", "amt": 621958.0}, {"cc": "CG0198191", "role": "Carpintero", "amt": 922726.25}, {"cc": "CG0198191", "role": "Encargado de Mantención", "amt": 1010283.0}, {"cc": "CG0198191", "role": "Jornal", "amt": 438321.5714285714}, {"cc": "CG0198191", "role": "Operador de Maquinaria", "amt": 1083943.5}, {"cc": "CG0198191", "role": "Pañolero", "amt": 817082.5}, {"cc": "CG0198191", "role": "Trazador", "amt": 1043969.0}, {"cc": "CG0198201", "role": "Albañil", "amt": 1524713.0}, {"cc": "CG0198201", "role": "Andamiero", "amt": 202325.0}, {"cc": "CG0198201", "role": "Ayudante de Trazador", "amt": 868718.5}, {"cc": "CG0198201", "role": "Carpintero", "amt": 1119080.5}, {"cc": "CG0198201", "role": "Jornal", "amt": 737913.5789473684}, {"cc": "CG0198201", "role": "Jornal Canguero", "amt": 671883.0}, {"cc": "CG0198201", "role": "Maestro Multifuncional", "amt": 1912537.6}, {"cc": "CG0198201", "role": "Trazador", "amt": 1273715.5}];
+let ULTIMO_COSTO = [{"key": "103832713#CG0198201", "amt": 1376143}, {"key": "10829020K#CG0198201", "amt": 1054984}, {"key": "111695903#CG0198191", "amt": 1017699}, {"key": "116081164#CG0198201", "amt": 1112384}, {"key": "116975890#CG0198191", "amt": 710737}, {"key": "118044495#CG0198201", "amt": 1151381}, {"key": "118326121#CG0198131", "amt": 2869569}, {"key": "121753200#CG0198201", "amt": 2186060}, {"key": "124122414#CG0198201", "amt": 758713}, {"key": "128777156#CG0198201", "amt": 1088598}, {"key": "131997221#CG0198201", "amt": 2426002}, {"key": "132501386#CG0198191", "amt": 1524071}, {"key": "137117649#CG0198201", "amt": 2190652}, {"key": "14129248K#CG0198131", "amt": 0}, {"key": "142462850#CG0198191", "amt": 1232081}, {"key": "143118479#CG0198201", "amt": 743453}, {"key": "151169236#CG0198201", "amt": 704256}, {"key": "154022899#CG0198201", "amt": 2225047}, {"key": "154064907#CG0198201", "amt": 758713}, {"key": "154731644#CG0198131", "amt": 1041240}, {"key": "156224987#CG0198201", "amt": 1597624}, {"key": "157005243#CG0198131", "amt": 1913534}, {"key": "158943646#CG0198131", "amt": 3281515}, {"key": "161860492#CG0198201", "amt": 2277376}, {"key": "162418467#CG0198191", "amt": 758713}, {"key": "163422026#CG0198201", "amt": 2260806}, {"key": "165705904#CG0198201", "amt": 2911114}, {"key": "168563086#CG0198201", "amt": 859978}, {"key": "169513015#CG0198201", "amt": 202325}, {"key": "170823214#CG0198201", "amt": 1907488}, {"key": "17084615K#CG0198201", "amt": 0}, {"key": "175192204#CG0198131", "amt": 1977108}, {"key": "175623744#CG0198201", "amt": 2134792}, {"key": "184550164#CG0198201", "amt": 202325}, {"key": "187002125#CG0198191", "amt": 1377201}, {"key": "187002125#CG0198201", "amt": 1305368}, {"key": "189615108#CG0198191", "amt": 1125587}, {"key": "191841743#CG0198191", "amt": 1052931}, {"key": "193132251#CG0198201", "amt": 1915565}, {"key": "201242142#CG0198191", "amt": 278193}, {"key": "201248345#CG0198191", "amt": 278193}, {"key": "20127513K#CG0198191", "amt": 1136106}, {"key": "202420117#CG0198201", "amt": 852203}, {"key": "203117019#CG0198191", "amt": 915998}, {"key": "203117019#CG0198201", "amt": 929467}, {"key": "20604246K#CG0198191", "amt": 1103456}, {"key": "20870740K#CG0198191", "amt": 327918}, {"key": "211656018#CG0198201", "amt": 780842}, {"key": "215011569#CG0198191", "amt": 702587}, {"key": "218559077#CG0198201", "amt": 798623}, {"key": "224236093#CG0198191", "amt": 49079}, {"key": "279833961#CG0196071", "amt": 342694}, {"key": "279833961#CG0198201", "amt": 812303}, {"key": "97199604#CG0198201", "amt": 790619}, {"key": "97514410#CG0198201", "amt": 671883}];
+let ULTIMO_COSTO_MAX = [{"key": "103832713#CG0198201", "amt": 1376143}, {"key": "10829020K#CG0198201", "amt": 1320375}, {"key": "111695903#CG0198191", "amt": 1017699}, {"key": "116081164#CG0198201", "amt": 1112384}, {"key": "116975890#CG0198191", "amt": 710737}, {"key": "118044495#CG0198201", "amt": 1159152}, {"key": "118326121#CG0198131", "amt": 2869569}, {"key": "121753200#CG0198201", "amt": 2186060}, {"key": "124122414#CG0198201", "amt": 758713}, {"key": "128777156#CG0198201", "amt": 1088598}, {"key": "131997221#CG0198201", "amt": 2426002}, {"key": "132501386#CG0198191", "amt": 1524071}, {"key": "137117649#CG0198201", "amt": 2190652}, {"key": "14129248K#CG0198131", "amt": 0}, {"key": "142462850#CG0198191", "amt": 1232081}, {"key": "143118479#CG0198201", "amt": 743453}, {"key": "151169236#CG0198201", "amt": 751932}, {"key": "154022899#CG0198201", "amt": 2225047}, {"key": "154064907#CG0198201", "amt": 781412}, {"key": "154731644#CG0198131", "amt": 1041240}, {"key": "156224987#CG0198201", "amt": 1597624}, {"key": "157005243#CG0198131", "amt": 1913534}, {"key": "158943646#CG0198131", "amt": 3281515}, {"key": "161860492#CG0198201", "amt": 2277376}, {"key": "162418467#CG0198191", "amt": 758713}, {"key": "163422026#CG0198201", "amt": 2260806}, {"key": "165705904#CG0198201", "amt": 2911114}, {"key": "168563086#CG0198201", "amt": 859978}, {"key": "169513015#CG0198201", "amt": 202325}, {"key": "170823214#CG0198201", "amt": 1907488}, {"key": "17084615K#CG0198201", "amt": 589489}, {"key": "175192204#CG0198131", "amt": 1977108}, {"key": "175623744#CG0198201", "amt": 2134792}, {"key": "184550164#CG0198201", "amt": 202325}, {"key": "187002125#CG0198191", "amt": 1377201}, {"key": "187002125#CG0198201", "amt": 1305368}, {"key": "189615108#CG0198191", "amt": 1125587}, {"key": "191841743#CG0198191", "amt": 1052931}, {"key": "193132251#CG0198201", "amt": 1915565}, {"key": "201242142#CG0198191", "amt": 278193}, {"key": "201248345#CG0198191", "amt": 278193}, {"key": "20127513K#CG0198191", "amt": 1136106}, {"key": "202420117#CG0198201", "amt": 852203}, {"key": "203117019#CG0198191", "amt": 915998}, {"key": "203117019#CG0198201", "amt": 929467}, {"key": "20604246K#CG0198191", "amt": 1103456}, {"key": "20870740K#CG0198191", "amt": 327918}, {"key": "211656018#CG0198201", "amt": 855000}, {"key": "215011569#CG0198191", "amt": 702587}, {"key": "218559077#CG0198201", "amt": 798623}, {"key": "224236093#CG0198191", "amt": 49079}, {"key": "279833961#CG0196071", "amt": 342694}, {"key": "279833961#CG0198201", "amt": 831233}, {"key": "97199604#CG0198201", "amt": 790619}, {"key": "97514410#CG0198201", "amt": 671883}];
+const CARGOS_LIST = ["Administrador de Obra","Administrativo RRHH","Albañil","Andamiero","Asistente Prevencionista de Riesgo","Asistente de Bodega","Asistente de Oficina Técnica","Ayudante de Trazador","Ayudante de Urbanización","Carpintero","Encargado de Calidad","Encargado de Mantención","Encargado de Oficina Técnica","Jefe de Bodega","Jefe de Terreno","Jornal","Jornal Canguero","Maestro Multifuncional","Maestro Urbanización","Operador de Maquinaria","Pañolero","Prevencionista de Riesgo","Supervisor","Topógrafo","Trazador"];
+const PP_LIST = [{"pp":6071,"cc":"CG0196071","cuenta":"IMIV"},{"pp":8131,"cc":"CG0198131","cuenta":"Personal Profesional"},{"pp":8191,"cc":"CG0198191","cuenta":"PERSONAL DE APOYO RIGGERS SENALEROS Y OTROS"},{"pp":8201,"cc":"CG0198201","cuenta":"MO DIRECTA EDIFICACION"},{"pp":6301,"cc":"CG0276301","cuenta":"MO DIRECTA URBANIZACION"},{"pp":8141,"cc":"CG0278141","cuenta":"PERSONAL TECNICO"}];
+const ASISTENCIA_NUEVOS = [{"rutlimpio":"170823214","cc":"CG0198201","role":"Albañil","name":"Eduardo Antonio González","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"193132251","cc":"CG0198201","role":"Albañil","name":"Juan Carlos Cisterna","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":20},{"rutlimpio":"10829020K","cc":"CG0198201","role":"Albañil","name":"Pablo Del Rosario Araya","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"161860492","cc":"CG0198201","role":"Albañil","name":"Victor Alfonso Ramirez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"156224987","cc":"CG0198201","role":"Albañil","name":"Víctor Alfredo Rivera","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":20},{"rutlimpio":"169513015","cc":"CG0198201","role":"Andamiero","name":"Carlos Javier Abarca","meses":[7],"primera_fecha":"2026-07-23","ultima_fecha":"2026-07-30","dias":5},{"rutlimpio":"184550164","cc":"CG0198201","role":"Andamiero","name":"Rafael Antonio Parraguez","meses":[7],"primera_fecha":"2026-07-23","ultima_fecha":"2026-07-30","dias":5},{"rutlimpio":"203117019","cc":"CG0198201","role":"Ayudante de Trazador","name":"Victor Andres Diaz","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-13","dias":10},{"rutlimpio":"103832713","cc":"CG0198201","role":"Carpintero","name":"Carlos Amador Gallardo","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-30","dias":20},{"rutlimpio":"118044495","cc":"CG0198201","role":"Carpintero","name":"José Eduardo Salazar","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"128777156","cc":"CG0198201","role":"Carpintero","name":"Juan Carlos Andaur","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-30","dias":21},{"rutlimpio":"116081164","cc":"CG0198201","role":"Carpintero","name":"Osvaldo Rafael Pérez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":21},{"rutlimpio":"151169236","cc":"CG0198201","role":"Jornal","name":"Carlos Antonio Ramírez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":15},{"rutlimpio":"202420117","cc":"CG0198201","role":"Jornal","name":"Cleversson Hernan Maulen","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"211656018","cc":"CG0198201","role":"Jornal","name":"Cristopher Alexander Maulén","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"218559077","cc":"CG0198201","role":"Jornal","name":"Diego Eduardo Muñoz","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"279833961","cc":"CG0198201","role":"Jornal","name":"Jean Berris Augustin","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"97199604","cc":"CG0198201","role":"Jornal","name":"José Domingo Marambio","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"168563086","cc":"CG0198201","role":"Jornal","name":"José Miguel Carrasco","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"124122414","cc":"CG0198201","role":"Jornal","name":"Luis Armando Núñez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"154064907","cc":"CG0198201","role":"Jornal","name":"Pedro Humberto Castro","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"143118479","cc":"CG0198201","role":"Jornal","name":"Roberto Carlos Rivera","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":21},{"rutlimpio":"97514410","cc":"CG0198201","role":"Jornal Canguero","name":"Hernán Fernando Valdovinos","meses":[7],"primera_fecha":"2026-07-08","ultima_fecha":"2026-07-30","dias":15},{"rutlimpio":"165705904","cc":"CG0198201","role":"Maestro Multifuncional","name":"Alan Jonathan Rojas","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"154022899","cc":"CG0198201","role":"Maestro Multifuncional","name":"Alfredo Rodrigo Burgos","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":23},{"rutlimpio":"137117649","cc":"CG0198201","role":"Maestro Multifuncional","name":"Cristian Andres Henriquez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"121753200","cc":"CG0198201","role":"Maestro Multifuncional","name":"Cristian Rodrigo Manriquez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"175623744","cc":"CG0198201","role":"Maestro Multifuncional","name":"Oscar Antonio Toledo","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":23},{"rutlimpio":"163422026","cc":"CG0198201","role":"Maestro Multifuncional","name":"Patricio Guillermo Escalante","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-30","dias":22},{"rutlimpio":"131997221","cc":"CG0198201","role":"Maestro Multifuncional","name":"Raul Andres Garrido","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":23},{"rutlimpio":"187002125","cc":"CG0198201","role":"Trazador","name":"Luis Heriberto Antileo","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-13","dias":10},{"rutlimpio":"219234643","cc":"CG0276301","role":"Ayudante de Trazador","name":"Benjamin Jesus Cardenas","meses":[7],"primera_fecha":"2026-07-09","ultima_fecha":"2026-07-31","dias":17},{"rutlimpio":"19411771K","cc":"CG0276301","role":"Ayudante de Trazador","name":"Matías Osciel Cartagena","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-06","dias":4},{"rutlimpio":"189290853","cc":"CG0276301","role":"Ayudante de Urbanización","name":"Esteban Enrique Moya","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-08","dias":5},{"rutlimpio":"20385997K","cc":"CG0276301","role":"Jornal","name":"Boris Alejandro Rodríguez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":23},{"rutlimpio":"184877899","cc":"CG0276301","role":"Jornal","name":"Diego Ignacio Cáceres","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":23},{"rutlimpio":"20604215K","cc":"CG0276301","role":"Jornal","name":"Eric Robert Miranda","meses":[7],"primera_fecha":"2026-07-23","ultima_fecha":"2026-07-31","dias":7},{"rutlimpio":"170816412","cc":"CG0276301","role":"Jornal","name":"Juan Enrique González","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":24},{"rutlimpio":"16576448K","cc":"CG0276301","role":"Maestro Urbanización","name":"Arturo Alejandro Carter","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":24},{"rutlimpio":"183353500","cc":"CG0276301","role":"Maestro Urbanización","name":"Cristian Esteban Badilla","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":24},{"rutlimpio":"21173115K","cc":"CG0276301","role":"Maestro Urbanización","name":"Francisco Ignacio Mateluna","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"131745966","cc":"CG0276301","role":"Supervisor","name":"Rodrigo Patricio Alvarado","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"187783976","cc":"CG0276301","role":"Topógrafo","name":"Nicolás Marcelo Martínez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":24},{"rutlimpio":"191841743","cc":"CG0198191","role":"Asistente de Bodega","name":"Oliver Alan Lillo","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":23},{"rutlimpio":"20870740K","cc":"CG0198191","role":"Ayudante de Trazador","name":"Renato Antonio Allende","meses":[7],"primera_fecha":"2026-07-21","ultima_fecha":"2026-07-31","dias":9},{"rutlimpio":"203117019","cc":"CG0198191","role":"Ayudante de Trazador","name":"Victor Andres Diaz","meses":[7],"primera_fecha":"2026-07-14","ultima_fecha":"2026-07-31","dias":12},{"rutlimpio":"111695903","cc":"CG0198191","role":"Carpintero","name":"Carlos Humberto Toro","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":21},{"rutlimpio":"20127513K","cc":"CG0198191","role":"Carpintero","name":"Sergio Enrique Campos","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":23},{"rutlimpio":"142462850","cc":"CG0198191","role":"Encargado de Mantención","name":"Luis Alberto Vásquez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":21},{"rutlimpio":"201242142","cc":"CG0198191","role":"Jornal","name":"Cristian Andres Galdames","meses":[7],"primera_fecha":"2026-07-23","ultima_fecha":"2026-07-31","dias":8},{"rutlimpio":"162418467","cc":"CG0198191","role":"Jornal","name":"Paulina Beatriz Navarro","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"201248345","cc":"CG0198191","role":"Jornal","name":"Victor Manuel Castro","meses":[7],"primera_fecha":"2026-07-23","ultima_fecha":"2026-07-31","dias":7},{"rutlimpio":"132501386","cc":"CG0198191","role":"Operador de Maquinaria","name":"Mauricio Daniel Sanchez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"20604246K","cc":"CG0198191","role":"Pañolero","name":"Enrique Ignacio Carimán","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"116975890","cc":"CG0198191","role":"Trazador","name":"Carlos Alberto Esperguez","meses":[7],"primera_fecha":"2026-07-13","ultima_fecha":"2026-07-31","dias":14},{"rutlimpio":"187002125","cc":"CG0198191","role":"Trazador","name":"Luis Heriberto Antileo","meses":[7],"primera_fecha":"2026-07-14","ultima_fecha":"2026-07-30","dias":9}];
+// Primer mes de liquidacion real en la obra, por persona+centro (Base costo empresa BUK)
+// Gasto empresa real por persona: rut#centro#cargo -> { mes: monto } (archivo MO)
+let GASTO_MES = {"154731644#CG0198131#Jefe de Terreno": {"2": 1041240}, "165705904#CG0198201#Maestro Multifuncional": {"4": 2407054, "5": 2052071, "6": 2077780, "7": 2911114}, "121753200#CG0198201#Maestro Multifuncional": {"4": 2025792, "5": 1695307, "6": 1790102, "7": 2186060}, "137117649#CG0198201#Maestro Multifuncional": {"4": 2093074, "5": 1761556, "6": 1747167, "7": 2190652}, "215011569#CG0198191#Jornal": {"4": 245403, "5": 702587}, "131997221#CG0198201#Maestro Multifuncional": {"4": 2270025, "5": 2033812, "6": 1960110, "7": 2426002}, "154022899#CG0198201#Maestro Multifuncional": {"4": 2024913, "5": 1795178, "6": 1803608, "7": 2225047}, "163422026#CG0198201#Maestro Multifuncional": {"4": 2043303, "5": 1807118, "6": 1672745, "7": 2260806}, "224236093#CG0198191#Jornal": {"4": 49079}, "14129248K#CG0198131#Administrador de Obra": {"5": 0, "6": 0, "7": 0}, "175623744#CG0198201#Maestro Multifuncional": {"4": 2052729, "5": 1747045, "6": 1591677, "7": 2134792}, "118044495#CG0198201#Carpintero": {"5": 1058468, "6": 1159152, "7": 1151381}, "279833961#CG0196071#Jornal": {"5": 342694}, "203117019#CG0198201#Ayudante de Trazador": {"5": 807970, "6": 929467}, "175192204#CG0198131#Prevencionista de Riesgo": {"6": 1913723, "7": 1977108}, "20127513K#CG0198191#Carpintero": {"5": 489078, "6": 1048022, "7": 1136106}, "193132251#CG0198201#Albañil": {"5": 1071369, "6": 1716908, "7": 1915565}, "161860492#CG0198201#Albañil": {"5": 1171823, "6": 1743187, "7": 2277376}, "279833961#CG0198201#Jornal": {"6": 831233, "7": 812303}, "187002125#CG0198201#Trazador": {"5": 1242063, "6": 1305368}, "158943646#CG0198131#Encargado de Oficina Técnica": {"6": 3277734, "7": 3281515}, "151169236#CG0198201#Jornal": {"5": 694838, "6": 751932, "7": 704256}, "103832713#CG0198201#Carpintero": {"5": 1093811, "6": 1194492, "7": 1376143}, "143118479#CG0198201#Jornal": {"6": 530853, "7": 743453}, "168563086#CG0198201#Jornal": {"6": 554462, "7": 859978}, "170823214#CG0198201#Albañil": {"6": 995144, "7": 1907488}, "154064907#CG0198201#Jornal": {"6": 781412, "7": 758713}, "162418467#CG0198191#Jornal": {"6": 756083, "7": 758713}, "218559077#CG0198201#Jornal": {"6": 579665, "7": 798623}, "211656018#CG0198201#Jornal": {"6": 855000, "7": 780842}, "142462850#CG0198191#Encargado de Mantención": {"6": 673181, "7": 1232081}, "10829020K#CG0198201#Albañil": {"6": 1320375, "7": 1054984}, "189615108#CG0198191#Encargado de Mantención": {"6": 1125587}, "132501386#CG0198191#Operador de Maquinaria": {"6": 643816, "7": 1524071}, "116081164#CG0198201#Carpintero": {"6": 1084757, "7": 1112384}, "128777156#CG0198201#Carpintero": {"6": 871619, "7": 1088598}, "124122414#CG0198201#Jornal": {"6": 581260, "7": 758713}, "157005243#CG0198131#Encargado de Calidad": {"6": 1517826, "7": 1913534}, "17084615K#CG0198201#Maestro Multifuncional": {"6": 589489, "7": 0}, "118326121#CG0198131#Jefe de Terreno": {"6": 2503880, "7": 2869569}, "20604246K#CG0198191#Pañolero": {"6": 530709, "7": 1103456}, "97514410#CG0198201#Jornal Canguero": {"7": 671883}, "97199604#CG0198201#Jornal": {"7": 790619}, "169513015#CG0198201#Andamiero": {"7": 202325}, "187002125#CG0198191#Trazador": {"7": 1377201}, "201242142#CG0198191#Jornal": {"7": 278193}, "111695903#CG0198191#Carpintero": {"7": 1017699}, "201248345#CG0198191#Jornal": {"7": 278193}, "20870740K#CG0198191#Ayudante de Trazador": {"7": 327918}, "156224987#CG0198201#Albañil": {"7": 1597624}, "116975890#CG0198191#Trazador": {"7": 710737}, "191841743#CG0198191#Asistente de Bodega": {"7": 1052931}, "203117019#CG0198191#Ayudante de Trazador": {"7": 915998}, "184550164#CG0198201#Andamiero": {"7": 202325}, "202420117#CG0198201#Jornal": {"7": 852203}};
+let PRIMER_PERIODO = {"154731644#CG0198131": 2, "165705904#CG0198201": 4, "121753200#CG0198201": 4, "137117649#CG0198201": 4, "215011569#CG0198191": 4, "131997221#CG0198201": 4, "154022899#CG0198201": 4, "163422026#CG0198201": 4, "224236093#CG0198191": 4, "14129248K#CG0198131": 5, "175623744#CG0198201": 4, "118044495#CG0198201": 5, "279833961#CG0196071": 5, "203117019#CG0198201": 5, "175192204#CG0198131": 6, "20127513K#CG0198191": 5, "193132251#CG0198201": 5, "161860492#CG0198201": 5, "279833961#CG0198201": 6, "187002125#CG0198201": 5, "158943646#CG0198131": 6, "151169236#CG0198201": 5, "103832713#CG0198201": 5, "143118479#CG0198201": 6, "168563086#CG0198201": 6, "170823214#CG0198201": 6, "154064907#CG0198201": 6, "162418467#CG0198191": 6, "218559077#CG0198201": 6, "211656018#CG0198201": 6, "142462850#CG0198191": 6, "10829020K#CG0198201": 6, "189615108#CG0198191": 6, "132501386#CG0198191": 6, "116081164#CG0198201": 6, "128777156#CG0198201": 6, "124122414#CG0198201": 6, "157005243#CG0198131": 6, "17084615K#CG0198201": 6, "118326121#CG0198131": 6, "20604246K#CG0198191": 6, "97514410#CG0198201": 7, "97199604#CG0198201": 7, "169513015#CG0198201": 7, "187002125#CG0198191": 7, "201242142#CG0198191": 7, "111695903#CG0198191": 7, "201248345#CG0198191": 7, "20870740K#CG0198191": 7, "156224987#CG0198201": 7, "116975890#CG0198191": 7, "191841743#CG0198191": 7, "203117019#CG0198191": 7, "184550164#CG0198201": 7, "202420117#CG0198201": 7};
+const PREV_ROLES = {};
+let REAL_MONTHLY = [{"cc": "CG0198131", "month": 2, "costo": 1041240, "personas": 1}, {"cc": "CG0198191", "month": 4, "costo": 294482, "personas": 2}, {"cc": "CG0198201", "month": 4, "costo": 14916890, "personas": 7}, {"cc": "CG0196071", "month": 5, "costo": 342694, "personas": 1}, {"cc": "CG0198131", "month": 5, "costo": 0, "personas": 1}, {"cc": "CG0198191", "month": 5, "costo": 1191665, "personas": 2}, {"cc": "CG0198201", "month": 5, "costo": 20032429, "personas": 14}, {"cc": "CG0198131", "month": 6, "costo": 9213163, "personas": 5}, {"cc": "CG0198191", "month": 6, "costo": 4777398, "personas": 6}, {"cc": "CG0198201", "month": 6, "costo": 31018964, "personas": 26}, {"cc": "CG0198131", "month": 7, "costo": 10041726, "personas": 5}, {"cc": "CG0198191", "month": 7, "costo": 11713297, "personas": 13}, {"cc": "CG0198201", "month": 7, "costo": 38752252, "personas": 30}];
+
+// Gasto empresa real de la persona en un mes puntual (archivo MO). null si no hay.
+function gastoMesReal(w, mes){
+  const reg = GASTO_MES[`${w.rutlimpio}#${w.cc}#${w.role}`];
+  if(!reg) return null;
+  const v = reg[String(mes)];
+  return Number.isFinite(Number(v)) ? Math.round(Number(v)) : null;
+}
+
+// Promedio de los sueldos anteriores de la MISMA persona en el mismo cargo.
+// Se usa cuando el mes pedido no tiene liquidacion cargada.
+function promedioRutCargo(w, mes){
+  const reg = GASTO_MES[`${w.rutlimpio}#${w.cc}#${w.role}`];
+  if(!reg) return null;
+  const previos = Object.keys(reg)
+    .map(Number)
+    .filter(m => !mes || m < mes)
+    .map(m => Number(reg[String(m)]))
+    .filter(Number.isFinite);
+  const base = previos.length ? previos : Object.values(reg).map(Number).filter(Number.isFinite);
+  if(!base.length) return null;
+  return Math.round(base.reduce((s,v)=>s+v,0) / base.length);
+}
+
+function costoMensual(w, mes){
   if(w.costoManual !== undefined && w.costoManual !== null && Number.isFinite(Number(w.costoManual))){
     return Math.round(Number(w.costoManual));
   }
-  const found = COSTOS.find(c => c.cc === w.cc && c.role === w.role);
-  if(!found) return null;
-  const n = Number(found.amt);
-  return Number.isFinite(n) ? Math.round(n) : null;
+  // Si el archivo MO trae gasto empresa para ese periodo, manda ese valor.
+  if(mes){
+    const real = gastoMesReal(w, mes);
+    if(real !== null) return real;
+  }
+  // Si no, promedio por rut y cargo de los sueldos anteriores.
+  const prom = promedioRutCargo(w, mes);
+  if(prom !== null) return prom;
+  // 1st: exact match cc+role in promedio NN
+  let costoProm = null;
+  const found = COSTOS.find(c => c.cc === w.cc && (c.role||'').toLowerCase().trim() === (w.role||'').toLowerCase().trim());
+  if(found){ const n = Number(found.amt); if(Number.isFinite(n)) costoProm = Math.round(n); }
+
+  // 2nd: if no exact match, use same role in ANY cc as reference (average across ccs)
+  if(costoProm === null){
+    const sameRole = COSTOS.filter(c => (c.role||'').toLowerCase().trim() === (w.role||'').toLowerCase().trim());
+    if(sameRole.length > 0){
+      const avg = sameRole.reduce((s,c)=>s+Number(c.amt),0) / sameRole.length;
+      if(Number.isFinite(avg)) costoProm = Math.round(avg);
+    }
+  }
+
+  // 3rd: max historical real cost for this person+cc
+  let costoMax = null;
+  const maxReal = ULTIMO_COSTO_MAX.find(u => u.key === `${w.rutlimpio}#${w.cc}`);
+  if(maxReal && Number.isFinite(Number(maxReal.amt))) costoMax = Math.round(Number(maxReal.amt));
+
+  if(costoProm !== null && costoMax !== null) return Math.max(costoProm, costoMax);
+  if(costoProm !== null) return costoProm;
+  if(costoMax !== null) return costoMax;
+  return null;
 }
 
 function formatCLP(n){
@@ -678,10 +974,114 @@ function formatCLP(n){
   return '$' + Math.round(n).toLocaleString('es-CL');
 }
 
+// most recent REAL monthly cost recorded for this person+cost center (Base costo empresa BUK),
+// falling back to the average by cargo+centro if no real record exists.
+// Most recent real liquidation cost for this person+cc (used for finiquito base, mirrors column L in planilla)
+// Base del finiquito: el gasto empresa MAS ALTO registrado para la persona.
+function ultimoCostoReal(w){
+  const reg = GASTO_MES[`${w.rutlimpio}#${w.cc}#${w.role}`];
+  if(reg){
+    const vals = Object.values(reg).map(Number).filter(Number.isFinite);
+    if(vals.length) return Math.round(Math.max(...vals));
+  }
+  const found = ULTIMO_COSTO_MAX.find(u => u.key === `${w.rutlimpio}#${w.cc}`);
+  if(found && Number.isFinite(Number(found.amt))) return Math.round(Number(found.amt));
+  return costoMensual(w); // fallback a promedio si no hay registro real
+}
+
+// Max historical cost for this person+cc (used for monthly cost projection — conservative upper bound)
+function ultimoCostoEmpresa(w){
+  const found = ULTIMO_COSTO.find(u => u.key === `${w.rutlimpio}#${w.cc}`);
+  if(found && Number.isFinite(Number(found.amt))) return Math.round(Number(found.amt));
+  return costoMensual(w);
+}
+
+// Fecha de inicio efectiva para antiguedad de finiquito:
+// la obra parte en 2026, asi que si la persona ya venia de otra obra
+// se cuenta desde su primera liquidacion real en este centro de costo.
+function fcEfectiva(w){
+  const m = PRIMER_PERIODO[`${w.rutlimpio}#${w.cc}`];
+  if(!m) return w.fc;
+  const inicioObra = `${YEAR}-${String(m).padStart(2,'0')}-01`;
+  return (w.fc && w.fc > inicioObra) ? w.fc : inicioObra;
+}
+function fcRecortada(w){
+  return fcEfectiva(w) !== w.fc;
+}
+
+// Finiquito: =+((fs-fc)*1.25/30)*ultimoCostoReal/30  — same formula as planilla column O
+// Uses ultimo costo REAL (col L in planilla), NOT the projection max
+function montoFiniquito(w){
+  if(w.status !== 'finiquitado' || !w.fs || !w.fc) return null;
+  const start = new Date(fcEfectiva(w) + 'T00:00:00');
+  const end   = new Date(w.fs + 'T00:00:00');
+  const tenureDays = (end - start) / 86400000;
+  if(!Number.isFinite(tenureDays) || tenureDays < 0) return null;
+  const costoBase = ultimoCostoReal(w);
+  if(costoBase === null) return null;
+
+  const causal = (w.motivo || '').toLowerCase();
+
+  if(causal === 'necesidades_empresa'){
+    // Indemnización por años de servicio: 1 mes por cada año completo (sin tope)
+    const añosCompletos = Math.floor(tenureDays / 365);
+    const indemAnios = añosCompletos * costoBase;
+    // Sustitutiva de aviso previo: siempre 1 mes adicional
+    const sustitutiva = costoBase;
+    return Math.round(indemAnios + sustitutiva);
+  }
+
+  const vacaciones = (tenureDays / 365) * 15 * (costoBase / 30);
+  const mesesTrabajados = tenureDays / 30;
+  const añosServicio = Math.floor(mesesTrabajados / 12);
+
+  if(causal === 'vencimiento_plazo'){
+    // Vacaciones + mes de aviso + 1 mes por cada año de permanencia
+    const aviso = costoBase;
+    return Math.round(vacaciones + aviso + añosServicio * costoBase);
+  }
+
+  if(['renuncia','no_concurrencia','cambio_obra'].includes(causal)){
+    // Proporcional gratificación: 1/12 del salario anual por mes trabajado
+    const gratificacion = (mesesTrabajados / 12) * costoBase;
+    return Math.round(vacaciones + gratificacion + añosServicio * costoBase);
+  }
+
+  // Fallecimiento, Otro, sin motivo → fórmula general original
+  return Math.round(((tenureDays * 1.25) / 30) * (costoBase / 30));
+}
+
+// Returns a readable label describing the finiquito calculation used
+function finiquitoDetalle(w){
+  if(w.status !== 'finiquitado' || !w.fs || !w.fc) return null;
+  const causal = (w.motivo || '').toLowerCase();
+  const start = new Date(fcEfectiva(w) + 'T00:00:00');
+  const end   = new Date(w.fs + 'T00:00:00');
+  const tenureDays = (end - start) / 86400000;
+  if(!Number.isFinite(tenureDays) || tenureDays < 0) return null;
+  const nota = fcRecortada(w)
+    ? ` · antigüedad desde ${fcEfectiva(w)} (inicio en obra)`
+    : '';
+  if(causal === 'necesidades_empresa'){
+    const años = Math.floor(tenureDays / 365);
+    return `${años} año${años!==1?'s':''} × 1 mes + sustitutiva${nota}`;
+  }
+  const años = Math.floor((tenureDays / 30) / 12);
+  const extra = años > 0 ? ` + ${años} mes${años!==1?'es':''} por año de servicio` : '';
+  if(causal === 'vencimiento_plazo'){
+    return `Vacaciones + mes de aviso${extra}${nota}`;
+  }
+  if(['renuncia','no_concurrencia','cambio_obra'].includes(causal)){
+    return `Vacaciones + gratificación proporcional${extra}${nota}`;
+  }
+  return `Fórmula general${nota}`;
+}
+
 let workers = [];
-let meta = { ultimoMesReal: 5 }; // 1-12
+let meta = { ultimoMesReal: 7 }; // 1-12
 let activeCC = 'todos';
 let pendingExitId = null;
+let costoAutoFilled = false;
 
 function toast(msg){
   const t = document.getElementById('toast');
@@ -720,56 +1120,60 @@ function isProjectedEnd(w){
 // returns array of 12 states: 'before' | 'auto' | 'manual-on' | 'manual-out'
 function computeMonthStates(w){
   const states = [];
-  const fc = ymOf(w.fc);
-  const fs = ymOf(w.fs);
-  for(let m=1; m<=12; m++){
-    let working = false;
-    if(fc && (fc.y < YEAR || (fc.y===YEAR && fc.m<=m))) working = true;
-    if(fc && fc.y === YEAR && fc.m > m) working = false;
-    if(working && w.status === 'finiquitado' && fs){
-      if(fs.y === YEAR && fs.m < m) working = false;
-      // month of departure itself still counts as worked
-    }
+  // Usa la llegada real a la obra: si la persona venia de otro proyecto,
+  // los meses anteriores a su primera liquidacion aqui no se pintan.
+  const fcYM = ymOf(fcEfectiva(w));
+  const fsYM = ymOf(w.fs);
+  const fcIdx = fcYM ? ymToIdx(fcYM.y, fcYM.m) : null;
+  const fsIdx = fsYM ? ymToIdx(fsYM.y, fsYM.m) : null;
+  for(let i=0; i<HORIZON; i++){
+    let working = fcIdx !== null && fcIdx <= i;
+    if(working && w.status === 'finiquitado' && fsIdx !== null && fsIdx < i) working = false;
     if(!working){ states.push('before'); continue; }
-    states.push(m <= meta.ultimoMesReal ? 'auto' : (w.status==='finiquitado' && fs && fs.y===YEAR && fs.m===m ? 'manual-out' : 'manual-on'));
+    states.push((i+1) <= meta.ultimoMesReal ? 'auto'
+      : (w.status==='finiquitado' && fsIdx === i ? 'manual-out' : 'manual-on'));
   }
   return states;
 }
 
 let storageMode = 'none'; // 'cloud' | 'local' | 'none'
 
+// Guardado real en el servidor de Baker (server.js), compartido entre todo
+// el equipo — reemplaza el guardado local/por-navegador que traía este
+// archivo antes.
 function storageModeLabel(){
-  return 'Guardado automático: en el servidor (todos ven los mismos cambios)';
+  return 'Guardado automático: compartido en el servidor (todo el equipo ve los mismos cambios)';
 }
 
+const SEED_VERSION = SEED_WORKERS.length + '_' + (SEED_WORKERS[0]||{}).id;
+
 async function loadState(){
-  storageMode = 'server';
-  try{
-    const res = await fetch(`${API}/dotacion`);
-    if(!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    workers = Array.isArray(data.workers) ? data.workers : [];
-    meta = data.meta && Object.keys(data.meta).length ? data.meta : meta;
-  }catch(e){
-    console.warn('loadState: no se pudo leer del servidor', e);
-    workers = [];
-    toast('No se pudo cargar la dotación guardada — revisa la conexión con el servidor.');
+  const guardado = await cargarDesdeServidor();
+  if(guardado && Array.isArray(guardado.workers) && guardado.workers.length){
+    workers = guardado.workers;
+    meta = guardado.meta || meta;
+  } else {
+    // Primera vez que corre en el servidor — siembra con lo que traía este
+    // archivo (ya filtrado a Mirador El Pino) y lo sube.
+    workers = SEED_WORKERS.map(w => ({...w}));
+    meta = { ultimoMesReal: 7 };
+    await guardarEnServidor(false);
   }
 }
 
 async function persist(showToast){
-  try{
-    const res = await fetch(`${API}/dotacion`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workers, meta }),
-    });
-    if(!res.ok) throw new Error(`HTTP ${res.status}`);
-    if(showToast) toast('Cambios guardados en el servidor');
-  }catch(e){
-    console.error('persist error:', e);
-    toast('No se pudo guardar automáticamente (' + (e && e.message ? e.message : 'error desconocido') + '). Usa "Descargar respaldo (JSON)" para no perder el trabajo.');
-  }
+  await guardarEnServidor(showToast);
+}
+
+function resetToOriginal(){
+  const ok = confirm('Esto va a borrar TODOS los cambios guardados (ingresos agregados, salidas registradas, etc.) y volver a la dotación base con la que se armó este archivo. ¿Continuar?');
+  if(!ok) return;
+  workers = SEED_WORKERS.map(w => ({...w}));
+  meta = { ultimoMesReal: 7 };
+  renderMesRealSelect();
+  renderAll();
+  persist(false);
+  toast('Dotación reiniciada');
 }
 
 function downloadBackupJSON(){
@@ -824,13 +1228,13 @@ function renderLegend(){
 
 function renderMesRealSelect(){
   const sel = document.getElementById('mesReal');
-  sel.innerHTML = MONTH_NAMES.map((n,i)=>`<option value="${i+1}">${n} ${YEAR}</option>`).join('');
+  sel.innerHTML = PERIOD_LABELS.map((n,i)=>`<option value="${i+1}">${n}</option>`).join('');
   sel.value = meta.ultimoMesReal;
   sel.onchange = () => { meta.ultimoMesReal = parseInt(sel.value,10); renderAll(); persist(false); };
 }
 
 function renderCCChips(){
-  const ccs = Array.from(new Set(workers.map(w=>w.cc))).sort();
+  const ccs = PP_LIST.slice().sort((a,b)=>a.cc.localeCompare(b.cc)).map(p=>p.cc);
   const wrap = document.getElementById('ccChips');
   const all = ['todos', ...ccs];
   wrap.innerHTML = all.map(cc => `<div class="chip ${cc===activeCC?'active':''}" data-cc="${cc}">${cc==='todos'?'Todos':cc}</div>`).join('');
@@ -845,6 +1249,234 @@ function matchesSearch(w, q){
   return w.name.toLowerCase().includes(q) || (w.rut||'').toLowerCase().includes(q) || (w.role||'').toLowerCase().includes(q);
 }
 
+function computeResumenPorCentro(){
+  const byCC = {};
+  PP_LIST.forEach(p => { byCC[p.cc] = { cc: p.cc, personasActivas: 0, costoEmpresa: 0, finiquito: 0 }; });
+  workers.forEach(w=>{
+    const bucket = byCC[w.cc];
+    if(!bucket) return; // skip any worker with a cc outside the 7 known centers
+    if(!isDeparted(w)){
+      bucket.personasActivas += 1;
+      const cm = costoMensual(w);
+      if(cm !== null) bucket.costoEmpresa += cm;
+    }
+    if(w.status === 'finiquitado' && w.fs){
+      const mf = montoFiniquito(w);
+      if(mf !== null) bucket.finiquito += mf;
+    }
+  });
+  return Object.values(byCC).sort((a,b)=> a.cc.localeCompare(b.cc));
+}
+
+const MONTH_ABBR_BASE = ['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'];
+const MONTH_ABBR = Array.from({length:HORIZON},(_,i)=>{
+  const {y,m}=idxToYM(i); return MONTH_ABBR_BASE[m-1]+'-'+String(y).slice(2);
+});
+
+function formatNumOrDash(n){
+  if(!n) return '-';
+  return Math.round(n).toLocaleString('es-CL');
+}
+
+function computeMonthlyBreakdown(){
+  const ccs = PP_LIST.slice().sort((a,b)=>a.cc.localeCompare(b.cc)).map(p=>p.cc);
+  const costoMensualByCC = {};
+  const finiquitosByCC = {};
+  const dotacionByCC = {};
+  ccs.forEach(cc => {
+    costoMensualByCC[cc] = new Array(HORIZON).fill(0);
+    finiquitosByCC[cc] = new Array(HORIZON).fill(0);
+    dotacionByCC[cc] = new Array(HORIZON).fill(0);
+  });
+
+  // Auto months (real cost already loaded): use the real aggregate straight from
+  // Base costo empresa BUK — actual headcount and actual amount for that cc+month.
+  for(let m=1; m<=meta.ultimoMesReal; m++){
+    ccs.forEach(cc=>{
+      const real = REAL_MONTHLY.find(r => r.cc===cc && r.month===m);
+      if(real){
+        dotacionByCC[cc][m-1] = real.personas;
+        costoMensualByCC[cc][m-1] = real.costo;
+      }
+    });
+  }
+
+  // Manual months (no real cost loaded yet): derive from each worker's tracked
+  // permanencia (fc/fs + Sigue/Con término). Also covers any auto month that's
+  // missing a real aggregate for some reason, as a safety net.
+  workers.forEach(w => {
+    if(!dotacionByCC[w.cc]) return; // skip any worker with a cc outside the 7 known centers
+    const states = computeMonthStates(w);
+    for(let m=1; m<=HORIZON; m++){
+      const idx = m-1;
+      const hasRealForThisMonth = m <= meta.ultimoMesReal && REAL_MONTHLY.some(r => r.cc===w.cc && r.month===m);
+      if(hasRealForThisMonth) continue;
+      if(states[idx] !== 'before'){
+        const cm = costoMensual(w, m);
+        dotacionByCC[w.cc][idx] += 1;
+        if(cm !== null) costoMensualByCC[w.cc][idx] += cm;
+      }
+    }
+  });
+
+  // Finiquitos: always the month the departure (real or projected) falls in,
+  // independent of the auto/manual boundary.
+  workers.forEach(w => {
+    if(!finiquitosByCC[w.cc]) return; // skip any worker with a cc outside the 7 known centers
+    if(w.status === 'finiquitado' && w.fs){
+      const fsDate = new Date(w.fs + 'T00:00:00');
+      const fsMonthIdx = ymToIdx(fsDate.getFullYear(), fsDate.getMonth()+1);
+      if(fsMonthIdx >= 0 && fsMonthIdx < HORIZON){
+        const mf = montoFiniquito(w);
+        if(mf !== null) finiquitosByCC[w.cc][fsMonthIdx] += mf;
+      }
+    }
+  });
+
+  const totals = { costoMensual: new Array(HORIZON).fill(0), finiquitos: new Array(HORIZON).fill(0), dotacion: new Array(HORIZON).fill(0) };
+  ccs.forEach(cc=>{
+    for(let m=0;m<HORIZON;m++){
+      totals.costoMensual[m] += costoMensualByCC[cc][m];
+      totals.finiquitos[m] += finiquitosByCC[cc][m];
+      totals.dotacion[m] += dotacionByCC[cc][m];
+    }
+  });
+
+  return { ccs, costoMensualByCC, finiquitosByCC, dotacionByCC, totals };
+}
+
+function renderMonthlyTable(title, ccs, dataByCC, totalsRow, formatter){
+  const months = MONTH_ABBR.slice(MONTH_ABBR.length - totalsRow.length);
+  const grandTotal = totalsRow.reduce((s,v)=>s+v,0);
+  return `
+    <div class="monthly-table-title">${title}</div>
+    <div class="monthly-table-scroll">
+      <table class="monthly-table">
+        <thead><tr>
+          <th class="cc-col">Centro de costo</th>
+          ${months.map(m=>`<th>${m}</th>`).join('')}
+          <th class="total-col">Total</th>
+        </tr></thead>
+        <tbody>
+          ${ccs.map(cc => {
+            const rowTotal = dataByCC[cc].reduce((s,v)=>s+v,0);
+            return `
+            <tr>
+              <td class="cc-col">${cc}<span class="cuenta-name">${cuentaNombre(cc)}</span></td>
+              ${dataByCC[cc].map(v => `<td>${formatter(v)}</td>`).join('')}
+              <td class="total-col">${formatter(rowTotal)}</td>
+            </tr>`;
+          }).join('')}
+          <tr class="total-row">
+            <td class="cc-col">Total</td>
+            ${totalsRow.map(v => `<td>${formatter(v)}</td>`).join('')}
+            <td class="total-col">${formatter(grandTotal)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function cuentaNombre(cc){
+  const found = PP_LIST.find(p => p.cc === cc);
+  return found ? found.cuenta : '';
+}
+
+let expandedCC = new Set();
+
+function renderCostoProyectadoTable(ccs, b, startIdx){
+  const months = MONTH_ABBR.slice(startIdx);
+  if(months.length === 0){
+    return `
+      <div class="monthly-table-title">Costo Proyectado</div>
+      <p style="padding:0 16px 14px;font-size:12.5px;color:var(--steel);">
+        No quedan meses posteriores al último mes con costo real cargado.
+      </p>`;
+  }
+
+  const totalCosto = b.totals.costoMensual.slice(startIdx);
+  const totalFiniq = b.totals.finiquitos.slice(startIdx);
+  const totalGeneral = totalCosto.map((v,i)=>v+totalFiniq[i]);
+  const grandTotal = totalGeneral.reduce((s,v)=>s+v,0);
+
+  const rows = ccs.map(cc => {
+    const costoRow = b.costoMensualByCC[cc].slice(startIdx);
+    const finRow = b.finiquitosByCC[cc].slice(startIdx);
+    const subtotalRow = costoRow.map((v,i) => v + finRow[i]);
+    const rowTotal = subtotalRow.reduce((s,v)=>s+v,0);
+    const costoTotal = costoRow.reduce((s,v)=>s+v,0);
+    const finTotal = finRow.reduce((s,v)=>s+v,0);
+    const isOpen = expandedCC.has(cc);
+    return `
+    <tr class="cc-parent-row">
+      <td class="cc-col">
+        <button class="toggle-sub" data-cc="${cc}">${isOpen ? '−' : '+'}</button>
+        ${cc}<span class="cuenta-name">${cuentaNombre(cc)}</span>
+      </td>
+      ${subtotalRow.map(v=>`<td>${formatNumOrDash(v)}</td>`).join('')}
+      <td class="total-col">${formatNumOrDash(rowTotal)}</td>
+    </tr>
+    <tr class="sub-row cc-child-row" data-parent="${cc}" style="display:${isOpen?'table-row':'none'};">
+      <td class="cc-col sub-indent">Costo Liquidación</td>
+      ${costoRow.map(v=>`<td>${formatNumOrDash(v)}</td>`).join('')}
+      <td class="total-col">${formatNumOrDash(costoTotal)}</td>
+    </tr>
+    <tr class="sub-row cc-child-row" data-parent="${cc}" style="display:${isOpen?'table-row':'none'};">
+      <td class="cc-col sub-indent">Finiquito</td>
+      ${finRow.map(v=>`<td>${formatNumOrDash(v)}</td>`).join('')}
+      <td class="total-col">${formatNumOrDash(finTotal)}</td>
+    </tr>`;
+  }).join('');
+
+  return `
+    <div class="monthly-table-title">Costo Proyectado</div>
+    <div class="monthly-table-scroll">
+      <table class="monthly-table">
+        <thead><tr>
+          <th class="cc-col">Centro de costo</th>
+          ${months.map(m=>`<th>${m}</th>`).join('')}
+          <th class="total-col">Total</th>
+        </tr></thead>
+        <tbody>
+          ${rows}
+          <tr class="total-row">
+            <td class="cc-col">Total</td>
+            ${totalGeneral.map(v=>`<td>${formatNumOrDash(v)}</td>`).join('')}
+            <td class="total-col">${formatNumOrDash(grandTotal)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function attachToggleSubListeners(){
+  document.querySelectorAll('.toggle-sub').forEach(btn=>{
+    btn.addEventListener('click', () => {
+      const cc = btn.dataset.cc;
+      if(expandedCC.has(cc)) expandedCC.delete(cc); else expandedCC.add(cc);
+      renderResumenWidget();
+    });
+  });
+}
+
+function renderResumenWidget(){
+  const el = document.getElementById('resumenCard');
+  if(!el) return;
+  const b = computeMonthlyBreakdown();
+  const startIdx = meta.ultimoMesReal; // 0-indexed position of the month right after ultimoMesReal
+  const dotacionMonths = MONTH_ABBR.slice(startIdx);
+  const dotacionTable = dotacionMonths.length === 0 ? '' : renderMonthlyTable(
+    'Dotación', b.ccs,
+    Object.fromEntries(b.ccs.map(cc => [cc, b.dotacionByCC[cc].slice(startIdx)])),
+    b.totals.dotacion.slice(startIdx),
+    v => v || '-'
+  );
+  el.innerHTML = renderCostoProyectadoTable(b.ccs, b, startIdx) + dotacionTable;
+  attachToggleSubListeners();
+}
+
 function renderRoster(){
   const body = document.getElementById('rosterBody');
   const q = document.getElementById('searchBox').value.trim();
@@ -852,6 +1484,7 @@ function renderRoster(){
   list = list.slice().sort((a,b)=> (isDeparted(a))-(isDeparted(b)) || a.name.localeCompare(b.name));
 
   document.getElementById('activeCount').textContent = workers.filter(w=>!isDeparted(w)).length + ' de ' + workers.length;
+  renderResumenWidget();
 
   if(list.length===0){
     body.innerHTML = `<div class="empty">No hay personas que coincidan con el filtro.</div>`;
@@ -873,18 +1506,35 @@ function renderRoster(){
     } else if(projected){
       detail = `<div style="font-size:11px;color:var(--orange);margin-top:6px;">Término proyectado ${w.fs} · ${motivoLabel(w.motivo)}</div>`;
     }
+    const prevKey = `${w.rutlimpio}#${w.cc}#${w.role}`;
+    const prev = PREV_ROLES[prevKey] || null;
+    // prevCosto: use the actual recorded gasto from the previous role period if available,
+    // otherwise fall back to promedio NN for that role
+    const prevCosto = prev
+      ? (prev.prevCosto || costoMensual({...w, role: prev.prevRole}))
+      : null;
     return `
     <div class="row ${departed?'is-out':''}" data-id="${w.id}">
       <div>
-        <div class="name">${w.name} ${w.source==='ingreso'?'<span class="badge-ingreso">Ingreso</span>':''}</div>
+        <div class="name">${w.name} ${w.source==='ingreso'?'<span class="badge-ingreso">Ingreso</span>':''} ${w.source==='proyectado'?'<span class="badge-ingreso" style="background:#EEF2FF;color:#4F46E5;">Proyectado</span>':''}</div>
         <div class="rut">${w.rut||''}</div>
       </div>
       <div>
         <div class="role">${w.role||''}</div>
-        <div style="font-size:11px;color:var(--steel);margin-top:2px;">${formatCLP(costoMensual(w))}/mes</div>
+        ${prev ? `<div style="font-size:11px;color:var(--steel);margin-top:2px;">antes: ${prev.prevRole}</div>` : ''}
       </div>
       <div class="cc">${w.cc||''}</div>
-      <div style="font-size:12.5px;color:var(--ink);">${w.fc||'-'}</div>
+      <div style="font-size:12.5px;color:var(--ink);">${
+        w.source === 'proyectado'
+          ? `<input type="date" data-action="editar-inicio" value="${w.fc||''}" min="2026-01-01" max="2027-10-31" style="font-size:12px;padding:3px 5px;border:1px solid var(--line);border-radius:5px;width:125px;">`
+          : (w.fc||'-')
+      }</div>
+      <div style="font-size:12.5px;color:var(--ink);">${formatCLP(costoMensual(w))}</div>
+      <div style="font-size:12px;color:var(--steel);">${prev ? formatCLP(prevCosto) : '—'}</div>
+      <div style="font-size:12.5px;color:var(--ink);">
+        ${hasEnd ? formatCLP(montoFiniquito(w)) : '—'}
+        ${hasEnd && finiquitoDetalle(w) ? `<div style="font-size:10.5px;color:var(--steel);margin-top:2px;">${finiquitoDetalle(w)}</div>` : ''}
+      </div>
       <div>
         <div class="status-toggle">
           <div class="toggle-btn ${!hasEnd?'sel-on':''}" data-action="sigue">Sigue</div>
@@ -897,7 +1547,7 @@ function renderRoster(){
       </div>
       <div class="mini-wrap">
         <div class="mini">${bars}</div>
-        <div class="mini-caption"><span>${MONTH_NAMES[0]}</span><span class="mid">· · ·</span><span>${MONTH_NAMES[11]}</span></div>
+        <div class="mini-caption"><span>${MONTH_ABBR[0]}</span><span class="mid">· · ·</span><span>${MONTH_ABBR[HORIZON-1]}</span></div>
       </div>
     </div>`;
   }).join('');
@@ -908,12 +1558,29 @@ function renderRoster(){
     row.querySelector('[data-action="salio"]').onclick = () => openExitModal(id);
     const editBtn = row.querySelector('[data-action="editar-salida"]');
     if(editBtn) editBtn.onclick = () => openExitModal(id);
+    const fcInput = row.querySelector('[data-action="editar-inicio"]');
+    if(fcInput) fcInput.onchange = () => setFechaInicio(id, fcInput.value);
   });
 }
 
 function motivoLabel(m){
-  const map = { renuncia:'Renuncia', vencimiento_plazo:'Vencimiento de plazo', necesidades_empresa:'Necesidades de la empresa', no_concurrencia:'No concurrencia', muerte:'Fallecimiento', otro:'Otro' };
+  const map = { renuncia:'Renuncia', vencimiento_plazo:'Vencimiento de plazo', necesidades_empresa:'Necesidades de la empresa', no_concurrencia:'No concurrencia', muerte:'Fallecimiento', cambio_obra:'Cambio de obra', otro:'Otro' };
   return map[m] || '';
+}
+
+function setFechaInicio(id, value){
+  const w = workers.find(x=>x.id===id);
+  if(!w) return;
+  if(!value){ toast('Ingresa una fecha de inicio válida'); renderRoster(); return; }
+  if(w.fs && value > w.fs){
+    toast(`El inicio no puede ser posterior al término (${w.fs})`);
+    renderRoster();
+    return;
+  }
+  w.fc = value;
+  renderRoster();
+  renderExportPreview();
+  toast(`Inicio actualizado a ${value}`);
 }
 
 function setSigue(id){
@@ -953,7 +1620,31 @@ function confirmExit(){
   renderExportPreview();
 }
 
-function updateIngresoCostPreview(){
+function onIngresoRoleCCChange(){
+  const role = document.getElementById('inRole').value.trim();
+  const cc = document.getElementById('inCC').value.trim();
+  const costoField = document.getElementById('inCosto');
+  const currentVal = costoField.value.trim();
+
+  if(role && cc && (currentVal === '' || costoAutoFilled)){
+    const cost = costoMensual({ cc, role });
+    if(cost !== null){
+      costoField.value = cost;
+      costoAutoFilled = true;
+    } else {
+      costoField.value = '';
+      costoAutoFilled = false;
+    }
+  }
+  renderIngresoCostText();
+}
+
+function onIngresoCostoInput(){
+  costoAutoFilled = false;
+  renderIngresoCostText();
+}
+
+function renderIngresoCostText(){
   const el = document.getElementById('ingresoCostPreview');
   if(!el) return;
   const role = document.getElementById('inRole').value.trim();
@@ -963,35 +1654,249 @@ function updateIngresoCostPreview(){
   if(costoRaw){
     const n = Number(costoRaw.replace(/[^0-9.]/g,''));
     if(Number.isFinite(n) && n > 0){
-      el.innerHTML = `Se usará el costo que ingresaste: <strong style="color:var(--ink);">${formatCLP(n)}/mes</strong>.`;
+      el.innerHTML = costoAutoFilled
+        ? `Costo empresa autocompletado con el promedio: <strong style="color:var(--ink);">${formatCLP(n)}/mes</strong> (de ${role} en ${cc}) — puedes editarlo arriba si es distinto.`
+        : `Se usará el costo que ingresaste: <strong style="color:var(--ink);">${formatCLP(n)}/mes</strong>.`;
       return;
     }
   }
   if(!role || !cc){
-    el.textContent = 'Ingresa cargo y centro de gestión para ver el costo empresa promedio, o escribe uno manual arriba.';
+    el.textContent = 'Ingresa cargo y centro de gestión para autocompletar el costo empresa, o escribe uno manual arriba.';
     return;
   }
-  const cost = costoMensual({ cc, role });
-  if(cost === null){
-    el.innerHTML = `No hay costo promedio registrado para <strong>${role}</strong> en <strong>${cc}</strong> (pestaña NN) — indica un costo manual o se agregará sin costo estimado.`;
-  } else {
-    el.innerHTML = `Costo empresa promedio: <strong style="color:var(--ink);">${formatCLP(cost)}/mes</strong> (de ${role} en ${cc}) — o escribe uno manual arriba si es distinto.`;
+  el.innerHTML = `No hay costo promedio registrado para <strong>${role}</strong> en <strong>${cc}</strong> (pestaña NN) — indica un costo manual o se agregará sin costo estimado.`;
+}
+
+function updateIngresoCostPreview(){
+  renderIngresoCostText();
+}
+
+function isValidRutLimpio(v){
+  return /^\d{7,8}[0-9kK]$/.test(v);
+}
+
+function populateProyectadoDropdowns(){
+  const roleSel = document.getElementById('pRole');
+  if(!roleSel) return;
+  CARGOS_LIST.forEach(role => {
+    const opt = document.createElement('option');
+    opt.value = role; opt.textContent = role;
+    roleSel.appendChild(opt);
+  });
+  const ccSel = document.getElementById('pCC');
+  PP_LIST.slice().sort((a,b)=>a.cc.localeCompare(b.cc)).forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.cc; opt.textContent = `${p.cc} — ${p.cuenta}`;
+    ccSel.appendChild(opt);
+  });
+}
+
+function validateProyectadoRut(){
+  const el = document.getElementById('pRut');
+  const hint = document.getElementById('pRutHint');
+  if(!el || !hint) return true;
+  const v = el.value.trim();
+  if(!v){ hint.textContent=''; hint.style.color='var(--steel)'; return true; }
+  if(!isValidRutLimpio(v)){
+    hint.textContent='8-9 dígitos, sin puntos ni guión';
+    hint.style.color='var(--red)';
+    return false;
   }
+  // Check if this RUT already exists in any worker entry
+  const rutUp = v.toUpperCase();
+  const existing = workers.filter(w => w.rutlimpio === rutUp);
+  if(existing.length > 0){
+    const lines = existing.map(w => `${w.name} · ${w.role} · ${w.cc} · ${w.status==='finiquitado'?'Con término '+w.fs:'Activo'}`);
+    hint.innerHTML = `⚠️ Ya existe en la dotación:<br><span style="font-size:10px;color:var(--steel);">${lines.join('<br>')}</span>`;
+    hint.style.color = 'var(--orange)';
+    return false;
+  }
+  hint.textContent = '✓ formato válido · no encontrado en dotación actual';
+  hint.style.color = 'var(--green)';
+  return true;
+}
+
+function updateProyectadoCostPreview(){
+  const el = document.getElementById('proyectadoCostPreview');
+  if(!el) return;
+  const role = document.getElementById('pRole').value;
+  const cc = document.getElementById('pCC').value;
+  if(!role || !cc){ el.textContent='Ingresa cargo y centro para ver el costo proyectado.'; return; }
+  const cost = costoMensual({rutlimpio:'', cc, role});
+  if(cost === null){
+    el.innerHTML=`Sin costo promedio registrado para <strong>${role}</strong> en <strong>${cc}</strong>.`;
+  } else {
+    el.innerHTML=`Costo empresa estimado: <strong style="color:var(--ink);">${formatCLP(cost)}/mes</strong>`;
+  }
+}
+
+function addProyectado(){
+  const name = document.getElementById('pName').value.trim();
+  const rut  = document.getElementById('pRut').value.trim();
+  const role = document.getElementById('pRole').value;
+  const cc   = document.getElementById('pCC').value;
+  const desde = document.getElementById('pDesde').value; // YYYY-MM-DD
+  const hasta = document.getElementById('pHasta').value; // YYYY-MM-DD
+  if(!name){ toast('Ingresa el nombre'); return; }
+  if(!isValidRutLimpio(rut)){ toast('RUT inválido — 8-9 dígitos sin puntos ni guión'); return; }
+  if(!role){ toast('Selecciona un cargo'); return; }
+  if(!cc){ toast('Selecciona un centro de gestión'); return; }
+  if(!desde || !hasta){ toast('Ingresa periodo desde y hasta'); return; }
+  if(desde > hasta){ toast('El periodo desde debe ser anterior o igual al hasta'); return; }
+  const rutlimpio = rut.toUpperCase();
+  const existingRut = workers.filter(w => w.rutlimpio === rutlimpio);
+  if(existingRut.length > 0){
+    toast(`Este RUT ya está en la dotación como: ${existingRut.map(w=>w.role+' ('+w.cc+')').join(', ')}`);
+    return;
+  }
+  const uid = `${rutlimpio}#${cc}#${role}`;
+  const fc = desde;
+  const fs = hasta;
+  workers.push({
+    id: uid, rutlimpio, cc, role, name, rut: rutlimpio,
+    fc, status:'finiquitado', fs, motivo:'vencimiento_plazo', source:'proyectado'
+  });
+  ['pName','pRut','pDesde','pHasta'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.value='';
+  });
+  document.getElementById('pRole').value='';
+  document.getElementById('pCC').value='';
+  document.getElementById('pRutHint').textContent='';
+  updateProyectadoCostPreview();
+  renderCCChips();
+  renderRoster();
+  renderResumenWidget();
+  renderExportPreview();
+  toast(`${name} agregado a proyección — no olvides Guardar cambios`);
+}
+
+function populateIngresoDropdowns(){
+  const roleSel = document.getElementById('inRole');
+  CARGOS_LIST.forEach(role => {
+    const opt = document.createElement('option');
+    opt.value = role;
+    opt.textContent = role;
+    roleSel.appendChild(opt);
+  });
+  const ccSel = document.getElementById('inCC');
+  PP_LIST.slice().sort((a,b)=>a.cc.localeCompare(b.cc)).forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.cc;
+    opt.textContent = `${p.cc} — ${p.cuenta}`;
+    ccSel.appendChild(opt);
+  });
+}
+
+function validateRutInput(){
+  const el = document.getElementById('inRut');
+  const hint = document.getElementById('inRutHint');
+  const v = el.value.trim();
+  if(!v){ hint.textContent = ''; return true; }
+  if(isValidRutLimpio(v)){
+    hint.textContent = '✓ formato válido';
+    hint.style.color = 'var(--green)';
+    return true;
+  }
+  hint.textContent = 'Debe tener 8-9 dígitos, sin puntos ni guión (ej: 123456789 o 12345678k)';
+  hint.style.color = 'var(--red)';
+  return false;
+}
+
+function pendingSugerencias(){
+  const existing = new Set(workers.map(w => `${w.rutlimpio}#${w.cc}#${(w.role||'').toLowerCase().trim()}`));
+  return ASISTENCIA_NUEVOS.filter(a => !existing.has(`${a.rutlimpio}#${a.cc}#${(a.role||'').toLowerCase().trim()}`));
+}
+
+function mesLabel(mes){
+  return MONTH_NAMES_BASE[mes-1] || `Mes ${mes}`;
+}
+
+function renderSugerencias(){
+  const pending = pendingSugerencias();
+  document.getElementById('sugerenciasCount').textContent = pending.length;
+  const list = document.getElementById('sugerenciasList');
+  if(pending.length === 0){
+    list.innerHTML = `<div class="empty">Sin discrepancias — todas las personas de Asistencia BUK están en la dotación activa.</div>`;
+    return;
+  }
+  list.innerHTML = pending.map(a => `
+    <div class="sugerencia-row">
+      <div>
+        <div style="font-weight:600;">${a.name}</div>
+        <div class="rut-sm">${a.rutlimpio}</div>
+      </div>
+      <div>${a.role}</div>
+      <div class="cc" style="font-size:12px;color:var(--steel);">${a.cc}</div>
+      <div>${a.meses.map(m=>`<span class="mes-badge">${mesLabel(m)}</span>`).join(' ')}</div>
+      <div style="font-size:12px;color:var(--steel);">${a.primera_fecha}</div>
+      <div style="font-size:11px;color:var(--steel);font-style:italic;">${(()=>{
+        const same_rut = workers.filter(w => w.rutlimpio === a.rutlimpio);
+        if(same_rut.length > 0){
+          const diff_roles = same_rut.filter(w => w.cc !== a.cc || (w.role||'').toLowerCase().trim() !== (a.role||'').toLowerCase().trim());
+          if(diff_roles.length > 0) return 'En dotación como: ' + diff_roles.map(w => w.role + (w.cc !== a.cc ? ' (' + w.cc + ')' : '')).join(', ');
+        }
+        return 'Sin coincidencia en dotación';
+      })()}</div>
+    </div>
+  `).join('');
+}
+
+function addFromSugerencia(a){
+  const id = `${a.rutlimpio}#${a.cc}#${a.role}`;
+  if(workers.some(w => w.id === id)) return;
+  workers.push({
+    id, rutlimpio: a.rutlimpio, cc: a.cc, role: a.role, name: a.name,
+    rut: a.rutlimpio, fc: a.primera_fecha, status: 'activo', fs: null, motivo: null,
+    source: 'ingreso'
+  });
+  renderCCChips();
+  renderRoster();
+  renderExportPreview();
+  toast(`${a.name} agregado — no olvides Guardar cambios`);
+}
+
+function addAllSugerencias(){
+  const pending = pendingSugerencias();
+  if(pending.length === 0) return;
+  pending.forEach(a => {
+    const id = `${a.rutlimpio}#${a.cc}#${a.role}`;
+    if(!workers.some(w => w.id === id)){
+      workers.push({
+        id, rutlimpio: a.rutlimpio, cc: a.cc, role: a.role, name: a.name,
+        rut: a.rutlimpio, fc: a.primera_fecha, status: 'activo', fs: null, motivo: null,
+        source: 'ingreso'
+      });
+    }
+  });
+  renderCCChips();
+  renderRoster();
+  renderExportPreview();
+  toast(`${pending.length} personas agregadas — no olvides Guardar cambios`);
 }
 
 function addIngreso(){
   const name = document.getElementById('inName').value.trim();
   const rut = document.getElementById('inRut').value.trim();
-  const role = document.getElementById('inRole').value.trim();
-  const cc = document.getElementById('inCC').value.trim();
+  const role = document.getElementById('inRole').value;
+  const cc = document.getElementById('inCC').value;
   const fc = document.getElementById('inFC').value;
   const costoRaw = document.getElementById('inCosto').value.trim();
   if(!name || !cc || !fc){ toast('Completa al menos nombre, centro de gestión y fecha'); return; }
-  const id = (rut || name).replace(/[^a-zA-Z0-9]/g,'').toUpperCase() + '-' + Date.now().toString().slice(-4);
-  const rutlimpio = (rut||'').replace(/[^0-9kK]/g,'').toUpperCase();
+  if(!role){ toast('Selecciona un cargo de la lista'); return; }
+  if(!isValidRutLimpio(rut)){ toast('El RUT debe tener 8-9 dígitos, sin puntos ni guión'); return; }
+  const rutlimpio = rut.toUpperCase();
+  if(workers.some(w => w.rutlimpio === rutlimpio && w.cc === cc && w.role === role)){
+    toast('Esa persona ya está en la dotación con ese mismo cargo y centro de gestión'); return;
+  }
+  const id = `${rutlimpio}#${cc}#${role}`;
   const costoManual = costoRaw ? Number(costoRaw.replace(/[^0-9.]/g,'')) : null;
-  workers.push({ id, rutlimpio, cc, role, name, rut, fc, status:'activo', fs:null, motivo:null, source:'ingreso', costoManual: (costoManual && Number.isFinite(costoManual)) ? costoManual : null });
-  ['inName','inRut','inRole','inCC','inFC','inCosto'].forEach(elId => document.getElementById(elId).value='');
+  workers.push({ id, rutlimpio, cc, role, name, rut: rutlimpio, fc, status:'activo', fs:null, motivo:null, source:'ingreso', costoManual: (costoManual && Number.isFinite(costoManual)) ? costoManual : null });
+  ['inName','inRut','inFC','inCosto'].forEach(elId => document.getElementById(elId).value='');
+  document.getElementById('inRole').value = '';
+  document.getElementById('inCC').value = '';
+  document.getElementById('inRutHint').textContent = '';
+  costoAutoFilled = false;
   updateIngresoCostPreview();
   renderCCChips();
   renderRoster();
@@ -1001,9 +1906,12 @@ function addIngreso(){
 
 function manualMonthsList(){
   const list = [];
-  for(let m = meta.ultimoMesReal+1; m<=12; m++) list.push(m);
+  for(let m = meta.ultimoMesReal+1; m<=HORIZON; m++) list.push(m);
   return list;
 }
+
+let expandedExportCC = new Set();
+let expandedExportCargo = new Set();
 
 function renderExportPreview(){
   const months = manualMonthsList();
@@ -1012,87 +1920,204 @@ function renderExportPreview(){
     wrap.innerHTML = `<p class="export-note" style="margin-top:12px;">No hay meses manuales pendientes (el costo real ya cubre todo el año).</p>`;
     return;
   }
-  const rows = workers.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(w=>{
+  const monthCols = months.map(m => MONTH_NAMES[m-1]);
+  const totalCols = 2 + months.length; // name + rut + months
+  const gridTpl = `2fr 100px ${months.map(()=>'52px').join(' ')}`;
+
+  // Group workers: cc → cargo → [workers]
+  const byCC = {};
+  workers.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(w => {
     const states = computeMonthStates(w);
-    const cells = months.map(m => {
+    const vals = months.map(m => {
       const s = states[m-1];
-      const on = s==='manual-on' || s==='manual-out';
-      return `<td class="${on?'on':'off'}">${on?1:0}</td>`;
+      return (s==='manual-on'||s==='manual-out') ? 1 : 0;
+    });
+    const cc = w.cc || '—';
+    const cargo = w.role || '—';
+    if(!byCC[cc]) byCC[cc] = {};
+    if(!byCC[cc][cargo]) byCC[cc][cargo] = [];
+    byCC[cc][cargo].push({ name: w.name, rut: w.rut||w.rutlimpio||'', vals });
+  });
+
+  const ccsorted = Object.keys(byCC).sort();
+
+  const html = ccsorted.map(cc => {
+    const ccOpen = expandedExportCC.has(cc);
+    const cargos = Object.keys(byCC[cc]).sort();
+    const cargoBlocks = cargos.map(cargo => {
+      const cargoKey = cc+'||'+cargo;
+      const cargoOpen = expandedExportCargo.has(cargoKey);
+      const people = byCC[cc][cargo];
+      // totals per month for this cargo
+      const cargoTotals = months.map((_,mi) => people.reduce((s,p)=>s+p.vals[mi],0));
+      const personRows = people.map(p => `
+        <div class="tree-person" style="grid-template-columns:${gridTpl};">
+          <div class="p-name">${p.name}</div>
+          <div class="p-rut">${p.rut}</div>
+          ${p.vals.map(v=>`<div class="p-cell ${v?'on':'off'}">${v}</div>`).join('')}
+        </div>`).join('');
+      const monthsHead = `
+        <div class="tree-months-head" style="grid-template-columns:${gridTpl};">
+          <div class="mh-name">Nombre</div>
+          <div class="mh">RUT</div>
+          ${monthCols.map(m=>`<div class="mh">${m}</div>`).join('')}
+        </div>`;
+      return `
+        <div class="tree-cargo">
+          <div class="tree-cargo-head" data-cargo-key="${cargoKey}" style="grid-template-columns:${gridTpl};">
+            <span style="display:flex;align-items:center;gap:8px;padding-left:0;">
+              <span class="tog">${cargoOpen?'−':'+'}</span>
+              <span>${cargo}</span>
+              <span style="font-size:11px;color:var(--steel);margin-left:8px;">${people.length} persona${people.length>1?'s':''}</span>
+            </span>
+            ${cargoTotals.map(t=>`<span style="text-align:center;font-family:var(--font-mono);font-size:11.5px;color:var(--steel);border-left:1px solid var(--line);padding:0 10px;">${t||'—'}</span>`).join('')}
+          </div>
+          <div class="tree-cargo-body ${cargoOpen?'open':''}">
+            ${monthsHead}
+            ${personRows}
+          </div>
+        </div>`;
     }).join('');
-    return `<tr><td class="name-col">${w.name}</td><td>${w.cc}</td>${cells}</tr>`;
+
+    // totals per month for this cc
+    const ccTotals = months.map((_,mi) =>
+      Object.values(byCC[cc]).reduce((s, people) => s + people.reduce((s2,p)=>s2+p.vals[mi],0), 0)
+    );
+
+    return `
+      <div class="tree-cc">
+        <div class="tree-cc-head" data-cc="${cc}" style="display:grid;grid-template-columns:1fr ${months.map(()=>'52px').join(' ')};gap:0;padding:0;">
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;">
+            <span class="tog">${ccOpen?'−':'+'}</span>
+            <span>${cuentaNombre(cc)||cc}</span>
+            <span class="cc-label">${cc}</span>
+            <span style="font-size:11px;color:var(--steel);margin-left:auto;">${cargos.length} cargo${cargos.length>1?'s':''} · ${Object.values(byCC[cc]).reduce((s,p)=>s+p.length,0)} personas</span>
+          </div>
+          ${ccTotals.map(t=>`<div style="display:flex;align-items:center;justify-content:center;border-left:1px solid var(--line-strong);font-family:var(--font-mono);font-size:12px;font-weight:700;">${t||'—'}</div>`).join('')}
+        </div>
+        <div class="tree-cc-body ${ccOpen?'open':''}">
+          ${cargoBlocks}
+        </div>
+      </div>`;
   }).join('');
-  wrap.innerHTML = `
-    <table class="preview">
-      <thead><tr><th class="name-col">Nombre</th><th>Centro gestión</th>${months.map(m=>`<th>${MONTH_NAMES[m-1]}</th>`).join('')}</tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
+
+  // Grand totals across all ccs
+  const grandTotals = months.map((_,mi) =>
+    ccsorted.reduce((s,cc) => s + Object.values(byCC[cc]).reduce((s2,ppl)=>s2+ppl.reduce((s3,p)=>s3+p.vals[mi],0),0), 0)
+  );
+
+  const monthsHeaderBar = `
+    <div style="display:grid;grid-template-columns:1fr ${months.map(()=>'52px').join(' ')};gap:0;
+      background:var(--ink);color:#fff;border-radius:8px 8px 0 0;margin-bottom:0;
+      font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.04em;">
+      <div style="padding:8px 14px;text-transform:uppercase;letter-spacing:.06em;font-size:10px;color:#9FB0C4;">Cuenta / Cargo / Persona</div>
+      ${monthCols.map(m=>`<div style="padding:8px 6px;text-align:center;border-left:1px solid rgba(255,255,255,.15);">${m}</div>`).join('')}
+    </div>`;
+
+  const grandTotalBar = `
+    <div style="display:grid;grid-template-columns:1fr ${months.map(()=>'52px').join(' ')};gap:0;
+      background:var(--ink);color:#fff;border-radius:0 0 8px 8px;margin-top:0;
+      font-family:var(--font-mono);font-size:12px;font-weight:700;border-top:2px solid var(--line-strong);">
+      <div style="padding:9px 14px;color:#9FB0C4;font-size:11px;text-transform:uppercase;letter-spacing:.06em;">Total</div>
+      ${grandTotals.map(t=>`<div style="padding:9px 6px;text-align:center;border-left:1px solid rgba(255,255,255,.15);">${t||'—'}</div>`).join('')}
+    </div>`;
+
+  wrap.innerHTML = `<div class="tree-wrap" style="border:1px solid var(--line);border-radius:8px;overflow:hidden;">${monthsHeaderBar}${html}${grandTotalBar}</div>`;
+
+  // Wire up toggles
+  wrap.querySelectorAll('.tree-cc-head').forEach(head => {
+    head.addEventListener('click', () => {
+      const cc = head.dataset.cc;
+      if(expandedExportCC.has(cc)) expandedExportCC.delete(cc); else expandedExportCC.add(cc);
+      renderExportPreview();
+    });
+  });
+  wrap.querySelectorAll('.tree-cargo-head').forEach(head => {
+    head.addEventListener('click', e => {
+      e.stopPropagation();
+      const key = head.dataset.cargoKey;
+      if(expandedExportCargo.has(key)) expandedExportCargo.delete(key); else expandedExportCargo.add(key);
+      renderExportPreview();
+    });
+  });
+}
+
+// Helper: last 4 digits of a cost center code
+function cuentaCodigo(cc){ return cc ? cc.slice(-4) : cc; }
+
+// Helper: period label for a given month index (0-based)
+const PERIOD_LABELS = Array.from({length:HORIZON},(_,i)=>{
+  const {y,m}=idxToYM(i);
+  return ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto',
+          'Septiembre','Octubre','Noviembre','Diciembre'][m-1] + ' ' + y;
+});
+
+function buildProjectionRows(){
+  // Returns one row per (cc, month) for months AFTER ultimoMesReal
+  const b = computeMonthlyBreakdown();
+  const startIdx = meta.ultimoMesReal; // first projected month index (0-based)
+  const rows = [];
+  b.ccs.forEach(cc => {
+    for(let i = startIdx; i < HORIZON; i++){
+      rows.push({
+        cuenta: cuentaCodigo(cc),
+        cc,
+        periodo: PERIOD_LABELS[i],
+        mes: i + 1,
+        dotacion: b.dotacionByCC[cc][i] || 0,
+        costoEmpresa: Math.round(b.costoMensualByCC[cc][i] || 0),
+        finiquito: Math.round(b.finiquitosByCC[cc][i] || 0)
+      });
+    }
+  });
+  return rows;
 }
 
 function downloadExcelConsolidado(){
   if(typeof XLSX === 'undefined'){ toast('No se pudo cargar la librería de Excel — revisa tu conexión e intenta de nuevo.'); return; }
 
-  const header = ['job_cost_center','role_name','full_name','rut','Rutlimpio','fin permanencia','costo_empresa_proyectado'];
+  const projRows = buildProjectionRows();
+  const header = ['cuenta','centro_de_costo','periodo','mes','dotacion','costo_empresa','finiquito'];
   const data = [header];
-  const sorted = workers.slice().sort((a,b)=>a.name.localeCompare(b.name));
-
-  sorted.forEach(w=>{
-    // everyone gets a fin permanencia: their registered end date if set,
-    // otherwise the default assumption — active through the end of the projection year.
-    const finDateStr = w.status === 'finiquitado' && w.fs ? w.fs : `${YEAR}-12-31`;
-    data.push([
-      w.cc || '',
-      w.role || '',
-      w.name || '',
-      w.rut || '',
-      w.rutlimpio || '',
-      new Date(finDateStr + 'T00:00:00'),
-      costoMensual(w)
-    ]);
+  projRows.forEach(r => {
+    data.push([r.cuenta, r.cc, r.periodo, r.mes, r.dotacion, r.costoEmpresa, r.finiquito]);
   });
 
   const sheet = XLSX.utils.aoa_to_sheet(data);
-  sheet['!cols'] = [{wch:14},{wch:24},{wch:30},{wch:14},{wch:14},{wch:14},{wch:20}];
-  // format the fin permanencia column (index 5, 0-based) as mmm-yy, and cost column as currency
-  for(let r = 1; r < data.length; r++){
-    const finCell = sheet[XLSX.utils.encode_cell({ r, c: 5 })];
-    if(finCell) finCell.z = 'mmm-yy';
-    const costCell = sheet[XLSX.utils.encode_cell({ r, c: 6 })];
-    if(costCell && typeof costCell.v === 'number') costCell.z = '#,##0';
+  sheet['!cols'] = [{wch:8},{wch:14},{wch:18},{wch:6},{wch:10},{wch:18},{wch:16}];
+  for(let r=1; r<data.length; r++){
+    const costoCell = sheet[XLSX.utils.encode_cell({r,c:5})];
+    if(costoCell && typeof costoCell.v==='number') costoCell.z='#,##0';
+    const finCell = sheet[XLSX.utils.encode_cell({r,c:6})];
+    if(finCell && typeof finCell.v==='number') finCell.z='#,##0';
   }
 
   const book = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(book, sheet, 'ConsolidadoPersonal');
+  XLSX.utils.book_append_sheet(book, sheet, 'Costo Proyectado');
+  XLSX.writeFile(book, `costo_proyectado_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('Excel descargado');
+}
 
-  // second sheet: only the new hires added through this tool
-  const ingresos = sorted.filter(w => w.source === 'ingreso');
-  const ingresosHeader = ['job_cost_center','role_name','full_name','rut','Rutlimpio','fecha_contratacion','costo_empresa_proyectado'];
-  const ingresosData = [ingresosHeader];
-  ingresos.forEach(w=>{
-    ingresosData.push([
-      w.cc || '', w.role || '', w.name || '', w.rut || '', w.rutlimpio || '',
-      w.fc ? new Date(w.fc + 'T00:00:00') : '',
-      costoMensual(w)
-    ]);
-  });
-  const ingresosSheet = XLSX.utils.aoa_to_sheet(ingresosData);
-  ingresosSheet['!cols'] = [{wch:14},{wch:24},{wch:30},{wch:14},{wch:14},{wch:16},{wch:20}];
-  for(let r = 1; r < ingresosData.length; r++){
-    const fcCell = ingresosSheet[XLSX.utils.encode_cell({ r, c: 5 })];
-    if(fcCell && fcCell.t === 'd') fcCell.z = 'dd-mm-yyyy';
-    const costCell = ingresosSheet[XLSX.utils.encode_cell({ r, c: 6 })];
-    if(costCell && typeof costCell.v === 'number') costCell.z = '#,##0';
-  }
-  XLSX.utils.book_append_sheet(book, ingresosSheet, 'Ingresos Nuevos');
-
-  XLSX.writeFile(book, `ConsolidadoPersonal_actualizado_${new Date().toISOString().slice(0,10)}.xlsx`);
-  toast(`Excel descargado (${ingresos.length} ingreso${ingresos.length===1?'':'s'} en pestaña aparte)`);
+function downloadJSONResumen(){
+  const projRows = buildProjectionRows();
+  const blob = new Blob(
+    [JSON.stringify(projRows, null, 2)],
+    { type:'application/json;charset=utf-8;' }
+  );
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `costo_proyectado_${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('JSON descargado');
 }
 
 
 function downloadCSV(){
   const months = manualMonthsList();
   if(months.length===0){ toast('No hay meses manuales para exportar'); return; }
-  const header = ['rutlimpio','nombre','cargo','centro_gestion', ...months.map(m=>MONTH_NAMES[m-1]+ '_' + YEAR)];
+  const header = ['rutlimpio','nombre','cargo','centro_gestion', ...months.map(m=>MONTH_ABBR[m-1])];
   const lines = [header.join(',')];
   workers.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(w=>{
     const states = computeMonthStates(w);
@@ -1118,31 +2143,36 @@ function renderAll(){
   renderExportPreview();
 }
 
+
 async function init(){
   await loadState();
   renderMesRealSelect();
+  populateProyectadoDropdowns();
   renderAll();
   document.getElementById('storageModeNote').textContent = storageModeLabel();
 
   document.getElementById('searchBox').addEventListener('input', renderRoster);
   document.getElementById('saveBtn').addEventListener('click', () => persist(true));
-  document.getElementById('addIngresoBtn').addEventListener('click', addIngreso);
-  document.getElementById('inRole').addEventListener('input', updateIngresoCostPreview);
-  document.getElementById('inCC').addEventListener('input', updateIngresoCostPreview);
-  document.getElementById('inCosto').addEventListener('input', updateIngresoCostPreview);
-  updateIngresoCostPreview();
   document.getElementById('exportBtn').addEventListener('click', downloadCSV);
   document.getElementById('exportExcelBtn').addEventListener('click', downloadExcelConsolidado);
+  document.getElementById('exportJsonResumenBtn').addEventListener('click', downloadJSONResumen);
   document.getElementById('exitCancel').addEventListener('click', closeExitModal);
   document.getElementById('exitConfirm').addEventListener('click', confirmExit);
   document.getElementById('exitModal').addEventListener('click', (e)=>{ if(e.target.id==='exitModal') closeExitModal(); });
   document.getElementById('downloadBackupBtn').addEventListener('click', downloadBackupJSON);
+  document.getElementById('resetBtn').addEventListener('click', resetToOriginal);
   document.getElementById('loadBackupBtn').addEventListener('click', triggerLoadBackup);
   document.getElementById('backupFileInput').addEventListener('change', handleBackupFile);
-  document.getElementById('syncBukBtn').addEventListener('click', sincronizarBUK);
+  document.getElementById('addProyectadoBtn').addEventListener('click', addProyectado);
+  document.getElementById('pRole').addEventListener('change', updateProyectadoCostPreview);
+  document.getElementById('pCC').addEventListener('change', updateProyectadoCostPreview);
+  document.getElementById('pRut').addEventListener('input', validateProyectadoRut);
+  document.getElementById('syncBukBtn').addEventListener('click', sincronizarConBUK);
+  updateProyectadoCostPreview();
 }
 
 initAuth();
 </script>
+</div><!-- /main-wrap -->
 </body>
 </html>
