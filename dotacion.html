@@ -149,10 +149,10 @@
     border-radius:10px;
     overflow-x:auto;
   }
-  .roster-inner{ min-width:1300px; }
+  .roster-inner{ min-width:1650px; }
   .roster-head{
     display:grid;
-    grid-template-columns: 1.4fr 1fr 0.75fr 115px 95px 125px 125px 150px 175px 230px;
+    grid-template-columns: 1.3fr 0.9fr 0.7fr 110px 90px 120px 120px 145px 165px 480px;
     gap:0;
     padding:0;
     background:var(--gray-soft);
@@ -173,7 +173,7 @@
   .roster-head > div:last-child{ border-right:none; }
   .row{
     display:grid;
-    grid-template-columns: 1.4fr 1fr 0.75fr 115px 95px 125px 125px 150px 175px 230px;
+    grid-template-columns: 1.3fr 0.9fr 0.7fr 110px 90px 120px 120px 145px 165px 480px;
     gap:0;
     padding:0;
     align-items:stretch;
@@ -204,22 +204,27 @@
 
   /* mini timeline */
   .mini{
-    display:flex; gap:3px;
+    display:flex; gap:2px;
   }
   .mini i{
-    width:12px; height:22px; border-radius:2px;
+    width:28px; height:24px; border-radius:3px;
     background:var(--gray-soft);
     position:relative;
+    display:flex; align-items:center; justify-content:center;
+    font-style:normal; font-family:var(--font-mono);
+    font-size:9px; font-weight:700; letter-spacing:.02em;
+    color:var(--steel);
+    text-transform:uppercase;
   }
-  .mini i.auto{ background:var(--ink); }
-  .mini i.manual-on{ background:var(--green); }
-  .mini i.manual-out{ background:var(--red); }
+  .mini i.auto{ background:var(--ink); color:#fff; }
+  .mini i.manual-on{ background:var(--green); color:#fff; }
+  .mini i.manual-out{ background:var(--red); color:#fff; }
   /* Marca de trimestre: un pequeño espacio extra cada 3 meses, para que el
      ojo pueda ubicarse sin tener que pasar el cursor por cada barra. */
-  .mini i.q-end{ margin-right:3px; }
+  .mini i.q-end{ margin-right:4px; }
   /* Marca de cambio de año: separador más grueso y visible. */
-  .mini i.year-end{ margin-right:6px; border-right:2px solid var(--ink); }
-  .mini-wrap{ display:flex; flex-direction:column; gap:3px; width:230px; }
+  .mini i.year-end{ margin-right:7px; box-shadow: 3px 0 0 var(--ink); }
+  .mini-wrap{ display:flex; flex-direction:column; gap:4px; width:auto; overflow-x:auto; }
   .mini-caption{ font-size:9.5px; color:var(--steel); font-family:var(--font-mono); display:flex; justify-content:space-between; align-items:center; width:100%; }
   .mini-caption .mid{ flex:1; text-align:center; color:var(--line-strong); }
 
@@ -598,6 +603,17 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="historialModal">
+  <div class="modal" style="max-height:70vh;overflow-y:auto;">
+    <h3>Historial de asistencia</h3>
+    <p id="historialNombre" style="font-weight:600;color:var(--ink);margin-bottom:12px;"></p>
+    <div id="historialBody"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary btn-sm" onclick="cerrarHistorialAsistencia()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -758,7 +774,7 @@ async function cargarAsistenciaBUK() {
     const ultima = lista[lista.length - 1];
     const diasDesdeUltima = Math.floor((hoy - new Date(ultima + 'T00:00:00')) / 86400000);
     const ultimos14 = lista.filter(f => (hoy - new Date(f + 'T00:00:00')) / 86400000 <= 14).length;
-    resumen[rutlimpio] = { ultima, total: lista.length, ultimos14, diasDesdeUltima };
+    resumen[rutlimpio] = { ultima, total: lista.length, ultimos14, diasDesdeUltima, fechas: lista };
   });
   asistenciaPorRut = resumen;
   console.log('[Asistencia] Personas con registro en Mirador El Pino:', Object.keys(resumen).length);
@@ -771,7 +787,43 @@ function asistenciaLabel(w) {
   const alerta = w.status === 'activo' && reg.diasDesdeUltima > DIAS_SIN_ASISTENCIA_ALERTA;
   const color = alerta ? 'var(--red)' : 'var(--steel)';
   const aviso = alerta ? ' ⚠ sin marcar hace tiempo' : '';
-  return `<span style="color:${color};">Últ. asistencia ${reg.ultima}${aviso}</span>`;
+  return `<span style="color:${color};">Últ. asistencia ${reg.ultima}${aviso}</span>
+    <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:10.5px;margin-top:3px;" onclick="abrirHistorialAsistencia('${w.rutlimpio}','${w.name.replace(/'/g,"\\'")}')">Ver historial</button>`;
+}
+
+function abrirHistorialAsistencia(rutlimpio, nombre) {
+  const reg = asistenciaPorRut[rutlimpio];
+  document.getElementById('historialNombre').textContent = nombre;
+  const body = document.getElementById('historialBody');
+  if (!reg || !reg.fechas.length) {
+    body.innerHTML = `<div class="empty">Sin marcaciones registradas.</div>`;
+  } else {
+    // Agrupa por mes para que se lea más fácil que una lista plana de 30+ fechas.
+    const porMes = {};
+    reg.fechas.forEach(f => {
+      const key = f.slice(0,7); // YYYY-MM
+      porMes[key] = porMes[key] || [];
+      porMes[key].push(f.slice(8,10));
+    });
+    const meses = Object.keys(porMes).sort();
+    body.innerHTML = `
+      <div style="margin-bottom:10px;font-size:12.5px;color:var(--steel);">
+        ${reg.total} día${reg.total!==1?'s':''} marcados en total · última marcación ${reg.ultima}
+      </div>
+      ${meses.map(key => {
+        const [y,m] = key.split('-');
+        const nombreMes = MONTH_NAMES_BASE[parseInt(m,10)-1];
+        return `<div style="margin-bottom:8px;">
+          <div style="font-size:11px;font-weight:700;color:var(--ink);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">${nombreMes} ${y}</div>
+          <div style="font-size:12px;color:var(--steel);font-family:var(--font-mono);">${porMes[key].sort((a,b)=>a-b).join(', ')}</div>
+        </div>`;
+      }).join('')}
+    `;
+  }
+  document.getElementById('historialModal').classList.add('show');
+}
+function cerrarHistorialAsistencia() {
+  document.getElementById('historialModal').classList.remove('show');
 }
 
 // Lee la pestaña "MO" del Excel de BUK, filtra a Mirador El Pino (CG019...) y
@@ -956,6 +1008,7 @@ async function sincronizarConBUK() {
 
 const YEAR = 2026;
 const MONTH_NAMES_BASE = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const MONTH_ABBR3 = MONTH_NAMES_BASE.map(m => m.toUpperCase());
 const HORIZON = 22;              // Ene 2026 .. Oct 2027
 // idx 0-based -> {y,m}
 function idxToYM(i){ return { y: YEAR + Math.floor(i/12), m: (i%12)+1 }; }
@@ -1570,7 +1623,7 @@ function renderRoster(){
       const esFinDeTrimestre = !esFinDeAnio && (m % 3 === 0);
       const marca = esFinDeAnio ? ' year-end' : (esFinDeTrimestre ? ' q-end' : '');
       const estadoTxt = s==='manual-on' ? ' · Activo' : s==='manual-out' ? ' · Salida' : s==='auto' ? ' · Sin confirmar' : '';
-      return `<i class="${cls}${marca}" title="${MONTH_NAMES_BASE[m-1]} ${y}${estadoTxt}"></i>`;
+      return `<i class="${cls}${marca}" title="${MONTH_NAMES_BASE[m-1]} ${y}${estadoTxt}">${MONTH_ABBR3[m-1]}</i>`;
     }).join('');
     const departed = isDeparted(w);
     const projected = isProjectedEnd(w);
@@ -2235,6 +2288,7 @@ async function init(){
   document.getElementById('exitCancel').addEventListener('click', closeExitModal);
   document.getElementById('exitConfirm').addEventListener('click', confirmExit);
   document.getElementById('exitModal').addEventListener('click', (e)=>{ if(e.target.id==='exitModal') closeExitModal(); });
+  document.getElementById('historialModal').addEventListener('click', (e)=>{ if(e.target.id==='historialModal') cerrarHistorialAsistencia(); });
   document.getElementById('downloadBackupBtn').addEventListener('click', downloadBackupJSON);
   document.getElementById('resetBtn').addEventListener('click', resetToOriginal);
   document.getElementById('loadBackupBtn').addEventListener('click', triggerLoadBackup);
