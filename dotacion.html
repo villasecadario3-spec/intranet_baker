@@ -973,9 +973,9 @@ async function guardarEnServidor(showToast) {
 // las personas que ya tienen una salida confirmada a mano (motivo/estado)
 // NO se pisan — solo se agregan las que son nuevas o se actualiza gente que
 // sigue "activo" sin confirmar salida.
-async function sincronizarConBUK() {
+async function sincronizarConBUK(silencioso) {
   const btn = document.getElementById('syncBukBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando...'; }
+  if (btn && !silencioso) { btn.disabled = true; btn.textContent = 'Sincronizando...'; }
   try {
     const desdeExcel = await cargarDesdeBUK();
     await cargarAsistenciaBUK();
@@ -997,12 +997,14 @@ async function sincronizarConBUK() {
     await guardarEnServidor(false);
     renderMesRealSelect();
     renderAll();
-    toast(`Sincronizado — ${nuevos} nuevos, ${actualizados} actualizados, ${desdeExcel.length} personas de Mirador El Pino en el Excel`);
+    if (!silencioso) toast(`Sincronizado — ${nuevos} nuevos, ${actualizados} actualizados, ${desdeExcel.length} personas de Mirador El Pino en el Excel`);
+    else if (nuevos || actualizados) toast(`Actualizado automáticamente desde el Excel — ${nuevos} nuevos, ${actualizados} actualizados`);
   } catch(e) {
     console.error('Error sincronizando con BUK:', e);
-    toast('Error al sincronizar: ' + e.message);
+    if (!silencioso) toast('Error al sincronizar: ' + e.message);
+    else console.warn('Sincronización automática falló silenciosamente:', e.message);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Sincronizar con Excel BUK'; }
+    if (btn && !silencioso) { btn.disabled = false; btn.textContent = 'Sincronizar con Excel BUK'; }
   }
 }
 
@@ -2297,8 +2299,14 @@ async function init(){
   document.getElementById('pRole').addEventListener('change', updateProyectadoCostPreview);
   document.getElementById('pCC').addEventListener('change', updateProyectadoCostPreview);
   document.getElementById('pRut').addEventListener('input', validateProyectadoRut);
-  document.getElementById('syncBukBtn').addEventListener('click', sincronizarConBUK);
+  document.getElementById('syncBukBtn').addEventListener('click', () => sincronizarConBUK(false));
   updateProyectadoCostPreview();
+
+  // Sincroniza sola en segundo plano apenas se entra al módulo, para que la
+  // asistencia y los datos del Excel ya estén frescos sin apretar el botón.
+  // No bloquea la carga: primero se ve lo que ya había guardado, y esto
+  // actualiza por detrás cuando termine.
+  sincronizarConBUK(true);
 }
 
 initAuth();
