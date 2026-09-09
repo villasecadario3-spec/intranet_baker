@@ -739,10 +739,17 @@ const DIAS_SIN_ASISTENCIA_ALERTA = 10; // más de esto sin marcar y activo → a
 
 let asistenciaPorRut = {}; // rutlimpio -> { ultima: 'YYYY-MM-DD', total: N, ultimos14: N }
 
+let listaHojasCache = null;
+async function obtenerListaHojas() {
+  if (listaHojasCache) return listaHojasCache;
+  listaHojasCache = await graphGet(`https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets`);
+  return listaHojasCache;
+}
+
 async function cargarAsistenciaBUK() {
   const ok = await resolverExcelItem();
   if (!ok) throw new Error('No se pudo acceder al Excel de SharePoint');
-  const listaHojas = await graphGet(`https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets`);
+  const listaHojas = await obtenerListaHojas();
   const hoja = listaHojas.value.find(h => h.name.trim().toUpperCase() === 'ASISTENCIA BUK');
   if (!hoja) { console.warn('[Asistencia] No se encontró la pestaña "ASISTENCIA BUK"'); return; }
   const data = await graphGet(`https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets/${encodeURIComponent(hoja.id)}/usedRange`);
@@ -833,7 +840,7 @@ function cerrarHistorialAsistencia() {
 async function cargarDesdeBUK() {
   const ok = await resolverExcelItem();
   if (!ok) throw new Error('No se pudo acceder al Excel de SharePoint');
-  const listaHojas = await graphGet(`https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets`);
+  const listaHojas = await obtenerListaHojas();
   const hojaMO = listaHojas.value.find(h => h.name.trim().toUpperCase() === 'MO');
   if (!hojaMO) throw new Error(`No se encontró la pestaña "MO" — pestañas disponibles: ${listaHojas.value.map(h=>h.name).join(', ')}`);
   const data = await graphGet(`https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets/${encodeURIComponent(hojaMO.id)}/usedRange`);
@@ -977,8 +984,9 @@ async function sincronizarConBUK(silencioso) {
   const btn = document.getElementById('syncBukBtn');
   if (btn && !silencioso) { btn.disabled = true; btn.textContent = 'Sincronizando...'; }
   try {
-    const desdeExcel = await cargarDesdeBUK();
-    await cargarAsistenciaBUK();
+    // Las dos pestañas (MO y ASISTENCIA BUK) son grandes — se piden en
+    // paralelo en vez de una después de la otra, para no sumar sus tiempos.
+    const [desdeExcel] = await Promise.all([cargarDesdeBUK(), cargarAsistenciaBUK()]);
     const porId = new Map(workers.map(w => [w.id, w]));
     let nuevos = 0, actualizados = 0;
     desdeExcel.forEach(w => {
