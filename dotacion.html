@@ -152,7 +152,7 @@
   .roster-inner{ min-width:1300px; }
   .roster-head{
     display:grid;
-    grid-template-columns: 1.6fr 1.2fr 0.85fr 110px 140px 140px 160px 185px 210px;
+    grid-template-columns: 1.4fr 1fr 0.75fr 115px 95px 125px 125px 150px 175px 230px;
     gap:0;
     padding:0;
     background:var(--gray-soft);
@@ -173,7 +173,7 @@
   .roster-head > div:last-child{ border-right:none; }
   .row{
     display:grid;
-    grid-template-columns: 1.6fr 1.2fr 0.85fr 110px 140px 140px 160px 185px 210px;
+    grid-template-columns: 1.4fr 1fr 0.75fr 115px 95px 125px 125px 150px 175px 230px;
     gap:0;
     padding:0;
     align-items:stretch;
@@ -204,17 +204,22 @@
 
   /* mini timeline */
   .mini{
-    display:flex; gap:2px;
+    display:flex; gap:3px;
   }
   .mini i{
-    width:11px; height:20px; border-radius:2px;
+    width:12px; height:22px; border-radius:2px;
     background:var(--gray-soft);
     position:relative;
   }
   .mini i.auto{ background:var(--ink); }
   .mini i.manual-on{ background:var(--green); }
   .mini i.manual-out{ background:var(--red); }
-  .mini-wrap{ display:flex; flex-direction:column; gap:3px; width:210px; }
+  /* Marca de trimestre: un pequeño espacio extra cada 3 meses, para que el
+     ojo pueda ubicarse sin tener que pasar el cursor por cada barra. */
+  .mini i.q-end{ margin-right:3px; }
+  /* Marca de cambio de año: separador más grueso y visible. */
+  .mini i.year-end{ margin-right:6px; border-right:2px solid var(--ink); }
+  .mini-wrap{ display:flex; flex-direction:column; gap:3px; width:230px; }
   .mini-caption{ font-size:9.5px; color:var(--steel); font-family:var(--font-mono); display:flex; justify-content:space-between; align-items:center; width:100%; }
   .mini-caption .mid{ flex:1; text-align:center; color:var(--line-strong); }
 
@@ -494,6 +499,7 @@
       <div>Nombre</div>
       <div>Cargo</div>
       <div>Centro gestión</div>
+      <div>Asistencia</div>
       <div>Fecha contrato</div>
       <div>Costo mensual</div>
       <div>Costo anterior</div>
@@ -705,6 +711,69 @@ const COL_FING_BUK   = 'Trabajo - Fecha Ingreso Compañía';
 const COL_FTERM_BUK  = 'Trabajo - Fecha Término Trabajo';
 const COL_PERIODO_BUK= 'Liquidación - Período';
 
+// ── Asistencia BUK (reporte de Power BI conectado a la API de BUK) ─────
+// Trae un registro por día trabajado. Se usa para detectar personas
+// marcadas "activo" en la nómina pero sin asistencia reciente (podrían
+// haberse ido sin que aún quede registrado formalmente), o viceversa.
+const COL_ASIS_OBRA   = 'OBRA';
+const COL_ASIS_RUT    = 'Asistencia[data.rut_trabajador]';
+const COL_ASIS_FECHA  = 'Asistencia[data.dia_entrada]';
+const OBRA_ASISTENCIA = 'Mirador El Pino';
+const DIAS_SIN_ASISTENCIA_ALERTA = 10; // más de esto sin marcar y activo → aviso
+
+let asistenciaPorRut = {}; // rutlimpio -> { ultima: 'YYYY-MM-DD', total: N, ultimos14: N }
+
+async function cargarAsistenciaBUK() {
+  const ok = await resolverExcelItem();
+  if (!ok) throw new Error('No se pudo acceder al Excel de SharePoint');
+  const listaHojas = await graphGet(`https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets`);
+  const hoja = listaHojas.value.find(h => h.name.trim().toUpperCase() === 'ASISTENCIA BUK');
+  if (!hoja) { console.warn('[Asistencia] No se encontró la pestaña "ASISTENCIA BUK"'); return; }
+  const data = await graphGet(`https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets/${encodeURIComponent(hoja.id)}/usedRange`);
+  const values = data.values;
+  if (!values || values.length < 2) { console.warn('[Asistencia] La pestaña está vacía'); return; }
+
+  const idxHeader = values.findIndex(row => row.includes(COL_ASIS_RUT));
+  if (idxHeader === -1) { console.warn('[Asistencia] No se encontró la fila de encabezados'); return; }
+  const headers = values[idxHeader].map(h => String(h).trim());
+  const idxObra = headers.indexOf(COL_ASIS_OBRA);
+  const idxRut  = headers.indexOf(COL_ASIS_RUT);
+  const idxFecha= headers.indexOf(COL_ASIS_FECHA);
+
+  const hoy = new Date();
+  const registros = {}; // rutlimpio -> Set de fechas
+  for (let i = idxHeader + 1; i < values.length; i++) {
+    const row = values[i];
+    if (String(row[idxObra] || '').trim() !== OBRA_ASISTENCIA) continue;
+    const rutlimpio = String(row[idxRut] || '').replace(/[^0-9kK]/g,'').toUpperCase();
+    const fecha = parseFechaExcelBUK(row[idxFecha]);
+    if (!rutlimpio || !fecha) continue;
+    registros[rutlimpio] = registros[rutlimpio] || new Set();
+    registros[rutlimpio].add(fecha);
+  }
+
+  const resumen = {};
+  Object.entries(registros).forEach(([rutlimpio, fechas]) => {
+    const lista = [...fechas].sort();
+    const ultima = lista[lista.length - 1];
+    const diasDesdeUltima = Math.floor((hoy - new Date(ultima + 'T00:00:00')) / 86400000);
+    const ultimos14 = lista.filter(f => (hoy - new Date(f + 'T00:00:00')) / 86400000 <= 14).length;
+    resumen[rutlimpio] = { ultima, total: lista.length, ultimos14, diasDesdeUltima };
+  });
+  asistenciaPorRut = resumen;
+  console.log('[Asistencia] Personas con registro en Mirador El Pino:', Object.keys(resumen).length);
+}
+
+// Etiqueta corta de asistencia para mostrar junto a cada persona activa.
+function asistenciaLabel(w) {
+  const reg = asistenciaPorRut[w.rutlimpio];
+  if (!reg) return `<span style="color:var(--steel);">Sin registro de asistencia</span>`;
+  const alerta = w.status === 'activo' && reg.diasDesdeUltima > DIAS_SIN_ASISTENCIA_ALERTA;
+  const color = alerta ? 'var(--red)' : 'var(--steel)';
+  const aviso = alerta ? ' ⚠ sin marcar hace tiempo' : '';
+  return `<span style="color:${color};">Últ. asistencia ${reg.ultima}${aviso}</span>`;
+}
+
 // Lee la pestaña "MO" del Excel de BUK, filtra a Mirador El Pino (CG019...) y
 // deriva TODAS las tablas de costo (GASTO_MES, PRIMER_PERIODO, ULTIMO_COSTO,
 // ULTIMO_COSTO_MAX, COSTOS promedio, REAL_MONTHLY) directamente de los datos
@@ -857,6 +926,7 @@ async function sincronizarConBUK() {
   if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando...'; }
   try {
     const desdeExcel = await cargarDesdeBUK();
+    await cargarAsistenciaBUK();
     const porId = new Map(workers.map(w => [w.id, w]));
     let nuevos = 0, actualizados = 0;
     desdeExcel.forEach(w => {
@@ -1495,7 +1565,12 @@ function renderRoster(){
     const states = computeMonthStates(w);
     const bars = states.map((s,i)=>{
       const cls = s==='auto' ? 'auto' : s==='manual-on' ? 'manual-on' : s==='manual-out' ? 'manual-out' : '';
-      return `<i class="${cls}" title="${MONTH_NAMES[i]}"></i>`;
+      const {y,m} = idxToYM(i);
+      const esFinDeAnio = m === 12;
+      const esFinDeTrimestre = !esFinDeAnio && (m % 3 === 0);
+      const marca = esFinDeAnio ? ' year-end' : (esFinDeTrimestre ? ' q-end' : '');
+      const estadoTxt = s==='manual-on' ? ' · Activo' : s==='manual-out' ? ' · Salida' : s==='auto' ? ' · Sin confirmar' : '';
+      return `<i class="${cls}${marca}" title="${MONTH_NAMES_BASE[m-1]} ${y}${estadoTxt}"></i>`;
     }).join('');
     const departed = isDeparted(w);
     const projected = isProjectedEnd(w);
@@ -1524,6 +1599,7 @@ function renderRoster(){
         ${prev ? `<div style="font-size:11px;color:var(--steel);margin-top:2px;">antes: ${prev.prevRole}</div>` : ''}
       </div>
       <div class="cc">${w.cc||''}</div>
+      <div style="font-size:11px;">${!isDeparted(w) ? asistenciaLabel(w) : ''}</div>
       <div style="font-size:12.5px;color:var(--ink);">${
         w.source === 'proyectado'
           ? `<input type="date" data-action="editar-inicio" value="${w.fc||''}" min="2026-01-01" max="2027-10-31" style="font-size:12px;padding:3px 5px;border:1px solid var(--line);border-radius:5px;width:125px;">`
