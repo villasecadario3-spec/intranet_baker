@@ -486,7 +486,6 @@
     </div>
     <div class="spacer"></div>
     <button class="btn btn-primary btn-sm" id="syncBukBtn">Sincronizar con Excel BUK</button>
-    <button class="btn btn-ghost btn-sm" id="resetBtn" style="border-color:var(--red);color:var(--red);">Reiniciar desde el Excel original</button>
     <button class="btn btn-ghost btn-sm" id="loadBackupBtn">Cargar respaldo (JSON)</button>
     <button class="btn btn-ghost btn-sm" id="downloadBackupBtn">Descargar respaldo (JSON)</button>
     <input type="file" id="backupFileInput" accept="application/json" style="display:none;">
@@ -1296,17 +1295,6 @@ async function loadState(){
 
 async function persist(showToast){
   await guardarEnServidor(showToast);
-}
-
-function resetToOriginal(){
-  const ok = confirm('Esto va a borrar TODOS los cambios guardados (ingresos agregados, salidas registradas, etc.) y volver a la dotación base con la que se armó este archivo. ¿Continuar?');
-  if(!ok) return;
-  workers = SEED_WORKERS.map(w => ({...w}));
-  meta = { ultimoMesReal: 7 };
-  renderMesRealSelect();
-  renderAll();
-  persist(false);
-  toast('Dotación reiniciada');
 }
 
 function downloadBackupJSON(){
@@ -2300,7 +2288,6 @@ async function init(){
   document.getElementById('exitModal').addEventListener('click', (e)=>{ if(e.target.id==='exitModal') closeExitModal(); });
   document.getElementById('historialModal').addEventListener('click', (e)=>{ if(e.target.id==='historialModal') cerrarHistorialAsistencia(); });
   document.getElementById('downloadBackupBtn').addEventListener('click', downloadBackupJSON);
-  document.getElementById('resetBtn').addEventListener('click', resetToOriginal);
   document.getElementById('loadBackupBtn').addEventListener('click', triggerLoadBackup);
   document.getElementById('backupFileInput').addEventListener('change', handleBackupFile);
   document.getElementById('addProyectadoBtn').addEventListener('click', addProyectado);
