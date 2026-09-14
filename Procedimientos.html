@@ -193,7 +193,7 @@
     <!-- TABS -->
     <div class="tabs" id="tabs-wrap">
         <div class="tab activo" onclick="cambiarTab('publicados')">Publicados</div>
-        <div class="tab" onclick="cambiarTab('comunicaciones')">Comunicaciones Internas</div>
+        <div class="tab" onclick="cambiarTab('comunicaciones')">Procedimientos Internos por área</div>
     </div>
 
     <!-- TAB: PUBLICADOS -->
@@ -212,7 +212,7 @@
             <div style="font-size:0.82rem;color:var(--txt-dim);">Documentos visibles solo para tu área.</div>
             <button class="btn-subir" onclick="abrirModal('comunicacion')" style="padding:7px 14px;font-size:0.8rem;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                Subir comunicación
+                Subir documento
             </button>
         </div>
         <div id="gestion-areas-wrap" style="display:none;margin-bottom:16px;">
@@ -853,7 +853,7 @@ async function guardarArea() {
 // ── MODAL SUBIR ───────────────────────────────────────────────
 function abrirModal(tipoDoc) {
     tipoSubidaActual = tipoDoc === 'comunicacion' ? 'comunicacion' : 'procedimiento';
-    document.getElementById('modal-titulo').textContent = tipoSubidaActual === 'comunicacion' ? 'Subir comunicación' : 'Subir documento';
+    document.getElementById('modal-titulo').textContent = tipoSubidaActual === 'comunicacion' ? 'Subir documento (por área)' : 'Subir documento';
     document.getElementById('grupo-carpeta').style.display = tipoSubidaActual === 'comunicacion' ? 'none' : '';
     document.getElementById('grupo-area').style.display = tipoSubidaActual === 'comunicacion' ? '' : 'none';
     document.getElementById('modal-overlay').classList.add('visible');
