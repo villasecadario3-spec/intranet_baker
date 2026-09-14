@@ -181,7 +181,7 @@
             <h1>Procedimientos<br>e <em>Instructivos</em></h1>
             <div class="page-header-sub">Documentos internos del grupo Baker.</div>
         </div>
-        <button class="btn-subir" onclick="abrirModal()">
+        <button class="btn-subir" onclick="abrirModal('procedimiento')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Subir documento
         </button>
@@ -190,10 +190,10 @@
 
 <div class="main">
 
-    <!-- TABS — solo visibles para aprobadores -->
-    <div class="tabs" id="tabs-wrap" style="display:none">
+    <!-- TABS -->
+    <div class="tabs" id="tabs-wrap">
         <div class="tab activo" onclick="cambiarTab('publicados')">Publicados</div>
-        <div class="tab" onclick="cambiarTab('pendientes')">Pendientes de aprobación <span id="badge-pend" style="background:var(--amarillo);color:white;border-radius:100px;padding:1px 7px;font-size:0.7rem;margin-left:4px;display:none">0</span></div>
+        <div class="tab" onclick="cambiarTab('comunicaciones')">Comunicaciones Internas</div>
     </div>
 
     <!-- TAB: PUBLICADOS -->
@@ -206,7 +206,23 @@
         <div class="doc-list" id="doc-list"></div>
     </div>
 
-    <!-- TAB: PENDIENTES (solo aprobadores) -->
+    <!-- TAB: COMUNICACIONES INTERNAS -->
+    <div class="tab-panel" id="panel-comunicaciones">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+            <div style="font-size:0.82rem;color:var(--txt-dim);">Documentos visibles solo para tu área.</div>
+            <button class="btn-subir" onclick="abrirModal('comunicacion')" style="padding:7px 14px;font-size:0.8rem;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Subir comunicación
+            </button>
+        </div>
+        <div id="gestion-areas-wrap" style="display:none;margin-bottom:16px;">
+            <button class="btn-doc btn-dl" onclick="abrirGestionAreas()">⚙ Gestionar áreas</button>
+        </div>
+        <div id="mis-areas-info" style="font-size:0.78rem;color:var(--txt-dim);margin-bottom:14px;"></div>
+        <div class="doc-list" id="doc-list-comunicaciones"></div>
+    </div>
+
+    <!-- TAB: PENDIENTES (solo aprobadores, se agrega dinámicamente) -->
     <div class="tab-panel" id="panel-pendientes">
         <div class="pend-bulk-bar" id="pend-bulk-bar" style="display:none">
             <label class="pend-check-todos">
@@ -222,14 +238,40 @@
 
 </div>
 
+<!-- MODAL GESTIONAR ÁREAS -->
+<div class="modal-overlay" id="modal-areas-overlay">
+    <div class="modal">
+        <div class="modal-titulo">Gestionar áreas</div>
+        <div id="areas-lista-actual" style="margin-bottom:16px;"></div>
+        <div class="modal-form-group">
+            <label class="modal-label">Nombre del área *</label>
+            <input class="modal-input" id="area-nombre" type="text" placeholder="Ej: Recursos Humanos">
+        </div>
+        <div class="modal-form-group">
+            <label class="modal-label">Correos con acceso * (separados por coma)</label>
+            <textarea class="modal-textarea" id="area-emails" placeholder="persona1@ibaker.cl, persona2@ibaker.cl"></textarea>
+        </div>
+        <div class="modal-btns">
+            <button class="btn-cancelar-modal" onclick="cerrarGestionAreas()">Cerrar</button>
+            <button class="btn-enviar-modal" onclick="guardarArea()">Guardar área</button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL SUBIR DOCUMENTO -->
 <div class="modal-overlay" id="modal-overlay">
     <div class="modal">
-        <div class="modal-titulo">Subir documento</div>
-        <div class="modal-form-group">
+        <div class="modal-titulo" id="modal-titulo">Subir documento</div>
+        <div class="modal-form-group" id="grupo-carpeta">
             <label class="modal-label">Carpeta *</label>
             <select class="modal-input" id="m-carpeta">
                 <option value="">Selecciona una carpeta…</option>
+            </select>
+        </div>
+        <div class="modal-form-group" id="grupo-area" style="display:none;">
+            <label class="modal-label">Área *</label>
+            <select class="modal-input" id="m-area">
+                <option value="">Selecciona un área…</option>
             </select>
         </div>
         <div class="modal-form-group" id="grupo-nombre">
@@ -279,6 +321,10 @@ let emailActual = '';
 let archivosSeleccionados = []; // [{file, base64, tipo}]
 let docsGithub = [];
 let carpetaActual = null; // null = viendo la grilla de carpetas
+let tipoSubidaActual = 'procedimiento'; // 'procedimiento' | 'comunicacion'
+let areasComunicacion = [];
+let misAreas = [];
+let docsComunicaciones = [];
 
 // ── MSAL ──────────────────────────────────────────────────────
 const msalConfig = {
@@ -306,11 +352,19 @@ async function initAuth() {
                     <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
                 </div>`;
             if (APROBADORES.includes(emailActual)) {
-                document.getElementById('tabs-wrap').style.display = 'flex';
+                // Agrega la pestaña de Pendientes solo para aprobadores.
+                const tabsWrap = document.getElementById('tabs-wrap');
+                const tabPend = document.createElement('div');
+                tabPend.className = 'tab';
+                tabPend.onclick = () => cambiarTab('pendientes');
+                tabPend.innerHTML = `Pendientes de aprobación <span id="badge-pend" style="background:var(--amarillo);color:white;border-radius:100px;padding:1px 7px;font-size:0.7rem;margin-left:4px;display:none">0</span>`;
+                tabsWrap.appendChild(tabPend);
+                document.getElementById('gestion-areas-wrap').style.display = 'block';
                 cargarPendientes();
             }
             poblarSelectorCarpetas();
             renderCarpetas();
+            await cargarAreas();
         } else {
             window.location.href = 'index.html';
         }
@@ -487,7 +541,7 @@ function renderPendientes(lista) {
             <div class="pend-header">
                 <div>
                     <div class="pend-nombre">${doc.nombre}</div>
-                    ${doc.carpeta ? `<span class="carpeta-badge">${doc.carpeta}</span>` : ''}
+                    ${doc.tipoDoc === 'comunicacion' ? `<span class="carpeta-badge">📢 ${doc.area}</span>` : (doc.carpeta ? `<span class="carpeta-badge">${doc.carpeta}</span>` : '')}
                     <div class="pend-meta">
                         Subido por <strong>${doc.subidoPor}</strong> · 
                         ${new Date(doc.fecha).toLocaleDateString('es-CL', {day:'numeric', month:'long', year:'numeric'})}
@@ -626,16 +680,188 @@ async function rechazar(id) {
 
 // ── TABS ──────────────────────────────────────────────────────
 function cambiarTab(tab) {
-    document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('activo', (i === 0 && tab === 'publicados') || (i === 1 && tab === 'pendientes')));
+    document.querySelectorAll('.tab').forEach(t => {
+        const onclickAttr = t.getAttribute('onclick') || (t.onclick ? t.onclick.toString() : '');
+        t.classList.toggle('activo', onclickAttr.includes(`'${tab}'`));
+    });
     document.getElementById('panel-publicados').classList.toggle('activo', tab === 'publicados');
+    document.getElementById('panel-comunicaciones').classList.toggle('activo', tab === 'comunicaciones');
     document.getElementById('panel-pendientes').classList.toggle('activo', tab === 'pendientes');
+    if (tab === 'comunicaciones') cargarComunicaciones();
+}
+
+// ── COMUNICACIONES INTERNAS por área ───────────────────────────
+async function cargarAreas() {
+    try {
+        const res = await fetch(`${API}/comunicaciones-internas/areas`);
+        areasComunicacion = await res.json();
+    } catch(e) {
+        console.error('Error cargando áreas:', e);
+        areasComunicacion = [];
+    }
+    misAreas = areasComunicacion.filter(a => a.emails.includes(emailActual)).map(a => a.nombre);
+    poblarSelectorAreas();
+    const info = document.getElementById('mis-areas-info');
+    if (info) {
+        info.textContent = misAreas.length
+            ? `Perteneces a: ${misAreas.join(', ')}`
+            : 'No perteneces a ningún área con comunicaciones internas todavía.';
+    }
+}
+
+function poblarSelectorAreas() {
+    const sel = document.getElementById('m-area');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Selecciona un área…</option>';
+    areasComunicacion.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a.nombre; opt.textContent = a.nombre;
+        sel.appendChild(opt);
+    });
+}
+
+async function cargarComunicaciones() {
+    const lista = document.getElementById('doc-list-comunicaciones');
+    if (misAreas.length === 0 && !APROBADORES.includes(emailActual)) {
+        lista.innerHTML = `<div class="empty">No perteneces a ningún área con comunicaciones internas todavía.</div>`;
+        return;
+    }
+    lista.innerHTML = `<div class="empty">Cargando documentos…</div>`;
+    // Para aprobadores se muestran todas las áreas; para el resto, solo las propias.
+    const areasAVer = APROBADORES.includes(emailActual) ? areasComunicacion.map(a=>a.nombre) : misAreas;
+    try {
+        const resultados = await Promise.all(areasAVer.map(async area => {
+            const res = await fetch(`${API}/comunicaciones-internas/carpeta/${encodeURIComponent(area)}`);
+            if (!res.ok) return [];
+            const files = await res.json();
+            return (Array.isArray(files) ? files : []).map(f => ({
+                nombre: f.nombre.replace(/\.[^.]+$/, ''),
+                tipo: f.nombre.split('.').pop().toUpperCase(),
+                area,
+                githubUrl: f.url,
+            }));
+        }));
+        docsComunicaciones = resultados.flat();
+    } catch(e) {
+        console.error('Error cargando comunicaciones:', e);
+        docsComunicaciones = [];
+    }
+    renderComunicaciones();
+}
+
+function renderComunicaciones() {
+    const lista = document.getElementById('doc-list-comunicaciones');
+    if (docsComunicaciones.length === 0) {
+        lista.innerHTML = `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div>No hay comunicaciones todavía</div></div>`;
+        return;
+    }
+    lista.innerHTML = docsComunicaciones.map(doc => {
+        const url = doc.githubUrl;
+        const esPdf = doc.tipo.toLowerCase() === 'pdf';
+        return `
+        <div class="doc-card">
+            <div class="doc-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </div>
+            <div class="doc-info">
+                <div class="doc-nombre">${doc.nombre}</div>
+                <div class="doc-meta">${doc.tipo} · <span class="carpeta-badge">${doc.area}</span></div>
+            </div>
+            <div class="doc-acciones">
+                ${esPdf ? `
+                <button class="btn-doc btn-ver" onclick="verDocumento('${url}', '${(doc.nombre+'.'+doc.tipo).replace(/'/g,"\\'")}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    Ver
+                </button>` : ''}
+                <a class="btn-doc btn-dl" href="${url}" download>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Descargar
+                </a>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ── Gestión de áreas (solo aprobadores) ────────────────────────
+function abrirGestionAreas() {
+    renderAreasActuales();
+    document.getElementById('area-nombre').value = '';
+    document.getElementById('area-emails').value = '';
+    document.getElementById('modal-areas-overlay').classList.add('visible');
+}
+function cerrarGestionAreas() {
+    document.getElementById('modal-areas-overlay').classList.remove('visible');
+}
+function renderAreasActuales() {
+    const cont = document.getElementById('areas-lista-actual');
+    if (areasComunicacion.length === 0) {
+        cont.innerHTML = `<div class="empty" style="padding:16px;">Todavía no hay áreas creadas</div>`;
+        return;
+    }
+    cont.innerHTML = areasComunicacion.map(a => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border:1px solid var(--gris-2);border-radius:9px;margin-bottom:8px;">
+            <div>
+                <div style="font-weight:600;font-size:0.85rem;">${a.nombre}</div>
+                <div style="font-size:0.72rem;color:var(--txt-dim);">${a.emails.join(', ')}</div>
+            </div>
+            <div style="display:flex;gap:6px;">
+                <button class="btn-doc btn-dl" onclick="editarArea('${a.nombre.replace(/'/g,"\\'")}')">Editar</button>
+                <button class="btn-doc btn-dl" style="color:var(--rojo);border-color:var(--rojo);" onclick="eliminarArea('${a.nombre.replace(/'/g,"\\'")}')">Eliminar</button>
+            </div>
+        </div>`).join('');
+}
+function editarArea(nombre) {
+    const a = areasComunicacion.find(x => x.nombre === nombre);
+    if (!a) return;
+    document.getElementById('area-nombre').value = a.nombre;
+    document.getElementById('area-emails').value = a.emails.join(', ');
+}
+async function eliminarArea(nombre) {
+    if (!confirm(`¿Eliminar el área "${nombre}"? Los documentos ya publicados en GitHub no se borran, solo deja de existir el grupo.`)) return;
+    try {
+        const res = await fetch(`${API}/comunicaciones-internas/areas/${encodeURIComponent(nombre)}?email=${encodeURIComponent(emailActual)}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Error al eliminar');
+        await cargarAreas();
+        renderAreasActuales();
+        mostrarToast('Área eliminada', 'ok');
+    } catch(e) {
+        mostrarToast('Error: ' + e.message, 'err');
+    }
+}
+async function guardarArea() {
+    const nombre = document.getElementById('area-nombre').value.trim();
+    const emailsRaw = document.getElementById('area-emails').value.trim();
+    if (!nombre || !emailsRaw) { alert('Completa el nombre y los correos'); return; }
+    const emails = emailsRaw.split(',').map(e => e.trim()).filter(Boolean);
+    try {
+        const res = await fetch(`${API}/comunicaciones-internas/areas`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: emailActual, nombre, emails })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error al guardar');
+        await cargarAreas();
+        renderAreasActuales();
+        document.getElementById('area-nombre').value = '';
+        document.getElementById('area-emails').value = '';
+        mostrarToast('Área guardada', 'ok');
+    } catch(e) {
+        mostrarToast('Error: ' + e.message, 'err');
+    }
 }
 
 // ── MODAL SUBIR ───────────────────────────────────────────────
-function abrirModal() { document.getElementById('modal-overlay').classList.add('visible'); }
+function abrirModal(tipoDoc) {
+    tipoSubidaActual = tipoDoc === 'comunicacion' ? 'comunicacion' : 'procedimiento';
+    document.getElementById('modal-titulo').textContent = tipoSubidaActual === 'comunicacion' ? 'Subir comunicación' : 'Subir documento';
+    document.getElementById('grupo-carpeta').style.display = tipoSubidaActual === 'comunicacion' ? 'none' : '';
+    document.getElementById('grupo-area').style.display = tipoSubidaActual === 'comunicacion' ? '' : 'none';
+    document.getElementById('modal-overlay').classList.add('visible');
+}
 function cerrarModal() {
     document.getElementById('modal-overlay').classList.remove('visible');
     document.getElementById('m-carpeta').value = '';
+    document.getElementById('m-area').value = '';
     document.getElementById('m-nombre').value = '';
     document.getElementById('m-desc').value = '';
     document.getElementById('archivos-lista').style.display = 'none';
@@ -709,8 +935,11 @@ function handleDrop(e) {
 }
 
 async function enviarDocumento() {
-    const carpeta = document.getElementById('m-carpeta').value;
-    if (!carpeta) { alert('Selecciona una carpeta'); return; }
+    const esComunicacion = tipoSubidaActual === 'comunicacion';
+    const carpeta = esComunicacion ? '' : document.getElementById('m-carpeta').value;
+    const area = esComunicacion ? document.getElementById('m-area').value : '';
+    if (esComunicacion && !area) { alert('Selecciona un área'); return; }
+    if (!esComunicacion && !carpeta) { alert('Selecciona una carpeta'); return; }
     if (archivosSeleccionados.length === 0) { alert('Selecciona uno o más archivos'); return; }
 
     const esMasivo = archivosSeleccionados.length > 1;
@@ -743,7 +972,9 @@ async function enviarDocumento() {
                     archivo: a.base64,
                     tipo: a.tipo,
                     archivoNombreOriginal: a.nombreOriginal,
-                    carpeta,
+                    tipoDoc: tipoSubidaActual,
+                    carpeta: esComunicacion ? undefined : carpeta,
+                    area: esComunicacion ? area : undefined,
                     subidoPor: emailActual
                 })
             });
