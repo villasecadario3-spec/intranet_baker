@@ -1608,6 +1608,33 @@ function renderR8(data) {
         </div>`;
     document.getElementById('r8-stats').style.display = 'grid';
 
+    // Diagnóstico: cuentas cuyo tipo (PCTIPO) no es ninguno de los conocidos
+    // (A, P, T, I, G, C, O) — el motivo más probable de que Activo y Pasivo
+    // no cuadren, ya que esas cuentas caen por defecto en "Activo".
+    const diagId = 'r8-diag-tipos';
+    let diagBox = document.getElementById(diagId);
+    if (data.tiposDesconocidos && data.tiposDesconocidos.length) {
+        if (!diagBox) {
+            diagBox = document.createElement('div');
+            diagBox.id = diagId;
+            diagBox.style.cssText = 'margin-bottom:16px;padding:14px 18px;background:rgba(192,57,43,0.06);border:1px solid rgba(192,57,43,0.25);border-radius:10px;';
+            document.getElementById('r8-stats').insertAdjacentElement('afterend', diagBox);
+        }
+        diagBox.innerHTML = `
+            <div style="font-weight:700;color:var(--rojo);margin-bottom:6px;">
+                ⚠ ${data.tiposDesconocidos.length} cuenta(s) con tipo no reconocido — probable causa de que no cuadre
+            </div>
+            <div style="font-size:0.8rem;color:var(--txt-mid);">
+                Estas cuentas tienen un PCTIPO que no es A, P, T, I, G, C ni O, y por defecto se están sumando como Activo.
+                Revísalas en Softland y confirma cuál es su tipo real:
+            </div>
+            <ul style="margin:8px 0 0 18px;font-size:0.8rem;color:var(--txt);">
+                ${data.tiposDesconocidos.map(t => `<li><b>${t.cuenta}</b> — ${t.descripcion} (tipo: "${t.tipo}", saldo: $${Math.round(t.saldo).toLocaleString('es-CL')})</li>`).join('')}
+            </ul>`;
+    } else if (diagBox) {
+        diagBox.remove();
+    }
+
     if (filas.length === 0) {
         document.getElementById('r8-body').innerHTML = `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--txt-dim);">Esa cuenta no tiene movimientos en este período</td></tr>`;
     } else {
