@@ -645,6 +645,10 @@
                     <div class="partida-dropdown" id="cuenta-dropdown"></div>
                 </div>
                 <div class="form-hint">Opcional — filtra por código del plan de cuentas</div>
+                <label id="wrap-incluir-anteriores" style="display:none;align-items:center;gap:6px;margin-top:6px;font-size:0.78rem;color:var(--txt-mid);cursor:pointer;">
+                    <input type="checkbox" id="chk-incluir-anteriores" style="accent-color:var(--rojo);">
+                    Incluir años anteriores (verificar saldo acumulado)
+                </label>
             </div>
         </div>
         <div style="padding:0 24px 20px;display:flex;gap:10px;align-items:center">
@@ -1061,6 +1065,13 @@ function seleccionarCuenta(codigo) {
     cuentaInput.value = `${c.codigo} — ${c.descripcion || '(sin descripción)'}`;
     cuentaDropdown.classList.remove('abierto');
     cuentaClearBtn.classList.add('visible');
+    // El casillero de "incluir años anteriores" solo aplica a cuentas de
+    // Activo/Pasivo (A, P, T) — para Pérdida/Ganancia no tiene sentido
+    // contable acumular entre años.
+    const wrap = document.getElementById('wrap-incluir-anteriores');
+    const esBalance = ['A','P','T'].includes((c.tipo||'').toUpperCase());
+    wrap.style.display = esBalance ? 'flex' : 'none';
+    if (!esBalance) document.getElementById('chk-incluir-anteriores').checked = false;
 }
 
 function limpiarCuenta() {
@@ -1068,11 +1079,15 @@ function limpiarCuenta() {
     cuentaInput.value = '';
     cuentaClearBtn.classList.remove('visible');
     cuentaDropdown.classList.remove('abierto');
+    document.getElementById('wrap-incluir-anteriores').style.display = 'none';
+    document.getElementById('chk-incluir-anteriores').checked = false;
 }
 
 cuentaInput.addEventListener('input', () => {
     cuentaSeleccionada = '';
     cuentaClearBtn.classList.remove('visible');
+    document.getElementById('wrap-incluir-anteriores').style.display = 'none';
+    document.getElementById('chk-incluir-anteriores').checked = false;
     renderCuentaDropdown(cuentaInput.value);
 });
 cuentaInput.addEventListener('focus', () => {
@@ -1125,7 +1140,7 @@ async function buscar() {
         const res = await fetch(`${API}/asientos`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ empresa, ano: anos, mes: meses, voucher, rut, partida: partidaFiltro, cuenta: cuentaSeleccionada })
+            body: JSON.stringify({ empresa, ano: anos, mes: meses, voucher, rut, partida: partidaFiltro, cuenta: cuentaSeleccionada, incluirAnteriores: document.getElementById('chk-incluir-anteriores').checked })
         });
         const data = await res.json();
 
@@ -1163,7 +1178,7 @@ function renderTabla(datos, meta) {
     // Badge
     const badge = document.getElementById('resultados-badge');
     badge.className = 'resultados-badge badge-ok';
-    badge.innerText = `${datos.length} registro${datos.length !== 1 ? 's' : ''}`;
+    badge.innerText = `${datos.length} registro${datos.length !== 1 ? 's' : ''}${meta.incluyeAnteriores ? ' (incluye años anteriores)' : ''}`;
 
     // Renderizar primera página
     renderPagina(0);
