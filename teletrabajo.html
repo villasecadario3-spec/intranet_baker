@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teletrabajo — Baker</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+<style>
+:root{
+    --rojo:#C0392B; --rojo-dark:#96281B; --rojo-light:rgba(192,57,43,0.08);
+    --negro:#111010; --negro-2:#1A1918; --negro-3:#242220; --borde-dark:#2E2C2A;
+    --crema:#F8F6F3; --gris-1:#F0EDE9; --gris-2:#E2DED9; --gris-3:#B5B0AA;
+    --txt:#1C1A18; --txt-mid:#6B6762; --txt-dim:#A09C97;
+    --verde:#1a7a4a; --verde-bg:rgba(26,122,74,0.08);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans',sans-serif;background:var(--crema);color:var(--txt);min-height:100vh;}
+nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px solid var(--borde-dark);height:60px;display:flex;align-items:center;padding:0 32px;gap:16px;position:sticky;top:0;z-index:100;}
+.nav-back{display:flex;align-items:center;gap:6px;color:#B5B0AA;text-decoration:none;font-size:0.8rem;font-weight:500;}
+.nav-back svg{width:14px;height:14px;}
+.nav-sep{width:1px;height:18px;background:var(--borde-dark);}
+.nav-title{font-family:'DM Mono',monospace;font-size:0.72rem;color:#B5B0AA;letter-spacing:0.08em;text-transform:uppercase;}
+.nav-spacer{flex:1;}
+.user-chip{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;background:var(--negro-3);border:1px solid var(--borde-dark);border-radius:100px;}
+.user-av{width:26px;height:26px;border-radius:50%;background:var(--rojo);display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:0.72rem;font-weight:700;color:white;}
+.user-nm{font-size:0.78rem;font-weight:500;color:white;}
+.page-header{background:var(--negro);padding:36px 32px 30px;border-bottom:1px solid var(--borde-dark);}
+.page-eyebrow{font-size:0.65rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--rojo);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.page-eyebrow::before{content:'';width:16px;height:1px;background:var(--rojo);}
+.page-header h1{font-family:'Playfair Display',serif;font-size:1.9rem;font-weight:900;color:white;letter-spacing:-0.02em;}
+.page-header-sub{font-size:0.82rem;color:#6b6762;margin-top:6px;}
+.main{padding:28px 32px 60px;max-width:1100px;margin:0 auto;}
+.tabs{display:flex;gap:0;border-bottom:2px solid var(--gris-2);margin-bottom:22px;}
+.tab{padding:11px 20px;font-size:0.85rem;font-weight:600;color:var(--txt-dim);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;}
+.tab.activo{color:var(--rojo);border-bottom-color:var(--rojo);}
+.panel{display:none;}
+.panel.activo{display:block;}
+.card{background:white;border:1px solid var(--gris-2);border-radius:14px;padding:22px;margin-bottom:18px;}
+.card h3{font-family:'Playfair Display',serif;font-size:1.05rem;margin-bottom:14px;}
+.dias-grid{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+.dia-chip{padding:10px 16px;border-radius:9px;border:1px solid var(--gris-2);background:var(--crema);font-size:0.82rem;font-weight:600;cursor:pointer;transition:all 0.15s;}
+.dia-chip.activo{background:var(--negro);color:white;border-color:var(--negro);}
+.btn{display:flex;align-items:center;gap:7px;padding:10px 18px;border-radius:9px;border:none;font-family:'DM Sans',sans-serif;font-size:0.85rem;font-weight:600;cursor:pointer;transition:all 0.15s;}
+.btn-primary{background:var(--negro);color:white;}
+.btn-primary:hover{background:var(--rojo);}
+.btn-outline{background:white;border:1px solid var(--gris-2);color:var(--txt-mid);}
+.btn-sm{padding:6px 12px;font-size:0.76rem;}
+.form-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+.form-group{flex:1;min-width:140px;}
+.form-label{font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--txt-dim);display:block;margin-bottom:5px;}
+.form-input,.form-select{width:100%;padding:9px 12px;border:1px solid var(--gris-2);border-radius:8px;font-family:inherit;font-size:0.85rem;}
+.excepcion-item{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border:1px solid var(--gris-2);border-radius:9px;margin-bottom:8px;font-size:0.82rem;}
+.tag{padding:2px 9px;border-radius:100px;font-size:0.68rem;font-weight:700;text-transform:uppercase;}
+.tag-remoto{background:var(--verde-bg);color:var(--verde);}
+.tag-visita_obra{background:rgba(184,134,11,0.1);color:#8a6508;}
+.tag-presencial{background:rgba(192,57,43,0.08);color:var(--rojo);}
+.week-nav{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
+.week-nav button{background:white;border:1px solid var(--gris-2);border-radius:8px;padding:7px 12px;cursor:pointer;}
+.week-label{font-weight:600;font-size:0.9rem;}
+.tabla-semana{width:100%;border-collapse:collapse;background:white;border:1px solid var(--gris-2);border-radius:12px;overflow:hidden;}
+.tabla-semana th{background:var(--negro);color:#B5B0AA;font-family:'DM Mono',monospace;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.05em;padding:10px;text-align:left;}
+.tabla-semana td{padding:10px;border-bottom:1px solid var(--gris-1);font-size:0.82rem;}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
+.dot-remoto{background:var(--verde);}
+.dot-visita_obra{background:#B8860B;}
+.dot-presencial{background:var(--gris-3);}
+.empty{text-align:center;padding:40px 20px;color:var(--txt-dim);}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--negro);color:white;padding:12px 20px;border-radius:9px;font-size:0.85rem;transition:transform 0.25s;z-index:300;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<nav>
+    <a class="nav-back" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        Volver a la intranet
+    </a>
+    <div class="nav-sep"></div>
+    <div class="nav-title">Teletrabajo</div>
+    <div class="nav-spacer"></div>
+    <div id="auth-area"></div>
+</nav>
+<div class="page-header">
+    <div class="page-eyebrow">Grupo Baker</div>
+    <h1>Teletrabajo</h1>
+    <div class="page-header-sub">Configura tus días remotos fijos y consulta quién está en teletrabajo cada semana.</div>
+</div>
+<div class="main">
+    <div class="tabs">
+        <div class="tab activo" onclick="cambiarTab('mio')">Mi teletrabajo</div>
+        <div class="tab" onclick="cambiarTab('equipo')">Ver equipo por semana</div>
+    </div>
+
+    <div class="panel activo" id="panel-mio">
+        <div class="card">
+            <h3>Día de Teletrabajo</h3>
+            <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Elige como máximo un día fijo, solo entre martes y jueves.</p>
+            <div class="dias-grid" id="dias-teletrabajo">
+                <div class="dia-chip" data-dia="martes">Martes</div>
+                <div class="dia-chip" data-dia="jueves">Jueves</div>
+            </div>
+            <h3 style="margin-top:20px;">Visita a Obra</h3>
+            <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Marca los días en que normalmente estás en terreno, no en la oficina. Aquí sí puedes elegir varios días.</p>
+            <div class="dias-grid" id="dias-obra">
+                <div class="dia-chip" data-dia="lunes">Lunes</div>
+                <div class="dia-chip" data-dia="martes">Martes</div>
+                <div class="dia-chip" data-dia="miercoles">Miércoles</div>
+                <div class="dia-chip" data-dia="jueves">Jueves</div>
+                <div class="dia-chip" data-dia="viernes">Viernes</div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="guardarPatron()">Guardar patrón</button>
+        </div>
+
+
+        <div class="card">
+            <h3>Excepción para un día puntual</h3>
+            <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Para cambiar un día específico sin tocar tu patrón fijo (ej. esta semana trabajas remoto un día distinto al habitual).</p>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" type="date" id="exc-fecha"></div>
+                <div class="form-group">
+                    <label class="form-label">Ese día voy a estar</label>
+                    <select class="form-select" id="exc-tipo">
+                        <option value="remoto">Remoto</option>
+                        <option value="visita_obra">Visita a Obra</option>
+                        <option value="presencial">Presencial</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="guardarExcepcion()">Agregar</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Mis excepciones próximas</h3>
+            <div id="lista-excepciones"></div>
+        </div>
+    </div>
+
+    <div class="panel" id="panel-equipo">
+        <div class="week-nav">
+            <button onclick="cambiarSemana(-1)">‹ Semana anterior</button>
+            <div class="week-label" id="week-label"></div>
+            <button onclick="cambiarSemana(1)">Semana siguiente ›</button>
+        </div>
+        <table class="tabla-semana">
+            <thead><tr id="semana-head"></tr></thead>
+            <tbody id="semana-body"></tbody>
+        </table>
+        <div style="margin-top:14px;font-size:0.78rem;color:var(--txt-dim);">
+            <span class="dot dot-remoto"></span> Remoto &nbsp;&nbsp; <span class="dot dot-visita_obra"></span> Visita a Obra &nbsp;&nbsp; <span class="dot dot-presencial"></span> Presencial
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'https://api.ibaker.cl';
+const APROBADORES = ['dvillaseca@ibaker.cl', 'jcumplido@ibaker.cl'];
+let emailActual = '', nombreActual = '';
+let dataTeletrabajo = { patrones: {}, excepciones: [] };
+let teletrabajoDia = null;
+let visitaObraDias = new Set();
+let semanaOffset = 0;
+const DIAS = ['lunes','martes','miercoles','jueves','viernes'];
+const DIAS_LABEL = {lunes:'Lunes',martes:'Martes',miercoles:'Miércoles',jueves:'Jueves',viernes:'Viernes'};
+
+const msalConfig = {
+    auth: {
+        clientId: "9a56ab1c-d3c4-4460-9892-1d4da768ecfb",
+        authority: "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
+        redirectUri: window.location.origin + window.location.pathname,
+    },
+    cache: { cacheLocation: "sessionStorage" }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+async function initAuth() {
+    try {
+        await msalInstance.initialize();
+        const accounts = msalInstance.getAllAccounts();
+        if (accounts.length > 0) {
+            const u = accounts[0];
+            emailActual = u.username.toLowerCase();
+            if (!APROBADORES.includes(emailActual)) {
+                window.location.href = 'index.html';
+                return;
+            }
+            nombreActual = u.name || u.username;
+            const iniciales = nombreActual.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+            document.getElementById('auth-area').innerHTML = `<div class="user-chip"><div class="user-av">${iniciales}</div><span class="user-nm">${nombreActual.split(' ').slice(0,2).join(' ')}</span></div>`;
+
+            // "Día de Teletrabajo": máximo 1 día, comportamiento tipo radio.
+            document.querySelectorAll('#dias-teletrabajo .dia-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    const dia = chip.dataset.dia;
+                    if (visitaObraDias.has(dia)) { toast('Ese día ya está marcado como Visita a Obra'); return; }
+                    if (teletrabajoDia === dia) {
+                        teletrabajoDia = null;
+                    } else {
+                        teletrabajoDia = dia;
+                    }
+                    renderChipsPatron();
+                });
+            });
+            // "Visita a Obra": varios días permitidos.
+            document.querySelectorAll('#dias-obra .dia-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    const dia = chip.dataset.dia;
+                    if (teletrabajoDia === dia) { toast('Ese día ya está marcado como Teletrabajo'); return; }
+                    if (visitaObraDias.has(dia)) visitaObraDias.delete(dia); else visitaObraDias.add(dia);
+                    renderChipsPatron();
+                });
+            });
+            await cargarDatos();
+        } else {
+            window.location.href = 'index.html';
+        }
+    } catch(e) { window.location.href = 'index.html'; }
+}
+
+function renderChipsPatron() {
+    document.querySelectorAll('#dias-teletrabajo .dia-chip').forEach(chip => {
+        chip.classList.toggle('activo', chip.dataset.dia === teletrabajoDia);
+    });
+    document.querySelectorAll('#dias-obra .dia-chip').forEach(chip => {
+        chip.classList.toggle('activo', visitaObraDias.has(chip.dataset.dia));
+    });
+}
+
+async function cargarDatos() {
+    try {
+        const res = await fetch(`${API}/teletrabajo`);
+        dataTeletrabajo = await res.json();
+        const miPatron = dataTeletrabajo.patrones[emailActual] || { teletrabajoDia: null, visitaObraDias: [] };
+        teletrabajoDia = miPatron.teletrabajoDia || null;
+        visitaObraDias = new Set(miPatron.visitaObraDias || []);
+        renderChipsPatron();
+        renderExcepciones();
+        renderSemana();
+    } catch(e) {
+        toast('Error al cargar: ' + e.message);
+    }
+}
+
+function cambiarTab(tab) {
+    document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('activo', (i===0 && tab==='mio') || (i===1 && tab==='equipo')));
+    document.getElementById('panel-mio').classList.toggle('activo', tab==='mio');
+    document.getElementById('panel-equipo').classList.toggle('activo', tab==='equipo');
+    if (tab === 'equipo') renderSemana();
+}
+
+async function guardarPatron() {
+    try {
+        const res = await fetch(`${API}/teletrabajo/patron`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ email: emailActual, teletrabajoDia, visitaObraDias: [...visitaObraDias] })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error al guardar');
+        dataTeletrabajo.patrones[emailActual] = { teletrabajoDia, visitaObraDias: [...visitaObraDias] };
+        toast('Patrón guardado');
+        renderSemana();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function guardarExcepcion() {
+    const fecha = document.getElementById('exc-fecha').value;
+    const tipo = document.getElementById('exc-tipo').value;
+    if (!fecha) { alert('Elige una fecha'); return; }
+    try {
+        const res = await fetch(`${API}/teletrabajo/excepcion`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ email: emailActual, fecha, tipo })
+        });
+        if (!res.ok) throw new Error('Error al guardar');
+        dataTeletrabajo.excepciones = dataTeletrabajo.excepciones.filter(e => !(e.email===emailActual && e.fecha===fecha));
+        dataTeletrabajo.excepciones.push({ email: emailActual, fecha, tipo });
+        toast('Excepción agregada');
+        renderExcepciones();
+        renderSemana();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function borrarExcepcion(fecha) {
+    try {
+        await fetch(`${API}/teletrabajo/excepcion?email=${encodeURIComponent(emailActual)}&fecha=${fecha}`, { method: 'DELETE' });
+        dataTeletrabajo.excepciones = dataTeletrabajo.excepciones.filter(e => !(e.email===emailActual && e.fecha===fecha));
+        renderExcepciones();
+        renderSemana();
+        toast('Excepción eliminada');
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+function renderExcepciones() {
+    const hoy = new Date().toISOString().slice(0,10);
+    const mias = dataTeletrabajo.excepciones.filter(e => e.email === emailActual && e.fecha >= hoy).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+    const cont = document.getElementById('lista-excepciones');
+    if (!mias.length) { cont.innerHTML = `<div class="empty">No tienes excepciones próximas.</div>`; return; }
+    cont.innerHTML = mias.map(e => `
+        <div class="excepcion-item">
+            <span>${fmt(e.fecha)} — <span class="tag tag-${e.tipo}">${e.tipo}</span></span>
+            <button class="btn btn-outline btn-sm" onclick="borrarExcepcion('${e.fecha}')">Quitar</button>
+        </div>`).join('');
+}
+
+function fmt(iso) { const [y,m,d]=iso.split('-'); return `${d}-${m}-${y}`; }
+
+function inicioSemana(offset) {
+    const hoy = new Date();
+    const dia = hoy.getDay(); // 0=domingo
+    const diff = (dia === 0 ? -6 : 1) - dia; // lunes de esta semana
+    const lunes = new Date(hoy);
+    lunes.setDate(hoy.getDate() + diff + offset*7);
+    lunes.setHours(0,0,0,0);
+    return lunes;
+}
+
+function cambiarSemana(delta) {
+    semanaOffset += delta;
+    renderSemana();
+}
+
+// Estado efectivo de una persona en una fecha: excepción propia si existe, si no su patrón fijo según el día de la semana.
+function estadoEnFecha(email, fechaISO, diaSemana) {
+    const exc = dataTeletrabajo.excepciones.find(e => e.email === email && e.fecha === fechaISO);
+    if (exc) return exc.tipo;
+    const patron = dataTeletrabajo.patrones[email] || { teletrabajoDia: null, visitaObraDias: [] };
+    if (patron.teletrabajoDia === diaSemana) return 'remoto';
+    if ((patron.visitaObraDias || []).includes(diaSemana)) return 'visita_obra';
+    return 'presencial';
+}
+
+function renderSemana() {
+    const lunes = inicioSemana(semanaOffset);
+    const fechas = DIAS.map((_, i) => {
+        const d = new Date(lunes);
+        d.setDate(lunes.getDate() + i);
+        return d.toISOString().slice(0,10);
+    });
+    document.getElementById('week-label').textContent = `${fmt(fechas[0])} — ${fmt(fechas[4])}`;
+
+    document.getElementById('semana-head').innerHTML =
+        '<th>Persona</th>' + DIAS.map((d,i) => `<th>${DIAS_LABEL[d]}<br><span style="font-weight:400;">${fmt(fechas[i])}</span></th>`).join('');
+
+    const personas = Object.keys(dataTeletrabajo.patrones);
+    // Asegura que la propia persona aparezca aunque aún no tenga patrón guardado.
+    if (!personas.includes(emailActual)) personas.push(emailActual);
+
+    if (!personas.length) {
+        document.getElementById('semana-body').innerHTML = `<tr><td colspan="6" class="empty">Todavía nadie configuró su patrón de teletrabajo.</td></tr>`;
+        return;
+    }
+
+    document.getElementById('semana-body').innerHTML = personas.map(email => {
+        const celdas = DIAS.map((dia,i) => {
+            const estado = estadoEnFecha(email, fechas[i], dia);
+            const label = estado === 'remoto' ? 'Remoto' : estado === 'visita_obra' ? 'Visita a Obra' : 'Presencial';
+            return `<td><span class="dot dot-${estado}"></span> ${label}</td>`;
+        }).join('');
+        return `<tr><td>${email}${email===emailActual?' (tú)':''}</td>${celdas}</tr>`;
+    }).join('');
+}
+
+function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+initAuth();
+</script>
+</body>
+</html>
