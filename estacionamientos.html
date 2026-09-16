@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estacionamientos — Baker</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+<style>
+:root{
+    --rojo:#C0392B; --rojo-dark:#96281B; --rojo-light:rgba(192,57,43,0.08);
+    --negro:#111010; --negro-2:#1A1918; --negro-3:#242220; --borde-dark:#2E2C2A;
+    --crema:#F8F6F3; --gris-1:#F0EDE9; --gris-2:#E2DED9; --gris-3:#B5B0AA;
+    --txt:#1C1A18; --txt-mid:#6B6762; --txt-dim:#A09C97;
+    --verde:#1a7a4a; --verde-bg:rgba(26,122,74,0.08);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans',sans-serif;background:var(--crema);color:var(--txt);min-height:100vh;}
+nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px solid var(--borde-dark);height:60px;display:flex;align-items:center;padding:0 32px;gap:16px;position:sticky;top:0;z-index:100;}
+.nav-back{display:flex;align-items:center;gap:6px;color:#B5B0AA;text-decoration:none;font-size:0.8rem;font-weight:500;}
+.nav-back svg{width:14px;height:14px;}
+.nav-sep{width:1px;height:18px;background:var(--borde-dark);}
+.nav-title{font-family:'DM Mono',monospace;font-size:0.72rem;color:#B5B0AA;letter-spacing:0.08em;text-transform:uppercase;}
+.nav-spacer{flex:1;}
+.user-chip{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;background:var(--negro-3);border:1px solid var(--borde-dark);border-radius:100px;}
+.user-av{width:26px;height:26px;border-radius:50%;background:var(--rojo);display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:0.72rem;font-weight:700;color:white;}
+.user-nm{font-size:0.78rem;font-weight:500;color:white;}
+.page-header{background:var(--negro);padding:36px 32px 30px;border-bottom:1px solid var(--borde-dark);}
+.page-eyebrow{font-size:0.65rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--rojo);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.page-eyebrow::before{content:'';width:16px;height:1px;background:var(--rojo);}
+.page-header h1{font-family:'Playfair Display',serif;font-size:1.9rem;font-weight:900;color:white;letter-spacing:-0.02em;}
+.page-header-sub{font-size:0.82rem;color:#6b6762;margin-top:6px;}
+.main{padding:28px 32px 60px;max-width:1200px;margin:0 auto;}
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;}
+.btn{display:flex;align-items:center;gap:7px;padding:10px 18px;border-radius:9px;border:none;font-family:'DM Sans',sans-serif;font-size:0.85rem;font-weight:600;cursor:pointer;transition:all 0.15s;}
+.btn-primary{background:var(--negro);color:white;}
+.btn-primary:hover{background:var(--rojo);}
+.btn-outline{background:white;border:1px solid var(--gris-2);color:var(--txt-mid);}
+.btn-outline:hover{border-color:var(--rojo);color:var(--rojo);}
+.btn-sm{padding:6px 12px;font-size:0.76rem;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
+.spot-card{background:white;border:1px solid var(--gris-2);border-radius:14px;padding:18px;}
+.spot-card.libre{border-color:rgba(26,122,74,0.35);background:var(--verde-bg);}
+.spot-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
+.spot-num{font-family:'Playfair Display',serif;font-size:1.3rem;font-weight:900;}
+.spot-badge{font-size:0.65rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;padding:3px 9px;border-radius:100px;white-space:nowrap;}
+.badge-ocupado{background:var(--gris-1);color:var(--txt-dim);}
+.badge-libre{background:var(--verde-bg);color:var(--verde);border:1px solid rgba(26,122,74,0.25);}
+.badge-reservado{background:rgba(192,57,43,0.08);color:var(--rojo);border:1px solid rgba(192,57,43,0.2);}
+.spot-dueno{font-size:0.82rem;color:var(--txt-mid);margin-bottom:12px;}
+.spot-info{font-size:0.76rem;color:var(--txt-dim);margin-bottom:10px;line-height:1.5;}
+.spot-acciones{display:flex;gap:8px;flex-wrap:wrap;}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.visible{display:flex;}
+.modal{background:white;border-radius:16px;padding:26px;max-width:420px;width:100%;}
+.modal h3{font-family:'Playfair Display',serif;font-size:1.15rem;margin-bottom:16px;}
+.form-group{margin-bottom:14px;}
+.form-label{font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--txt-dim);display:block;margin-bottom:5px;}
+.form-input{width:100%;padding:9px 12px;border:1px solid var(--gris-2);border-radius:8px;font-family:inherit;font-size:0.85rem;}
+.modal-btns{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
+.empty{text-align:center;padding:50px 20px;color:var(--txt-dim);}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--negro);color:white;padding:12px 20px;border-radius:9px;font-size:0.85rem;transition:transform 0.25s;z-index:300;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+.admin-box{background:white;border:1px solid var(--gris-2);border-radius:14px;padding:18px;margin-bottom:20px;}
+.admin-row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+.admin-row input{flex:1;min-width:120px;padding:8px 10px;border:1px solid var(--gris-2);border-radius:7px;font-size:0.82rem;}
+</style>
+</head>
+<body>
+<nav>
+    <a class="nav-back" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        Volver a la intranet
+    </a>
+    <div class="nav-sep"></div>
+    <div class="nav-title">Estacionamientos</div>
+    <div class="nav-spacer"></div>
+    <div id="auth-area"></div>
+</nav>
+<div class="page-header">
+    <div class="page-eyebrow">Grupo Baker</div>
+    <h1>Estacionamientos</h1>
+    <div class="page-header-sub">Libera tu estacionamiento cuando no lo vayas a usar, o reserva uno que esté libre.</div>
+</div>
+<div class="main">
+    <div id="admin-wrap" style="display:none;">
+        <div class="admin-box">
+            <div style="font-weight:700;font-size:0.85rem;margin-bottom:10px;">⚙ Agregar / editar estacionamiento</div>
+            <div class="admin-row">
+                <input id="a-numero" placeholder="N° estacionamiento (ej. 5)">
+                <input id="a-dueno-email" placeholder="correo del dueño">
+                <input id="a-dueno-nombre" placeholder="nombre del dueño">
+                <button class="btn btn-primary btn-sm" onclick="guardarSpot()">Guardar</button>
+            </div>
+        </div>
+    </div>
+    <div class="toolbar">
+        <div style="font-size:0.82rem;color:var(--txt-dim);">Hoy: <b id="fecha-hoy"></b></div>
+        <button class="btn btn-outline btn-sm" onclick="cargarTodo()">↻ Actualizar</button>
+    </div>
+    <div class="grid" id="grid-spots"></div>
+</div>
+
+<div class="modal-overlay" id="modal-liberar">
+    <div class="modal">
+        <h3>Liberar tu estacionamiento</h3>
+        <div class="form-group"><label class="form-label">Desde</label><input class="form-input" type="date" id="lib-desde"></div>
+        <div class="form-group"><label class="form-label">Hasta</label><input class="form-input" type="date" id="lib-hasta"></div>
+        <div class="modal-btns">
+            <button class="btn btn-outline btn-sm" onclick="cerrarModal('modal-liberar')">Cancelar</button>
+            <button class="btn btn-primary btn-sm" onclick="confirmarLiberar()">Liberar</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-reservar">
+    <div class="modal">
+        <h3>Reservar este estacionamiento</h3>
+        <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;" id="reservar-rango-info"></p>
+        <div class="modal-btns">
+            <button class="btn btn-outline btn-sm" onclick="cerrarModal('modal-reservar')">Cancelar</button>
+            <button class="btn btn-primary btn-sm" onclick="confirmarReservar()">Confirmar reserva</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'https://api.ibaker.cl';
+const APROBADORES = ['dvillaseca@ibaker.cl', 'jcumplido@ibaker.cl'];
+let emailActual = '', nombreActual = '';
+let spots = [], reservas = [];
+let liberarSpotId = null, reservarLiberacionId = null;
+
+const msalConfig = {
+    auth: {
+        clientId: "9a56ab1c-d3c4-4460-9892-1d4da768ecfb",
+        authority: "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
+        redirectUri: window.location.origin + window.location.pathname,
+    },
+    cache: { cacheLocation: "sessionStorage" }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+async function initAuth() {
+    try {
+        await msalInstance.initialize();
+        const accounts = msalInstance.getAllAccounts();
+        if (accounts.length > 0) {
+            const u = accounts[0];
+            emailActual = u.username.toLowerCase();
+            if (!APROBADORES.includes(emailActual)) {
+                window.location.href = 'index.html';
+                return;
+            }
+            nombreActual = u.name || u.username;
+            const iniciales = nombreActual.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+            document.getElementById('auth-area').innerHTML = `<div class="user-chip"><div class="user-av">${iniciales}</div><span class="user-nm">${nombreActual.split(' ').slice(0,2).join(' ')}</span></div>`;
+            if (APROBADORES.includes(emailActual)) document.getElementById('admin-wrap').style.display = 'block';
+            document.getElementById('fecha-hoy').textContent = new Date().toLocaleDateString('es-CL', {weekday:'long', day:'numeric', month:'long'});
+            cargarTodo();
+        } else {
+            window.location.href = 'index.html';
+        }
+    } catch(e) { window.location.href = 'index.html'; }
+}
+
+function hoyISO() { return new Date().toISOString().slice(0,10); }
+
+async function cargarTodo() {
+    try {
+        const [spotsRes, reservasRes] = await Promise.all([
+            fetch(`${API}/estacionamientos`),
+            fetch(`${API}/estacionamientos/reservas`)
+        ]);
+        spots = await spotsRes.json();
+        reservas = await reservasRes.json();
+        render();
+    } catch(e) {
+        toast('Error al cargar: ' + e.message);
+    }
+}
+
+// Encuentra la liberación vigente HOY para un estacionamiento (si existe).
+function liberacionVigente(spotId) {
+    const hoy = hoyISO();
+    return reservas.find(r => r.estacionamientoId === spotId && r.tipo === 'liberado' && r.fechaInicio <= hoy && r.fechaFin >= hoy);
+}
+
+function render() {
+    const grid = document.getElementById('grid-spots');
+    if (!spots.length) {
+        grid.innerHTML = `<div class="empty">Todavía no hay estacionamientos cargados.</div>`;
+        return;
+    }
+    grid.innerHTML = spots.map(s => {
+        const lib = liberacionVigente(s.id);
+        const esMio = s.duenoEmail === emailActual;
+        let badge, info, acciones = '';
+        if (!lib) {
+            badge = `<span class="spot-badge badge-ocupado">Ocupado</span>`;
+            info = '';
+            if (esMio) acciones = `<button class="btn btn-outline btn-sm" onclick="abrirLiberar('${s.id}')">Liberar este período</button>`;
+        } else if (lib.reservadoPor) {
+            const soyYo = lib.reservadoPor === emailActual;
+            badge = `<span class="spot-badge badge-reservado">Reservado${soyYo?' por ti':''}</span>`;
+            info = `Por ${lib.reservadoPorNombre || lib.reservadoPor}, del ${fmt(lib.fechaInicio)} al ${fmt(lib.fechaFin)}`;
+            if (soyYo || esMio || APROBADORES.includes(emailActual)) {
+                acciones = `<button class="btn btn-outline btn-sm" onclick="cancelarReserva('${lib.id}')">Cancelar</button>`;
+            }
+        } else {
+            badge = `<span class="spot-badge badge-libre">Disponible</span>`;
+            info = `Libre del ${fmt(lib.fechaInicio)} al ${fmt(lib.fechaFin)}`;
+            if (!esMio) acciones = `<button class="btn btn-primary btn-sm" onclick="abrirReservar('${lib.id}','${lib.fechaInicio}','${lib.fechaFin}')">Reservar</button>`;
+            acciones += ` <button class="btn btn-outline btn-sm" onclick="cancelarReserva('${lib.id}')">Anular liberación</button>`;
+        }
+        return `
+        <div class="spot-card ${lib && !lib.reservadoPor ? 'libre' : ''}">
+            <div class="spot-top">
+                <div class="spot-num">N° ${s.numero}</div>
+                ${badge}
+            </div>
+            <div class="spot-dueno">Dueño: ${s.duenoNombre || s.duenoEmail}</div>
+            ${info ? `<div class="spot-info">${info}</div>` : ''}
+            <div class="spot-acciones">${acciones}</div>
+        </div>`;
+    }).join('');
+}
+
+function fmt(iso) {
+    const [y,m,d] = iso.split('-');
+    return `${d}-${m}-${y}`;
+}
+
+function abrirLiberar(spotId) {
+    liberarSpotId = spotId;
+    document.getElementById('lib-desde').value = hoyISO();
+    document.getElementById('lib-hasta').value = hoyISO();
+    document.getElementById('modal-liberar').classList.add('visible');
+}
+function cerrarModal(id) { document.getElementById(id).classList.remove('visible'); }
+
+async function confirmarLiberar() {
+    const fechaInicio = document.getElementById('lib-desde').value;
+    const fechaFin = document.getElementById('lib-hasta').value;
+    if (!fechaInicio || !fechaFin || fechaFin < fechaInicio) { alert('Revisa las fechas'); return; }
+    try {
+        const res = await fetch(`${API}/estacionamientos/liberar`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ estacionamientoId: liberarSpotId, fechaInicio, fechaFin, email: emailActual })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        cerrarModal('modal-liberar');
+        toast('Estacionamiento liberado');
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+function abrirReservar(liberacionId, fechaInicio, fechaFin) {
+    reservarLiberacionId = liberacionId;
+    document.getElementById('reservar-rango-info').textContent = `Del ${fmt(fechaInicio)} al ${fmt(fechaFin)}`;
+    document.getElementById('modal-reservar').classList.add('visible');
+}
+async function confirmarReservar() {
+    try {
+        const res = await fetch(`${API}/estacionamientos/reservar`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ liberacionId: reservarLiberacionId, email: emailActual, nombre: nombreActual })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        cerrarModal('modal-reservar');
+        toast('Estacionamiento reservado');
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function cancelarReserva(id) {
+    if (!confirm('¿Cancelar esto?')) return;
+    try {
+        const res = await fetch(`${API}/estacionamientos/reservas/${id}?email=${encodeURIComponent(emailActual)}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        toast('Cancelado');
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function guardarSpot() {
+    const numero = document.getElementById('a-numero').value.trim();
+    const duenoEmail = document.getElementById('a-dueno-email').value.trim();
+    const duenoNombre = document.getElementById('a-dueno-nombre').value.trim();
+    if (!numero || !duenoEmail) { alert('Completa número y correo del dueño'); return; }
+    try {
+        const res = await fetch(`${API}/estacionamientos`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ email: emailActual, numero, duenoEmail, duenoNombre })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        document.getElementById('a-numero').value = '';
+        document.getElementById('a-dueno-email').value = '';
+        document.getElementById('a-dueno-nombre').value = '';
+        toast('Estacionamiento guardado');
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+initAuth();
+</script>
+</body>
+</html>
