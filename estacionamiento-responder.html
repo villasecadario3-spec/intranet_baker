@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Responder solicitud — Estacionamientos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,900&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+<style>
+:root{--rojo:#C0392B;--negro:#111010;--crema:#F8F6F3;--verde:#1a7a4a;--txt:#1C1A18;--txt-mid:#6B6762;}
+*{box-sizing:border-box;}
+body{margin:0;font-family:'DM Sans',sans-serif;background:var(--crema);color:var(--txt);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+.card{background:white;border-radius:16px;padding:32px 28px;max-width:420px;width:100%;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.08);}
+.icono{font-size:2.4rem;margin-bottom:14px;}
+h1{font-family:'Playfair Display',serif;font-size:1.2rem;margin:0 0 10px;}
+p{font-size:0.88rem;color:var(--txt-mid);line-height:1.6;margin:0 0 6px;}
+.spinner{width:26px;height:26px;border:3px solid #e2ded9;border-top-color:var(--rojo);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+a.volver{display:inline-block;margin-top:18px;color:var(--rojo);font-size:0.82rem;font-weight:600;text-decoration:none;}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+    <div class="spinner"></div>
+    <p>Procesando tu respuesta…</p>
+</div>
+
+<script>
+const API = 'https://api.ibaker.cl';
+const params = new URLSearchParams(window.location.search);
+const solicitudId = params.get('id');
+const decision = params.get('decision'); // 'aprobar' | 'rechazar'
+
+const msalConfig = {
+    auth: {
+        clientId: "9a56ab1c-d3c4-4460-9892-1d4da768ecfb",
+        authority: "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
+        redirectUri: window.location.origin + window.location.pathname,
+    },
+    cache: { cacheLocation: "sessionStorage" }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+function mostrar(icono, titulo, texto) {
+    document.getElementById('card').innerHTML = `
+        <div class="icono">${icono}</div>
+        <h1>${titulo}</h1>
+        <p>${texto}</p>
+        <a class="volver" href="estacionamientos.html">Ir al módulo de Estacionamientos</a>
+    `;
+}
+
+async function getTokenCorreo(account) {
+    try {
+        const res = await msalInstance.acquireTokenSilent({ scopes: ['Mail.Send'], account });
+        return res.accessToken;
+    } catch(e) {
+        try {
+            const res = await msalInstance.acquireTokenPopup({ scopes: ['Mail.Send'] });
+            return res.accessToken;
+        } catch(e2) { return null; }
+    }
+}
+
+async function avisarResultado(token, solicitud, spot, aprobada) {
+    if (!token) return;
+    try {
+        const mensaje = {
+            message: {
+                subject: `Tu solicitud del estacionamiento N° ${spot.numero} fue ${aprobada ? 'aprobada' : 'rechazada'}`,
+                body: { contentType: 'Text', content: `Hola ${solicitud.solicitanteNombre || ''},\n\nTu solicitud para usar el estacionamiento N° ${spot.numero} el ${solicitud.fechaInicio} fue ${aprobada ? 'APROBADA ✅' : 'RECHAZADA ✕'} por su dueño.` },
+                toRecipients: [{ emailAddress: { address: solicitud.solicitanteEmail } }],
+            },
+            saveToSentItems: true,
+        };
+        await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(mensaje),
+        });
+    } catch(e) { console.warn('No se pudo avisar el resultado por correo:', e.message); }
+}
+
+async function procesar() {
+    if (!solicitudId || !['aprobar','rechazar'].includes(decision)) {
+        mostrar('⚠️', 'Link inválido', 'Este enlace no tiene los datos necesarios para procesar la solicitud.');
+        return;
+    }
+    try {
+        await msalInstance.initialize();
+        let accounts = msalInstance.getAllAccounts();
+        if (!accounts.length) {
+            await msalInstance.loginRedirect({ scopes: ['User.Read'] });
+            return; // la página se recarga tras el login
+        }
+        const account = accounts[0];
+        const emailActual = account.username.toLowerCase();
+
+        const [solicitudes, spots] = await Promise.all([
+            fetch(`${API}/estacionamientos/solicitudes`).then(r => r.json()),
+            fetch(`${API}/estacionamientos`).then(r => r.json()),
+        ]);
+        const solicitud = solicitudes.find(s => s.id === solicitudId);
+        if (!solicitud) { mostrar('⚠️', 'Solicitud no encontrada', 'Puede que ya haya sido respondida o eliminada.'); return; }
+        const spot = spots.find(s => s.id === solicitud.estacionamientoId);
+        if (solicitud.estado !== 'pendiente') {
+            mostrar('ℹ️', 'Ya fue respondida', `Esta solicitud ya estaba marcada como "${solicitud.estado}".`);
+            return;
+        }
+        if (!spot || spot.duenoEmail !== emailActual) {
+            mostrar('🚫', 'Sin permiso', 'Solo el dueño del estacionamiento puede aprobar o rechazar esta solicitud.');
+            return;
+        }
+
+        const aprobar = decision === 'aprobar';
+        const res = await fetch(`${API}/estacionamientos/solicitudes/${solicitudId}/responder`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ email: emailActual, aprobar }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error al responder');
+
+        mostrar(
+            aprobar ? '✅' : '✕',
+            aprobar ? 'Solicitud aprobada' : 'Solicitud rechazada',
+            `${solicitud.solicitanteNombre || solicitud.solicitanteEmail} ${aprobar ? 'ya puede usar' : 'no podrá usar'} el estacionamiento N° ${spot.numero}. Le estamos avisando por correo.`
+        );
+
+        const tokenCorreo = await getTokenCorreo(account);
+        avisarResultado(tokenCorreo, solicitud, spot, aprobar);
+    } catch(e) {
+        mostrar('⚠️', 'Error', e.message || 'Ocurrió un problema al procesar tu respuesta.');
+    }
+}
+
+procesar();
+</script>
+</body>
+</html>
