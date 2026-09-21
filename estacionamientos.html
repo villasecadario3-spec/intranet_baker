@@ -225,7 +225,7 @@ async function avisarDuenoPorCorreo(duenoEmail, duenoNombre, spotNumero, fecha, 
     const token = await getTokenCorreo();
     if (!token) { toast('Solicitud enviada, pero no se pudo avisar por correo al dueño'); return; }
     try {
-        const base = window.location.origin + window.location.pathname.replace(/estacionamientos\.html$/, '');
+        const base = window.location.origin + '/';
         const linkAprobar  = `${base}estacionamiento-responder.html?id=${encodeURIComponent(solicitudId)}&decision=aprobar`;
         const linkRechazar = `${base}estacionamiento-responder.html?id=${encodeURIComponent(solicitudId)}&decision=rechazar`;
         const html = `
