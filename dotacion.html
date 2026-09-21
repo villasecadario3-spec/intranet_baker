@@ -767,7 +767,10 @@ async function cargarAsistenciaBUK() {
   for (let i = idxHeader + 1; i < values.length; i++) {
     const row = values[i];
     if (String(row[idxObra] || '').trim() !== OBRA_ASISTENCIA) continue;
-    const rutlimpio = String(row[idxRut] || '').replace(/[^0-9kK]/g,'').toUpperCase();
+    // Se quitan ceros a la izquierda: si en una pestaña el RUT viene como
+    // texto ("05123456") y en otra como número (pierde el 0 inicial:
+    // "5123456"), sin esto la persona queda sin cruce de asistencia.
+    const rutlimpio = String(row[idxRut] || '').replace(/[^0-9kK]/g,'').toUpperCase().replace(/^0+(?=\d)/, '');
     const fecha = parseFechaExcelBUK(row[idxFecha]);
     if (!rutlimpio || !fecha) continue;
     registros[rutlimpio] = registros[rutlimpio] || new Set();
@@ -866,7 +869,7 @@ async function cargarDesdeBUK() {
 
   deObra.forEach(r => {
     const rut = String(r[COL_RUT_BUK] || '').trim();
-    const rutlimpio = rut.replace(/[^0-9kK]/g,'').toUpperCase();
+    const rutlimpio = rut.replace(/[^0-9kK]/g,'').toUpperCase().replace(/^0+(?=\d)/, '');
     const cc = String(r[COL_CC_BUK] || '').trim();
     const role = String(r[COL_CARGO_BUK] || '').trim();
     const name = String(r[COL_NOMBRE_BUK] || '').trim();
