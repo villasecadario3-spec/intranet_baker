@@ -94,6 +94,7 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
                 <input id="a-dueno-nombre" placeholder="nombre del dueño">
                 <button class="btn btn-primary btn-sm" onclick="guardarSpot()">Guardar</button>
             </div>
+            <div id="admin-lista" style="margin-top:14px;"></div>
         </div>
     </div>
     <div class="toolbar">
@@ -179,9 +180,49 @@ async function cargarTodo() {
         spots = await spotsRes.json();
         reservas = await reservasRes.json();
         render();
+        if (APROBADORES.includes(emailActual)) renderAdminLista();
     } catch(e) {
         toast('Error al cargar: ' + e.message);
     }
+}
+
+function renderAdminLista() {
+    const cont = document.getElementById('admin-lista');
+    if (!spots.length) { cont.innerHTML = `<div style="font-size:0.8rem;color:var(--txt-dim);">Todavía no hay estacionamientos cargados.</div>`; return; }
+    const ordenados = [...spots].sort((a,b) => a.numero.localeCompare(b.numero, undefined, {numeric:true}));
+    cont.innerHTML = `
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--txt-dim);margin-bottom:8px;">
+            ${spots.length} estacionamiento${spots.length!==1?'s':''} cargados
+        </div>
+        ${ordenados.map(s => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border:1px solid var(--gris-2);border-radius:8px;margin-bottom:6px;font-size:0.8rem;">
+                <span><b>N° ${s.numero}</b> — ${s.duenoNombre || s.duenoEmail} <span style="color:var(--txt-dim);">(${s.duenoEmail})</span></span>
+                <span style="display:flex;gap:6px;">
+                    <button class="btn btn-outline btn-sm" onclick="editarSpot('${s.id}')">Editar</button>
+                    <button class="btn btn-outline btn-sm" style="color:var(--rojo);border-color:var(--rojo);" onclick="borrarSpot('${s.id}')">Eliminar</button>
+                </span>
+            </div>`).join('')}
+    `;
+}
+
+function editarSpot(id) {
+    const s = spots.find(x => x.id === id);
+    if (!s) return;
+    document.getElementById('a-numero').value = s.numero;
+    document.getElementById('a-dueno-email').value = s.duenoEmail;
+    document.getElementById('a-dueno-nombre').value = s.duenoNombre || '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function borrarSpot(id) {
+    const s = spots.find(x => x.id === id);
+    if (!confirm(`¿Eliminar el estacionamiento N° ${s?.numero}? Esto no borra las reservas ya hechas, solo el estacionamiento de la lista.`)) return;
+    try {
+        const res = await fetch(`${API}/estacionamientos/${id}?email=${encodeURIComponent(emailActual)}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        toast('Estacionamiento eliminado');
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); }
 }
 
 // Encuentra la liberación vigente HOY para un estacionamiento (si existe).
@@ -203,7 +244,9 @@ function render() {
         if (!lib) {
             badge = `<span class="spot-badge badge-ocupado">Ocupado</span>`;
             info = '';
-            if (esMio) acciones = `<button class="btn btn-outline btn-sm" onclick="abrirLiberar('${s.id}')">Liberar este período</button>`;
+            if (esMio) acciones = `
+                <button class="btn btn-primary btn-sm" onclick="liberarHoy('${s.id}')">✅ Queda libre hoy</button>
+                <button class="btn btn-outline btn-sm" onclick="abrirLiberar('${s.id}')">Liberar otro período</button>`;
         } else if (lib.reservadoPor) {
             const soyYo = lib.reservadoPor === emailActual;
             badge = `<span class="spot-badge badge-reservado">Reservado${soyYo?' por ti':''}</span>`;
@@ -215,7 +258,8 @@ function render() {
             badge = `<span class="spot-badge badge-libre">Disponible</span>`;
             info = `Libre del ${fmt(lib.fechaInicio)} al ${fmt(lib.fechaFin)}`;
             if (!esMio) acciones = `<button class="btn btn-primary btn-sm" onclick="abrirReservar('${lib.id}','${lib.fechaInicio}','${lib.fechaFin}')">Reservar</button>`;
-            acciones += ` <button class="btn btn-outline btn-sm" onclick="cancelarReserva('${lib.id}')">Anular liberación</button>`;
+            if (esMio) acciones += ` <button class="btn btn-outline btn-sm" onclick="cancelarReserva('${lib.id}')">🚗 Lo estoy usando</button>`;
+            else acciones += ` <button class="btn btn-outline btn-sm" onclick="cancelarReserva('${lib.id}')">Anular liberación</button>`;
         }
         return `
         <div class="spot-card ${lib && !lib.reservadoPor ? 'libre' : ''}">
@@ -233,6 +277,19 @@ function render() {
 function fmt(iso) {
     const [y,m,d] = iso.split('-');
     return `${d}-${m}-${y}`;
+}
+
+async function liberarHoy(spotId) {
+    try {
+        const hoy = hoyISO();
+        const res = await fetch(`${API}/estacionamientos/liberar`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ estacionamientoId: spotId, fechaInicio: hoy, fechaFin: hoy, email: emailActual })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        toast('Liberado por hoy');
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); }
 }
 
 function abrirLiberar(spotId) {
