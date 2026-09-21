@@ -83,17 +83,36 @@ async function avisarResultado(token, solicitud, spot, aprobada) {
 }
 
 async function procesar() {
-    if (!solicitudId || !['aprobar','rechazar'].includes(decision)) {
+    // Si venimos de vuelta de un login por redirección, procesa esa respuesta
+    // primero (limpia el hash #code=... de la URL).
+    await msalInstance.initialize();
+    await msalInstance.handleRedirectPromise().catch(() => {});
+
+    // Los parámetros de la URL se pierden durante el ida-y-vuelta del login,
+    // así que se guardan en sessionStorage ANTES de mandar a loginRedirect,
+    // y se recuperan de ahí si ya no están en la URL al volver.
+    let idFinal = solicitudId, decisionFinal = decision;
+    if (!idFinal || !decisionFinal) {
+        const guardado = sessionStorage.getItem('estac_pendiente');
+        if (guardado) {
+            const datos = JSON.parse(guardado);
+            idFinal = datos.id; decisionFinal = datos.decision;
+        }
+    }
+
+    if (!idFinal || !['aprobar','rechazar'].includes(decisionFinal)) {
         mostrar('⚠️', 'Link inválido', 'Este enlace no tiene los datos necesarios para procesar la solicitud.');
         return;
     }
+
     try {
-        await msalInstance.initialize();
         let accounts = msalInstance.getAllAccounts();
         if (!accounts.length) {
+            sessionStorage.setItem('estac_pendiente', JSON.stringify({ id: idFinal, decision: decisionFinal }));
             await msalInstance.loginRedirect({ scopes: ['User.Read'] });
             return; // la página se recarga tras el login
         }
+        sessionStorage.removeItem('estac_pendiente');
         const account = accounts[0];
         const emailActual = account.username.toLowerCase();
 
@@ -101,7 +120,7 @@ async function procesar() {
             fetch(`${API}/estacionamientos/solicitudes`).then(r => r.json()),
             fetch(`${API}/estacionamientos`).then(r => r.json()),
         ]);
-        const solicitud = solicitudes.find(s => s.id === solicitudId);
+        const solicitud = solicitudes.find(s => s.id === idFinal);
         if (!solicitud) { mostrar('⚠️', 'Solicitud no encontrada', 'Puede que ya haya sido respondida o eliminada.'); return; }
         const spot = spots.find(s => s.id === solicitud.estacionamientoId);
         if (solicitud.estado !== 'pendiente') {
@@ -113,8 +132,8 @@ async function procesar() {
             return;
         }
 
-        const aprobar = decision === 'aprobar';
-        const res = await fetch(`${API}/estacionamientos/solicitudes/${solicitudId}/responder`, {
+        const aprobar = decisionFinal === 'aprobar';
+        const res = await fetch(`${API}/estacionamientos/solicitudes/${idFinal}/responder`, {
             method: 'POST', headers: {'Content-Type':'application/json'},
             body: JSON.stringify({ email: emailActual, aprobar }),
         });
