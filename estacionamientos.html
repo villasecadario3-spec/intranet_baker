@@ -99,7 +99,10 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
     </div>
     <div class="toolbar">
         <div style="font-size:0.82rem;color:var(--txt-dim);">Hoy: <b id="fecha-hoy"></b></div>
-        <button class="btn btn-outline btn-sm" onclick="cargarTodo()">↻ Actualizar</button>
+        <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="abrirSolicitar()">🙋 Solicitar estacionamiento</button>
+            <button class="btn btn-outline btn-sm" onclick="cargarTodo()">↻ Actualizar</button>
+        </div>
     </div>
     <div class="grid" id="grid-spots"></div>
 </div>
@@ -109,6 +112,13 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
         <h3>Liberar tu estacionamiento</h3>
         <div class="form-group"><label class="form-label">Desde</label><input class="form-input" type="date" id="lib-desde"></div>
         <div class="form-group"><label class="form-label">Hasta</label><input class="form-input" type="date" id="lib-hasta"></div>
+        <div class="form-group">
+            <label class="form-label">Horario (opcional — vacío = todo el día)</label>
+            <div style="display:flex;gap:8px;">
+                <input class="form-input" type="time" id="lib-hora-desde">
+                <input class="form-input" type="time" id="lib-hora-hasta">
+            </div>
+        </div>
         <div class="modal-btns">
             <button class="btn btn-outline btn-sm" onclick="cerrarModal('modal-liberar')">Cancelar</button>
             <button class="btn btn-primary btn-sm" onclick="confirmarLiberar()">Liberar</button>
@@ -123,6 +133,29 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
         <div class="modal-btns">
             <button class="btn btn-outline btn-sm" onclick="cerrarModal('modal-reservar')">Cancelar</button>
             <button class="btn btn-primary btn-sm" onclick="confirmarReservar()">Confirmar reserva</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-solicitar">
+    <div class="modal">
+        <h3>Solicitar un estacionamiento</h3>
+        <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Elige un estacionamiento y el dueño recibirá un aviso para aprobar o rechazar tu solicitud.</p>
+        <div class="form-group">
+            <label class="form-label">Estacionamiento</label>
+            <select class="form-input" id="sol-spot"></select>
+        </div>
+        <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" type="date" id="sol-fecha"></div>
+        <div class="form-group">
+            <label class="form-label">Horario (opcional — vacío = todo el día)</label>
+            <div style="display:flex;gap:8px;">
+                <input class="form-input" type="time" id="sol-hora-desde">
+                <input class="form-input" type="time" id="sol-hora-hasta">
+            </div>
+        </div>
+        <div class="modal-btns">
+            <button class="btn btn-outline btn-sm" onclick="cerrarModal('modal-solicitar')">Cancelar</button>
+            <button class="btn btn-primary btn-sm" onclick="confirmarSolicitar()">Enviar solicitud</button>
         </div>
     </div>
 </div>
@@ -167,6 +200,45 @@ async function initAuth() {
             window.location.href = 'index.html';
         }
     } catch(e) { window.location.href = 'index.html'; }
+}
+
+// Correo de aviso al dueño cuando alguien solicita su estacionamiento —
+// se manda desde la cuenta de quien solicita (mismo patrón que en
+// Escrituración), pidiendo el permiso Mail.Send la primera vez que se usa.
+async function getTokenCorreo() {
+    const accounts = msalInstance.getAllAccounts();
+    if (!accounts.length) return null;
+    try {
+        const res = await msalInstance.acquireTokenSilent({ scopes: ['Mail.Send'], account: accounts[0] });
+        return res.accessToken;
+    } catch(e) {
+        try {
+            const res = await msalInstance.acquireTokenPopup({ scopes: ['Mail.Send'] });
+            return res.accessToken;
+        } catch(e2) {
+            console.warn('No se pudo autorizar el envío de correo:', e2.message);
+            return null;
+        }
+    }
+}
+async function avisarDuenoPorCorreo(duenoEmail, duenoNombre, spotNumero, fecha, horaTxt) {
+    const token = await getTokenCorreo();
+    if (!token) { toast('Solicitud enviada, pero no se pudo avisar por correo al dueño'); return; }
+    try {
+        const mensaje = {
+            message: {
+                subject: `Solicitud de tu estacionamiento N° ${spotNumero}`,
+                body: { contentType: 'Text', content: `Hola ${duenoNombre || ''},\n\n${nombreActual} solicitó usar tu estacionamiento N° ${spotNumero} el ${fecha}${horaTxt ? ' ('+horaTxt+')' : ''}.\n\nEntra al módulo de Estacionamientos en la intranet para aprobarla o rechazarla.` },
+                toRecipients: [{ emailAddress: { address: duenoEmail } }],
+            },
+            saveToSentItems: true,
+        };
+        await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(mensaje),
+        });
+    } catch(e) { console.warn('Error enviando aviso por correo:', e.message); }
 }
 
 function hoyISO() { return new Date().toISOString().slice(0,10); }
@@ -226,9 +298,26 @@ async function borrarSpot(id) {
 }
 
 // Encuentra la liberación vigente HOY para un estacionamiento (si existe).
-function liberacionVigente(spotId) {
+// Revisa si un rango de fecha (y opcionalmente hora) está vigente ahora mismo.
+function estaVigenteAhora(fechaInicio, fechaFin, horaInicio, horaFin) {
+    const ahora = new Date();
     const hoy = hoyISO();
-    return reservas.find(r => r.estacionamientoId === spotId && r.tipo === 'liberado' && r.fechaInicio <= hoy && r.fechaFin >= hoy);
+    if (fechaInicio > hoy || fechaFin < hoy) return false;
+    if (!horaInicio && !horaFin) return true;
+    const horaActual = ahora.toTimeString().slice(0,5);
+    if (horaInicio && horaActual < horaInicio) return false;
+    if (horaFin && horaActual > horaFin) return false;
+    return true;
+}
+
+function liberacionVigente(spotId) {
+    return reservas.find(r => r.estacionamientoId === spotId && r.tipo === 'liberado' && estaVigenteAhora(r.fechaInicio, r.fechaFin, r.horaInicio, r.horaFin));
+}
+function solicitudVigente(spotId, estado) {
+    return reservas.find(r => r.estacionamientoId === spotId && r.tipo === 'solicitud' && r.estado === estado && estaVigenteAhora(r.fechaInicio, r.fechaFin, r.horaInicio, r.horaFin));
+}
+function horarioTexto(r) {
+    return (r.horaInicio || r.horaFin) ? `${r.horaInicio||'00:00'} a ${r.horaFin||'23:59'}` : 'todo el día';
 }
 
 function render() {
@@ -238,10 +327,30 @@ function render() {
         return;
     }
     grid.innerHTML = spots.map(s => {
-        const lib = liberacionVigente(s.id);
         const esMio = s.duenoEmail === emailActual;
+        const aprobada = solicitudVigente(s.id, 'aprobada');
+        const pendiente = solicitudVigente(s.id, 'pendiente');
+        const lib = liberacionVigente(s.id);
         let badge, info, acciones = '';
-        if (!lib) {
+
+        if (aprobada) {
+            // Solicitud aprobada por el dueño: queda "Ocupado por" esa persona.
+            badge = `<span class="spot-badge badge-reservado">Ocupado</span>`;
+            info = `Ocupado por: ${aprobada.solicitanteNombre || aprobada.solicitanteEmail} (${horarioTexto(aprobada)})`;
+            if (esMio || aprobada.solicitanteEmail === emailActual || APROBADORES.includes(emailActual)) {
+                acciones = `<button class="btn btn-outline btn-sm" onclick="cancelarReserva('${aprobada.id}')">Cancelar</button>`;
+            }
+        } else if (pendiente && esMio) {
+            // El dueño ve la solicitud pendiente con botones para responder.
+            badge = `<span class="spot-badge badge-reservado">Solicitud pendiente</span>`;
+            info = `${pendiente.solicitanteNombre || pendiente.solicitanteEmail} pidió usarlo (${horarioTexto(pendiente)})`;
+            acciones = `
+                <button class="btn btn-primary btn-sm" onclick="responderSolicitud('${pendiente.id}', true)">✅ Aprobar</button>
+                <button class="btn btn-outline btn-sm" onclick="responderSolicitud('${pendiente.id}', false)">✕ Rechazar</button>`;
+        } else if (pendiente) {
+            badge = `<span class="spot-badge badge-ocupado">Solicitud en revisión</span>`;
+            info = `Esperando que el dueño apruebe (${horarioTexto(pendiente)})`;
+        } else if (!lib) {
             badge = `<span class="spot-badge badge-ocupado">Ocupado</span>`;
             info = '';
             if (esMio) acciones = `
@@ -250,19 +359,19 @@ function render() {
         } else if (lib.reservadoPor) {
             const soyYo = lib.reservadoPor === emailActual;
             badge = `<span class="spot-badge badge-reservado">Reservado${soyYo?' por ti':''}</span>`;
-            info = `Por ${lib.reservadoPorNombre || lib.reservadoPor}, del ${fmt(lib.fechaInicio)} al ${fmt(lib.fechaFin)}`;
+            info = `Por ${lib.reservadoPorNombre || lib.reservadoPor}, del ${fmt(lib.fechaInicio)} al ${fmt(lib.fechaFin)} (${horarioTexto(lib)})`;
             if (soyYo || esMio || APROBADORES.includes(emailActual)) {
                 acciones = `<button class="btn btn-outline btn-sm" onclick="cancelarReserva('${lib.id}')">Cancelar</button>`;
             }
         } else {
             badge = `<span class="spot-badge badge-libre">Disponible</span>`;
-            info = `Libre del ${fmt(lib.fechaInicio)} al ${fmt(lib.fechaFin)}`;
+            info = `Libre del ${fmt(lib.fechaInicio)} al ${fmt(lib.fechaFin)} (${horarioTexto(lib)})`;
             if (!esMio) acciones = `<button class="btn btn-primary btn-sm" onclick="abrirReservar('${lib.id}','${lib.fechaInicio}','${lib.fechaFin}')">Reservar</button>`;
             if (esMio) acciones += ` <button class="btn btn-outline btn-sm" onclick="cancelarReserva('${lib.id}')">🚗 Lo estoy usando</button>`;
             else acciones += ` <button class="btn btn-outline btn-sm" onclick="cancelarReserva('${lib.id}')">Anular liberación</button>`;
         }
         return `
-        <div class="spot-card ${lib && !lib.reservadoPor ? 'libre' : ''}">
+        <div class="spot-card ${lib && !lib.reservadoPor && !aprobada && !pendiente ? 'libre' : ''}">
             <div class="spot-top">
                 <div class="spot-num">N° ${s.numero}</div>
                 ${badge}
@@ -303,11 +412,13 @@ function cerrarModal(id) { document.getElementById(id).classList.remove('visible
 async function confirmarLiberar() {
     const fechaInicio = document.getElementById('lib-desde').value;
     const fechaFin = document.getElementById('lib-hasta').value;
+    const horaInicio = document.getElementById('lib-hora-desde').value || null;
+    const horaFin = document.getElementById('lib-hora-hasta').value || null;
     if (!fechaInicio || !fechaFin || fechaFin < fechaInicio) { alert('Revisa las fechas'); return; }
     try {
         const res = await fetch(`${API}/estacionamientos/liberar`, {
             method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ estacionamientoId: liberarSpotId, fechaInicio, fechaFin, email: emailActual })
+            body: JSON.stringify({ estacionamientoId: liberarSpotId, fechaInicio, fechaFin, horaInicio, horaFin, email: emailActual })
         });
         if (!res.ok) throw new Error((await res.json()).error || 'Error');
         cerrarModal('modal-liberar');
@@ -340,6 +451,48 @@ async function cancelarReserva(id) {
         const res = await fetch(`${API}/estacionamientos/reservas/${id}?email=${encodeURIComponent(emailActual)}`, { method: 'DELETE' });
         if (!res.ok) throw new Error((await res.json()).error || 'Error');
         toast('Cancelado');
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+function abrirSolicitar() {
+    const sel = document.getElementById('sol-spot');
+    sel.innerHTML = spots.map(s => `<option value="${s.id}">N° ${s.numero} — ${s.duenoNombre || s.duenoEmail}</option>`).join('');
+    document.getElementById('sol-fecha').value = hoyISO();
+    document.getElementById('sol-hora-desde').value = '';
+    document.getElementById('sol-hora-hasta').value = '';
+    document.getElementById('modal-solicitar').classList.add('visible');
+}
+
+async function confirmarSolicitar() {
+    const estacionamientoId = document.getElementById('sol-spot').value;
+    const fecha = document.getElementById('sol-fecha').value;
+    const horaInicio = document.getElementById('sol-hora-desde').value || null;
+    const horaFin = document.getElementById('sol-hora-hasta').value || null;
+    if (!estacionamientoId || !fecha) { alert('Completa estacionamiento y fecha'); return; }
+    try {
+        const res = await fetch(`${API}/estacionamientos/solicitar`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ estacionamientoId, email: emailActual, nombre: nombreActual, fecha, horaInicio, horaFin })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error');
+        cerrarModal('modal-solicitar');
+        toast('Solicitud enviada — avisando al dueño por correo…');
+        const horaTxt = (horaInicio || horaFin) ? `${horaInicio||'00:00'} a ${horaFin||'23:59'}` : '';
+        avisarDuenoPorCorreo(data.duenoEmail, data.duenoNombre, spots.find(s=>s.id===estacionamientoId)?.numero, fmt(fecha), horaTxt);
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function responderSolicitud(id, aprobar) {
+    try {
+        const res = await fetch(`${API}/estacionamientos/solicitudes/${id}/responder`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ email: emailActual, aprobar })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        toast(aprobar ? 'Solicitud aprobada' : 'Solicitud rechazada');
         cargarTodo();
     } catch(e) { toast('Error: ' + e.message); }
 }
