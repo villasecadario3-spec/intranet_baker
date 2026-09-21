@@ -221,14 +221,33 @@ async function getTokenCorreo() {
         }
     }
 }
-async function avisarDuenoPorCorreo(duenoEmail, duenoNombre, spotNumero, fecha, horaTxt) {
+async function avisarDuenoPorCorreo(duenoEmail, duenoNombre, spotNumero, fecha, horaTxt, solicitudId) {
     const token = await getTokenCorreo();
     if (!token) { toast('Solicitud enviada, pero no se pudo avisar por correo al dueño'); return; }
     try {
+        const base = window.location.origin + window.location.pathname.replace(/estacionamientos\.html$/, '');
+        const linkAprobar  = `${base}estacionamiento-responder.html?id=${encodeURIComponent(solicitudId)}&decision=aprobar`;
+        const linkRechazar = `${base}estacionamiento-responder.html?id=${encodeURIComponent(solicitudId)}&decision=rechazar`;
+        const html = `
+            <div style="font-family:Arial,sans-serif;color:#1C1A18;">
+                <p>Hola ${duenoNombre || ''},</p>
+                <p><b>${nombreActual}</b> solicitó usar tu estacionamiento <b>N° ${spotNumero}</b> el <b>${fecha}</b>${horaTxt ? ' ('+horaTxt+')' : ''}.</p>
+                <table cellpadding="0" cellspacing="0" style="margin:20px 0;">
+                    <tr>
+                        <td style="padding-right:10px;">
+                            <a href="${linkAprobar}" style="background:#1a7a4a;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold;display:inline-block;">✅ Aprobar</a>
+                        </td>
+                        <td>
+                            <a href="${linkRechazar}" style="background:#C0392B;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold;display:inline-block;">✕ Rechazar</a>
+                        </td>
+                    </tr>
+                </table>
+                <p style="font-size:12px;color:#6B6762;">Al hacer clic puede pedirte iniciar sesión con tu cuenta de Microsoft para confirmar que eres el dueño del estacionamiento.</p>
+            </div>`;
         const mensaje = {
             message: {
                 subject: `Solicitud de tu estacionamiento N° ${spotNumero}`,
-                body: { contentType: 'Text', content: `Hola ${duenoNombre || ''},\n\n${nombreActual} solicitó usar tu estacionamiento N° ${spotNumero} el ${fecha}${horaTxt ? ' ('+horaTxt+')' : ''}.\n\nEntra al módulo de Estacionamientos en la intranet para aprobarla o rechazarla.` },
+                body: { contentType: 'HTML', content: html },
                 toRecipients: [{ emailAddress: { address: duenoEmail } }],
             },
             saveToSentItems: true,
@@ -480,7 +499,7 @@ async function confirmarSolicitar() {
         cerrarModal('modal-solicitar');
         toast('Solicitud enviada — avisando al dueño por correo…');
         const horaTxt = (horaInicio || horaFin) ? `${horaInicio||'00:00'} a ${horaFin||'23:59'}` : '';
-        avisarDuenoPorCorreo(data.duenoEmail, data.duenoNombre, spots.find(s=>s.id===estacionamientoId)?.numero, fmt(fecha), horaTxt);
+        avisarDuenoPorCorreo(data.duenoEmail, data.duenoNombre, spots.find(s=>s.id===estacionamientoId)?.numero, fmt(fecha), horaTxt, data.id);
         cargarTodo();
     } catch(e) { toast('Error: ' + e.message); }
 }
