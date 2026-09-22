@@ -41,6 +41,12 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
 .card{background:white;border:1px solid var(--gris-2);border-radius:14px;padding:22px;margin-bottom:18px;}
 .card h3{font-family:'Playfair Display',serif;font-size:1.05rem;margin-bottom:14px;}
 .dias-grid{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+.obra-dia-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gris-1);flex-wrap:wrap;}
+.obra-dia-row:last-child{border-bottom:none;}
+.obra-dia-check{display:flex;align-items:center;gap:8px;min-width:110px;font-size:0.85rem;font-weight:500;cursor:pointer;}
+.obra-dia-check input{width:16px;height:16px;accent-color:var(--negro);cursor:pointer;}
+.obra-dia-select{flex:1;min-width:180px;padding:7px 10px;border:1px solid var(--gris-2);border-radius:7px;font-family:inherit;font-size:0.82rem;}
+.obra-dia-select:disabled{background:var(--gris-1);color:var(--txt-dim);}
 .dia-chip{padding:10px 16px;border-radius:9px;border:1px solid var(--gris-2);background:var(--crema);font-size:0.82rem;font-weight:600;cursor:pointer;transition:all 0.15s;}
 .dia-chip.activo{background:var(--negro);color:white;border-color:var(--negro);}
 .btn{display:flex;align-items:center;gap:7px;padding:10px 18px;border-radius:9px;border:none;font-family:'DM Sans',sans-serif;font-size:0.85rem;font-weight:600;cursor:pointer;transition:all 0.15s;}
@@ -105,13 +111,7 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
             </div>
             <h3 style="margin-top:20px;">Visita a Obra</h3>
             <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Marca los días en que normalmente estás en terreno, no en la oficina. Aquí sí puedes elegir varios días.</p>
-            <div class="dias-grid" id="dias-obra">
-                <div class="dia-chip" data-dia="lunes">Lunes</div>
-                <div class="dia-chip" data-dia="martes">Martes</div>
-                <div class="dia-chip" data-dia="miercoles">Miércoles</div>
-                <div class="dia-chip" data-dia="jueves">Jueves</div>
-                <div class="dia-chip" data-dia="viernes">Viernes</div>
-            </div>
+            <div id="dias-obra"></div>
             <button class="btn btn-primary btn-sm" onclick="guardarPatron()">Guardar patrón</button>
         </div>
 
@@ -123,11 +123,15 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
                 <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" type="date" id="exc-fecha"></div>
                 <div class="form-group">
                     <label class="form-label">Ese día voy a estar</label>
-                    <select class="form-select" id="exc-tipo">
+                    <select class="form-select" id="exc-tipo" onchange="toggleObraExcepcion()">
                         <option value="remoto">Remoto</option>
                         <option value="visita_obra">Visita a Obra</option>
                         <option value="presencial">Presencial</option>
                     </select>
+                </div>
+                <div class="form-group" id="exc-obra-wrap" style="display:none;">
+                    <label class="form-label">Obra(s)</label>
+                    <div id="exc-obra-chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
                 </div>
                 <button class="btn btn-primary btn-sm" onclick="guardarExcepcion()">Agregar</button>
             </div>
@@ -163,7 +167,9 @@ const APROBADORES = ['dvillaseca@ibaker.cl', 'jcumplido@ibaker.cl'];
 let emailActual = '', nombreActual = '';
 let dataTeletrabajo = { patrones: {}, excepciones: [] };
 let teletrabajoDia = null;
-let visitaObraDias = new Set();
+let visitaObra = new Map(); // dia -> Set<obra>
+const OBRAS_ACTIVAS = ['Los Molinos', 'Portal el Abra', 'Mirador El Águila', 'Portal Los Maitenes', 'Portal Oriente', 'Mirador El Pino'];
+const DIAS_OBRA = ['lunes','martes','miercoles','jueves','viernes'];
 let semanaOffset = 0;
 const DIAS = ['lunes','martes','miercoles','jueves','viernes'];
 const DIAS_LABEL = {lunes:'Lunes',martes:'Martes',miercoles:'Miércoles',jueves:'Jueves',viernes:'Viernes'};
@@ -207,14 +213,15 @@ async function initAuth() {
                 });
             });
             // "Visita a Obra": varios días permitidos.
-            document.querySelectorAll('#dias-obra .dia-chip').forEach(chip => {
+            document.querySelectorAll('#dias-teletrabajo .dia-chip').forEach(chip => {
                 chip.addEventListener('click', () => {
                     const dia = chip.dataset.dia;
-                    if (teletrabajoDia === dia) { toast('Ese día ya está marcado como Teletrabajo'); return; }
-                    if (visitaObraDias.has(dia)) visitaObraDias.delete(dia); else visitaObraDias.add(dia);
+                    if (visitaObra.has(dia)) { toast('Ese día ya está marcado como Visita a Obra'); return; }
+                    teletrabajoDia = (teletrabajoDia === dia) ? null : dia;
                     renderChipsPatron();
                 });
             });
+            renderFilasObra();
             await cargarDatos();
         } else {
             window.location.href = 'index.html';
@@ -226,18 +233,60 @@ function renderChipsPatron() {
     document.querySelectorAll('#dias-teletrabajo .dia-chip').forEach(chip => {
         chip.classList.toggle('activo', chip.dataset.dia === teletrabajoDia);
     });
-    document.querySelectorAll('#dias-obra .dia-chip').forEach(chip => {
-        chip.classList.toggle('activo', visitaObraDias.has(chip.dataset.dia));
-    });
+    renderFilasObra();
+}
+
+const DIA_LABEL_OBRA = {lunes:'Lunes',martes:'Martes',miercoles:'Miércoles',jueves:'Jueves',viernes:'Viernes'};
+
+function renderFilasObra() {
+    const cont = document.getElementById('dias-obra');
+    cont.innerHTML = DIAS_OBRA.map(dia => {
+        const marcado = visitaObra.has(dia);
+        const obrasDia = visitaObra.get(dia) || new Set();
+        const bloqueadoPorTeletrabajo = teletrabajoDia === dia;
+        return `
+        <div class="obra-dia-row" style="flex-direction:column;align-items:flex-start;">
+            <label class="obra-dia-check">
+                <input type="checkbox" ${marcado?'checked':''} ${bloqueadoPorTeletrabajo?'disabled':''}
+                    onchange="toggleDiaObra('${dia}', this.checked)">
+                ${DIA_LABEL_OBRA[dia]}
+            </label>
+            ${marcado ? `
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px 26px;">
+                ${OBRAS_ACTIVAS.map(o => `
+                    <div class="dia-chip" style="padding:6px 12px;font-size:0.76rem;${obrasDia.has(o)?'background:var(--negro);color:#fff;border-color:var(--negro);':''}"
+                         onclick="toggleObraEnDia('${dia}', '${o.replace(/'/g,"\\'")}')">${o}</div>
+                `).join('')}
+            </div>
+            <div style="font-size:0.7rem;color:var(--txt-dim);margin-left:26px;">Puedes elegir más de una obra para ese día</div>
+            ` : ''}
+        </div>`;
+    }).join('');
+}
+
+function toggleDiaObra(dia, marcado) {
+    if (marcado) {
+        if (teletrabajoDia === dia) { toast('Ese día ya está marcado como Teletrabajo'); renderFilasObra(); return; }
+        visitaObra.set(dia, new Set());
+    } else {
+        visitaObra.delete(dia);
+    }
+    renderFilasObra();
+}
+function toggleObraEnDia(dia, obra) {
+    const set = visitaObra.get(dia);
+    if (!set) return;
+    if (set.has(obra)) set.delete(obra); else set.add(obra);
+    renderFilasObra();
 }
 
 async function cargarDatos() {
     try {
         const res = await fetch(`${API}/teletrabajo`);
         dataTeletrabajo = await res.json();
-        const miPatron = dataTeletrabajo.patrones[emailActual] || { teletrabajoDia: null, visitaObraDias: [] };
+        const miPatron = dataTeletrabajo.patrones[emailActual] || { teletrabajoDia: null, visitaObra: [] };
         teletrabajoDia = miPatron.teletrabajoDia || null;
-        visitaObraDias = new Set(miPatron.visitaObraDias || []);
+        visitaObra = new Map((miPatron.visitaObra || []).map(item => [item.dia, new Set(item.obras || (item.obra ? [item.obra] : []))]));
         renderChipsPatron();
         renderExcepciones();
         renderSemana();
@@ -254,30 +303,56 @@ function cambiarTab(tab) {
 }
 
 async function guardarPatron() {
+    const sinObra = [...visitaObra.entries()].find(([dia, obras]) => !obras.size);
+    if (sinObra) { toast(`Falta elegir al menos una obra para el ${DIA_LABEL_OBRA[sinObra[0]]}`); return; }
+    const visitaObraArr = [...visitaObra.entries()].map(([dia, obras]) => ({ dia, obras: [...obras] }));
     try {
         const res = await fetch(`${API}/teletrabajo/patron`, {
             method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ email: emailActual, teletrabajoDia, visitaObraDias: [...visitaObraDias] })
+            body: JSON.stringify({ email: emailActual, teletrabajoDia, visitaObra: visitaObraArr })
         });
         if (!res.ok) throw new Error((await res.json()).error || 'Error al guardar');
-        dataTeletrabajo.patrones[emailActual] = { teletrabajoDia, visitaObraDias: [...visitaObraDias] };
+        dataTeletrabajo.patrones[emailActual] = { teletrabajoDia, visitaObra: visitaObraArr };
         toast('Patrón guardado');
         renderSemana();
     } catch(e) { toast('Error: ' + e.message); }
 }
 
+let excObrasSeleccionadas = new Set();
+function toggleObraExcepcion() {
+    const tipo = document.getElementById('exc-tipo').value;
+    const wrap = document.getElementById('exc-obra-wrap');
+    wrap.style.display = tipo === 'visita_obra' ? 'block' : 'none';
+    if (tipo === 'visita_obra') {
+        excObrasSeleccionadas = new Set();
+        renderExcObraChips();
+    }
+}
+function renderExcObraChips() {
+    document.getElementById('exc-obra-chips').innerHTML = OBRAS_ACTIVAS.map(o => `
+        <div class="dia-chip" style="padding:6px 12px;font-size:0.76rem;${excObrasSeleccionadas.has(o)?'background:var(--negro);color:#fff;border-color:var(--negro);':''}"
+             onclick="toggleExcObra('${o.replace(/'/g,"\\'")}')">${o}</div>
+    `).join('');
+}
+function toggleExcObra(o) {
+    if (excObrasSeleccionadas.has(o)) excObrasSeleccionadas.delete(o); else excObrasSeleccionadas.add(o);
+    renderExcObraChips();
+}
+
 async function guardarExcepcion() {
     const fecha = document.getElementById('exc-fecha').value;
     const tipo = document.getElementById('exc-tipo').value;
+    const obras = tipo === 'visita_obra' ? [...excObrasSeleccionadas] : undefined;
     if (!fecha) { alert('Elige una fecha'); return; }
+    if (tipo === 'visita_obra' && !obras.length) { alert('Selecciona al menos una obra'); return; }
     try {
         const res = await fetch(`${API}/teletrabajo/excepcion`, {
             method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ email: emailActual, fecha, tipo })
+            body: JSON.stringify({ email: emailActual, fecha, tipo, obras })
         });
-        if (!res.ok) throw new Error('Error al guardar');
+        if (!res.ok) throw new Error((await res.json()).error || 'Error al guardar');
         dataTeletrabajo.excepciones = dataTeletrabajo.excepciones.filter(e => !(e.email===emailActual && e.fecha===fecha));
-        dataTeletrabajo.excepciones.push({ email: emailActual, fecha, tipo });
+        dataTeletrabajo.excepciones.push({ email: emailActual, fecha, tipo, obras });
         toast('Excepción agregada');
         renderExcepciones();
         renderSemana();
@@ -301,7 +376,7 @@ function renderExcepciones() {
     if (!mias.length) { cont.innerHTML = `<div class="empty">No tienes excepciones próximas.</div>`; return; }
     cont.innerHTML = mias.map(e => `
         <div class="excepcion-item">
-            <span>${fmt(e.fecha)} — <span class="tag tag-${e.tipo}">${e.tipo}</span></span>
+            <span>${fmt(e.fecha)} — <span class="tag tag-${e.tipo}">${e.tipo === 'visita_obra' ? (e.obras && e.obras.length ? e.obras.join(', ') : 'Visita a Obra') : e.tipo}</span></span>
             <button class="btn btn-outline btn-sm" onclick="borrarExcepcion('${e.fecha}')">Quitar</button>
         </div>`).join('');
 }
@@ -326,11 +401,12 @@ function cambiarSemana(delta) {
 // Estado efectivo de una persona en una fecha: excepción propia si existe, si no su patrón fijo según el día de la semana.
 function estadoEnFecha(email, fechaISO, diaSemana) {
     const exc = dataTeletrabajo.excepciones.find(e => e.email === email && e.fecha === fechaISO);
-    if (exc) return exc.tipo;
-    const patron = dataTeletrabajo.patrones[email] || { teletrabajoDia: null, visitaObraDias: [] };
-    if (patron.teletrabajoDia === diaSemana) return 'remoto';
-    if ((patron.visitaObraDias || []).includes(diaSemana)) return 'visita_obra';
-    return 'presencial';
+    if (exc) return { estado: exc.tipo, obras: exc.obras || [] };
+    const patron = dataTeletrabajo.patrones[email] || { teletrabajoDia: null, visitaObra: [] };
+    if (patron.teletrabajoDia === diaSemana) return { estado: 'remoto', obras: [] };
+    const item = (patron.visitaObra || []).find(v => v.dia === diaSemana);
+    if (item) return { estado: 'visita_obra', obras: item.obras || [] };
+    return { estado: 'presencial', obras: [] };
 }
 
 function renderSemana() {
@@ -356,8 +432,8 @@ function renderSemana() {
 
     document.getElementById('semana-body').innerHTML = personas.map(email => {
         const celdas = DIAS.map((dia,i) => {
-            const estado = estadoEnFecha(email, fechas[i], dia);
-            const label = estado === 'remoto' ? 'Remoto' : estado === 'visita_obra' ? 'Visita a Obra' : 'Presencial';
+            const { estado, obras } = estadoEnFecha(email, fechas[i], dia);
+            const label = estado === 'remoto' ? 'Remoto' : estado === 'visita_obra' ? (obras.length ? obras.join(', ') : 'Visita a Obra') : 'Presencial';
             return `<td><span class="dot dot-${estado}"></span> ${label}</td>`;
         }).join('');
         return `<tr><td>${email}${email===emailActual?' (tú)':''}</td>${celdas}</tr>`;
