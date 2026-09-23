@@ -989,9 +989,12 @@ async function aplicarAccesos(email) {
     // Estacionamientos y Teletrabajo usan una lista dinámica (se administra
     // desde dentro de esos módulos), no la lista fija de abajo.
     try {
-        const listaBeta = await fetch('https://api.ibaker.cl/acceso-beta').then(r => r.json());
-        ACCESOS_MODULOS['estacionamientos.html'] = listaBeta;
-        ACCESOS_MODULOS['teletrabajo.html'] = listaBeta;
+        const [listaEstac, listaTele] = await Promise.all([
+            fetch('https://api.ibaker.cl/acceso-beta/estacionamientos').then(r => r.json()),
+            fetch('https://api.ibaker.cl/acceso-beta/teletrabajo').then(r => r.json()),
+        ]);
+        ACCESOS_MODULOS['estacionamientos.html'] = listaEstac;
+        ACCESOS_MODULOS['teletrabajo.html'] = listaTele;
     } catch(e) { console.warn('No se pudo cargar la lista de acceso beta:', e.message); }
     document.querySelectorAll('[data-modulo]').forEach(card => {
         const modulo = card.getAttribute('data-modulo');
