@@ -101,6 +101,14 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
     </div>
 
     <div class="panel activo" id="panel-mio">
+        <div class="card" id="acceso-admin-card" style="display:none;">
+            <h3>👥 Acceso al módulo (mientras está en pruebas)</h3>
+            <div class="form-row" style="margin-bottom:12px;">
+                <input class="form-input" id="acceso-nuevo" placeholder="correo@ibaker.cl">
+                <button class="btn btn-primary btn-sm" onclick="agregarAcceso()">Agregar acceso</button>
+            </div>
+            <div id="acceso-lista"></div>
+        </div>
         <div class="card">
             <h3>Día de Teletrabajo</h3>
             <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Elige como máximo un día fijo, entre martes, miércoles o jueves.</p>
@@ -191,13 +199,16 @@ async function initAuth() {
         if (accounts.length > 0) {
             const u = accounts[0];
             emailActual = u.username.toLowerCase();
-            if (!APROBADORES.includes(emailActual)) {
+            let listaAcceso = [];
+            try { listaAcceso = await fetch(`${API}/acceso-beta`).then(r => r.json()); } catch(e) { listaAcceso = APROBADORES; }
+            if (!listaAcceso.includes(emailActual)) {
                 window.location.href = 'index.html';
                 return;
             }
             nombreActual = u.name || u.username;
             const iniciales = nombreActual.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
             document.getElementById('auth-area').innerHTML = `<div class="user-chip"><div class="user-av">${iniciales}</div><span class="user-nm">${nombreActual.split(' ').slice(0,2).join(' ')}</span></div>`;
+            if (APROBADORES.includes(emailActual)) { document.getElementById('acceso-admin-card').style.display = 'block'; renderAccesoLista(listaAcceso); }
 
             // "Día de Teletrabajo": máximo 1 día, comportamiento tipo radio.
             document.querySelectorAll('#dias-teletrabajo .dia-chip').forEach(chip => {
@@ -438,6 +449,41 @@ function renderSemana() {
         }).join('');
         return `<tr><td>${email}${email===emailActual?' (tú)':''}</td>${celdas}</tr>`;
     }).join('');
+}
+
+function renderAccesoLista(lista) {
+    const cont = document.getElementById('acceso-lista');
+    if (!cont) return;
+    cont.innerHTML = lista.map(email => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;border:1px solid var(--gris-2);border-radius:7px;margin-bottom:6px;font-size:0.8rem;">
+            <span>${email}</span>
+            ${APROBADORES.includes(email) ? '<span style="font-size:0.68rem;color:var(--txt-dim);">Admin fijo</span>' : `<button class="btn btn-outline btn-sm" onclick="quitarAcceso('${email}')">Quitar</button>`}
+        </div>`).join('');
+}
+async function agregarAcceso() {
+    const email = document.getElementById('acceso-nuevo').value.trim().toLowerCase();
+    if (!email) return;
+    try {
+        const res = await fetch(`${API}/acceso-beta`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ email, emailQuienPide: emailActual })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error');
+        document.getElementById('acceso-nuevo').value = '';
+        renderAccesoLista(data.lista);
+        toast('Acceso agregado');
+    } catch(e) { toast('Error: ' + e.message); }
+}
+async function quitarAcceso(email) {
+    if (!confirm(`¿Quitar el acceso a ${email}?`)) return;
+    try {
+        const res = await fetch(`${API}/acceso-beta/${encodeURIComponent(email)}?emailQuienPide=${encodeURIComponent(emailActual)}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error');
+        renderAccesoLista(data.lista);
+        toast('Acceso quitado');
+    } catch(e) { toast('Error: ' + e.message); }
 }
 
 function toast(msg) {
