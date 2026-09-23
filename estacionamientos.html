@@ -195,7 +195,7 @@ async function initAuth() {
             const u = accounts[0];
             emailActual = u.username.toLowerCase();
             let listaAcceso = [];
-            try { listaAcceso = await fetch(`${API}/acceso-beta`).then(r => r.json()); } catch(e) { listaAcceso = APROBADORES; }
+            try { listaAcceso = await fetch(`${API}/acceso-beta/estacionamientos`).then(r => r.json()); } catch(e) { listaAcceso = APROBADORES; }
             if (!listaAcceso.includes(emailActual)) {
                 window.location.href = 'index.html';
                 return;
@@ -228,7 +228,7 @@ async function agregarAcceso() {
     const email = document.getElementById('acceso-nuevo').value.trim().toLowerCase();
     if (!email) return;
     try {
-        const res = await fetch(`${API}/acceso-beta`, {
+        const res = await fetch(`${API}/acceso-beta/estacionamientos`, {
             method: 'POST', headers: {'Content-Type':'application/json'},
             body: JSON.stringify({ email, emailQuienPide: emailActual })
         });
@@ -242,7 +242,7 @@ async function agregarAcceso() {
 async function quitarAcceso(email) {
     if (!confirm(`¿Quitar el acceso a ${email}?`)) return;
     try {
-        const res = await fetch(`${API}/acceso-beta/${encodeURIComponent(email)}?emailQuienPide=${encodeURIComponent(emailActual)}`, { method: 'DELETE' });
+        const res = await fetch(`${API}/acceso-beta/estacionamientos/${encodeURIComponent(email)}?emailQuienPide=${encodeURIComponent(emailActual)}`, { method: 'DELETE' });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Error');
         renderAccesoLista(data.lista);
