@@ -949,7 +949,7 @@ init();
 // ── CONTROL DE VISIBILIDAD DE MÓDULOS ────────────────────────
 const ACCESOS_MODULOS = {
     "estacionamientos.html": ["dvillaseca@ibaker.cl","jcumplido@ibaker.cl"],
-    "teletrabajo.html": ["dvillaseca@ibaker.cl","jcumplido@ibaker.cl","informatica@ibaker.cl"],
+    "teletrabajo.html": ["dvillaseca@ibaker.cl","jcumplido@ibaker.cl"],
     "softland.html": [
         "dvillaseca@ibaker.cl","informatica@ibaker.cl","alarrain@ibaker.cl",
         "jcumplido@ibaker.cl","bsilva@ibaker.cl","ccampos@ibaker.cl",
@@ -984,14 +984,24 @@ const ACCESOS_MODULOS = {
         "dvillaseca@ibaker.cl","jcumplido@ibaker.cl","phenriquez@ibaker.cl"
     ]
 };
-function aplicarAccesos(email) {
+async function aplicarAccesos(email) {
     const correo = (email || '').toLowerCase();
+    // Estacionamientos y Teletrabajo usan una lista dinámica (se administra
+    // desde dentro de esos módulos), no la lista fija de abajo.
+    try {
+        const listaBeta = await fetch('https://api.ibaker.cl/acceso-beta').then(r => r.json());
+        ACCESOS_MODULOS['estacionamientos.html'] = listaBeta;
+        ACCESOS_MODULOS['teletrabajo.html'] = listaBeta;
+    } catch(e) { console.warn('No se pudo cargar la lista de acceso beta:', e.message); }
     document.querySelectorAll('[data-modulo]').forEach(card => {
         const modulo = card.getAttribute('data-modulo');
         const lista  = ACCESOS_MODULOS[modulo];
         if (lista && !lista.includes(correo)) {
             card.style.display = 'none';
             card.dataset.sinAcceso = 'true';
+        } else if (lista && lista.includes(correo) && card.dataset.sinAcceso === 'true') {
+            card.style.display = '';
+            delete card.dataset.sinAcceso;
         }
     });
     // Si a esta persona no le quedó ningún módulo específico visible, oculta también el título de la sección
