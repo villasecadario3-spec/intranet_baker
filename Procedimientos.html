@@ -294,7 +294,7 @@
         <div class="modal-form-group" id="grupo-firma">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
                 <input type="checkbox" id="m-requiere-firma" onchange="toggleFirmantesUI()">
-                Requiere firma de gerentes antes de quedar vigente
+                ¿Necesita firmantes?
             </label>
             <div id="grupo-firmantes" style="display:none;margin-top:10px;">
                 <label class="modal-label">¿Quiénes deben firmar?</label>
@@ -351,7 +351,7 @@ const GITHUB_RAW  = 'https://raw.githubusercontent.com/villasecadario3-spec/intr
 const CARPETAS = [
     'Compliance', 'Procedimientos Generales', 'Administración y Finanzas',
     'Control de Gestión y TI', 'Proyectos', 'Estudios',
-    'Adquisiciones', 'Entidades Patrocinantes', 'Personas'
+    'Adquisiciones', 'Entidades Patrocinantes', 'Personas', 'Obras'
 ];
 
 let emailActual = '';
@@ -362,7 +362,7 @@ let carpetaActual = null; // null = viendo la grilla de carpetas
 let tipoSubidaActual = 'procedimiento'; // 'procedimiento' | 'comunicacion'
 const OBRAS_ACTIVAS_PROC = ['Los Molinos', 'Portal el Abra', 'Mirador El Águila', 'Portal Los Maitenes', 'Portal Oriente', 'Mirador El Pino'];
 const SUBIDORES_PROCEDIMIENTOS = ['dvillaseca@ibaker.cl', 'jcumplido@ibaker.cl', 'phenriquez@ibaker.cl'];
-const FIRMANTES_DISPONIBLES = ['jcumplido@ibaker.cl','bsilva@ibaker.cl','alarrain@ibaker.cl','amolina@ibaker.cl','cgarces@ibaker.cl','pzuniga@ibaker.cl','pablo@cmcromeral.cl','crivera@ibaker.cl','jdiaz@ibaker.cl'];
+const FIRMANTES_DISPONIBLES = ['dvillaseca@ibaker.cl','jcumplido@ibaker.cl','bsilva@ibaker.cl','alarrain@ibaker.cl','amolina@ibaker.cl','cgarces@ibaker.cl','pzuniga@ibaker.cl','pablo@cmcromeral.cl','crivera@ibaker.cl','jdiaz@ibaker.cl'];
 let firmantesSeleccionadosModal = new Set();
 let obrasSeleccionadasModal = new Set();
 let docsAprobadosCache = []; // metadata completa (obras, firmas) de /docs/aprobados
