@@ -773,8 +773,28 @@ async function cargarAsistenciaBUK() {
   const listaHojas = await obtenerListaHojas();
   const hoja = listaHojas.value.find(h => h.name.trim().toUpperCase() === 'ASISTENCIA BUK');
   if (!hoja) { console.warn('[Asistencia] No se encontró la pestaña "ASISTENCIA BUK"'); return; }
-  const data = await graphGet(`https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets/${encodeURIComponent(hoja.id)}/usedRange`);
-  const values = data.values;
+  let data = await graphGet(`https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets/${encodeURIComponent(hoja.id)}/usedRange`);
+  let values = data.values;
+  if (!values || values.length < 2) {
+    // El "usedRange" a veces queda desactualizado para una sesión puntual en
+    // pestañas alimentadas por Power Query — si pasa, se intenta leer
+    // directamente la tabla con nombre de esa pestaña, que no sufre el mismo
+    // problema porque Excel lleva su propio conteo de filas por tabla.
+    console.warn('[Asistencia] usedRange vino corto, probando por tabla con nombre...');
+    try {
+      const tablas = await graphGet(`https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/worksheets/${encodeURIComponent(hoja.id)}/tables`);
+      if (tablas.value && tablas.value.length) {
+        const tabla = tablas.value[0];
+        const rango = await graphGet(`https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/tables/${encodeURIComponent(tabla.id)}/range`);
+        if (rango.values && rango.values.length >= 2) {
+          values = rango.values;
+          console.log('[Asistencia] Recuperado por tabla:', tabla.name, '—', values.length, 'filas');
+        }
+      }
+    } catch(e) {
+      console.warn('[Asistencia] Tampoco se pudo leer por tabla:', e.message);
+    }
+  }
   if (!values || values.length < 2) { console.warn('[Asistencia] La pestaña está vacía'); return; }
 
   const idxHeader = values.findIndex(row => row.includes(COL_ASIS_RUT));
