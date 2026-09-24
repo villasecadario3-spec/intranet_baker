@@ -181,7 +181,7 @@
             <h1>Procedimientos<br>e <em>Instructivos</em></h1>
             <div class="page-header-sub">Documentos internos del grupo Baker.</div>
         </div>
-        <button class="btn-subir" onclick="abrirModal('procedimiento')">
+        <button class="btn-subir" id="btn-subir-procedimiento" onclick="abrirModal('procedimiento')" style="display:none;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Subir documento
         </button>
@@ -203,6 +203,11 @@
             <input class="search-input" id="search" type="text" placeholder="Buscar carpetas…" oninput="filtrar()">
         </div>
         <div class="breadcrumb" id="breadcrumb" style="display:none"></div>
+        <div id="filtro-obra-wrap" style="display:none;margin-bottom:12px;">
+            <select class="modal-input" id="filtro-obra" style="max-width:260px;" onchange="cambiarFiltroObra(this.value)">
+                <option value="">Todas las obras</option>
+            </select>
+        </div>
         <div class="doc-list" id="doc-list"></div>
     </div>
 
@@ -282,6 +287,38 @@
             <label class="modal-label">Descripción (opcional)</label>
             <textarea class="modal-textarea" id="m-desc" placeholder="Breve descripción del contenido…"></textarea>
         </div>
+        <div class="modal-form-group" id="grupo-obras">
+            <label class="modal-label">Obra(s) a las que aplica (opcional)</label>
+            <div id="m-obras-chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+        </div>
+        <div class="modal-form-group" id="grupo-firma">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
+                <input type="checkbox" id="m-requiere-firma" onchange="toggleFirmantesUI()">
+                Requiere firma de gerentes antes de quedar vigente
+            </label>
+            <div id="grupo-firmantes" style="display:none;margin-top:10px;">
+                <label class="modal-label">¿Quiénes deben firmar?</label>
+                <div id="m-firmantes-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;"></div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:140px;">
+                        <label class="modal-label">Página del sello</label>
+                        <select class="modal-input" id="m-firma-pagina">
+                            <option value="ultima">Última página</option>
+                            <option value="primera">Primera página</option>
+                        </select>
+                    </div>
+                    <div style="flex:1;min-width:160px;">
+                        <label class="modal-label">Posición en la página</label>
+                        <select class="modal-input" id="m-firma-posicion">
+                            <option value="inferior-izquierda">Inferior izquierda</option>
+                            <option value="inferior-derecha">Inferior derecha</option>
+                            <option value="superior-izquierda">Superior izquierda</option>
+                            <option value="superior-derecha">Superior derecha</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div class="modal-form-group">
             <label class="modal-label">Archivo(s) *</label>
             <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()"
@@ -318,10 +355,18 @@ const CARPETAS = [
 ];
 
 let emailActual = '';
+let nombreActual = '';
 let archivosSeleccionados = []; // [{file, base64, tipo}]
 let docsGithub = [];
 let carpetaActual = null; // null = viendo la grilla de carpetas
 let tipoSubidaActual = 'procedimiento'; // 'procedimiento' | 'comunicacion'
+const OBRAS_ACTIVAS_PROC = ['Los Molinos', 'Portal el Abra', 'Mirador El Águila', 'Portal Los Maitenes', 'Portal Oriente', 'Mirador El Pino'];
+const SUBIDORES_PROCEDIMIENTOS = ['dvillaseca@ibaker.cl', 'jcumplido@ibaker.cl', 'phenriquez@ibaker.cl'];
+const FIRMANTES_DISPONIBLES = ['jcumplido@ibaker.cl','bsilva@ibaker.cl','alarrain@ibaker.cl','amolina@ibaker.cl','cgarces@ibaker.cl','pzuniga@ibaker.cl','pablo@cmcromeral.cl','crivera@ibaker.cl','jdiaz@ibaker.cl'];
+let firmantesSeleccionadosModal = new Set();
+let obrasSeleccionadasModal = new Set();
+let docsAprobadosCache = []; // metadata completa (obras, firmas) de /docs/aprobados
+let filtroObraPublicados = '';
 let areasComunicacion = [];
 let misAreas = [];
 let docsComunicaciones = [];
@@ -345,12 +390,14 @@ async function initAuth() {
             const usuario = accounts[0];
             emailActual = usuario.username.toLowerCase();
             const nombre = usuario.name || usuario.username;
+            nombreActual = nombre;
             const iniciales = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
             document.getElementById('auth-area').innerHTML = `
                 <div class="user-chip">
                     <div class="user-av">${iniciales}</div>
                     <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
                 </div>`;
+            if (SUBIDORES_PROCEDIMIENTOS.includes(emailActual)) document.getElementById('btn-subir-procedimiento').style.display = '';
             if (APROBADORES.includes(emailActual)) {
                 // Agrega la pestaña de Pendientes solo para aprobadores.
                 const tabsWrap = document.getElementById('tabs-wrap');
@@ -429,21 +476,30 @@ async function abrirCarpeta(nombre) {
     lista.innerHTML = `<div class="empty">Cargando documentos…</div>`;
 
     try {
-        const res = await fetch(`${API}/docs/carpeta/${encodeURIComponent(nombre)}`);
+        const [res, resAprobados] = await Promise.all([
+            fetch(`${API}/docs/carpeta/${encodeURIComponent(nombre)}`),
+            fetch(`${API}/docs/aprobados`),
+        ]);
         if (!res.ok) { throw new Error('Error del servidor'); }
         const files = await res.json();
+        docsAprobadosCache = await resAprobados.json().catch(() => []);
         docsGithub = (Array.isArray(files) ? files : [])
-            .map(f => ({
-                nombre: f.nombre.replace(/\.[^.]+$/, ''),
-                archivo: `docs/${nombre}/${f.nombre}`,
-                tipo:    f.nombre.split('.').pop().toUpperCase(),
-                fecha:   '',
-                githubUrl: f.url,
-            }));
+            .map(f => {
+                const meta = docsAprobadosCache.find(m => m.archivoGithub === f.nombre && m.carpeta === nombre);
+                return {
+                    nombre: f.nombre.replace(/\.[^.]+$/, ''),
+                    archivo: `docs/${nombre}/${f.nombre}`,
+                    tipo:    f.nombre.split('.').pop().toUpperCase(),
+                    fecha:   '',
+                    githubUrl: f.url,
+                    meta: meta || null,
+                };
+            });
     } catch(e) {
         console.error('Error cargando docs de carpeta:', e);
         docsGithub = [];
     }
+    renderFiltroObra();
     renderDocs();
 }
 
@@ -453,9 +509,25 @@ function volverACarpetas() {
     renderCarpetas();
 }
 
+function renderFiltroObra() {
+    const wrap = document.getElementById('filtro-obra-wrap');
+    const sel = document.getElementById('filtro-obra');
+    const obrasEnCarpeta = new Set();
+    docsGithub.forEach(d => (d.meta?.obras || []).forEach(o => obrasEnCarpeta.add(o)));
+    if (!obrasEnCarpeta.size) { wrap.style.display = 'none'; filtroObraPublicados = ''; return; }
+    wrap.style.display = 'block';
+    sel.innerHTML = `<option value="">Todas las obras</option>` + [...obrasEnCarpeta].map(o => `<option value="${o}">${o}</option>`).join('');
+    sel.value = filtroObraPublicados;
+}
+function cambiarFiltroObra(valor) {
+    filtroObraPublicados = valor;
+    renderDocs();
+}
+
 function renderDocs() {
     const query = document.getElementById('search').value.toLowerCase();
-    const filtrados = query ? docsGithub.filter(d => d.nombre.toLowerCase().includes(query)) : docsGithub;
+    let filtrados = query ? docsGithub.filter(d => d.nombre.toLowerCase().includes(query)) : docsGithub;
+    if (filtroObraPublicados) filtrados = filtrados.filter(d => (d.meta?.obras || []).includes(filtroObraPublicados));
 
     const lista = document.getElementById('doc-list');
     if (filtrados.length === 0) {
@@ -466,6 +538,22 @@ function renderDocs() {
     lista.innerHTML = filtrados.map(doc => {
         const url = doc.githubUrl || doc.archivo;
         const esPdf = doc.tipo.toLowerCase() === 'pdf';
+        const meta = doc.meta;
+        const obrasTxt = meta?.obras?.length ? `<div class="doc-meta">🏗 ${meta.obras.join(', ')}</div>` : '';
+        let firmaHtml = '';
+        if (meta?.requiereFirma) {
+            const yaFirme = meta.firmas.some(f => f.email === emailActual);
+            const puedeFirmar = meta.firmantesRequeridos.includes(emailActual) && !yaFirme;
+            const vigente = meta.estadoFirma === 'vigente';
+            firmaHtml = `
+                <div style="margin-top:6px;font-size:0.72rem;">
+                    <span style="font-weight:700;color:${vigente ? 'var(--verde,#1a7a4a)' : '#b8860b'};">
+                        ${vigente ? '✅ Vigente — todas las firmas completas' : `⏳ Faltan firmas (${meta.firmas.length}/${meta.firmantesRequeridos.length})`}
+                    </span>
+                    ${meta.firmas.map(f => `<div style="color:var(--txt-dim,#999);">✔ ${f.nombre} — ${new Date(f.fecha).toLocaleString('es-CL',{dateStyle:'short',timeStyle:'short'})}</div>`).join('')}
+                    ${puedeFirmar ? `<button class="btn-doc btn-dl" style="margin-top:4px;" onclick="firmarDocumento('${meta.id}')">✍️ Firmar</button>` : ''}
+                </div>`;
+        }
         return `
         <div class="doc-card">
             <div class="doc-icon">
@@ -474,6 +562,8 @@ function renderDocs() {
             <div class="doc-info">
                 <div class="doc-nombre">${doc.nombre}</div>
                 <div class="doc-meta">${doc.tipo}${doc.fecha ? ' · ' + doc.fecha : ''}</div>
+                ${obrasTxt}
+                ${firmaHtml}
             </div>
             <div class="doc-acciones">
                 ${esPdf ? `
@@ -856,7 +946,39 @@ function abrirModal(tipoDoc) {
     document.getElementById('modal-titulo').textContent = tipoSubidaActual === 'comunicacion' ? 'Subir documento (por área)' : 'Subir documento';
     document.getElementById('grupo-carpeta').style.display = tipoSubidaActual === 'comunicacion' ? 'none' : '';
     document.getElementById('grupo-area').style.display = tipoSubidaActual === 'comunicacion' ? '' : 'none';
+    document.getElementById('grupo-obras').style.display = tipoSubidaActual === 'procedimiento' ? '' : 'none';
+    document.getElementById('grupo-firma').style.display = tipoSubidaActual === 'procedimiento' ? '' : 'none';
+    obrasSeleccionadasModal = new Set();
+    firmantesSeleccionadosModal = new Set();
+    document.getElementById('m-requiere-firma').checked = false;
+    document.getElementById('m-firmantes-chips').innerHTML = '';
+    toggleFirmantesUI();
+    renderObraChipsModal();
     document.getElementById('modal-overlay').classList.add('visible');
+}
+function renderObraChipsModal() {
+    document.getElementById('m-obras-chips').innerHTML = OBRAS_ACTIVAS_PROC.map(o => `
+        <div class="dia-chip" style="padding:6px 12px;font-size:0.76rem;border:1px solid var(--gris-2,#ddd);border-radius:100px;cursor:pointer;${obrasSeleccionadasModal.has(o)?'background:#111;color:#fff;':''}"
+             onclick="toggleObraModal('${o.replace(/'/g,"\\'")}')">${o}</div>
+    `).join('');
+}
+function toggleObraModal(o) {
+    if (obrasSeleccionadasModal.has(o)) obrasSeleccionadasModal.delete(o); else obrasSeleccionadasModal.add(o);
+    renderObraChipsModal();
+}
+function toggleFirmantesUI() {
+    document.getElementById('grupo-firmantes').style.display = document.getElementById('m-requiere-firma').checked ? 'block' : 'none';
+    if (document.getElementById('m-requiere-firma').checked) renderFirmantesChipsModal();
+}
+function renderFirmantesChipsModal() {
+    document.getElementById('m-firmantes-chips').innerHTML = FIRMANTES_DISPONIBLES.map(email => `
+        <div class="dia-chip" style="padding:6px 12px;font-size:0.76rem;border:1px solid var(--gris-2,#ddd);border-radius:100px;cursor:pointer;${firmantesSeleccionadosModal.has(email)?'background:#111;color:#fff;':''}"
+             onclick="toggleFirmanteModal('${email}')">${email}</div>
+    `).join('');
+}
+function toggleFirmanteModal(email) {
+    if (firmantesSeleccionadosModal.has(email)) firmantesSeleccionadosModal.delete(email); else firmantesSeleccionadosModal.add(email);
+    renderFirmantesChipsModal();
 }
 function cerrarModal() {
     document.getElementById('modal-overlay').classList.remove('visible');
@@ -963,6 +1085,11 @@ async function enviarDocumento() {
                 : document.getElementById('m-nombre').value.trim();
             const desc = esMasivo ? '' : document.getElementById('m-desc').value.trim();
 
+            const requiereFirma = document.getElementById('m-requiere-firma').checked;
+            const firmantesRequeridos = requiereFirma ? [...firmantesSeleccionadosModal] : [];
+            if (requiereFirma && !firmantesRequeridos.length) { alert('Selecciona al menos un firmante'); btn.disabled = false; return; }
+            const firmaPagina = document.getElementById('m-firma-pagina').value;
+            const firmaPosicion = document.getElementById('m-firma-posicion').value;
             const res = await fetch(`${API}/docs/pendiente`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -975,6 +1102,11 @@ async function enviarDocumento() {
                     tipoDoc: tipoSubidaActual,
                     carpeta: esComunicacion ? undefined : carpeta,
                     area: esComunicacion ? area : undefined,
+                    obras: esComunicacion ? undefined : [...obrasSeleccionadasModal],
+                    requiereFirma: esComunicacion ? false : requiereFirma,
+                    firmantesRequeridos: esComunicacion ? [] : firmantesRequeridos,
+                    firmaPagina: esComunicacion ? undefined : firmaPagina,
+                    firmaPosicion: esComunicacion ? undefined : firmaPosicion,
                     subidoPor: emailActual
                 })
             });
@@ -994,6 +1126,21 @@ async function enviarDocumento() {
 }
 
 // ── TOAST ─────────────────────────────────────────────────────
+async function firmarDocumento(id) {
+    if (!confirm('¿Confirmas que quieres firmar este documento? Quedará registrado tu nombre, fecha y hora.')) return;
+    try {
+        const res = await fetch(`${API}/docs/firmar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, email: emailActual, nombre: nombreActual })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al firmar');
+        mostrarToast(data.estadoFirma === 'vigente' ? 'Firmado — el documento ya quedó vigente' : 'Firma registrada', 'ok');
+        if (carpetaActual) abrirCarpeta(carpetaActual);
+    } catch(e) { mostrarToast('Error: ' + e.message, 'err'); }
+}
+
 function mostrarToast(msg, tipo) {
     const t = document.createElement('div');
     t.className = `toast ${tipo}`;
