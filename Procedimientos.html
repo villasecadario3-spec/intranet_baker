@@ -126,7 +126,7 @@
         /* ── MODAL SUBIR ─────────────────────── */
         .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;padding:20px}
         .modal-overlay.visible{display:flex}
-        .modal{background:white;border-radius:16px;padding:28px;width:100%;max-width:500px;box-shadow:0 20px 60px rgba(0,0,0,0.15)}
+        .modal{background:white;border-radius:16px;padding:28px;width:100%;max-width:500px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.15)}
         .modal-titulo{font-family:'Playfair Display',serif;font-size:1.2rem;margin-bottom:20px;color:var(--txt)}
         .modal-form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
         .modal-label{font-size:0.72rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--txt-mid)}
@@ -952,6 +952,8 @@ function abrirModal(tipoDoc) {
     document.getElementById('grupo-obras').style.display = tipoSubidaActual === 'procedimiento' ? '' : 'none';
     document.getElementById('grupo-firma').style.display = tipoSubidaActual === 'procedimiento' ? '' : 'none';
     obrasSeleccionadasModal = new Set();
+    ultimoRenderFirmaKey = null;
+    firmaXSeleccionado = null; firmaYSeleccionado = null;
     firmantesSeleccionadosModal = new Set();
     document.getElementById('m-requiere-firma').checked = false;
     document.getElementById('m-firmantes-chips').innerHTML = '';
@@ -977,23 +979,32 @@ function toggleFirmantesUI() {
     actualizarAvisoNoPdf();
 }
 
+let ultimoRenderFirmaKey = null;
+
 async function renderVistaPreviaFirma() {
     const wrapPreview = document.getElementById('m-firma-preview-wrap');
     const wrapCargando = document.getElementById('m-firma-preview-cargando');
     const wrapNoDisp = document.getElementById('m-firma-preview-no-disp');
-    wrapPreview.style.display = 'none';
-    wrapNoDisp.style.display = 'none';
 
     const archivoPdf = archivosSeleccionados.find(a => a.tipo === 'pdf');
     if (!document.getElementById('m-requiere-firma').checked) return;
-    if (!archivoPdf) { wrapNoDisp.style.display = 'block'; return; }
+    if (!archivoPdf) { wrapPreview.style.display = 'none'; wrapNoDisp.style.display = 'block'; return; }
 
+    // Si ya se dibujó esta misma página de este mismo archivo, no se vuelve a
+    // renderizar — así un clic ya marcado no se borra por un redibujado
+    // innecesario (por ejemplo al tocar la casilla de una obra).
+    const paginaElegida = document.getElementById('m-firma-pagina').value;
+    const key = `${archivoPdf.nombreOriginal}|${archivoPdf.peso}|${paginaElegida}`;
+    if (key === ultimoRenderFirmaKey && wrapPreview.style.display === 'block') return;
+
+    wrapPreview.style.display = 'none';
+    wrapNoDisp.style.display = 'none';
     wrapCargando.style.display = 'block';
     try {
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         const bytes = Uint8Array.from(atob(archivoPdf.base64), c => c.charCodeAt(0));
         const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
-        const numPagina = document.getElementById('m-firma-pagina').value === 'primera' ? 1 : pdf.numPages;
+        const numPagina = paginaElegida === 'primera' ? 1 : pdf.numPages;
         const pagina = await pdf.getPage(numPagina);
         const viewport = pagina.getViewport({ scale: 1.3 });
         const canvas = document.getElementById('m-firma-canvas');
@@ -1001,6 +1012,7 @@ async function renderVistaPreviaFirma() {
         canvas.height = viewport.height;
         const ctx = canvas.getContext('2d');
         await pagina.render({ canvasContext: ctx, viewport }).promise;
+        ultimoRenderFirmaKey = key;
         firmaXSeleccionado = null; firmaYSeleccionado = null;
         document.getElementById('m-firma-marcador').style.display = 'none';
         document.getElementById('m-firma-coord-txt').textContent = 'Sin marcar — se usará la esquina inferior izquierda por defecto.';
