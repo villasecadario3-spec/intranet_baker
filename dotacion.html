@@ -745,9 +745,31 @@ async function obtenerListaHojas() {
   return listaHojasCache;
 }
 
+// A veces Excel calcula el "usedRange" de una pestaña con datos viejos para
+// una sesión puntual (sobre todo en pestañas que se llenan solas desde Power
+// Query/Power BI, como ASISTENCIA BUK) — reportando muchas menos filas de
+// las que realmente tiene. Forzar un recálculo completo antes de leer evita
+// ese problema.
+let recalculoForzado = false;
+async function forzarRecalculoLibro() {
+  if (recalculoForzado) return; // solo hace falta una vez por sesión
+  try {
+    const token = await getToken();
+    await fetch(`https://graph.microsoft.com/v1.0/drives/${excelDriveId}/items/${excelItemId}/workbook/application/calculate`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ calculationType: 'FullRebuild' }),
+    });
+    recalculoForzado = true;
+  } catch(e) {
+    console.warn('[Excel] No se pudo forzar el recálculo del libro:', e.message);
+  }
+}
+
 async function cargarAsistenciaBUK() {
   const ok = await resolverExcelItem();
   if (!ok) throw new Error('No se pudo acceder al Excel de SharePoint');
+  await forzarRecalculoLibro();
   const listaHojas = await obtenerListaHojas();
   const hoja = listaHojas.value.find(h => h.name.trim().toUpperCase() === 'ASISTENCIA BUK');
   if (!hoja) { console.warn('[Asistencia] No se encontró la pestaña "ASISTENCIA BUK"'); return; }
@@ -842,6 +864,7 @@ function cerrarHistorialAsistencia() {
 async function cargarDesdeBUK() {
   const ok = await resolverExcelItem();
   if (!ok) throw new Error('No se pudo acceder al Excel de SharePoint');
+  await forzarRecalculoLibro();
   const listaHojas = await obtenerListaHojas();
   const hojaMO = listaHojas.value.find(h => h.name.trim().toUpperCase() === 'MO');
   if (!hojaMO) throw new Error(`No se encontró la pestaña "MO" — pestañas disponibles: ${listaHojas.value.map(h=>h.name).join(', ')}`);
