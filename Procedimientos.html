@@ -156,6 +156,7 @@
 
         @media(max-width:768px){nav{padding:0 16px}.nav-title{display:none}.page-header{padding:24px 16px 20px}.main{padding:20px 16px 60px}.doc-card{flex-wrap:wrap}.doc-acciones{width:100%}.btn-doc{flex:1;justify-content:center}}
     </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
@@ -299,24 +300,26 @@
             <div id="grupo-firmantes" style="display:none;margin-top:10px;">
                 <label class="modal-label">¿Quiénes deben firmar?</label>
                 <div id="m-firmantes-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;"></div>
-                <div style="display:flex;gap:10px;flex-wrap:wrap;">
-                    <div style="flex:1;min-width:140px;">
-                        <label class="modal-label">Página del sello</label>
-                        <select class="modal-input" id="m-firma-pagina">
-                            <option value="ultima">Última página</option>
-                            <option value="primera">Primera página</option>
-                        </select>
-                    </div>
-                    <div style="flex:1;min-width:160px;">
-                        <label class="modal-label">Posición en la página</label>
-                        <select class="modal-input" id="m-firma-posicion">
-                            <option value="inferior-izquierda">Inferior izquierda</option>
-                            <option value="inferior-derecha">Inferior derecha</option>
-                            <option value="superior-izquierda">Superior izquierda</option>
-                            <option value="superior-derecha">Superior derecha</option>
-                        </select>
-                    </div>
+                <div id="m-firma-aviso-no-pdf" style="display:none;background:rgba(184,134,11,0.1);color:#8a6508;padding:8px 12px;border-radius:8px;font-size:0.76rem;margin-bottom:10px;">
+                    ⚠ Este archivo no es PDF — la firma quedará registrada, pero no se va a estampar un sello visual dentro del documento.
                 </div>
+                <div style="margin-bottom:10px;">
+                    <label class="modal-label">Página del sello</label>
+                    <select class="modal-input" id="m-firma-pagina" onchange="renderVistaPreviaFirma()" style="max-width:200px;">
+                        <option value="ultima">Última página</option>
+                        <option value="primera">Primera página</option>
+                    </select>
+                </div>
+                <div id="m-firma-preview-wrap" style="display:none;">
+                    <label class="modal-label">Haz clic en el punto exacto donde quieres que aparezca la firma</label>
+                    <div style="position:relative;border:1px solid var(--gris-2,#ddd);border-radius:8px;overflow:hidden;display:inline-block;max-width:100%;">
+                        <canvas id="m-firma-canvas" style="display:block;max-width:100%;cursor:crosshair;" onclick="marcarPosicionFirma(event)"></canvas>
+                        <div id="m-firma-marcador" style="display:none;position:absolute;width:14px;height:14px;border-radius:50%;background:var(--rojo,#C0392B);border:2px solid white;transform:translate(-50%,-50%);pointer-events:none;"></div>
+                    </div>
+                    <div style="font-size:0.72rem;color:var(--txt-dim,#999);margin-top:4px;" id="m-firma-coord-txt">Sin marcar — se usará la esquina inferior izquierda por defecto.</div>
+                </div>
+                <div id="m-firma-preview-cargando" style="display:none;font-size:0.8rem;color:var(--txt-dim,#999);">Cargando vista previa del PDF…</div>
+                <div id="m-firma-preview-no-disp" style="display:none;font-size:0.8rem;color:var(--txt-dim,#999);">La vista previa solo está disponible para archivos PDF — selecciona el archivo primero.</div>
             </div>
         </div>
         <div class="modal-form-group">
@@ -966,9 +969,74 @@ function toggleObraModal(o) {
     if (obrasSeleccionadasModal.has(o)) obrasSeleccionadasModal.delete(o); else obrasSeleccionadasModal.add(o);
     renderObraChipsModal();
 }
+let firmaXSeleccionado = null, firmaYSeleccionado = null;
+
 function toggleFirmantesUI() {
     document.getElementById('grupo-firmantes').style.display = document.getElementById('m-requiere-firma').checked ? 'block' : 'none';
-    if (document.getElementById('m-requiere-firma').checked) renderFirmantesChipsModal();
+    if (document.getElementById('m-requiere-firma').checked) { renderFirmantesChipsModal(); renderVistaPreviaFirma(); }
+    actualizarAvisoNoPdf();
+}
+
+async function renderVistaPreviaFirma() {
+    const wrapPreview = document.getElementById('m-firma-preview-wrap');
+    const wrapCargando = document.getElementById('m-firma-preview-cargando');
+    const wrapNoDisp = document.getElementById('m-firma-preview-no-disp');
+    wrapPreview.style.display = 'none';
+    wrapNoDisp.style.display = 'none';
+
+    const archivoPdf = archivosSeleccionados.find(a => a.tipo === 'pdf');
+    if (!document.getElementById('m-requiere-firma').checked) return;
+    if (!archivoPdf) { wrapNoDisp.style.display = 'block'; return; }
+
+    wrapCargando.style.display = 'block';
+    try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        const bytes = Uint8Array.from(atob(archivoPdf.base64), c => c.charCodeAt(0));
+        const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+        const numPagina = document.getElementById('m-firma-pagina').value === 'primera' ? 1 : pdf.numPages;
+        const pagina = await pdf.getPage(numPagina);
+        const viewport = pagina.getViewport({ scale: 1.3 });
+        const canvas = document.getElementById('m-firma-canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+        await pagina.render({ canvasContext: ctx, viewport }).promise;
+        firmaXSeleccionado = null; firmaYSeleccionado = null;
+        document.getElementById('m-firma-marcador').style.display = 'none';
+        document.getElementById('m-firma-coord-txt').textContent = 'Sin marcar — se usará la esquina inferior izquierda por defecto.';
+        wrapPreview.style.display = 'block';
+    } catch(e) {
+        console.error('Error renderizando vista previa del PDF:', e);
+        wrapNoDisp.style.display = 'block';
+        wrapNoDisp.textContent = 'No se pudo generar la vista previa de este PDF.';
+    } finally {
+        wrapCargando.style.display = 'none';
+    }
+}
+
+function marcarPosicionFirma(event) {
+    const canvas = document.getElementById('m-firma-canvas');
+    const rect = canvas.getBoundingClientRect();
+    // Posición del clic relativa al canvas, convertida a fracción 0–1. El eje
+    // Y se invierte porque en pantalla crece hacia abajo, pero en un PDF el
+    // origen (0,0) es la esquina inferior izquierda.
+    const fracX = (event.clientX - rect.left) / rect.width;
+    const fracYPantalla = (event.clientY - rect.top) / rect.height;
+    firmaXSeleccionado = fracX;
+    firmaYSeleccionado = 1 - fracYPantalla;
+
+    const marcador = document.getElementById('m-firma-marcador');
+    marcador.style.left = `${fracX * 100}%`;
+    marcador.style.top = `${fracYPantalla * 100}%`;
+    marcador.style.display = 'block';
+    document.getElementById('m-firma-coord-txt').textContent = 'Posición marcada ✓ — la firma aparecerá ahí.';
+}
+
+function actualizarAvisoNoPdf() {
+    const requiereFirma = document.getElementById('m-requiere-firma').checked;
+    const hayNoPdf = archivosSeleccionados.some(a => a.tipo !== 'pdf');
+    document.getElementById('m-firma-aviso-no-pdf').style.display = (requiereFirma && hayNoPdf) ? 'block' : 'none';
+    if (requiereFirma) renderVistaPreviaFirma();
 }
 function renderFirmantesChipsModal() {
     document.getElementById('m-firmantes-chips').innerHTML = FIRMANTES_DISPONIBLES.map(email => `
@@ -1039,6 +1107,7 @@ function renderArchivosSeleccionados() {
             <span class="nombre-archivo">${a.nombreOriginal}</span>
             <span class="peso">${(a.peso/1024).toFixed(0)} KB</span>
         </div>`).join('');
+    actualizarAvisoNoPdf();
 
     // Con 1 solo archivo se puede personalizar título y descripción;
     // con varios (subida masiva) se usa el nombre de cada archivo tal cual.
@@ -1089,7 +1158,6 @@ async function enviarDocumento() {
             const firmantesRequeridos = requiereFirma ? [...firmantesSeleccionadosModal] : [];
             if (requiereFirma && !firmantesRequeridos.length) { alert('Selecciona al menos un firmante'); btn.disabled = false; return; }
             const firmaPagina = document.getElementById('m-firma-pagina').value;
-            const firmaPosicion = document.getElementById('m-firma-posicion').value;
             const res = await fetch(`${API}/docs/pendiente`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1106,7 +1174,8 @@ async function enviarDocumento() {
                     requiereFirma: esComunicacion ? false : requiereFirma,
                     firmantesRequeridos: esComunicacion ? [] : firmantesRequeridos,
                     firmaPagina: esComunicacion ? undefined : firmaPagina,
-                    firmaPosicion: esComunicacion ? undefined : firmaPosicion,
+                    firmaX: esComunicacion ? undefined : firmaXSeleccionado,
+                    firmaY: esComunicacion ? undefined : firmaYSeleccionado,
                     subidoPor: emailActual
                 })
             });
