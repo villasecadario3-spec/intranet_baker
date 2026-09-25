@@ -264,6 +264,17 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="modal-historial-acceso">
+    <div class="modal" style="max-width:520px;">
+        <div class="modal-titulo">Historial de accesos</div>
+        <p id="historial-acceso-titulo" style="font-size:0.85rem;color:var(--txt-mid,#666);margin-bottom:14px;"></p>
+        <div id="historial-acceso-cuerpo" style="max-height:340px;overflow-y:auto;"></div>
+        <div class="modal-btns">
+            <button class="btn-cancelar-modal" onclick="cerrarHistorialAcceso()">Cerrar</button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL SUBIR DOCUMENTO -->
 <div class="modal-overlay" id="modal-overlay">
     <div class="modal">
@@ -570,20 +581,25 @@ function renderDocs() {
             </div>
             <div class="doc-acciones">
                 ${esPdf ? `
-                <button class="btn-doc btn-ver" onclick="verDocumento('${url}', '${(doc.nombre+'.'+doc.tipo).replace(/'/g,"\\'")}')">
+                <button class="btn-doc btn-ver" onclick="verDocumento('${url}', '${(doc.nombre+'.'+doc.tipo).replace(/'/g,"\\'")}', '${carpetaActual.replace(/'/g,"\\'")}')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                     Ver
                 </button>` : ''}
-                <a class="btn-doc btn-dl" href="${url}" download>
+                <a class="btn-doc btn-dl" href="${url}" download onclick="registrarAcceso('${carpetaActual.replace(/'/g,"\\'")}', '${(doc.nombre+'.'+doc.tipo).replace(/'/g,"\\'")}', 'descargar')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     Descargar
                 </a>
+                ${SUBIDORES_PROCEDIMIENTOS.includes(emailActual) ? `
+                <button class="btn-doc btn-dl" onclick="verHistorialAcceso('${carpetaActual.replace(/'/g,"\\'")}', '${(doc.nombre+'.'+doc.tipo).replace(/'/g,"\\'")}')" title="Ver quién lo vio o descargó">
+                    📊
+                </button>` : ''}
             </div>
         </div>`;
     }).join('');
 }
 
-async function verDocumento(url, nombreArchivo) {
+async function verDocumento(url, nombreArchivo, carpetaOArea) {
+    if (carpetaOArea) registrarAcceso(carpetaOArea, nombreArchivo, 'ver');
     try {
         const res = await fetch(url);
         if (!res.ok) throw new Error('No se pudo cargar el documento');
@@ -862,14 +878,18 @@ function renderComunicaciones() {
             </div>
             <div class="doc-acciones">
                 ${esPdf ? `
-                <button class="btn-doc btn-ver" onclick="verDocumento('${url}', '${(doc.nombre+'.'+doc.tipo).replace(/'/g,"\\'")}')">
+                <button class="btn-doc btn-ver" onclick="verDocumento('${url}', '${(doc.nombre+'.'+doc.tipo).replace(/'/g,"\\'")}', '${doc.area.replace(/'/g,"\\'")}')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                     Ver
                 </button>` : ''}
-                <a class="btn-doc btn-dl" href="${url}" download>
+                <a class="btn-doc btn-dl" href="${url}" download onclick="registrarAcceso('${doc.area.replace(/'/g,"\\'")}', '${(doc.nombre+'.'+doc.tipo).replace(/'/g,"\\'")}', 'descargar')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     Descargar
                 </a>
+                ${SUBIDORES_PROCEDIMIENTOS.includes(emailActual) ? `
+                <button class="btn-doc btn-dl" onclick="verHistorialAcceso('${doc.area.replace(/'/g,"\\'")}', '${(doc.nombre+'.'+doc.tipo).replace(/'/g,"\\'")}')" title="Ver quién lo vio o descargó">
+                    📊
+                </button>` : ''}
             </div>
         </div>`;
     }).join('');
@@ -1207,6 +1227,39 @@ async function enviarDocumento() {
 }
 
 // ── TOAST ─────────────────────────────────────────────────────
+function registrarAcceso(carpetaOArea, archivoNombre, tipo) {
+    fetch(`${API}/docs/registrar-acceso`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ carpeta: carpetaOArea, archivo: archivoNombre, email: emailActual, nombre: nombreActual, tipo })
+    }).catch(e => console.warn('No se pudo registrar el acceso:', e.message));
+}
+
+async function verHistorialAcceso(carpetaOArea, archivoNombre) {
+    try {
+        const res = await fetch(`${API}/docs/accesos/${encodeURIComponent(carpetaOArea)}/${encodeURIComponent(archivoNombre)}?email=${encodeURIComponent(emailActual)}`);
+        if (!res.ok) throw new Error((await res.json()).error || 'No se pudo cargar el historial');
+        const registros = await res.json();
+        const cuerpo = document.getElementById('historial-acceso-cuerpo');
+        document.getElementById('historial-acceso-titulo').textContent = archivoNombre;
+        if (!registros.length) {
+            cuerpo.innerHTML = `<div class="empty">Todavía nadie ha visto ni descargado este documento.</div>`;
+        } else {
+            cuerpo.innerHTML = registros.map(r => `
+                <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--gris-1,#eee);font-size:0.82rem;">
+                    <span>${r.tipo === 'ver' ? '👁 Vio' : '⬇ Descargó'} — ${r.nombre || r.email} <span style="color:var(--txt-dim,#999);">(${r.email})</span></span>
+                    <span style="color:var(--txt-dim,#999);white-space:nowrap;">${new Date(r.fecha).toLocaleString('es-CL',{dateStyle:'short',timeStyle:'short'})}</span>
+                </div>`).join('');
+        }
+        document.getElementById('modal-historial-acceso').classList.add('visible');
+    } catch(e) {
+        mostrarToast('Error: ' + e.message, 'err');
+    }
+}
+function cerrarHistorialAcceso() {
+    document.getElementById('modal-historial-acceso').classList.remove('visible');
+}
+
 async function firmarDocumento(id) {
     if (!confirm('¿Confirmas que quieres firmar este documento? Quedará registrado tu nombre, fecha y hora.')) return;
     try {
