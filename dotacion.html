@@ -767,17 +767,21 @@ async function forzarRecalculoLibro() {
 }
 
 async function cargarAsistenciaBUK() {
-  // Conexión directa a la API de Asistencia de BUK — reemplaza por completo
-  // el camino anterior por Excel/Power BI (que traía problemas de sesión,
-  // permisos y actualización manual). El servidor hace la consulta con la
-  // API Key guardada ahí, así que acá solo se pide el resultado ya filtrado.
+  // Conexión directa a la API de Asistencia de BUK — el servidor mantiene
+  // estos datos ya calculados en memoria (se renuevan solos cada 15 minutos)
+  // y responde al instante, así que esta llamada nunca debería demorar.
   const res = await fetch(`${API}/dotacion/asistencia-directa`);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     console.warn('[Asistencia Directa] Error:', err.error || res.status);
     return;
   }
-  const { datos } = await res.json();
+  const { datos, actualizadoEn, actualizando, error } = await res.json();
+  if (error) console.warn('[Asistencia Directa] Aviso del servidor:', error);
+  if (actualizando && (!datos || !datos.length)) {
+    console.log('[Asistencia Directa] El servidor está preparando los datos por primera vez — esto puede tardar unos minutos tras reiniciar. Vuelve a entrar en un rato.');
+  }
+  if (actualizadoEn) console.log('[Asistencia Directa] Datos actualizados por última vez:', new Date(actualizadoEn).toLocaleString('es-CL'));
   if (!datos || !datos.length) { console.warn('[Asistencia Directa] Sin registros para Mirador El Pino'); return; }
 
   const hoy = new Date();
