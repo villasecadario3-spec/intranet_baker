@@ -787,6 +787,7 @@ async function cargarAsistenciaBUK() {
     // falle si un lado trae el RUT como texto y el otro como número.
     const rutlimpio = String(r.rutTrabajador || '').replace(/[^0-9kK]/g,'').toUpperCase().replace(/^0+(?=\d)/, '');
     const fecha = String(r.fecha || '').slice(0, 10); // espera YYYY-MM-DD
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return; // descarta cualquier fecha ilegible
     if (!rutlimpio || !fecha || fecha.length < 10) return;
     registros[rutlimpio] = registros[rutlimpio] || new Set();
     registros[rutlimpio].add(fecha);
