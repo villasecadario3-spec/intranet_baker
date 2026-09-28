@@ -285,31 +285,31 @@ input[type=file] { display: none; }
   </div><!-- /panelConciliacion -->
 
   <div id="panelDS19" style="display:none;">
-    <div class="dropzone" style="cursor:default;">
-      <div style="background:#fafafa;border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:20px;text-align:left;">
-        <div style="font-weight:700;font-size:0.9rem;margin-bottom:10px;">Datos generales del proyecto</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;" id="ds19-carpeta" placeholder="Nombre Carpeta de Solicitud">
-          <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;" id="ds19-vendedor" placeholder="Vendedor (Inmobiliaria/Constructora)">
-          <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;" id="ds19-codigo" placeholder="Código Proyecto">
-          <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;" id="ds19-nombreproyecto" placeholder="Nombre Proyecto">
-          <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;" id="ds19-resoluciones" placeholder="N° Resolución(es) y Fecha(s)">
-          <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;" id="ds19-ano" placeholder="Año Beneficio">
-        </div>
-      </div>
-
-      <div style="text-align:left;margin-bottom:16px;">
-        <div style="font-weight:700;font-size:0.9rem;margin-bottom:8px;">Escrituras (hasta 10, una por comprador)</div>
-        <input type="file" id="ds19-file-input" accept=".pdf" multiple style="margin-bottom:10px;">
-        <br>
-        <button class="btn btn-primary" onclick="ds19SubirEscrituras()">Subir y procesar</button>
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:20px;">
+      <div style="font-weight:700;font-size:0.9rem;margin-bottom:10px;color:var(--ink);">Datos generales del proyecto</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-carpeta" placeholder="Nombre Carpeta de Solicitud">
+        <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-vendedor" placeholder="Vendedor (Inmobiliaria/Constructora)">
+        <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-codigo" placeholder="Código Proyecto">
+        <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-nombreproyecto" placeholder="Nombre Proyecto">
+        <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-resoluciones" placeholder="N° Resolución(es) y Fecha(s)">
+        <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-ano" placeholder="Año Beneficio">
       </div>
     </div>
 
-    <div id="ds19-lista-procesando" style="text-align:left;"></div>
-    <div id="ds19-tabla-revision" style="text-align:left;"></div>
+    <div style="font-weight:700;font-size:0.9rem;margin-bottom:8px;color:var(--ink);">Escrituras (hasta 10, una por comprador)</div>
+    <div class="dropzone" id="ds19-dropzone" onclick="document.getElementById('ds19-file-input').click()">
+      <input type="file" id="ds19-file-input" accept=".pdf" multiple onchange="ds19MostrarSeleccion()">
+      <div class="dropzone-icon">📄</div>
+      <div class="dropzone-title">Haz clic para seleccionar hasta 10 PDFs de escritura</div>
+      <div class="dropzone-sub" id="ds19-archivos-elegidos">Ningún archivo seleccionado todavía</div>
+    </div>
+    <button class="btn btn-primary" onclick="ds19SubirEscrituras()" style="margin-bottom:20px;">Subir y procesar</button>
 
-    <div style="margin-top:20px;display:none;text-align:left;" id="ds19-generar-wrap">
+    <div id="ds19-lista-procesando" style="color:var(--ink);"></div>
+    <div id="ds19-tabla-revision" style="color:var(--ink);"></div>
+
+    <div style="margin-top:20px;display:none;" id="ds19-generar-wrap">
       <button class="btn btn-primary" onclick="ds19GenerarFormulario()">📄 Generar formulario Word</button>
     </div>
   </div><!-- /panelDS19 -->
@@ -979,6 +979,15 @@ function ds19LeerArchivoBase64(file) {
   });
 }
 
+function ds19MostrarSeleccion() {
+  const input = document.getElementById('ds19-file-input');
+  const span = document.getElementById('ds19-archivos-elegidos');
+  const archivos = Array.from(input.files || []);
+  span.textContent = archivos.length
+    ? `${archivos.length} archivo(s) seleccionado(s): ${archivos.map(f=>f.name).join(', ')}`
+    : 'Ningún archivo seleccionado todavía';
+}
+
 async function ds19SubirEscrituras() {
   const input = document.getElementById('ds19-file-input');
   const archivos = Array.from(input.files || []).slice(0, 10);
@@ -1054,19 +1063,19 @@ function ds19RenderTablaRevision() {
     <div style="font-weight:700;font-size:0.9rem;margin:16px 0 8px;">Revisa y corrige antes de generar el formulario</div>
     <div style="overflow-x:auto;">
     <table style="border-collapse:collapse;width:100%;font-size:0.78rem;">
-      <thead><tr style="background:var(--bg2,#f0f0f0);">
-        <th style="padding:6px;border:1px solid var(--border);text-align:left;">Archivo</th>
-        <th style="padding:6px;border:1px solid var(--border);">RUT</th>
-        <th style="padding:6px;border:1px solid var(--border);">Nombre</th>
-        ${REQUISITOS_DS19.map(r => `<th style="padding:6px;border:1px solid var(--border);min-width:90px;">${r}</th>`).join('')}
+      <thead><tr style="background:var(--bg2);">
+        <th style="padding:6px;border:1px solid var(--border);text-align:left;color:var(--ink);">Archivo</th>
+        <th style="padding:6px;border:1px solid var(--border);color:var(--ink);">RUT</th>
+        <th style="padding:6px;border:1px solid var(--border);color:var(--ink);">Nombre</th>
+        ${REQUISITOS_DS19.map(r => `<th style="padding:6px;border:1px solid var(--border);min-width:90px;color:var(--ink);">${r}</th>`).join('')}
       </tr></thead>
       <tbody>
         ${ds19Compradores.map((c, i) => `
         <tr>
-          <td style="padding:4px;border:1px solid var(--border);">${c.archivoNombre}</td>
-          <td style="padding:2px;border:1px solid var(--border);"><input style="width:90px;border:none;" value="${c.rut}" onchange="ds19Compradores[${i}].rut=this.value"></td>
-          <td style="padding:2px;border:1px solid var(--border);"><input style="width:160px;border:none;" value="${c.nombre}" onchange="ds19Compradores[${i}].nombre=this.value"></td>
-          ${REQUISITOS_DS19.map(r => `<td style="padding:2px;border:1px solid var(--border);"><input style="width:40px;border:none;text-align:center;" value="${c.requisitos[r]}" onchange="ds19Compradores[${i}].requisitos['${r.replace(/'/g,"\\'")}']=this.value"></td>`).join('')}
+          <td style="padding:4px;border:1px solid var(--border);color:var(--ink);">${c.archivoNombre}</td>
+          <td style="padding:2px;border:1px solid var(--border);"><input style="width:90px;border:none;background:var(--bg2);color:var(--ink);" value="${c.rut}" onchange="ds19Compradores[${i}].rut=this.value"></td>
+          <td style="padding:2px;border:1px solid var(--border);"><input style="width:160px;border:none;background:var(--bg2);color:var(--ink);" value="${c.nombre}" onchange="ds19Compradores[${i}].nombre=this.value"></td>
+          ${REQUISITOS_DS19.map(r => `<td style="padding:2px;border:1px solid var(--border);"><input style="width:40px;border:none;text-align:center;background:var(--bg2);color:var(--ink);" value="${c.requisitos[r]}" onchange="ds19Compradores[${i}].requisitos['${r.replace(/'/g,"\\'")}']=this.value"></td>`).join('')}
         </tr>`).join('')}
       </tbody>
     </table>
