@@ -1,256 +1,1126 @@
-#!/usr/bin/env python3
-"""
-Motor de extracción para escrituras de compraventa DS19/DS1/DS49.
-Recibe un PDF (escaneado o con texto), hace OCR página por página si hace
-falta, detecta las cláusulas numeradas, y busca dónde aparece cada uno de
-los 14 "requisitos" del formulario SERVIU, junto con el comprador (nombre,
-RUT), el programa de subsidio y el tramo.
-
-Uso: python3 extraer_escritura.py <ruta_pdf> <ruta_json_salida>
-"""
-import sys
-import json
-import re
-import subprocess
-import tempfile
-import os
-
-# ── Números ordinales en español -> número, hasta trigésimo (30 cláusulas
-# debería ser más que suficiente para este tipo de escritura).
-ORDINALES = {
-    'PRIMERO': 1, 'SEGUNDO': 2, 'TERCERO': 3, 'CUARTO': 4, 'QUINTO': 5,
-    'SEXTO': 6, 'SEPTIMO': 7, 'SÉPTIMO': 7, 'OCTAVO': 8, 'NOVENO': 9,
-    'DECIMO': 10, 'DÉCIMO': 10,
-    'DECIMO PRIMERO': 11, 'DÉCIMO PRIMERO': 11, 'UNDECIMO': 11, 'UNDÉCIMO': 11,
-    'DECIMO SEGUNDO': 12, 'DÉCIMO SEGUNDO': 12, 'DUODECIMO': 12, 'DUODÉCIMO': 12,
-    'DECIMO TERCERO': 13, 'DÉCIMO TERCERO': 13,
-    'DECIMO CUARTO': 14, 'DÉCIMO CUARTO': 14,
-    'DECIMO QUINTO': 15, 'DÉCIMO QUINTO': 15,
-    'DECIMO SEXTO': 16, 'DÉCIMO SEXTO': 16,
-    'DECIMO SEPTIMO': 17, 'DÉCIMO SÉPTIMO': 17,
-    'DECIMO OCTAVO': 18, 'DÉCIMO OCTAVO': 18,
-    'DECIMO NOVENO': 19, 'DÉCIMO NOVENO': 19,
-    'VIGESIMO': 20, 'VIGÉSIMO': 20,
-    'VIGESIMO PRIMERO': 21, 'VIGÉSIMO PRIMERO': 21,
-    'VIGESIMO SEGUNDO': 22, 'VIGÉSIMO SEGUNDO': 22,
-    'VIGESIMO TERCERO': 23, 'VIGÉSIMO TERCERO': 23,
-    'VIGESIMO CUARTO': 24, 'VIGÉSIMO CUARTO': 24,
-    'VIGESIMO QUINTO': 25, 'VIGÉSIMO QUINTO': 25,
-    'VIGESIMO SEXTO': 26, 'VIGÉSIMO SEXTO': 26,
-    'VIGESIMO SEPTIMO': 27, 'VIGÉSIMO SÉPTIMO': 27,
-    'VIGESIMO OCTAVO': 28, 'VIGÉSIMO OCTAVO': 28,
-    'VIGESIMO NOVENO': 29, 'VIGÉSIMO NOVENO': 29,
-    'TRIGESIMO': 30, 'TRIGÉSIMO': 30,
-    'CUADRAGESIMO': 40, 'CUADRAGÉSIMO': 40,
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Escrituración, Gestor de Documentos — Baker</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #0f1923;
+  --bg2: #162030;
+  --panel: #1c2d40;
+  --border: rgba(99,179,237,0.15);
+  --border2: rgba(99,179,237,0.08);
+  --ink: #e2eaf2;
+  --ink2: #8fadc8;
+  --ink3: #5a7a96;
+  --cyan: #63b3ed;
+  --orange: #f6ad55;
+  --green: #68d391;
+  --red: #fc8181;
+  --radius: 8px;
+  --mono: 'DM Mono', monospace;
+  --sans: 'DM Sans', sans-serif;
 }
-# Se ordenan de más largo a más corto para que el regex intente primero
-# "DECIMO SEGUNDO" antes que "DECIMO" solo (si no, matchearía el más corto).
-ORDINALES_ORDENADOS = sorted(ORDINALES.keys(), key=len, reverse=True)
-PATRON_CLAUSULA = re.compile(
-    r'^(' + '|'.join(re.escape(o) for o in ORDINALES_ORDENADOS) + r')\s*:',
-    re.MULTILINE
-)
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); min-height: 100vh; -webkit-font-smoothing: antialiased; }
 
-# ── Diccionario de requisitos -> palabras clave a buscar (basado en el
-# lenguaje real observado en escrituras DS19 de Baker). Si no encuentra
-# ninguna, el campo queda vacío para que la persona lo revise a mano.
-REQUISITOS = {
-    'Permiso Edificación':      [r'permiso de edificaci'],
-    'Recepción Final':          [r'recepci[oó]n final', r'recepci[oó]n definitiva'],
-    'N° y fecha Resolución':    [r'resoluci[oó]n exenta', r'resoluci[oó]n n[uú]mero'],
-    'Estacionamiento':          [r'estacionamiento'],
-    'Individualización vivienda': [r'antecedentes', r'inmueble'],  # cae en la cláusula que describe la propiedad
-    'Precio compraventa':       [r'precio de venta', r'precio de.*compraventa'],
-    'Seguro incendio y sismo':  [r'seguro.*incendio', r'incendio y sismo'],
-    'Seguro desgravamen e invalidez 2/3': [r'seguro de desgravamen', r'invalidez permanente'],
-    'Seguro desempleo e incapacidad temporal': [r'seguro de desempleo', r'incapacidad temporal'],
-    'Prohibiciones de enajenar, ceder uso y goce y habitar en favor de Serviu': [r'prohibici[oó]n de enajenar'],
-    'Mandato cobro subsidio':   [r'mandato[\s\S]{0,150}?cobr\w*[\s\S]{0,60}?subsidio', r'subsidio[\s\S]{0,150}?mandato'],
-    'Exención IVA o Contrato suma alzada': [r'exent[oa].*iva', r'suma alzada'],
-    'Nómina de Profesionales, articulo 18. Ley General de U.': [r'n[oó]mina de profesionales', r'art[ií]culo\s*18'],
+/* NAV */
+.nav { height: 52px; background: rgba(15,25,35,0.95); border-bottom: 1px solid var(--border2); display: flex; align-items: center; padding: 0 24px; gap: 12px; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(12px); }
+.nav-logo img { height: 22px; background: white; border-radius: 3px; padding: 2px 8px; display: block; }
+.nav-sep { width: 1px; height: 14px; background: var(--border); }
+.nav-back { display: flex; align-items: center; gap: 4px; color: var(--ink3); text-decoration: none; font-size: 0.78rem; font-weight: 500; transition: color 0.15s; }
+.nav-back:hover { color: var(--ink); }
+.nav-back svg { width: 12px; height: 12px; }
+.nav-title { font-family: var(--mono); font-size: 0.68rem; color: var(--ink3); letter-spacing: 0.1em; text-transform: uppercase; }
+.nav-spacer { flex: 1; }
+.user-chip { display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 3px; background: var(--panel); border: 1px solid var(--border); border-radius: 100px; }
+.user-av { width: 22px; height: 22px; border-radius: 50%; background: var(--orange); display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; color: #1a0d02; }
+.user-nm { font-size: 0.76rem; font-weight: 500; color: var(--ink); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* WRAP */
+.wrap { max-width: 860px; margin: 0 auto; padding: 32px 24px 80px; }
+
+/* HEADER */
+.page-header { margin-bottom: 28px; }
+.eyebrow { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--cyan); margin-bottom: 8px; }
+.page-title { font-size: 1.8rem; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); margin-bottom: 6px; }
+.page-sub { font-size: 0.88rem; color: var(--ink2); line-height: 1.6; max-width: 580px; }
+
+/* DROP ZONE */
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--bg2);
+  margin-bottom: 24px;
+}
+.dropzone:hover, .dropzone.drag { border-color: var(--cyan); background: rgba(99,179,237,0.04); }
+.dropzone-icon { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.6; }
+.dropzone-title { font-size: 1rem; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+.dropzone-sub { font-size: 0.82rem; color: var(--ink2); }
+.dropzone-sub span { color: var(--cyan); }
+input[type=file] { display: none; }
+
+/* PROGRESS */
+.progress-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; margin-bottom: 20px; display: none; }
+.progress-card.visible { display: block; }
+.progress-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.progress-text { font-size: 0.85rem; font-weight: 500; color: var(--ink); }
+.progress-pct { font-family: var(--mono); font-size: 0.82rem; color: var(--cyan); }
+.progress-bar { height: 4px; background: var(--bg); border-radius: 2px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--cyan); border-radius: 2px; transition: width 0.3s ease; width: 0%; }
+.progress-detail { font-family: var(--mono); font-size: 0.75rem; color: var(--ink3); margin-top: 8px; }
+
+/* RESULTADO */
+.resultado-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 20px; display: none; overflow: hidden; }
+.historial-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 20px; overflow: hidden; }
+.resultado-card.visible { display: block; }
+.resultado-header { padding: 16px 20px; border-bottom: 1px solid var(--border2); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.resultado-titulo { font-size: 0.95rem; font-weight: 600; color: var(--ink); }
+.resultado-stats { display: flex; gap: 16px; }
+.stat { text-align: center; }
+.stat-n { font-family: var(--mono); font-size: 1.3rem; font-weight: 700; color: var(--cyan); line-height: 1; }
+.stat-l { font-size: 0.7rem; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+.resultado-acciones { padding: 14px 20px; border-bottom: 1px solid var(--border2); display: flex; gap: 10px; flex-wrap: wrap; }
+.btn { font-family: var(--sans); font-weight: 600; font-size: 0.82rem; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
+.btn-primary { background: var(--cyan); color: #0f1923; }
+.btn-primary:hover { background: #90cdf4; }
+.btn-secondary { background: var(--panel); border: 1px solid var(--border); color: var(--ink); }
+.btn-secondary:hover { background: var(--bg2); }
+.btn-warn { background: var(--orange); color: #1a0d02; }
+.btn-warn:hover { background: #fbd38d; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* LISTA DE CARTAS */
+.cartas-lista { max-height: 420px; overflow-y: auto; }
+.carta-item { display: flex; align-items: center; gap: 12px; padding: 11px 20px; border-bottom: 1px solid var(--border2); transition: background 0.1s; }
+.carta-item:last-child { border-bottom: none; }
+.carta-item:hover { background: var(--bg2); }
+.carta-num { font-family: var(--mono); font-size: 0.72rem; color: var(--ink3); width: 28px; flex-shrink: 0; text-align: right; }
+.carta-icon { width: 28px; height: 28px; border-radius: 4px; background: rgba(99,179,237,0.1); border: 1px solid rgba(99,179,237,0.2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.85rem; }
+.carta-info { flex: 1; min-width: 0; }
+.carta-nombre { font-size: 0.88rem; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.carta-pages { font-family: var(--mono); font-size: 0.72rem; color: var(--ink3); margin-top: 2px; }
+.carta-warn { font-size: 0.72rem; color: var(--orange); margin-top: 2px; }
+.carta-dl { flex-shrink: 0; }
+.btn-dl { font-family: var(--mono); font-size: 0.72rem; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--cyan); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.btn-dl:hover { background: var(--panel); border-color: var(--cyan); }
+
+/* ADVERTENCIAS */
+.warn-box { background: rgba(246,173,85,0.08); border: 1px solid rgba(246,173,85,0.25); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; display: none; }
+.warn-box.visible { display: block; }
+.warn-box-title { font-size: 0.82rem; font-weight: 600; color: var(--orange); margin-bottom: 6px; }
+.warn-box ul { padding-left: 16px; }
+.warn-box li { font-size: 0.8rem; color: var(--ink2); line-height: 1.6; }
+
+/* TOAST */
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(10px); background: var(--green); color: #0f2318; font-family: var(--mono); font-size: 0.8rem; font-weight: 600; padding: 9px 18px; border-radius: 6px; opacity: 0; transition: all 0.2s; pointer-events: none; z-index: 999; white-space: nowrap; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.err { background: var(--red); color: #1a0505; }
+
+/* ACCESO DENEGADO */
+.acceso-denegado { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 12px; text-align: center; }
+.acceso-denegado.visible { display: flex; }
+.acceso-denegado-icon { font-size: 3rem; opacity: 0.4; }
+.acceso-denegado-title { font-size: 1.2rem; font-weight: 600; color: var(--ink); }
+.acceso-denegado-sub { font-size: 0.85rem; color: var(--ink2); }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-back" href="index.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    Volver a la intranet
+  </a>
+  <div class="nav-sep"></div>
+  <div class="nav-title">Escrituración, Gestor de Documentos</div>
+  <div class="nav-spacer"></div>
+  <div id="auth-area"></div>
+</nav>
+
+<div class="wrap" id="main-wrap" style="display:none;">
+  <div class="page-header">
+    <div class="eyebrow">iBaker · Escrituración</div>
+    <h1 class="page-title">Escrituración, Gestor de Documentos</h1>
+    <p class="page-sub">Herramientas de apoyo para el equipo de escrituración: división de cartas oferta y conciliación energética.</p>
+  </div>
+
+  <div class="tabs-nav" style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;">
+    <button class="tab-btn tab-btn-activa" id="tabBtnCartas" onclick="cambiarTab('cartas')" style="padding:12px 22px;font-family:inherit;font-size:0.86rem;font-weight:600;background:transparent;border:none;border-bottom:2px solid var(--cyan);margin-bottom:-2px;cursor:pointer;color:var(--cyan);">
+      Divisor Cartas Oferta
+    </button>
+    <button class="tab-btn" id="tabBtnConciliacion" onclick="cambiarTab('conciliacion')" style="padding:12px 22px;font-family:inherit;font-size:0.86rem;font-weight:600;background:transparent;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;color:var(--ink2);">
+      Calificación Energética
+    </button>
+    <button class="tab-btn" id="tabBtnDS19" onclick="cambiarTab('ds19')" style="padding:12px 22px;font-family:inherit;font-size:0.86rem;font-weight:600;background:transparent;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;color:var(--ink2);">
+      Formulario DS19
+    </button>
+  </div>
+
+  <div id="panelCartas">
+
+  <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+    <input type="file" id="fileInput" accept=".pdf" onchange="procesarArchivo(event)">
+    <div class="dropzone-icon">📄</div>
+    <div class="dropzone-title">Arrastra el PDF aquí o haz clic para seleccionarlo</div>
+    <div class="dropzone-sub">Solo archivos <span>.pdf</span> · Sin límite de tamaño</div>
+  </div>
+
+  <div class="progress-card" id="progressCard">
+    <div class="progress-label">
+      <span class="progress-text" id="progressText">Procesando...</span>
+      <span class="progress-pct" id="progressPct">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-detail" id="progressDetail"></div>
+  </div>
+
+  <div class="warn-box" id="warnBox">
+    <div class="warn-box-title">⚠️ Cartas con advertencias</div>
+    <ul id="warnList"></ul>
+  </div>
+
+  <div class="resultado-card" id="resultadoCard">
+    <div class="resultado-header">
+      <div class="resultado-titulo">Cartas detectadas</div>
+      <div class="resultado-stats">
+        <div class="stat"><div class="stat-n" id="statCartas">0</div><div class="stat-l">Cartas</div></div>
+        <div class="stat"><div class="stat-n" id="statPaginas">0</div><div class="stat-l">Páginas</div></div>
+      </div>
+    </div>
+    <div class="resultado-acciones">
+      <button class="btn btn-primary" id="btnZip" onclick="descargarZip()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Descargar todo en ZIP
+      </button>
+      <button class="btn btn-secondary" onclick="resetear()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+        Procesar otro PDF
+      </button>
+    </div>
+    <div class="cartas-lista" id="cartasLista"></div>
+  </div>
+
+  </div><!-- /panelCartas -->
+
+  <div id="panelConciliacion" style="display:none;">
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+      <div class="dropzone" id="dropzoneExcel" onclick="document.getElementById('inputExcel').click()" style="margin-bottom:0;">
+        <input type="file" id="inputExcel" accept=".xlsx,.xls" onchange="cargarExcelConciliacion(event)">
+        <div class="dropzone-icon">📊</div>
+        <div class="dropzone-title" id="excelTitle">Sube el Excel con Producto y Cliente</div>
+        <div class="dropzone-sub">Columna <span>A</span> = N° lote, columna <span>B</span> = cliente · .xlsx / .xls</div>
+      </div>
+      <div class="dropzone" id="dropzonePdfs" onclick="document.getElementById('inputPdfs').click()" style="margin-bottom:0;">
+        <input type="file" id="inputPdfs" accept=".pdf" multiple onchange="cargarPdfsConciliacion(event)">
+        <div class="dropzone-icon">📁</div>
+        <div class="dropzone-title" id="pdfsTitle">Sube los PDF por lote</div>
+        <div class="dropzone-sub">Varios archivos <span>.pdf</span> a la vez</div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:center;margin-bottom:20px;">
+      <button class="btn btn-primary" id="btnProcesarConciliacion" onclick="procesarConciliacion()" disabled>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+        Cruzar información y renombrar
+      </button>
+    </div>
+
+    <div class="warn-box" id="warnBoxConciliacion">
+      <div class="warn-box-title">⚠️ PDF sin coincidencia en el Excel</div>
+      <ul id="warnListConciliacion"></ul>
+    </div>
+
+    <div class="resultado-card" id="resultadoConciliacionCard">
+      <div class="resultado-header">
+        <div class="resultado-titulo">Documentos renombrados</div>
+        <div class="resultado-stats">
+          <div class="stat"><div class="stat-n" id="statConciliados">0</div><div class="stat-l">Con cliente</div></div>
+          <div class="stat"><div class="stat-n" id="statSinMatch">0</div><div class="stat-l">Sin coincidencia</div></div>
+        </div>
+      </div>
+      <div class="resultado-acciones">
+        <button class="btn btn-primary" id="btnZipConciliacion" onclick="descargarZipConciliacion()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Descargar todo en ZIP
+        </button>
+        <button class="btn btn-secondary" onclick="resetearConciliacion()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+          Empezar de nuevo
+        </button>
+      </div>
+      <div class="cartas-lista" id="conciliacionLista"></div>
+      <div style="margin:0 20px 20px;padding-top:16px;border-top:1px solid var(--border2);">
+        <div style="font-size:0.78rem;font-weight:600;color:var(--ink2);margin-bottom:8px;">Enviar por correo (1 PDF por envío) al mismo destinatario — solo los que tienen coincidencia</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <input type="email" id="correoDestinoMasivo" placeholder="correo@banco.cl" style="flex:1;min-width:220px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:#fff;color:#111;">
+          <button class="btn btn-primary" id="btnEnviarCorreos" onclick="enviarCorreosMasivo()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            Enviar todos
+          </button>
+        </div>
+        <div id="envioProgreso" style="display:none;margin-top:10px;font-size:0.8rem;color:var(--ink2);"></div>
+      </div>
+    </div>
+
+  </div><!-- /panelConciliacion -->
+
+  <div id="panelDS19" style="display:none;">
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:20px;">
+      <div style="font-weight:700;font-size:0.9rem;margin-bottom:10px;color:var(--ink);">Datos generales del proyecto</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-carpeta" placeholder="Nombre Carpeta de Solicitud">
+        <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-vendedor" placeholder="Vendedor (Inmobiliaria/Constructora)">
+        <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-codigo" placeholder="Código Proyecto">
+        <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-nombreproyecto" placeholder="Nombre Proyecto">
+        <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-resoluciones" placeholder="N° Resolución(es) y Fecha(s)">
+        <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-ano" placeholder="Año Beneficio">
+      </div>
+    </div>
+
+    <div style="font-weight:700;font-size:0.9rem;margin-bottom:8px;color:var(--ink);">Escrituras (hasta 10, una por comprador)</div>
+    <div class="dropzone" id="ds19-dropzone" onclick="document.getElementById('ds19-file-input').click()">
+      <input type="file" id="ds19-file-input" accept=".pdf" multiple onchange="ds19MostrarSeleccion()">
+      <div class="dropzone-icon">📄</div>
+      <div class="dropzone-title">Haz clic para seleccionar hasta 10 PDFs de escritura</div>
+      <div class="dropzone-sub" id="ds19-archivos-elegidos">Ningún archivo seleccionado todavía</div>
+    </div>
+    <button class="btn btn-primary" onclick="ds19SubirEscrituras()" style="margin-bottom:20px;">Subir y procesar</button>
+
+    <div id="ds19-lista-procesando" style="color:var(--ink);"></div>
+    <div id="ds19-tabla-revision" style="color:var(--ink);"></div>
+
+    <div style="margin-top:20px;display:none;" id="ds19-generar-wrap">
+      <button class="btn btn-primary" onclick="ds19GenerarFormulario()">📄 Generar formulario Word</button>
+    </div>
+  </div><!-- /panelDS19 -->
+
+</div>
+
+<div class="acceso-denegado" id="accesoDenegado">
+  <div class="acceso-denegado-icon">🔒</div>
+  <div class="acceso-denegado-title">Acceso restringido</div>
+  <div class="acceso-denegado-sub">Este módulo es solo para el equipo de escrituración.</div>
+</div>
+
+<div class="historial-card" id="historialCard" style="display:none;">
+  <div class="resultado-header">
+    <div class="resultado-titulo">Historial de procesamientos</div>
+    <button class="btn btn-secondary" style="font-size:0.75rem;padding:5px 10px;" onclick="cargarHistorial()">↻ Actualizar</button>
+  </div>
+  <div class="cartas-lista" id="historialLista" style="max-height:300px;"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────
+const ACCESO   = ['mbello@ibaker.cl', 'jcumplido@ibaker.cl', 'dvillaseca@ibaker.cl'];
+const API_BASE = 'https://api.ibaker.cl';
+let correoActual = '';
+const PATRON_INICIO = 'carta oferta de la inmobiliaria';
+const PATRON_FIN    = 'moises bello puebla';
+const PATRON_NOMBRE = 'nombre completo cliente';
+
+const msalConfig = {
+  auth: {
+    clientId: '9a56ab1c-d3c4-4460-9892-1d4da768ecfb',
+    authority: 'https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26',
+    redirectUri: window.location.origin,
+  },
+  cache: { cacheLocation: 'sessionStorage' }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+// Estado global
+let pdfBytes          = null;
+let pdfDocCache       = null;
+let cartasData        = [];
+let zipGenerado       = null;
+let file_nombre_actual = '';
+
+// ── AUTH ──────────────────────────────────────────────────────
+async function initAuth() {
+  await msalInstance.initialize();
+  const accounts = msalInstance.getAllAccounts();
+  if (!accounts.length) { window.location.href = 'index.html'; return; }
+  const correo = accounts[0].username.toLowerCase();
+  if (!ACCESO.includes(correo)) {
+    document.getElementById('accesoDenegado').classList.add('visible');
+    return;
+  }
+  const nombre = accounts[0].name || accounts[0].username;
+  const iniciales = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('auth-area').innerHTML = `
+    <div class="user-chip">
+      <div class="user-av">${iniciales}</div>
+      <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
+    </div>`;
+  correoActual = correo;
+  document.getElementById('main-wrap').style.display = 'block';
+  cargarHistorial();
 }
 
-PATRON_PROGRAMA = {
-    'DS19': [r'D\.?\s*S\.?\s*N[°ºo]?\s*19', r'decreto supremo n[uú]mero diecinueve'],
-    'DS1':  [r'D\.?\s*S\.?\s*N[°ºo]?\s*1\b', r'decreto supremo n[uú]mero uno\b'],
-    'DS49': [r'D\.?\s*S\.?\s*N[°ºo]?\s*49', r'decreto supremo n[uú]mero cuarenta y nueve'],
-}
+// ── DRAG & DROP ───────────────────────────────────────────────
+const dz = document.getElementById('dropzone');
+dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type === 'application/pdf') procesarArchivo(null, file);
+  else toast('Solo se aceptan archivos PDF', true);
+});
 
-PATRON_RUT = re.compile(r'\b(\d{1,2}\.?\d{3}\.?\d{3}[-‐]?[\dkK])\b')
+// ── PROCESAMIENTO PRINCIPAL ───────────────────────────────────
+async function procesarArchivo(event, fileOverride) {
+  const file = fileOverride || event.target.files[0];
+  if (!file) return;
+  file_nombre_actual = file.name;
 
+  resetearEstado();
+  mostrarProgress(true);
+  setProgress(5, `Cargando "${file.name}"...`, '');
 
-def ocr_pdf(ruta_pdf, dpi=300):
-    """OCR página por página. Devuelve lista de (num_pagina, texto)."""
-    with tempfile.TemporaryDirectory() as tmp:
-        prefijo = os.path.join(tmp, 'pag')
-        subprocess.run(
-            ['pdftoppm', '-gray', '-r', str(dpi), ruta_pdf, prefijo],
-            check=True, capture_output=True
-        )
-        archivos = sorted(f for f in os.listdir(tmp) if f.endswith('.pgm'))
-        resultado = []
-        for i, nombre in enumerate(archivos, start=1):
-            ruta_img = os.path.join(tmp, nombre)
-            texto = subprocess.run(
-                ['tesseract', ruta_img, '-', '-l', 'spa'],
-                check=True, capture_output=True, encoding='utf-8', errors='replace'
-            ).stdout
-            resultado.append((i, texto))
-        return resultado
+  try {
+    // Leer el archivo
+    pdfBytes = await file.arrayBuffer();
+    setProgress(10, 'Leyendo páginas...', '');
 
+    // Configurar PDF.js para extracción de texto
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-def intentar_texto_nativo(ruta_pdf):
-    """Si el PDF tiene capa de texto real, es mucho más rápido que el OCR."""
-    try:
-        salida = subprocess.run(
-            ['pdftotext', '-layout', ruta_pdf, '-'],
-            check=True, capture_output=True, encoding='utf-8', errors='replace'
-        ).stdout
-        # No basta con que haya "algo" de texto — muchas escrituras
-        # escaneadas traen un sello/certificado con texto real en cada
-        # página (poco contenido, pero se suma en documentos largos). Se
-        # exige encontrar al menos una cláusula real para confiar en esto;
-        # si no, es una señal de que el cuerpo del documento es imagen y
-        # hay que ir a OCR.
-        if PATRON_CLAUSULA.search(salida):
-            paginas = salida.split('\x0c')  # separador de página de pdftotext
-            return [(i + 1, p) for i, p in enumerate(paginas) if p.strip()]
-    except Exception:
-        pass
-    return None
+    const pdfDoc = await pdfjsLib.getDocument({ data: pdfBytes.slice(0) }).promise;
+    const totalPaginas = pdfDoc.numPages;
+    setProgress(15, `PDF cargado — ${totalPaginas} páginas`, `Analizando texto de cada página...`);
 
-
-def detectar_clausulas(paginas_texto):
-    """Devuelve lista de {numero, titulo, pagina, inicio, fin} por cláusula."""
-    texto_completo = ''
-    mapa_offset_pagina = []  # (offset_inicio, num_pagina)
-    for num_pag, texto in paginas_texto:
-        mapa_offset_pagina.append((len(texto_completo), num_pag))
-        texto_completo += (texto or '') + '\n'
-
-    def pagina_de(offset):
-        pagina = paginas_texto[0][0] if paginas_texto else 1
-        for ini, num in mapa_offset_pagina:
-            if ini <= offset:
-                pagina = num
-            else:
-                break
-        return pagina
-
-    matches = list(PATRON_CLAUSULA.finditer(texto_completo))
-    clausulas = []
-    for i, m in enumerate(matches):
-        ordinal = m.group(1).upper()
-        numero = ORDINALES.get(ordinal, None)
-        inicio = m.start()
-        fin = matches[i + 1].start() if i + 1 < len(matches) else len(texto_completo)
-        resto_linea = texto_completo[m.end():fin].split('\n', 1)[0].strip()
-        clausulas.append({
-            'numero': numero,
-            'ordinal_texto': ordinal,
-            'titulo': resto_linea[:80],
-            'pagina': pagina_de(inicio),
-            'inicio': inicio,
-            'fin': fin,
-        })
-    return clausulas, texto_completo, pagina_de
-
-
-def buscar_requisitos(clausulas, texto_completo, pagina_de):
-    resultado = {}
-    for nombre_req, patrones in REQUISITOS.items():
-        encontrado = None
-        for patron in patrones:
-            m = re.search(patron, texto_completo, re.IGNORECASE | re.DOTALL)
-            if m:
-                offset = m.start()
-                clausula_match = next(
-                    (c for c in clausulas if c['inicio'] <= offset < c['fin']), None
-                )
-                encontrado = {
-                    'clausula': clausula_match['numero'] if clausula_match else None,
-                    'clausula_titulo': clausula_match['titulo'] if clausula_match else None,
-                    'pagina': pagina_de(offset),
-                }
-                break
-        resultado[nombre_req] = encontrado
-    return resultado
-
-
-def detectar_programa(texto_completo):
-    for programa, patrones in PATRON_PROGRAMA.items():
-        for patron in patrones:
-            if re.search(patron, texto_completo, re.IGNORECASE):
-                return programa
-    return None
-
-
-def extraer_comprador(texto_completo):
-    """
-    Busca en la sección de comparecencia (inicio del documento) el nombre y
-    RUT de quien está identificado como "el comprador"/"la parte
-    compradora"/"el deudor"/"el mutuario" — no cualquier persona nombrada
-    (para no confundir con el representante del banco, de la inmobiliaria,
-    o el notario). Es una heurística — el resultado siempre debe
-    confirmarse a mano.
-    """
-    inicio = texto_completo[:5000]  # la comparecencia siempre está al principio
-    etiquetas_comprador = re.compile(
-        r'(el\s+comprador|la\s+parte\s+compradora|el\s+deudor|la\s+parte\s+deudora|el\s+mutuario)',
-        re.IGNORECASE
-    )
-    etiquetas_excluir = re.compile(
-        r'(el\s+banco|el\s+vendedor|la\s+parte\s+vendedora|notari[oa]|en\s+representaci[oó]n\s+del?\s+banco)',
-        re.IGNORECASE
-    )
-    patron_persona = re.compile(
-        r'(don|doña)\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]+?),[\s\S]{0,300}?(?:c[eé]dula[^0-9]{0,40}|rut[^0-9]{0,10})(\d{1,2}\.?\d{3}\.?\d{3}[-‐]?[\dkK])',
-        re.IGNORECASE
-    )
-    candidatos = []
-    for m in patron_persona.finditer(inicio):
-        # Ventana de contexto: desde este candidato hasta el próximo "don/doña"
-        # (o el final de la comparecencia), para ver cómo lo etiquetan.
-        ventana = inicio[m.end():m.end() + 400]
-        es_comprador = etiquetas_comprador.search(ventana)
-        es_excluido = etiquetas_excluir.search(ventana)
-        if es_comprador and not es_excluido:
-            candidatos.append({'nombre': m.group(2).strip(), 'rut': m.group(3)})
-    return candidatos
-
-
-def main():
-    if len(sys.argv) < 3:
-        print(json.dumps({'error': 'Uso: extraer_escritura.py <pdf> <salida_json>'}))
-        sys.exit(1)
-    ruta_pdf, ruta_salida = sys.argv[1], sys.argv[2]
-
-    paginas_texto = intentar_texto_nativo(ruta_pdf)
-    metodo = 'texto_nativo'
-    if not paginas_texto:
-        paginas_texto = ocr_pdf(ruta_pdf)
-        metodo = 'ocr'
-
-    clausulas, texto_completo, pagina_de = detectar_clausulas(paginas_texto)
-    requisitos = buscar_requisitos(clausulas, texto_completo, pagina_de)
-    programa = detectar_programa(texto_completo)
-    candidatos_comprador = extraer_comprador(texto_completo)
-
-    resultado = {
-        'metodo_lectura': metodo,
-        'total_paginas': len(paginas_texto),
-        'total_clausulas_detectadas': len(clausulas),
-        'programa_detectado': programa,
-        'candidatos_comprador': candidatos_comprador,
-        'requisitos': requisitos,
+    // Extraer texto de cada página
+    const textosPaginas = [];
+    for (let i = 1; i <= totalPaginas; i++) {
+      const page    = await pdfDoc.getPage(i);
+      const content = await page.getTextContent();
+      const texto   = content.items.map(s => s.str).join(' ').toLowerCase();
+      textosPaginas.push(texto);
+      const pct = 15 + Math.round((i / totalPaginas) * 50);
+      setProgress(pct, `Leyendo página ${i} de ${totalPaginas}...`, '');
     }
-    with open(ruta_salida, 'w', encoding='utf-8') as f:
-        json.dump(resultado, f, ensure_ascii=False, indent=2)
-    print(json.dumps({'ok': True, 'resumen': {
-        'clausulas': len(clausulas), 'programa': programa,
-        'compradores_candidatos': len(candidatos_comprador),
-    }}))
 
+    setProgress(65, 'Detectando cartas...', '');
 
-if __name__ == '__main__':
-    main()
+    // Detectar límites de cada carta
+    const inicios = []; // índices base-0 de páginas donde empieza una carta
+    for (let i = 0; i < textosPaginas.length; i++) {
+      if (textosPaginas[i].includes(PATRON_INICIO)) {
+        inicios.push(i);
+      }
+    }
+
+    if (inicios.length === 0) {
+      toast('No se encontraron cartas oferta en el PDF', true);
+      mostrarProgress(false);
+      return;
+    }
+
+    // Para cada inicio, buscar el fin (página que contiene el patrón de fin)
+    // y extraer el nombre del cliente
+    const advertencias = [];
+    cartasData = [];
+
+    for (let idx = 0; idx < inicios.length; idx++) {
+      const paginaInicio = inicios[idx]; // base-0
+      // Buscar fin: desde paginaInicio hasta el inicio de la siguiente carta (o fin del doc)
+      const limite = idx + 1 < inicios.length ? inicios[idx + 1] : textosPaginas.length;
+      let paginaFin = -1;
+      for (let p = paginaInicio; p < limite; p++) {
+        if (textosPaginas[p].includes(PATRON_FIN)) {
+          paginaFin = p;
+          break;
+        }
+      }
+      // Si no encontró el patrón de fin, tomar hasta el inicio de la siguiente carta - 1
+      if (paginaFin === -1) {
+        paginaFin = limite - 1;
+        advertencias.push(`Carta ${idx + 1}: no se encontró firma de Moises Bello — se tomaron páginas ${paginaInicio + 1} a ${paginaFin + 1}`);
+      }
+
+      // Extraer nombre del cliente buscando el patrón en las páginas de esta carta
+      let nombreCliente = '';
+      for (let p = paginaInicio; p <= paginaFin; p++) {
+        const texto = textosPaginas[p];
+        const idxNombre = texto.indexOf(PATRON_NOMBRE);
+        if (idxNombre !== -1) {
+          // Extraer el texto que sigue al patrón
+          const resto = texto.slice(idxNombre + PATRON_NOMBRE.length).trim();
+          // Cortar antes de "rut cliente" u otros campos que siguen
+          const restoLimpio = resto.split(/rut\s*cliente|fecha|domicilio|teléfono|telefono/i)[0].trim();
+          const match = restoLimpio.match(/^([a-záéíóúüñ\s]{3,60})/i);
+          if (match) {
+            nombreCliente = match[1].trim().toUpperCase()
+              .replace(/\s+/g, ' ')
+              .replace(/[^A-ZÁÉÍÓÚÜÑ\s]/g, '');
+            break;
+          }
+        }
+      }
+
+      if (!nombreCliente) {
+        nombreCliente = `CARTA_${String(idx + 1).padStart(3, '0')}`;
+        advertencias.push(`Carta ${idx + 1} (páginas ${paginaInicio + 1}–${paginaFin + 1}): no se pudo extraer el nombre del cliente`);
+      }
+
+      // Sanitizar nombre para usar como nombre de archivo
+      const nombreArchivo = nombreCliente
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^A-Z0-9\s]/g, '').trim()
+        .replace(/\s+/g, '_') + '.pdf';
+
+      cartasData.push({
+        nombre:        nombreCliente,
+        nombreArchivo,
+        inicio:        paginaInicio, // base-0
+        fin:           paginaFin,    // base-0
+        paginas:       paginaFin - paginaInicio + 1,
+        advertencia:   advertencias.some(a => a.startsWith(`Carta ${idx + 1}:`))
+      });
+
+      setProgress(65 + Math.round((idx / inicios.length) * 20), `Detectando carta ${idx + 1} de ${inicios.length}...`, '');
+    }
+
+    setProgress(85, 'Preparando resultados...', '');
+    // Precargar el PDFDocument con pdf-lib una sola vez — se reutiliza para todas las cartas
+    const { PDFDocument: PDFDocumentLib } = PDFLib;
+    pdfDocCache = await PDFDocumentLib.load(pdfBytes);
+
+    // Mostrar advertencias
+    if (advertencias.length > 0) {
+      document.getElementById('warnBox').classList.add('visible');
+      document.getElementById('warnList').innerHTML = advertencias.map(a => `<li>${a}</li>`).join('');
+    }
+
+    // Mostrar resultados
+    document.getElementById('statCartas').textContent   = cartasData.length;
+    document.getElementById('statPaginas').textContent  = totalPaginas;
+
+    const lista = document.getElementById('cartasLista');
+    lista.innerHTML = cartasData.map((carta, i) => `
+      <div class="carta-item">
+        <div class="carta-num">${i + 1}</div>
+        <div class="carta-icon">📋</div>
+        <div class="carta-info">
+          <div class="carta-nombre">${carta.nombre}</div>
+          <div class="carta-pages">Páginas ${carta.inicio + 1} – ${carta.fin + 1} · ${carta.paginas} ${carta.paginas === 1 ? 'hoja' : 'hojas'}</div>
+          ${carta.advertencia ? '<div class="carta-warn">⚠️ Ver advertencia arriba</div>' : ''}
+        </div>
+        <div class="carta-dl">
+          <button class="btn-dl" onclick="descargarIndividual(${i})">↓ PDF</button>
+        </div>
+      </div>`).join('');
+
+    setProgress(100, `${cartasData.length} cartas detectadas correctamente`, '');
+    setTimeout(() => mostrarProgress(false), 800);
+    document.getElementById('resultadoCard').classList.add('visible');
+    toast(`${cartasData.length} cartas detectadas`);
+
+  } catch(err) {
+    console.error(err);
+    toast('Error al procesar el PDF: ' + err.message, true);
+    mostrarProgress(false);
+  }
+}
+
+// ── EXTRAER PDF INDIVIDUAL ────────────────────────────────────
+async function extraerPdf(carta) {
+  const { PDFDocument } = PDFLib;
+  // Reusar el documento ya cargado en lugar de leer los bytes cada vez
+  const srcDoc  = pdfDocCache || await PDFDocument.load(pdfBytes);
+  const newDoc  = await PDFDocument.create();
+  // Copiar páginas (base-0)
+  const indices = [];
+  for (let i = carta.inicio; i <= carta.fin; i++) indices.push(i);
+  const pagsCopadas = await newDoc.copyPages(srcDoc, indices);
+  pagsCopadas.forEach(p => newDoc.addPage(p));
+  return await newDoc.save();
+}
+
+async function descargarIndividual(idx) {
+  const carta = cartasData[idx];
+  try {
+    toast(`Generando ${carta.nombreArchivo}...`);
+    const bytes = await extraerPdf(carta);
+    const blob  = new Blob([bytes], { type: 'application/pdf' });
+    const url   = URL.createObjectURL(blob);
+    const a     = document.createElement('a');
+    a.href = url; a.download = carta.nombreArchivo;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    toast(`Descargado: ${carta.nombreArchivo}`);
+    registrarHistorial('individual', 1, carta.nombreArchivo);
+  } catch(err) {
+    toast('Error al generar PDF: ' + err.message, true);
+  }
+}
+
+// ── DESCARGAR ZIP ─────────────────────────────────────────────
+async function descargarZip() {
+  const btn = document.getElementById('btnZip');
+  btn.disabled = true;
+  btn.textContent = 'Generando ZIP...';
+
+  try {
+    const zip = new JSZip();
+    const carpeta = zip.folder('Cartas_Oferta_Baker');
+
+    for (let i = 0; i < cartasData.length; i++) {
+      const carta = cartasData[i];
+      setProgress(Math.round((i / cartasData.length) * 100),
+        `Generando PDF ${i + 1} de ${cartasData.length}...`,
+        carta.nombre);
+      mostrarProgress(true);
+      const bytes = await extraerPdf(carta);
+      carpeta.file(carta.nombreArchivo, bytes);
+    }
+
+    setProgress(100, 'Comprimiendo...', '');
+    const blob = await zip.generateAsync({
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    });
+
+    mostrarProgress(false);
+
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const fecha = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = `Cartas_Oferta_Baker_${fecha}.zip`;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+    toast(`ZIP descargado con ${cartasData.length} cartas`);
+    registrarHistorial('zip', cartasData.length, file_nombre_actual);
+  } catch(err) {
+    toast('Error al generar ZIP: ' + err.message, true);
+    mostrarProgress(false);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Descargar todo en ZIP`;
+  }
+}
+
+// ── HELPERS UI ────────────────────────────────────────────────
+function setProgress(pct, texto, detalle) {
+  document.getElementById('progressFill').style.width  = pct + '%';
+  document.getElementById('progressPct').textContent   = pct + '%';
+  document.getElementById('progressText').textContent  = texto;
+  document.getElementById('progressDetail').textContent = detalle;
+}
+function mostrarProgress(visible) {
+  document.getElementById('progressCard').classList.toggle('visible', visible);
+}
+function resetearEstado() {
+  pdfBytes           = null;
+  pdfDocCache        = null;
+  cartasData         = [];
+  zipGenerado        = null;
+  file_nombre_actual = '';
+  document.getElementById('resultadoCard').classList.remove('visible');
+  document.getElementById('warnBox').classList.remove('visible');
+  document.getElementById('cartasLista').innerHTML = '';
+  document.getElementById('warnList').innerHTML = '';
+}
+function resetear() {
+  resetearEstado();
+  mostrarProgress(false);
+  document.getElementById('fileInput').value = '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function toast(msg, err = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = 'toast' + (err ? ' err' : '');
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ── HISTORIAL ────────────────────────────────────────────────
+async function registrarHistorial(accion, totalCartas, archivo) {
+  try {
+    await fetch(`${API_BASE}/historial-cartas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: correoActual, archivo, totalCartas, accion })
+    });
+    cargarHistorial();
+  } catch(e) { console.warn('historial-cartas: sin conexión'); }
+}
+
+async function cargarHistorial() {
+  const card  = document.getElementById('historialCard');
+  const lista = document.getElementById('historialLista');
+  try {
+    const res  = await fetch(`${API_BASE}/historial-cartas`);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    if (!data.length) {
+      lista.innerHTML = '<div style="padding:16px 20px;font-family:var(--mono);font-size:0.78rem;color:var(--ink3);">Sin registros todavía</div>';
+    } else {
+      lista.innerHTML = data.slice(0, 50).map(h => {
+        const fecha = new Date(h.fecha).toLocaleString('es-CL', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
+        const accionLabel = h.accion === 'zip' ? `ZIP · ${h.totalCartas} cartas` : `PDF individual`;
+        return `
+          <div class="carta-item">
+            <div class="carta-icon">${h.accion === 'zip' ? '🗜️' : '📋'}</div>
+            <div class="carta-info">
+              <div class="carta-nombre">${h.email}</div>
+              <div class="carta-pages">${accionLabel} · ${h.archivo || ''}</div>
+            </div>
+            <div style="font-family:var(--mono);font-size:0.72rem;color:var(--ink3);flex-shrink:0;">${fecha}</div>
+          </div>`;
+      }).join('');
+    }
+    card.style.display = 'block';
+  } catch(e) {
+    card.style.display = 'none';
+  }
+}
+
+// ── PESTAÑAS ──────────────────────────────────────────────────
+function cambiarTab(tab) {
+  document.getElementById('panelCartas').style.display = tab === 'cartas' ? 'block' : 'none';
+  document.getElementById('panelConciliacion').style.display = tab === 'conciliacion' ? 'block' : 'none';
+  document.getElementById('panelDS19').style.display = tab === 'ds19' ? 'block' : 'none';
+  const btnC = document.getElementById('tabBtnCartas'), btnE = document.getElementById('tabBtnConciliacion'), btnD = document.getElementById('tabBtnDS19');
+  btnC.style.color = tab === 'cartas' ? 'var(--cyan)' : 'var(--ink2)';
+  btnC.style.borderBottomColor = tab === 'cartas' ? 'var(--cyan)' : 'transparent';
+  btnE.style.color = tab === 'conciliacion' ? 'var(--cyan)' : 'var(--ink2)';
+  btnE.style.borderBottomColor = tab === 'conciliacion' ? 'var(--cyan)' : 'transparent';
+  btnD.style.color = tab === 'ds19' ? 'var(--cyan)' : 'var(--ink2)';
+  btnD.style.borderBottomColor = tab === 'ds19' ? 'var(--cyan)' : 'transparent';
+}
+
+// ── CONCILIACIÓN ENERGÉTICO ──────────────────────────────────
+let excelDataConciliacion = [];   // [{producto:Number, cliente:String}]
+let pdfsConciliacion      = [];   // [File]
+let resultadosConciliacion = [];  // [{original, nuevo, cliente, numero, match, file}]
+
+function cargarExcelConciliacion(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      // Se lee por posición (columna A = número de lote, columna B = nombre del
+      // cliente), sin importar cómo se llamen los encabezados en el Excel.
+      const filas = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      excelDataConciliacion = filas.slice(1) // se salta la fila 1 (encabezados)
+        .map(f => ({ producto: parseInt(String(f[0]).trim(), 10), cliente: String(f[1] || '').trim() }))
+        .filter(r => !isNaN(r.producto) && r.cliente);
+      document.getElementById('excelTitle').textContent = `✓ ${file.name} (${excelDataConciliacion.length} clientes)`;
+      checkHabilitarProcesarConciliacion();
+    } catch(err) {
+      toast('No se pudo leer el Excel: ' + err.message, true);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function cargarPdfsConciliacion(event) {
+  pdfsConciliacion = Array.from(event.target.files);
+  document.getElementById('pdfsTitle').textContent = `✓ ${pdfsConciliacion.length} PDF seleccionados`;
+  checkHabilitarProcesarConciliacion();
+}
+
+function checkHabilitarProcesarConciliacion() {
+  document.getElementById('btnProcesarConciliacion').disabled = !(excelDataConciliacion.length && pdfsConciliacion.length);
+}
+
+// Extrae el número correlativo del nombre del archivo, ej:
+// "Informe_CEV - 001 - A.pdf" -> 1
+function extraerNumeroPdf(nombreArchivo) {
+  const m = nombreArchivo.match(/-\s*(\d+)\s*-/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function procesarConciliacion() {
+  resultadosConciliacion = pdfsConciliacion.map(file => {
+    const numero = extraerNumeroPdf(file.name);
+    const match = numero !== null ? excelDataConciliacion.find(r => r.producto === numero) : null;
+    const extIdx = file.name.lastIndexOf('.');
+    const base = extIdx > -1 ? file.name.slice(0, extIdx) : file.name;
+    const ext  = extIdx > -1 ? file.name.slice(extIdx) : '.pdf';
+    const nuevo = match ? `${base} - ${match.cliente}${ext}` : file.name;
+    return { original: file.name, nuevo, cliente: match ? match.cliente : '', numero, match: !!match, file };
+  });
+
+  const conMatch  = resultadosConciliacion.filter(r => r.match);
+  const sinMatch  = resultadosConciliacion.filter(r => !r.match);
+
+  document.getElementById('statConciliados').textContent = conMatch.length;
+  document.getElementById('statSinMatch').textContent = sinMatch.length;
+
+  const warnBox = document.getElementById('warnBoxConciliacion');
+  if (sinMatch.length) {
+    document.getElementById('warnListConciliacion').innerHTML = sinMatch.map(r =>
+      `<li>${r.original}${r.numero !== null ? ` — producto N°${r.numero} no está en el Excel` : ' — no se encontró un número correlativo en el nombre'}</li>`
+    ).join('');
+    warnBox.classList.add('visible');
+  } else {
+    warnBox.classList.remove('visible');
+  }
+
+  const lista = document.getElementById('conciliacionLista');
+  lista.innerHTML = resultadosConciliacion.map((r, i) => `
+    <div class="carta-item">
+      <div class="carta-icon">${r.match ? '📋' : '⚠️'}</div>
+      <div class="carta-info">
+        <div class="carta-nombre">${r.nuevo}</div>
+        <div class="carta-pages">${r.match ? `Producto N°${r.numero} · ${r.cliente}` : 'Sin coincidencia — se descarga con el nombre original'}</div>
+      </div>
+      <div class="carta-dl">
+        <button class="btn-dl" onclick="descargarIndividualConciliacion(${i})">↓ PDF</button>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('resultadoConciliacionCard').classList.add('visible');
+}
+
+async function descargarIndividualConciliacion(idx) {
+  const r = resultadosConciliacion[idx];
+  const url = URL.createObjectURL(r.file);
+  const a = document.createElement('a');
+  a.href = url; a.download = r.nuevo;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function descargarZipConciliacion() {
+  if (!resultadosConciliacion.length) return;
+  const zip = new JSZip();
+  for (const r of resultadosConciliacion) {
+    const buf = await r.file.arrayBuffer();
+    zip.file(r.nuevo, buf);
+  }
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'Calificacion_Energetica.zip';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function resetearConciliacion() {
+  excelDataConciliacion = [];
+  pdfsConciliacion = [];
+  resultadosConciliacion = [];
+  document.getElementById('inputExcel').value = '';
+  document.getElementById('inputPdfs').value = '';
+  document.getElementById('excelTitle').textContent = 'Sube el Excel con Producto y Cliente';
+  document.getElementById('pdfsTitle').textContent = 'Sube los PDF por lote';
+  document.getElementById('warnBoxConciliacion').classList.remove('visible');
+  document.getElementById('resultadoConciliacionCard').classList.remove('visible');
+  checkHabilitarProcesarConciliacion();
+}
+
+// ── ENVÍO MASIVO DE CORREOS (uno por uno, mismo destinatario) ──
+async function getTokenCorreo() {
+  const accounts = msalInstance.getAllAccounts();
+  if (!accounts.length) return null;
+  try {
+    const res = await msalInstance.acquireTokenSilent({ scopes: ['Mail.Send'], account: accounts[0] });
+    return res.accessToken;
+  } catch(e) {
+    try {
+      const res = await msalInstance.acquireTokenPopup({ scopes: ['Mail.Send'] });
+      return res.accessToken;
+    } catch(e2) {
+      toast('No se pudo autorizar el envío de correo: ' + e2.message, true);
+      return null;
+    }
+  }
+}
+
+function arrayBufferABase64(buffer) {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+async function enviarCorreosMasivo() {
+  const destino = document.getElementById('correoDestinoMasivo').value.trim();
+  if (!destino || !destino.includes('@')) { toast('Ingresa un correo de destino válido', true); return; }
+  if (!resultadosConciliacion.length) return;
+
+  // Solo se envían por correo los PDF que sí cruzaron con el Excel — los que
+  // quedaron sin coincidencia no se mandan (igual siguen disponibles para
+  // descargar manualmente arriba, por si hace falta revisarlos aparte).
+  const paraEnviar = resultadosConciliacion.filter(r => r.match);
+  const sinMatch = resultadosConciliacion.length - paraEnviar.length;
+  if (!paraEnviar.length) { toast('Ningún documento tiene coincidencia con el Excel — no hay nada que enviar', true); return; }
+
+  const n = paraEnviar.length;
+  const minEstimados = Math.ceil((n * 4) / 60);
+  if (!confirm(`Se van a enviar ${n} correo(s) individuales a ${destino}, cada uno con 1 PDF adjunto.${sinMatch ? `\n\n${sinMatch} documento(s) sin coincidencia NO se van a enviar.` : ''}\n\nEsto va a tardar aprox. ${minEstimados} minuto(s), más si Microsoft pide pausas extra en el camino. ¿Confirmas?`)) return;
+
+  const token = await getTokenCorreo();
+  if (!token) return;
+
+  const btn = document.getElementById('btnEnviarCorreos');
+  btn.disabled = true;
+  const progreso = document.getElementById('envioProgreso');
+  progreso.style.display = 'block';
+
+  // Envía UN correo con 1 PDF, con reintentos si Microsoft lo frena por exceso de velocidad (429).
+  async function enviarUno(r, intento = 1) {
+    const buf = await r.file.arrayBuffer();
+    const asunto = r.nuevo.replace(/\.pdf$/i, '');
+    const mensaje = {
+      message: {
+        subject: asunto,
+        body: { contentType: 'Text', content: `Se adjunta el documento ${r.nuevo}.` },
+        toRecipients: [{ emailAddress: { address: destino } }],
+        attachments: [{
+          '@odata.type': '#microsoft.graph.fileAttachment',
+          name: r.nuevo,
+          contentType: 'application/pdf',
+          contentBytes: arrayBufferABase64(buf),
+        }],
+      },
+      saveToSentItems: true,
+    };
+    const res = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(mensaje),
+    });
+    if (res.ok || res.status === 202) return { ok: true };
+    if (res.status === 429 && intento <= 5) {
+      // El 429 de Graph no siempre trae "Retry-After" legible desde el navegador
+      // (CORS puede bloquearlo), y 30s resultó insuficiente en la práctica —
+      // usamos espera creciente: 60s, 120s, 240s, 480s, 960s.
+      const headerEspera = parseInt(res.headers.get('Retry-After'), 10);
+      const espera = headerEspera && headerEspera > 0 ? headerEspera : 60 * Math.pow(2, intento - 1);
+      progreso.textContent = `Microsoft frenó el envío — esperando ${espera}s antes de reintentar "${r.nuevo}" (intento ${intento + 1} de 6)…`;
+      await new Promise(res2 => setTimeout(res2, espera * 1000));
+      return enviarUno(r, intento + 1);
+    }
+    const err = await res.json().catch(() => ({}));
+    return { ok: false, error: err.error?.message || `HTTP ${res.status}` };
+  }
+
+  let enviados = 0, fallidos = [];
+  for (let i = 0; i < paraEnviar.length; i++) {
+    const r = paraEnviar[i];
+    progreso.textContent = `Enviando ${i + 1} de ${n}: ${r.nuevo}`;
+    try {
+      const resultado = await enviarUno(r);
+      if (resultado.ok) enviados++;
+      else fallidos.push(`${r.nuevo}: ${resultado.error}`);
+    } catch(e) {
+      fallidos.push(`${r.nuevo}: ${e.message}`);
+    }
+    // Ritmo conservador entre correos, para no gatillar el limitador de Graph.
+    if (i < paraEnviar.length - 1) await new Promise(res => setTimeout(res, 4000));
+  }
+
+  btn.disabled = false;
+  progreso.textContent = `Listo — ${enviados} de ${n} enviados${fallidos.length ? `, ${fallidos.length} con error (ver consola)` : ''}.`;
+  if (fallidos.length) console.error('Correos que fallaron:', fallidos);
+  toast(fallidos.length ? `${enviados}/${n} enviados, ${fallidos.length} fallaron` : `${enviados} correo(s) enviados correctamente`, fallidos.length > 0);
+}
+
+// ── FORMULARIO DS19 ──────────────────────────────────────────
+const REQUISITOS_DS19 = [
+  'Permiso Edificación', 'Recepción Final', 'N° y fecha Resolución',
+  'Estacionamiento', 'Individualización vivienda', 'Precio compraventa',
+  'Seguro incendio y sismo', 'Seguro desgravamen e invalidez 2/3',
+  'Seguro desempleo e incapacidad temporal',
+  'Prohibiciones de enajenar, ceder uso y goce y habitar en favor de Serviu',
+  'Mandato cobro subsidio', 'Exención IVA o Contrato suma alzada',
+  'Nómina de Profesionales, articulo 18. Ley General de U.',
+];
+let ds19Compradores = []; // [{rut, nombre, requisitos:{...}, archivoNombre}]
+
+function ds19LeerArchivoBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function ds19MostrarSeleccion() {
+  const input = document.getElementById('ds19-file-input');
+  const span = document.getElementById('ds19-archivos-elegidos');
+  const archivos = Array.from(input.files || []);
+  span.textContent = archivos.length
+    ? `${archivos.length} archivo(s) seleccionado(s): ${archivos.map(f=>f.name).join(', ')}`
+    : 'Ningún archivo seleccionado todavía';
+}
+
+async function ds19SubirEscrituras() {
+  const input = document.getElementById('ds19-file-input');
+  const archivos = Array.from(input.files || []).slice(0, 10);
+  if (!archivos.length) { toast('Selecciona al menos un PDF', true); return; }
+
+  const contProcesando = document.getElementById('ds19-lista-procesando');
+  contProcesando.innerHTML = archivos.map(f => `
+    <div id="ds19-job-${f.name.replace(/[^a-zA-Z0-9]/g,'_')}" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;font-size:0.82rem;">
+      ⏳ ${f.name} — subiendo y procesando (puede tardar varios minutos)…
+    </div>`).join('');
+
+  for (const file of archivos) {
+    try {
+      const base64 = await ds19LeerArchivoBase64(file);
+      const res = await fetch(`${API_BASE}/ds19/procesar-escritura`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ archivoBase64: base64, nombreArchivo: file.name })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al subir');
+      ds19EsperarResultado(data.jobId, file.name);
+    } catch(e) {
+      const divId = `ds19-job-${file.name.replace(/[^a-zA-Z0-9]/g,'_')}`;
+      const div = document.getElementById(divId);
+      if (div) div.innerHTML = `❌ ${file.name} — error: ${e.message}`;
+    }
+  }
+}
+
+async function ds19EsperarResultado(jobId, nombreArchivo) {
+  const divId = `ds19-job-${nombreArchivo.replace(/[^a-zA-Z0-9]/g,'_')}`;
+  const div = document.getElementById(divId);
+  const maxIntentos = 60; // ~15 minutos tope (60 × 15s)
+  for (let i = 0; i < maxIntentos; i++) {
+    await new Promise(r => setTimeout(r, 15000));
+    try {
+      const res = await fetch(`${API_BASE}/ds19/estado/${jobId}`);
+      const data = await res.json();
+      if (data.estado === 'listo') {
+        if (div) div.innerHTML = `✅ ${nombreArchivo} — procesado`;
+        ds19AgregarComprador(data.resultado, nombreArchivo);
+        return;
+      } else if (data.estado === 'error') {
+        if (div) div.innerHTML = `❌ ${nombreArchivo} — error: ${data.error}`;
+        return;
+      }
+    } catch(e) { /* sigue esperando */ }
+  }
+  if (div) div.innerHTML = `⚠ ${nombreArchivo} — está tardando más de lo normal, revisa la consola del servidor`;
+}
+
+function ds19AgregarComprador(resultado, nombreArchivo) {
+  const candidato = (resultado.candidatos_comprador || [])[0] || {};
+  const requisitos = {};
+  REQUISITOS_DS19.forEach(nombre => {
+    const r = resultado.requisitos?.[nombre];
+    requisitos[nombre] = r ? String(r.clausula ?? '') : '';
+  });
+  ds19Compradores.push({
+    rut: candidato.rut || '',
+    nombre: candidato.nombre || '',
+    programa: resultado.programa_detectado || '',
+    requisitos,
+    archivoNombre: nombreArchivo,
+  });
+  ds19RenderTablaRevision();
+}
+
+function ds19RenderTablaRevision() {
+  const cont = document.getElementById('ds19-tabla-revision');
+  if (!ds19Compradores.length) { cont.innerHTML = ''; return; }
+  cont.innerHTML = `
+    <div style="font-weight:700;font-size:0.9rem;margin:16px 0 8px;">Revisa y corrige antes de generar el formulario</div>
+    <div style="overflow-x:auto;">
+    <table style="border-collapse:collapse;width:100%;font-size:0.78rem;">
+      <thead><tr style="background:var(--bg2);">
+        <th style="padding:6px;border:1px solid var(--border);text-align:left;color:var(--ink);">Archivo</th>
+        <th style="padding:6px;border:1px solid var(--border);color:var(--ink);">RUT</th>
+        <th style="padding:6px;border:1px solid var(--border);color:var(--ink);">Nombre</th>
+        ${REQUISITOS_DS19.map(r => `<th style="padding:6px;border:1px solid var(--border);min-width:90px;color:var(--ink);">${r}</th>`).join('')}
+      </tr></thead>
+      <tbody>
+        ${ds19Compradores.map((c, i) => `
+        <tr>
+          <td style="padding:4px;border:1px solid var(--border);color:var(--ink);">${c.archivoNombre}</td>
+          <td style="padding:2px;border:1px solid var(--border);"><input style="width:90px;border:none;background:var(--bg2);color:var(--ink);" value="${c.rut}" onchange="ds19Compradores[${i}].rut=this.value"></td>
+          <td style="padding:2px;border:1px solid var(--border);"><input style="width:160px;border:none;background:var(--bg2);color:var(--ink);" value="${c.nombre}" onchange="ds19Compradores[${i}].nombre=this.value"></td>
+          ${REQUISITOS_DS19.map(r => `<td style="padding:2px;border:1px solid var(--border);"><input style="width:40px;border:none;text-align:center;background:var(--bg2);color:var(--ink);" value="${c.requisitos[r]}" onchange="ds19Compradores[${i}].requisitos['${r.replace(/'/g,"\\'")}']=this.value"></td>`).join('')}
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    </div>`;
+  document.getElementById('ds19-generar-wrap').style.display = 'block';
+}
+
+async function ds19GenerarFormulario() {
+  const programaDetectado = ds19Compradores.find(c => c.programa)?.programa || '';
+  const payload = {
+    proyecto: {
+      fecha_ingreso: new Date().toLocaleDateString('es-CL'),
+      nombre_carpeta: document.getElementById('ds19-carpeta').value,
+      vendedor: document.getElementById('ds19-vendedor').value,
+      codigo_proyecto: document.getElementById('ds19-codigo').value,
+      nombre_proyecto: document.getElementById('ds19-nombreproyecto').value,
+      resoluciones_texto: document.getElementById('ds19-resoluciones').value,
+      programa: programaDetectado,
+      ano_beneficio: document.getElementById('ds19-ano').value,
+      tramo: '',
+    },
+    compradores: ds19Compradores.map(c => ({
+      rut: c.rut, nombre: c.nombre, requisitos: c.requisitos,
+    })),
+  };
+  try {
+    const res = await fetch(`${API_BASE}/ds19/generar-formulario`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Error'); }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'Formulario_DS19_completado.docx';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Formulario generado y descargado');
+  } catch(e) {
+    toast('Error al generar el formulario: ' + e.message, true);
+  }
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+initAuth();
+</script>
+</body>
+</html>
