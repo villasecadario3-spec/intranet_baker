@@ -1762,6 +1762,19 @@ function renderResumenWidget(){
   attachToggleSubListeners();
 }
 
+function eliminarWorker(id){
+  const w = workers.find(x => x.id === id);
+  if(!w) return;
+  if(!confirm(`¿Eliminar a ${w.name} (${w.role} · ${w.cc}) de la dotación? Esto no se puede deshacer una vez que guardes.`)) return;
+  workers = workers.filter(x => x.id !== id);
+  renderCCChips();
+  renderCargoFiltro();
+  renderRoster();
+  renderResumenWidget();
+  renderExportPreview();
+  toast(`${w.name} eliminado — no olvides Guardar cambios`);
+}
+
 function renderRoster(){
   const body = document.getElementById('rosterBody');
   const q = document.getElementById('searchBox').value.trim();
@@ -1809,7 +1822,9 @@ function renderRoster(){
     return `
     <div class="row ${departed?'is-out':''}" data-id="${w.id}">
       <div>
-        <div class="name">${w.name} ${w.source==='ingreso'?'<span class="badge-ingreso">Ingreso</span>':''} ${w.source==='proyectado'?'<span class="badge-ingreso" style="background:#EEF2FF;color:#4F46E5;">Proyectado</span>':''}</div>
+        <div class="name">${w.name} ${w.source==='ingreso'?'<span class="badge-ingreso">Ingreso</span>':''} ${w.source==='proyectado'?'<span class="badge-ingreso" style="background:#EEF2FF;color:#4F46E5;">Proyectado</span>':''}
+          <button class="btn btn-ghost btn-sm" style="padding:1px 6px;font-size:10px;color:var(--red);margin-left:6px;" title="Eliminar de la dotación" onclick="eliminarWorker('${w.id}')">✕</button>
+        </div>
         <div class="rut">${w.rut||''}</div>
       </div>
       <div>
