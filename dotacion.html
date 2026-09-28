@@ -486,6 +486,7 @@
     </div>
     <div class="spacer"></div>
     <button class="btn btn-primary btn-sm" id="syncBukBtn">Sincronizar con Excel BUK</button>
+    <button class="btn btn-outline btn-sm" id="syncAsistenciaBtn">📋 Sincronizar asistencia</button>
     <button class="btn btn-ghost btn-sm" id="loadBackupBtn">Cargar respaldo (JSON)</button>
     <button class="btn btn-ghost btn-sm" id="downloadBackupBtn">Descargar respaldo (JSON)</button>
     <input type="file" id="backupFileInput" accept="application/json" style="display:none;">
@@ -737,6 +738,7 @@ const OBRA_ASISTENCIA = 'Mirador El Pino';
 const DIAS_SIN_ASISTENCIA_ALERTA = 10; // más de esto sin marcar y activo → aviso
 
 let asistenciaPorRut = {}; // rutlimpio -> { ultima: 'YYYY-MM-DD', total: N, ultimos14: N }
+let ultimaActualizacionAsistencia = null;
 
 let listaHojasCache = null;
 async function obtenerListaHojas() {
@@ -766,6 +768,40 @@ async function forzarRecalculoLibro() {
   }
 }
 
+// Dispara la actualización manual de asistencia en el servidor y va
+// consultando cada cierto tiempo hasta que termine (puede tardar varios
+// minutos, así que se avisa con claridad en vez de dejar el botón colgado).
+async function sincronizarAsistenciaManual() {
+  const btn = document.getElementById('syncAsistenciaBtn');
+  const actualizadoAntes = ultimaActualizacionAsistencia;
+  btn.disabled = true;
+  btn.textContent = 'Sincronizando asistencia…';
+  try {
+    await fetch(`${API}/dotacion/asistencia-directa/refrescar`, { method: 'POST' });
+    toast('Actualización de asistencia iniciada — puede tardar varios minutos');
+    const maxIntentos = 40; // ~10 minutos como tope (40 × 15s)
+    for (let i = 0; i < maxIntentos; i++) {
+      await new Promise(r => setTimeout(r, 15000));
+      const res = await fetch(`${API}/dotacion/asistencia-directa`);
+      const data = await res.json();
+      if (data.actualizadoEn && data.actualizadoEn !== actualizadoAntes && !data.actualizando) {
+        await cargarAsistenciaBUK();
+        renderAll();
+        toast('Asistencia sincronizada correctamente');
+        btn.disabled = false;
+        btn.textContent = '📋 Sincronizar asistencia';
+        return;
+      }
+    }
+    toast('La sincronización está tardando más de lo normal — revisa la consola del servidor');
+  } catch(e) {
+    toast('Error al sincronizar asistencia: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📋 Sincronizar asistencia';
+  }
+}
+
 async function cargarAsistenciaBUK() {
   // Conexión directa a la API de Asistencia de BUK — el servidor mantiene
   // estos datos ya calculados en memoria (se renuevan solos cada 15 minutos)
@@ -777,6 +813,7 @@ async function cargarAsistenciaBUK() {
     return;
   }
   const { datos, actualizadoEn, actualizando, error } = await res.json();
+  ultimaActualizacionAsistencia = actualizadoEn || ultimaActualizacionAsistencia;
   if (error) console.warn('[Asistencia Directa] Aviso del servidor:', error);
   if (actualizando && (!datos || !datos.length)) {
     console.log('[Asistencia Directa] El servidor está preparando los datos por primera vez — esto puede tardar unos minutos tras reiniciar. Vuelve a entrar en un rato.');
@@ -2319,6 +2356,7 @@ async function init(){
   document.getElementById('pCC').addEventListener('change', updateProyectadoCostPreview);
   document.getElementById('pRut').addEventListener('input', validateProyectadoRut);
   document.getElementById('syncBukBtn').addEventListener('click', () => sincronizarConBUK(false));
+  document.getElementById('syncAsistenciaBtn').addEventListener('click', sincronizarAsistenciaManual);
   updateProyectadoCostPreview();
 
   // Sincroniza sola en segundo plano apenas se entra al módulo, para que la
