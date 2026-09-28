@@ -702,7 +702,7 @@ async function resolverExcelItem() {
 }
 
 // Obras identificadas por prefijo de Centro de Costo — CG019 = Mirador El Pino.
-const PREFIJO_OBRA = 'CG019';
+const PREFIJOS_OBRA = ['CG019', 'CG027'];
 
 function parseFechaExcelBUK(val) {
   if (!val) return null;
@@ -916,8 +916,8 @@ async function cargarDesdeBUK() {
     return obj;
   });
 
-  const deObra = filas.filter(r => String(r[COL_CC_BUK] || '').trim().startsWith(PREFIJO_OBRA));
-  console.log(`[BUK] Filas de ${PREFIJO_OBRA}* (Mirador El Pino):`, deObra.length, 'de', filas.length, 'totales');
+  const deObra = filas.filter(r => PREFIJOS_OBRA.some(p => String(r[COL_CC_BUK] || '').trim().startsWith(p)));
+  console.log(`[BUK] Filas de ${PREFIJOS_OBRA.join('/')}* (Mirador El Pino):`, deObra.length, 'de', filas.length, 'totales');
 
   const gastoMes = {};       // id -> {mes: gasto}
   const porPersonaCC = {};   // rutlimpio#cc -> [{mes, gasto}]
