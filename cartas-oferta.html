@@ -1050,6 +1050,7 @@ function ds19AgregarComprador(resultado, nombreArchivo) {
     rut: candidato.rut || '',
     nombre: candidato.nombre || '',
     programa: resultado.programa_detectado || '',
+    resolucion: resultado.resolucion_subsidio_texto || '',
     requisitos,
     archivoNombre: nombreArchivo,
   });
@@ -1067,6 +1068,7 @@ function ds19RenderTablaRevision() {
         <th style="padding:6px;border:1px solid var(--border);text-align:left;color:var(--ink);">Archivo</th>
         <th style="padding:6px;border:1px solid var(--border);color:var(--ink);">RUT</th>
         <th style="padding:6px;border:1px solid var(--border);color:var(--ink);">Nombre</th>
+        <th style="padding:6px;border:1px solid var(--border);color:var(--ink);min-width:160px;">N° Resolución y Fecha</th>
         ${REQUISITOS_DS19.map(r => `<th style="padding:6px;border:1px solid var(--border);min-width:90px;color:var(--ink);">${r}</th>`).join('')}
       </tr></thead>
       <tbody>
@@ -1075,6 +1077,7 @@ function ds19RenderTablaRevision() {
           <td style="padding:4px;border:1px solid var(--border);color:var(--ink);">${c.archivoNombre}</td>
           <td style="padding:2px;border:1px solid var(--border);"><input style="width:90px;border:none;background:var(--bg2);color:var(--ink);" value="${c.rut}" onchange="ds19Compradores[${i}].rut=this.value"></td>
           <td style="padding:2px;border:1px solid var(--border);"><input style="width:160px;border:none;background:var(--bg2);color:var(--ink);" value="${c.nombre}" onchange="ds19Compradores[${i}].nombre=this.value"></td>
+          <td style="padding:2px;border:1px solid var(--border);"><input style="width:150px;border:none;background:var(--bg2);color:var(--ink);" value="${c.resolucion || ''}" onchange="ds19Compradores[${i}].resolucion=this.value"></td>
           ${REQUISITOS_DS19.map(r => `<td style="padding:2px;border:1px solid var(--border);"><input style="width:40px;border:none;text-align:center;background:var(--bg2);color:var(--ink);" value="${c.requisitos[r]}" onchange="ds19Compradores[${i}].requisitos['${r.replace(/'/g,"\\'")}']=this.value"></td>`).join('')}
         </tr>`).join('')}
       </tbody>
@@ -1098,7 +1101,7 @@ async function ds19GenerarFormulario() {
       tramo: '',
     },
     compradores: ds19Compradores.map(c => ({
-      rut: c.rut, nombre: c.nombre, requisitos: c.requisitos,
+      rut: c.rut, nombre: c.nombre, resolucion_texto: c.resolucion || '', requisitos: c.requisitos,
     })),
   };
   try {
