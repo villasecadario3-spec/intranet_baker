@@ -286,6 +286,8 @@
   table.monthly-table tr.sub-row td{ color:var(--steel); font-size:11.5px; }
   table.monthly-table tr.sub-row td.cc-col{ padding-left:26px; font-weight:400; font-style:italic; }
   table.monthly-table td.cc-col.sub-indent{ padding-left:34px; font-style:italic; }
+  table.monthly-table td.cc-col.sub-indent-2{ padding-left:58px; }
+  .toggle-grupo-dotacion{ background:none; border:1px solid var(--line); border-radius:3px; width:16px; height:16px; font-size:11px; cursor:pointer; margin-right:6px; line-height:1; }
   table.monthly-table tr.cc-parent-row td.cc-col{ display:flex; align-items:center; gap:8px; }
   .toggle-sub{
     flex:none; width:18px; height:18px; border-radius:4px; border:1px solid var(--line-strong);
@@ -1681,6 +1683,7 @@ function cuentaNombre(cc){
 
 let expandedCC = new Set();
 let expandedDotacionCC = new Set();
+let expandedDotacionGrupo = new Set(); // "cc#vigente" o "cc#proyectado"
 
 function renderCostoProyectadoTable(ccs, b, startIdx){
   const months = MONTH_ABBR.slice(startIdx);
@@ -1758,6 +1761,48 @@ function attachToggleSubListeners(){
   });
 }
 
+// Nombres activos en un mes puntual, para un cc + cargo + criterio (vigente/proyectado).
+function nombresActivosEnMes(cc, role, predicado, mesIdx){
+  return workers
+    .filter(w => w.cc === cc && w.role === role && predicado(w) && computeMonthStates(w)[mesIdx] !== 'before')
+    .map(w => w.name)
+    .sort();
+}
+
+function renderDesgloseCargos(cc, tipo, startIdx){
+  const predicado = tipo === 'vigente' ? esVigente : esProyectado;
+  const roles = [...new Set(workers.filter(w => w.cc === cc && predicado(w)).map(w => w.role).filter(Boolean))].sort();
+  if(roles.length === 0) return '';
+
+  return roles.map(role => {
+    const porMes = [];
+    for(let idx = startIdx; idx < HORIZON; idx++){
+      porMes.push(nombresActivosEnMes(cc, role, predicado, idx));
+    }
+    const total = porMes.reduce((s,lista)=>s+lista.length, 0);
+    const primerMesConGente = porMes.findIndex(lista => lista.length > 0);
+    let lineaNombres = 'Sin nadie en el periodo visible';
+    if(primerMesConGente !== -1){
+      const nombresBase = porMes[primerMesConGente];
+      const varia = porMes.slice(primerMesConGente + 1).some(lista =>
+        lista.length !== nombresBase.length || lista.some((n,i)=>n !== nombresBase[i])
+      );
+      const { m } = idxToYM(startIdx + primerMesConGente);
+      const mesTxt = MONTH_ABBR3[m-1].toLowerCase() + '-' + String(idxToYM(startIdx + primerMesConGente).y).slice(-2);
+      lineaNombres = `<strong>${mesTxt}:</strong> ${nombresBase.join(' · ')}${varia ? ' · <em>varía en los meses siguientes</em>' : ''}`;
+    }
+    return `
+    <tr class="sub-row cc-child-row-dotacion cargo-row" data-parent="${cc}" data-grupo="${cc}#${tipo}" style="display:none;">
+      <td class="cc-col sub-indent-2">
+        <div style="font-style:italic;">${role}</div>
+        <div style="font-size:11px;color:var(--steel);font-weight:400;">${lineaNombres}</div>
+      </td>
+      ${porMes.map(lista=>`<td>${lista.length || '-'}</td>`).join('')}
+      <td class="total-col">${total || '-'}</td>
+    </tr>`;
+  }).join('');
+}
+
 function renderDotacionTable(ccs, b, startIdx){
   const months = MONTH_ABBR.slice(startIdx);
   if(months.length === 0) return '';
@@ -1773,6 +1818,8 @@ function renderDotacionTable(ccs, b, startIdx){
     const vigTotal = vigRow.reduce((s,v)=>s+v,0);
     const proyTotal = proyRow.reduce((s,v)=>s+v,0);
     const isOpen = expandedDotacionCC.has(cc);
+    const vigOpen = expandedDotacionGrupo.has(`${cc}#vigente`);
+    const proyOpen = expandedDotacionGrupo.has(`${cc}#proyectado`);
     return `
     <tr class="cc-parent-row">
       <td class="cc-col">
@@ -1783,15 +1830,23 @@ function renderDotacionTable(ccs, b, startIdx){
       <td class="total-col">${rowTotal || '-'}</td>
     </tr>
     <tr class="sub-row cc-child-row-dotacion" data-parent="${cc}" style="display:${isOpen?'table-row':'none'};">
-      <td class="cc-col sub-indent">Vigentes</td>
+      <td class="cc-col sub-indent">
+        <button class="toggle-grupo-dotacion" data-grupo="${cc}#vigente">${vigOpen ? '−' : '+'}</button>
+        Vigentes
+      </td>
       ${vigRow.map(v=>`<td>${v || '-'}</td>`).join('')}
       <td class="total-col">${vigTotal || '-'}</td>
     </tr>
+    ${renderDesgloseCargos(cc, 'vigente', startIdx)}
     <tr class="sub-row cc-child-row-dotacion" data-parent="${cc}" style="display:${isOpen?'table-row':'none'};">
-      <td class="cc-col sub-indent">Proyectados</td>
+      <td class="cc-col sub-indent">
+        <button class="toggle-grupo-dotacion" data-grupo="${cc}#proyectado">${proyOpen ? '−' : '+'}</button>
+        Proyectados
+      </td>
       ${proyRow.map(v=>`<td>${v || '-'}</td>`).join('')}
       <td class="total-col">${proyTotal || '-'}</td>
-    </tr>`;
+    </tr>
+    ${renderDesgloseCargos(cc, 'proyectado', startIdx)}`;
   }).join('');
 
   return `
@@ -1823,6 +1878,20 @@ function attachToggleSubDotacionListeners(){
       if(expandedDotacionCC.has(cc)) expandedDotacionCC.delete(cc); else expandedDotacionCC.add(cc);
       renderResumenWidget();
     });
+  });
+  document.querySelectorAll('.toggle-grupo-dotacion').forEach(btn=>{
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const grupo = btn.dataset.grupo;
+      if(expandedDotacionGrupo.has(grupo)) expandedDotacionGrupo.delete(grupo); else expandedDotacionGrupo.add(grupo);
+      renderResumenWidget();
+    });
+  });
+  // Las filas de cargo (tercer nivel) se muestran solo si su grupo padre
+  // (Vigentes/Proyectados) está expandido — se aplica después de dibujar.
+  document.querySelectorAll('.cargo-row').forEach(row=>{
+    const grupo = row.dataset.grupo;
+    row.style.display = expandedDotacionGrupo.has(grupo) ? 'table-row' : 'none';
   });
 }
 
