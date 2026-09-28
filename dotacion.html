@@ -1568,20 +1568,27 @@ function computeMonthlyBreakdown(){
   const costoMensualByCC = {};
   const finiquitosByCC = {};
   const dotacionByCC = {};
+  const vigentesByCC = {};
+  const proyectadosByCC = {};
   ccs.forEach(cc => {
     costoMensualByCC[cc] = new Array(HORIZON).fill(0);
     finiquitosByCC[cc] = new Array(HORIZON).fill(0);
     dotacionByCC[cc] = new Array(HORIZON).fill(0);
+    vigentesByCC[cc] = new Array(HORIZON).fill(0);
+    proyectadosByCC[cc] = new Array(HORIZON).fill(0);
   });
 
   // Auto months (real cost already loaded): use the real aggregate straight from
   // Base costo empresa BUK — actual headcount and actual amount for that cc+month.
+  // Todo lo que trae costo real del Excel cuenta como Vigente (así lo define
+  // Darío: vigente = tiene costo empresa según el Excel, columna G).
   for(let m=1; m<=meta.ultimoMesReal; m++){
     ccs.forEach(cc=>{
       const real = REAL_MONTHLY.find(r => r.cc===cc && r.month===m);
       if(real){
         dotacionByCC[cc][m-1] = real.personas;
         costoMensualByCC[cc][m-1] = real.costo;
+        vigentesByCC[cc][m-1] = real.personas;
       }
     });
   }
@@ -1600,6 +1607,8 @@ function computeMonthlyBreakdown(){
         const cm = costoMensual(w, m);
         dotacionByCC[w.cc][idx] += 1;
         if(cm !== null) costoMensualByCC[w.cc][idx] += cm;
+        if(esVigente(w)) vigentesByCC[w.cc][idx] += 1;
+        else if(esProyectado(w)) proyectadosByCC[w.cc][idx] += 1;
       }
     }
   });
@@ -1618,16 +1627,18 @@ function computeMonthlyBreakdown(){
     }
   });
 
-  const totals = { costoMensual: new Array(HORIZON).fill(0), finiquitos: new Array(HORIZON).fill(0), dotacion: new Array(HORIZON).fill(0) };
+  const totals = { costoMensual: new Array(HORIZON).fill(0), finiquitos: new Array(HORIZON).fill(0), dotacion: new Array(HORIZON).fill(0), vigentes: new Array(HORIZON).fill(0), proyectados: new Array(HORIZON).fill(0) };
   ccs.forEach(cc=>{
     for(let m=0;m<HORIZON;m++){
       totals.costoMensual[m] += costoMensualByCC[cc][m];
       totals.finiquitos[m] += finiquitosByCC[cc][m];
       totals.dotacion[m] += dotacionByCC[cc][m];
+      totals.vigentes[m] += vigentesByCC[cc][m];
+      totals.proyectados[m] += proyectadosByCC[cc][m];
     }
   });
 
-  return { ccs, costoMensualByCC, finiquitosByCC, dotacionByCC, totals };
+  return { ccs, costoMensualByCC, finiquitosByCC, dotacionByCC, vigentesByCC, proyectadosByCC, totals };
 }
 
 function renderMonthlyTable(title, ccs, dataByCC, totalsRow, formatter){
@@ -1669,6 +1680,7 @@ function cuentaNombre(cc){
 }
 
 let expandedCC = new Set();
+let expandedDotacionCC = new Set();
 
 function renderCostoProyectadoTable(ccs, b, startIdx){
   const months = MONTH_ABBR.slice(startIdx);
@@ -1746,20 +1758,83 @@ function attachToggleSubListeners(){
   });
 }
 
+function renderDotacionTable(ccs, b, startIdx){
+  const months = MONTH_ABBR.slice(startIdx);
+  if(months.length === 0) return '';
+
+  const totalDotacion = b.totals.dotacion.slice(startIdx);
+  const grandTotal = totalDotacion.reduce((s,v)=>s+v,0);
+
+  const rows = ccs.map(cc => {
+    const dotRow = b.dotacionByCC[cc].slice(startIdx);
+    const vigRow = b.vigentesByCC[cc].slice(startIdx);
+    const proyRow = b.proyectadosByCC[cc].slice(startIdx);
+    const rowTotal = dotRow.reduce((s,v)=>s+v,0);
+    const vigTotal = vigRow.reduce((s,v)=>s+v,0);
+    const proyTotal = proyRow.reduce((s,v)=>s+v,0);
+    const isOpen = expandedDotacionCC.has(cc);
+    return `
+    <tr class="cc-parent-row">
+      <td class="cc-col">
+        <button class="toggle-sub-dotacion" data-cc="${cc}">${isOpen ? '−' : '+'}</button>
+        ${cc}<span class="cuenta-name">${cuentaNombre(cc)}</span>
+      </td>
+      ${dotRow.map(v=>`<td>${v || '-'}</td>`).join('')}
+      <td class="total-col">${rowTotal || '-'}</td>
+    </tr>
+    <tr class="sub-row cc-child-row-dotacion" data-parent="${cc}" style="display:${isOpen?'table-row':'none'};">
+      <td class="cc-col sub-indent">Vigentes</td>
+      ${vigRow.map(v=>`<td>${v || '-'}</td>`).join('')}
+      <td class="total-col">${vigTotal || '-'}</td>
+    </tr>
+    <tr class="sub-row cc-child-row-dotacion" data-parent="${cc}" style="display:${isOpen?'table-row':'none'};">
+      <td class="cc-col sub-indent">Proyectados</td>
+      ${proyRow.map(v=>`<td>${v || '-'}</td>`).join('')}
+      <td class="total-col">${proyTotal || '-'}</td>
+    </tr>`;
+  }).join('');
+
+  return `
+    <div class="monthly-table-title">Dotación</div>
+    <div class="monthly-table-scroll">
+      <table class="monthly-table">
+        <thead><tr>
+          <th class="cc-col">Centro de costo</th>
+          ${months.map(m=>`<th>${m}</th>`).join('')}
+          <th class="total-col">Total</th>
+        </tr></thead>
+        <tbody>
+          ${rows}
+          <tr class="total-row">
+            <td class="cc-col">Total</td>
+            ${totalDotacion.map(v=>`<td>${v || '-'}</td>`).join('')}
+            <td class="total-col">${grandTotal || '-'}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function attachToggleSubDotacionListeners(){
+  document.querySelectorAll('.toggle-sub-dotacion').forEach(btn=>{
+    btn.addEventListener('click', () => {
+      const cc = btn.dataset.cc;
+      if(expandedDotacionCC.has(cc)) expandedDotacionCC.delete(cc); else expandedDotacionCC.add(cc);
+      renderResumenWidget();
+    });
+  });
+}
+
 function renderResumenWidget(){
   const el = document.getElementById('resumenCard');
   if(!el) return;
   const b = computeMonthlyBreakdown();
   const startIdx = meta.ultimoMesReal; // 0-indexed position of the month right after ultimoMesReal
-  const dotacionMonths = MONTH_ABBR.slice(startIdx);
-  const dotacionTable = dotacionMonths.length === 0 ? '' : renderMonthlyTable(
-    'Dotación', b.ccs,
-    Object.fromEntries(b.ccs.map(cc => [cc, b.dotacionByCC[cc].slice(startIdx)])),
-    b.totals.dotacion.slice(startIdx),
-    v => v || '-'
-  );
+  const dotacionTable = renderDotacionTable(b.ccs, b, startIdx);
   el.innerHTML = renderCostoProyectadoTable(b.ccs, b, startIdx) + dotacionTable;
   attachToggleSubListeners();
+  attachToggleSubDotacionListeners();
 }
 
 function eliminarWorker(id){
