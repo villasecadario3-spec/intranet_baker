@@ -480,6 +480,14 @@
       <label>Centro de gestión</label>
       <div class="chips" id="ccChips"></div>
     </div>
+    <div class="field">
+      <label for="periodoFiltro">Vigentes en</label>
+      <select id="periodoFiltro"><option value="">Todos los periodos</option></select>
+    </div>
+    <div class="field">
+      <label for="cargoFiltro">Cargo</label>
+      <select id="cargoFiltro"><option value="">Todos los cargos</option></select>
+    </div>
     <div class="field search">
       <label for="searchBox">Buscar</label>
       <input type="text" id="searchBox" placeholder="Nombre, rut o cargo...">
@@ -518,9 +526,23 @@
   </div>
 
 
+  <div class="section-title">
+    Marcan asistencia pero no están en la dotación
+    <span class="n" id="sugerenciasCount">0</span>
+    <button class="btn btn-ghost btn-sm" id="addAllSugBtn" style="margin-left:10px;">Agregar todos</button>
+  </div>
+  <div class="ingreso-card">
+    <div style="font-size:12px;color:var(--steel);margin-bottom:10px;">
+      Personas con marcas de entrada en Asistencia BUK que todavía no aparecen en ninguna
+      liquidación. Suelen ser ingresos recientes que la nómina aún no refleja — incluye a
+      quienes recién entraron este mes.
+    </div>
+    <div id="sugerenciasList"></div>
+  </div>
+
   <div class="section-title">Agregar personal proyectado</div>
   <div class="ingreso-card">
-    <div class="ingreso-grid" style="grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:12px;">
+    <div class="ingreso-grid" style="grid-template-columns:repeat(7,1fr);gap:12px;margin-bottom:12px;">
       <div class="field">
         <label for="pName">Nombre completo</label>
         <input type="text" id="pName" placeholder="Nombre y apellidos">
@@ -545,6 +567,10 @@
       <div class="field">
         <label for="pHasta">Periodo hasta</label>
         <input type="date" id="pHasta" min="2026-01-01" max="2027-10-31">
+      </div>
+      <div class="field">
+        <label for="pCosto">Costo empresa mensual</label>
+        <input type="number" id="pCosto" min="0" step="1000" placeholder="Promedio del cargo">
       </div>
     </div>
     <button class="btn btn-primary btn-sm" id="addProyectadoBtn">+ Agregar a proyección</button>
@@ -739,6 +765,7 @@ const DIAS_SIN_ASISTENCIA_ALERTA = 10; // más de esto sin marcar y activo → a
 
 let asistenciaPorRut = {}; // rutlimpio -> { ultima: 'YYYY-MM-DD', total: N, ultimos14: N }
 let ultimaActualizacionAsistencia = null;
+let ASISTENCIA_NUEVOS = []; // personas con marca de asistencia que aún no están en la nómina
 
 let listaHojasCache = null;
 async function obtenerListaHojas() {
@@ -823,6 +850,9 @@ async function cargarAsistenciaBUK() {
 
   const hoy = new Date();
   const registros = {}; // rutlimpio -> Set de fechas
+  // Detalle por combinación rut+centro+cargo — sirve para detectar personas
+  // que marcan asistencia pero todavía no aparecen en la nómina (Excel).
+  const detalle = {}; // "rut#cc#role" -> { rutlimpio, cc, role, name, fechas:Set }
   datos.forEach(r => {
     // Se quitan ceros a la izquierda para que el cruce con la nómina no
     // falle si un lado trae el RUT como texto y el otro como número.
@@ -832,6 +862,13 @@ async function cargarAsistenciaBUK() {
     if (!rutlimpio || !fecha || fecha.length < 10) return;
     registros[rutlimpio] = registros[rutlimpio] || new Set();
     registros[rutlimpio].add(fecha);
+
+    const cc = String(r.codigoRecinto || '').trim();
+    const role = String(r.especialidad || '').trim();
+    if (!cc || !role) return; // sin estos dos no se puede cruzar contra la nómina
+    const key = `${rutlimpio}#${cc}#${role}`;
+    detalle[key] = detalle[key] || { rutlimpio, cc, role, name: r.nombre || '', fechas: new Set() };
+    detalle[key].fechas.add(fecha);
   });
 
   const resumen = {};
@@ -843,6 +880,16 @@ async function cargarAsistenciaBUK() {
     resumen[rutlimpio] = { ultima, total: lista.length, ultimos14, diasDesdeUltima, fechas: lista };
   });
   asistenciaPorRut = resumen;
+
+  ASISTENCIA_NUEVOS = Object.values(detalle).map(d => {
+    const lista = [...d.fechas].sort();
+    const meses = [...new Set(lista.map(f => parseInt(f.slice(5,7),10)))].sort((a,b)=>a-b);
+    return {
+      rutlimpio: d.rutlimpio, cc: d.cc, role: d.role, name: d.name,
+      meses, primera_fecha: lista[0], ultima_fecha: lista[lista.length-1], dias: lista.length,
+    };
+  });
+
   console.log('[Asistencia Directa] Personas con registro en Mirador El Pino:', Object.keys(resumen).length);
 }
 
@@ -1092,9 +1139,7 @@ const SEED_WORKERS = [{"id": "154731644#CG0198131#Jefe de Terreno", "rutlimpio":
 let COSTOS = [{"cc": "CG0196071", "role": "Jornal", "amt": 342694.0}, {"cc": "CG0198131", "role": "Administrador de Obra", "amt": 0.0}, {"cc": "CG0198131", "role": "Encargado de Calidad", "amt": 1715680.0}, {"cc": "CG0198131", "role": "Encargado de Oficina Técnica", "amt": 3279624.5}, {"cc": "CG0198131", "role": "Jefe de Terreno", "amt": 2138229.6666666665}, {"cc": "CG0198131", "role": "Prevencionista de Riesgo", "amt": 1945415.5}, {"cc": "CG0198191", "role": "Asistente de Bodega", "amt": 1052931.0}, {"cc": "CG0198191", "role": "Ayudante de Trazador", "amt": 621958.0}, {"cc": "CG0198191", "role": "Carpintero", "amt": 922726.25}, {"cc": "CG0198191", "role": "Encargado de Mantención", "amt": 1010283.0}, {"cc": "CG0198191", "role": "Jornal", "amt": 438321.5714285714}, {"cc": "CG0198191", "role": "Operador de Maquinaria", "amt": 1083943.5}, {"cc": "CG0198191", "role": "Pañolero", "amt": 817082.5}, {"cc": "CG0198191", "role": "Trazador", "amt": 1043969.0}, {"cc": "CG0198201", "role": "Albañil", "amt": 1524713.0}, {"cc": "CG0198201", "role": "Andamiero", "amt": 202325.0}, {"cc": "CG0198201", "role": "Ayudante de Trazador", "amt": 868718.5}, {"cc": "CG0198201", "role": "Carpintero", "amt": 1119080.5}, {"cc": "CG0198201", "role": "Jornal", "amt": 737913.5789473684}, {"cc": "CG0198201", "role": "Jornal Canguero", "amt": 671883.0}, {"cc": "CG0198201", "role": "Maestro Multifuncional", "amt": 1912537.6}, {"cc": "CG0198201", "role": "Trazador", "amt": 1273715.5}];
 let ULTIMO_COSTO = [{"key": "103832713#CG0198201", "amt": 1376143}, {"key": "10829020K#CG0198201", "amt": 1054984}, {"key": "111695903#CG0198191", "amt": 1017699}, {"key": "116081164#CG0198201", "amt": 1112384}, {"key": "116975890#CG0198191", "amt": 710737}, {"key": "118044495#CG0198201", "amt": 1151381}, {"key": "118326121#CG0198131", "amt": 2869569}, {"key": "121753200#CG0198201", "amt": 2186060}, {"key": "124122414#CG0198201", "amt": 758713}, {"key": "128777156#CG0198201", "amt": 1088598}, {"key": "131997221#CG0198201", "amt": 2426002}, {"key": "132501386#CG0198191", "amt": 1524071}, {"key": "137117649#CG0198201", "amt": 2190652}, {"key": "14129248K#CG0198131", "amt": 0}, {"key": "142462850#CG0198191", "amt": 1232081}, {"key": "143118479#CG0198201", "amt": 743453}, {"key": "151169236#CG0198201", "amt": 704256}, {"key": "154022899#CG0198201", "amt": 2225047}, {"key": "154064907#CG0198201", "amt": 758713}, {"key": "154731644#CG0198131", "amt": 1041240}, {"key": "156224987#CG0198201", "amt": 1597624}, {"key": "157005243#CG0198131", "amt": 1913534}, {"key": "158943646#CG0198131", "amt": 3281515}, {"key": "161860492#CG0198201", "amt": 2277376}, {"key": "162418467#CG0198191", "amt": 758713}, {"key": "163422026#CG0198201", "amt": 2260806}, {"key": "165705904#CG0198201", "amt": 2911114}, {"key": "168563086#CG0198201", "amt": 859978}, {"key": "169513015#CG0198201", "amt": 202325}, {"key": "170823214#CG0198201", "amt": 1907488}, {"key": "17084615K#CG0198201", "amt": 0}, {"key": "175192204#CG0198131", "amt": 1977108}, {"key": "175623744#CG0198201", "amt": 2134792}, {"key": "184550164#CG0198201", "amt": 202325}, {"key": "187002125#CG0198191", "amt": 1377201}, {"key": "187002125#CG0198201", "amt": 1305368}, {"key": "189615108#CG0198191", "amt": 1125587}, {"key": "191841743#CG0198191", "amt": 1052931}, {"key": "193132251#CG0198201", "amt": 1915565}, {"key": "201242142#CG0198191", "amt": 278193}, {"key": "201248345#CG0198191", "amt": 278193}, {"key": "20127513K#CG0198191", "amt": 1136106}, {"key": "202420117#CG0198201", "amt": 852203}, {"key": "203117019#CG0198191", "amt": 915998}, {"key": "203117019#CG0198201", "amt": 929467}, {"key": "20604246K#CG0198191", "amt": 1103456}, {"key": "20870740K#CG0198191", "amt": 327918}, {"key": "211656018#CG0198201", "amt": 780842}, {"key": "215011569#CG0198191", "amt": 702587}, {"key": "218559077#CG0198201", "amt": 798623}, {"key": "224236093#CG0198191", "amt": 49079}, {"key": "279833961#CG0196071", "amt": 342694}, {"key": "279833961#CG0198201", "amt": 812303}, {"key": "97199604#CG0198201", "amt": 790619}, {"key": "97514410#CG0198201", "amt": 671883}];
 let ULTIMO_COSTO_MAX = [{"key": "103832713#CG0198201", "amt": 1376143}, {"key": "10829020K#CG0198201", "amt": 1320375}, {"key": "111695903#CG0198191", "amt": 1017699}, {"key": "116081164#CG0198201", "amt": 1112384}, {"key": "116975890#CG0198191", "amt": 710737}, {"key": "118044495#CG0198201", "amt": 1159152}, {"key": "118326121#CG0198131", "amt": 2869569}, {"key": "121753200#CG0198201", "amt": 2186060}, {"key": "124122414#CG0198201", "amt": 758713}, {"key": "128777156#CG0198201", "amt": 1088598}, {"key": "131997221#CG0198201", "amt": 2426002}, {"key": "132501386#CG0198191", "amt": 1524071}, {"key": "137117649#CG0198201", "amt": 2190652}, {"key": "14129248K#CG0198131", "amt": 0}, {"key": "142462850#CG0198191", "amt": 1232081}, {"key": "143118479#CG0198201", "amt": 743453}, {"key": "151169236#CG0198201", "amt": 751932}, {"key": "154022899#CG0198201", "amt": 2225047}, {"key": "154064907#CG0198201", "amt": 781412}, {"key": "154731644#CG0198131", "amt": 1041240}, {"key": "156224987#CG0198201", "amt": 1597624}, {"key": "157005243#CG0198131", "amt": 1913534}, {"key": "158943646#CG0198131", "amt": 3281515}, {"key": "161860492#CG0198201", "amt": 2277376}, {"key": "162418467#CG0198191", "amt": 758713}, {"key": "163422026#CG0198201", "amt": 2260806}, {"key": "165705904#CG0198201", "amt": 2911114}, {"key": "168563086#CG0198201", "amt": 859978}, {"key": "169513015#CG0198201", "amt": 202325}, {"key": "170823214#CG0198201", "amt": 1907488}, {"key": "17084615K#CG0198201", "amt": 589489}, {"key": "175192204#CG0198131", "amt": 1977108}, {"key": "175623744#CG0198201", "amt": 2134792}, {"key": "184550164#CG0198201", "amt": 202325}, {"key": "187002125#CG0198191", "amt": 1377201}, {"key": "187002125#CG0198201", "amt": 1305368}, {"key": "189615108#CG0198191", "amt": 1125587}, {"key": "191841743#CG0198191", "amt": 1052931}, {"key": "193132251#CG0198201", "amt": 1915565}, {"key": "201242142#CG0198191", "amt": 278193}, {"key": "201248345#CG0198191", "amt": 278193}, {"key": "20127513K#CG0198191", "amt": 1136106}, {"key": "202420117#CG0198201", "amt": 852203}, {"key": "203117019#CG0198191", "amt": 915998}, {"key": "203117019#CG0198201", "amt": 929467}, {"key": "20604246K#CG0198191", "amt": 1103456}, {"key": "20870740K#CG0198191", "amt": 327918}, {"key": "211656018#CG0198201", "amt": 855000}, {"key": "215011569#CG0198191", "amt": 702587}, {"key": "218559077#CG0198201", "amt": 798623}, {"key": "224236093#CG0198191", "amt": 49079}, {"key": "279833961#CG0196071", "amt": 342694}, {"key": "279833961#CG0198201", "amt": 831233}, {"key": "97199604#CG0198201", "amt": 790619}, {"key": "97514410#CG0198201", "amt": 671883}];
-const CARGOS_LIST = ["Administrador de Obra","Administrativo RRHH","Albañil","Andamiero","Asistente Prevencionista de Riesgo","Asistente de Bodega","Asistente de Oficina Técnica","Ayudante de Trazador","Ayudante de Urbanización","Carpintero","Encargado de Calidad","Encargado de Mantención","Encargado de Oficina Técnica","Jefe de Bodega","Jefe de Terreno","Jornal","Jornal Canguero","Maestro Multifuncional","Maestro Urbanización","Operador de Maquinaria","Pañolero","Prevencionista de Riesgo","Supervisor","Topógrafo","Trazador"];
 const PP_LIST = [{"pp":6071,"cc":"CG0196071","cuenta":"IMIV"},{"pp":8131,"cc":"CG0198131","cuenta":"Personal Profesional"},{"pp":8191,"cc":"CG0198191","cuenta":"PERSONAL DE APOYO RIGGERS SENALEROS Y OTROS"},{"pp":8201,"cc":"CG0198201","cuenta":"MO DIRECTA EDIFICACION"},{"pp":6301,"cc":"CG0276301","cuenta":"MO DIRECTA URBANIZACION"},{"pp":8141,"cc":"CG0278141","cuenta":"PERSONAL TECNICO"}];
-const ASISTENCIA_NUEVOS = [{"rutlimpio":"170823214","cc":"CG0198201","role":"Albañil","name":"Eduardo Antonio González","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"193132251","cc":"CG0198201","role":"Albañil","name":"Juan Carlos Cisterna","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":20},{"rutlimpio":"10829020K","cc":"CG0198201","role":"Albañil","name":"Pablo Del Rosario Araya","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"161860492","cc":"CG0198201","role":"Albañil","name":"Victor Alfonso Ramirez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"156224987","cc":"CG0198201","role":"Albañil","name":"Víctor Alfredo Rivera","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":20},{"rutlimpio":"169513015","cc":"CG0198201","role":"Andamiero","name":"Carlos Javier Abarca","meses":[7],"primera_fecha":"2026-07-23","ultima_fecha":"2026-07-30","dias":5},{"rutlimpio":"184550164","cc":"CG0198201","role":"Andamiero","name":"Rafael Antonio Parraguez","meses":[7],"primera_fecha":"2026-07-23","ultima_fecha":"2026-07-30","dias":5},{"rutlimpio":"203117019","cc":"CG0198201","role":"Ayudante de Trazador","name":"Victor Andres Diaz","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-13","dias":10},{"rutlimpio":"103832713","cc":"CG0198201","role":"Carpintero","name":"Carlos Amador Gallardo","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-30","dias":20},{"rutlimpio":"118044495","cc":"CG0198201","role":"Carpintero","name":"José Eduardo Salazar","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"128777156","cc":"CG0198201","role":"Carpintero","name":"Juan Carlos Andaur","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-30","dias":21},{"rutlimpio":"116081164","cc":"CG0198201","role":"Carpintero","name":"Osvaldo Rafael Pérez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":21},{"rutlimpio":"151169236","cc":"CG0198201","role":"Jornal","name":"Carlos Antonio Ramírez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":15},{"rutlimpio":"202420117","cc":"CG0198201","role":"Jornal","name":"Cleversson Hernan Maulen","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"211656018","cc":"CG0198201","role":"Jornal","name":"Cristopher Alexander Maulén","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"218559077","cc":"CG0198201","role":"Jornal","name":"Diego Eduardo Muñoz","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"279833961","cc":"CG0198201","role":"Jornal","name":"Jean Berris Augustin","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"97199604","cc":"CG0198201","role":"Jornal","name":"José Domingo Marambio","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"168563086","cc":"CG0198201","role":"Jornal","name":"José Miguel Carrasco","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"124122414","cc":"CG0198201","role":"Jornal","name":"Luis Armando Núñez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"154064907","cc":"CG0198201","role":"Jornal","name":"Pedro Humberto Castro","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"143118479","cc":"CG0198201","role":"Jornal","name":"Roberto Carlos Rivera","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":21},{"rutlimpio":"97514410","cc":"CG0198201","role":"Jornal Canguero","name":"Hernán Fernando Valdovinos","meses":[7],"primera_fecha":"2026-07-08","ultima_fecha":"2026-07-30","dias":15},{"rutlimpio":"165705904","cc":"CG0198201","role":"Maestro Multifuncional","name":"Alan Jonathan Rojas","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"154022899","cc":"CG0198201","role":"Maestro Multifuncional","name":"Alfredo Rodrigo Burgos","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":23},{"rutlimpio":"137117649","cc":"CG0198201","role":"Maestro Multifuncional","name":"Cristian Andres Henriquez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"121753200","cc":"CG0198201","role":"Maestro Multifuncional","name":"Cristian Rodrigo Manriquez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"175623744","cc":"CG0198201","role":"Maestro Multifuncional","name":"Oscar Antonio Toledo","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":23},{"rutlimpio":"163422026","cc":"CG0198201","role":"Maestro Multifuncional","name":"Patricio Guillermo Escalante","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-30","dias":22},{"rutlimpio":"131997221","cc":"CG0198201","role":"Maestro Multifuncional","name":"Raul Andres Garrido","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":23},{"rutlimpio":"187002125","cc":"CG0198201","role":"Trazador","name":"Luis Heriberto Antileo","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-13","dias":10},{"rutlimpio":"219234643","cc":"CG0276301","role":"Ayudante de Trazador","name":"Benjamin Jesus Cardenas","meses":[7],"primera_fecha":"2026-07-09","ultima_fecha":"2026-07-31","dias":17},{"rutlimpio":"19411771K","cc":"CG0276301","role":"Ayudante de Trazador","name":"Matías Osciel Cartagena","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-06","dias":4},{"rutlimpio":"189290853","cc":"CG0276301","role":"Ayudante de Urbanización","name":"Esteban Enrique Moya","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-08","dias":5},{"rutlimpio":"20385997K","cc":"CG0276301","role":"Jornal","name":"Boris Alejandro Rodríguez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":23},{"rutlimpio":"184877899","cc":"CG0276301","role":"Jornal","name":"Diego Ignacio Cáceres","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":23},{"rutlimpio":"20604215K","cc":"CG0276301","role":"Jornal","name":"Eric Robert Miranda","meses":[7],"primera_fecha":"2026-07-23","ultima_fecha":"2026-07-31","dias":7},{"rutlimpio":"170816412","cc":"CG0276301","role":"Jornal","name":"Juan Enrique González","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":24},{"rutlimpio":"16576448K","cc":"CG0276301","role":"Maestro Urbanización","name":"Arturo Alejandro Carter","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":24},{"rutlimpio":"183353500","cc":"CG0276301","role":"Maestro Urbanización","name":"Cristian Esteban Badilla","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":24},{"rutlimpio":"21173115K","cc":"CG0276301","role":"Maestro Urbanización","name":"Francisco Ignacio Mateluna","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"131745966","cc":"CG0276301","role":"Supervisor","name":"Rodrigo Patricio Alvarado","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"187783976","cc":"CG0276301","role":"Topógrafo","name":"Nicolás Marcelo Martínez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":24},{"rutlimpio":"191841743","cc":"CG0198191","role":"Asistente de Bodega","name":"Oliver Alan Lillo","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":23},{"rutlimpio":"20870740K","cc":"CG0198191","role":"Ayudante de Trazador","name":"Renato Antonio Allende","meses":[7],"primera_fecha":"2026-07-21","ultima_fecha":"2026-07-31","dias":9},{"rutlimpio":"203117019","cc":"CG0198191","role":"Ayudante de Trazador","name":"Victor Andres Diaz","meses":[7],"primera_fecha":"2026-07-14","ultima_fecha":"2026-07-31","dias":12},{"rutlimpio":"111695903","cc":"CG0198191","role":"Carpintero","name":"Carlos Humberto Toro","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":21},{"rutlimpio":"20127513K","cc":"CG0198191","role":"Carpintero","name":"Sergio Enrique Campos","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":23},{"rutlimpio":"142462850","cc":"CG0198191","role":"Encargado de Mantención","name":"Luis Alberto Vásquez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":21},{"rutlimpio":"201242142","cc":"CG0198191","role":"Jornal","name":"Cristian Andres Galdames","meses":[7],"primera_fecha":"2026-07-23","ultima_fecha":"2026-07-31","dias":8},{"rutlimpio":"162418467","cc":"CG0198191","role":"Jornal","name":"Paulina Beatriz Navarro","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"201248345","cc":"CG0198191","role":"Jornal","name":"Victor Manuel Castro","meses":[7],"primera_fecha":"2026-07-23","ultima_fecha":"2026-07-31","dias":7},{"rutlimpio":"132501386","cc":"CG0198191","role":"Operador de Maquinaria","name":"Mauricio Daniel Sanchez","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"20604246K","cc":"CG0198191","role":"Pañolero","name":"Enrique Ignacio Carimán","meses":[7],"primera_fecha":"2026-07-01","ultima_fecha":"2026-07-31","dias":22},{"rutlimpio":"116975890","cc":"CG0198191","role":"Trazador","name":"Carlos Alberto Esperguez","meses":[7],"primera_fecha":"2026-07-13","ultima_fecha":"2026-07-31","dias":14},{"rutlimpio":"187002125","cc":"CG0198191","role":"Trazador","name":"Luis Heriberto Antileo","meses":[7],"primera_fecha":"2026-07-14","ultima_fecha":"2026-07-30","dias":9}];
 // Primer mes de liquidacion real en la obra, por persona+centro (Base costo empresa BUK)
 // Gasto empresa real por persona: rut#centro#cargo -> { mes: monto } (archivo MO)
 let GASTO_MES = {"154731644#CG0198131#Jefe de Terreno": {"2": 1041240}, "165705904#CG0198201#Maestro Multifuncional": {"4": 2407054, "5": 2052071, "6": 2077780, "7": 2911114}, "121753200#CG0198201#Maestro Multifuncional": {"4": 2025792, "5": 1695307, "6": 1790102, "7": 2186060}, "137117649#CG0198201#Maestro Multifuncional": {"4": 2093074, "5": 1761556, "6": 1747167, "7": 2190652}, "215011569#CG0198191#Jornal": {"4": 245403, "5": 702587}, "131997221#CG0198201#Maestro Multifuncional": {"4": 2270025, "5": 2033812, "6": 1960110, "7": 2426002}, "154022899#CG0198201#Maestro Multifuncional": {"4": 2024913, "5": 1795178, "6": 1803608, "7": 2225047}, "163422026#CG0198201#Maestro Multifuncional": {"4": 2043303, "5": 1807118, "6": 1672745, "7": 2260806}, "224236093#CG0198191#Jornal": {"4": 49079}, "14129248K#CG0198131#Administrador de Obra": {"5": 0, "6": 0, "7": 0}, "175623744#CG0198201#Maestro Multifuncional": {"4": 2052729, "5": 1747045, "6": 1591677, "7": 2134792}, "118044495#CG0198201#Carpintero": {"5": 1058468, "6": 1159152, "7": 1151381}, "279833961#CG0196071#Jornal": {"5": 342694}, "203117019#CG0198201#Ayudante de Trazador": {"5": 807970, "6": 929467}, "175192204#CG0198131#Prevencionista de Riesgo": {"6": 1913723, "7": 1977108}, "20127513K#CG0198191#Carpintero": {"5": 489078, "6": 1048022, "7": 1136106}, "193132251#CG0198201#Albañil": {"5": 1071369, "6": 1716908, "7": 1915565}, "161860492#CG0198201#Albañil": {"5": 1171823, "6": 1743187, "7": 2277376}, "279833961#CG0198201#Jornal": {"6": 831233, "7": 812303}, "187002125#CG0198201#Trazador": {"5": 1242063, "6": 1305368}, "158943646#CG0198131#Encargado de Oficina Técnica": {"6": 3277734, "7": 3281515}, "151169236#CG0198201#Jornal": {"5": 694838, "6": 751932, "7": 704256}, "103832713#CG0198201#Carpintero": {"5": 1093811, "6": 1194492, "7": 1376143}, "143118479#CG0198201#Jornal": {"6": 530853, "7": 743453}, "168563086#CG0198201#Jornal": {"6": 554462, "7": 859978}, "170823214#CG0198201#Albañil": {"6": 995144, "7": 1907488}, "154064907#CG0198201#Jornal": {"6": 781412, "7": 758713}, "162418467#CG0198191#Jornal": {"6": 756083, "7": 758713}, "218559077#CG0198201#Jornal": {"6": 579665, "7": 798623}, "211656018#CG0198201#Jornal": {"6": 855000, "7": 780842}, "142462850#CG0198191#Encargado de Mantención": {"6": 673181, "7": 1232081}, "10829020K#CG0198201#Albañil": {"6": 1320375, "7": 1054984}, "189615108#CG0198191#Encargado de Mantención": {"6": 1125587}, "132501386#CG0198191#Operador de Maquinaria": {"6": 643816, "7": 1524071}, "116081164#CG0198201#Carpintero": {"6": 1084757, "7": 1112384}, "128777156#CG0198201#Carpintero": {"6": 871619, "7": 1088598}, "124122414#CG0198201#Jornal": {"6": 581260, "7": 758713}, "157005243#CG0198131#Encargado de Calidad": {"6": 1517826, "7": 1913534}, "17084615K#CG0198201#Maestro Multifuncional": {"6": 589489, "7": 0}, "118326121#CG0198131#Jefe de Terreno": {"6": 2503880, "7": 2869569}, "20604246K#CG0198191#Pañolero": {"6": 530709, "7": 1103456}, "97514410#CG0198201#Jornal Canguero": {"7": 671883}, "97199604#CG0198201#Jornal": {"7": 790619}, "169513015#CG0198201#Andamiero": {"7": 202325}, "187002125#CG0198191#Trazador": {"7": 1377201}, "201242142#CG0198191#Jornal": {"7": 278193}, "111695903#CG0198191#Carpintero": {"7": 1017699}, "201248345#CG0198191#Jornal": {"7": 278193}, "20870740K#CG0198191#Ayudante de Trazador": {"7": 327918}, "156224987#CG0198201#Albañil": {"7": 1597624}, "116975890#CG0198191#Trazador": {"7": 710737}, "191841743#CG0198191#Asistente de Bodega": {"7": 1052931}, "203117019#CG0198191#Ayudante de Trazador": {"7": 915998}, "184550164#CG0198201#Andamiero": {"7": 202325}, "202420117#CG0198201#Jornal": {"7": 852203}};
@@ -1273,6 +1318,9 @@ function finiquitoDetalle(w){
 let workers = [];
 let meta = { ultimoMesReal: 7 }; // 1-12
 let activeCC = 'todos';
+let periodoFiltro = '';
+let cargoFiltro = '';
+const CARGOS_LIST = ["Administrador de Obra","Administrativo RRHH","Albañil","Andamiero","Asistente Prevencionista de Riesgo","Asistente de Bodega","Asistente de Calidad","Asistente de Oficina Técnica","Asistente de Terreno","Ayudante Albañil","Ayudante de Trazador","Ayudante de Urbanización","Carpintero","Encargado de Calidad","Encargado de Mantención","Encargado de Oficina Técnica","Jefe General de terreno de Urbanización","Jefe de Bodega","Jefe de Terreno","Jornal","Jornal Canguero","Maestro Multifuncional","Maestro Urbanización","Operador de Maquinaria","Pañolero","Prevencionista de Riesgo","Supervisor","Supervisor de urbanización","Topógrafo","Trazador"];
 let pendingExitId = null;
 let costoAutoFilled = false;
 
@@ -1429,6 +1477,39 @@ function matchesSearch(w, q){
   if(!q) return true;
   q = q.toLowerCase();
   return w.name.toLowerCase().includes(q) || (w.rut||'').toLowerCase().includes(q) || (w.role||'').toLowerCase().includes(q);
+}
+
+// Vigente en el mes. Usa la misma fuente que la tabla de Dotación:
+//  - meses ya cerrados  -> hubo liquidación en ese centro ese mes
+//  - meses proyectados  -> la persona sigue vigente según su ficha
+// Así el conteo del filtro cuadra con el de la tabla.
+function vigenteEnMes(w, idx){
+  const ym = idxToYM(idx);
+  if(ym.y === YEAR && ym.m <= meta.ultimoMesReal){
+    const reg = GASTO_MES[`${w.rutlimpio}#${w.cc}#${w.role}`];
+    return !!(reg && reg[String(ym.m)] !== undefined);
+  }
+  const st = computeMonthStates(w);
+  return st[idx] && st[idx] !== 'before';
+}
+
+function renderPeriodoFiltro(){
+  const sel = document.getElementById('periodoFiltro');
+  if(!sel) return;
+  sel.innerHTML = '<option value="">Todos los periodos</option>' +
+    PERIOD_LABELS.map((n,i)=>`<option value="${i}">${n}</option>`).join('');
+  sel.value = periodoFiltro;
+  sel.onchange = () => { periodoFiltro = sel.value; renderRoster(); };
+}
+
+function renderCargoFiltro(){
+  const sel = document.getElementById('cargoFiltro');
+  if(!sel) return;
+  const cargosEnUso = [...new Set(workers.map(w => w.role).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Todos los cargos</option>' +
+    cargosEnUso.map(c=>`<option value="${c}">${c}</option>`).join('');
+  sel.value = cargoFiltro;
+  sel.onchange = () => { cargoFiltro = sel.value; renderRoster(); };
 }
 
 function computeResumenPorCentro(){
@@ -1662,7 +1743,9 @@ function renderResumenWidget(){
 function renderRoster(){
   const body = document.getElementById('rosterBody');
   const q = document.getElementById('searchBox').value.trim();
-  let list = workers.filter(w => (activeCC==='todos' || w.cc===activeCC) && matchesSearch(w,q));
+  let list = workers.filter(w => (activeCC==='todos' || w.cc===activeCC) && matchesSearch(w,q)
+    && (cargoFiltro==='' || w.role===cargoFiltro)
+    && (periodoFiltro==='' || vigenteEnMes(w, parseInt(periodoFiltro,10))));
   list = list.slice().sort((a,b)=> (isDeparted(a))-(isDeparted(b)) || a.name.localeCompare(b.name));
 
   document.getElementById('activeCount').textContent = workers.filter(w=>!isDeparted(w)).length + ' de ' + workers.length;
@@ -1925,6 +2008,8 @@ function addProyectado(){
   const cc   = document.getElementById('pCC').value;
   const desde = document.getElementById('pDesde').value; // YYYY-MM-DD
   const hasta = document.getElementById('pHasta').value; // YYYY-MM-DD
+  const costoInput = document.getElementById('pCosto').value;
+  const costoManual = costoInput !== '' && Number.isFinite(Number(costoInput)) ? Math.round(Number(costoInput)) : null;
   if(!name){ toast('Ingresa el nombre'); return; }
   if(!isValidRutLimpio(rut)){ toast('RUT inválido — 8-9 dígitos sin puntos ni guión'); return; }
   if(!role){ toast('Selecciona un cargo'); return; }
@@ -1942,9 +2027,9 @@ function addProyectado(){
   const fs = hasta;
   workers.push({
     id: uid, rutlimpio, cc, role, name, rut: rutlimpio,
-    fc, status:'finiquitado', fs, motivo:'vencimiento_plazo', source:'proyectado'
+    fc, status:'finiquitado', fs, motivo:'vencimiento_plazo', source:'proyectado', costoManual
   });
-  ['pName','pRut','pDesde','pHasta'].forEach(id => {
+  ['pName','pRut','pDesde','pHasta','pCosto'].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.value='';
   });
@@ -2026,8 +2111,16 @@ function renderSugerencias(){
         }
         return 'Sin coincidencia en dotación';
       })()}</div>
+      <div><button class="btn btn-primary btn-sm" data-add-sug="${a.rutlimpio}#${a.cc}#${a.role}">Agregar</button></div>
     </div>
   `).join('');
+
+  list.querySelectorAll('[data-add-sug]').forEach(btn=>{
+    btn.onclick = () => {
+      const a = ASISTENCIA_NUEVOS.find(x => `${x.rutlimpio}#${x.cc}#${x.role}` === btn.dataset.addSug);
+      if(a) addFromSugerencia(a);
+    };
+  });
 }
 
 function addFromSugerencia(a){
@@ -2040,13 +2133,15 @@ function addFromSugerencia(a){
   });
   renderCCChips();
   renderRoster();
+  renderSugerencias();
   renderExportPreview();
   toast(`${a.name} agregado — no olvides Guardar cambios`);
 }
 
 function addAllSugerencias(){
   const pending = pendingSugerencias();
-  if(pending.length === 0) return;
+  if(pending.length === 0){ toast('No hay sugerencias pendientes'); return; }
+  if(!confirm(`¿Agregar ${pending.length} persona(s) de Asistencia BUK a la dotación?`)) return;
   pending.forEach(a => {
     const id = `${a.rutlimpio}#${a.cc}#${a.role}`;
     if(!workers.some(w => w.id === id)){
@@ -2059,6 +2154,7 @@ function addAllSugerencias(){
   });
   renderCCChips();
   renderRoster();
+  renderSugerencias();
   renderExportPreview();
   toast(`${pending.length} personas agregadas — no olvides Guardar cambios`);
 }
@@ -2327,7 +2423,10 @@ function downloadCSV(){
 function renderAll(){
   renderLegend();
   renderCCChips();
+  renderPeriodoFiltro();
+  renderCargoFiltro();
   renderRoster();
+  renderSugerencias();
   renderExportPreview();
 }
 
@@ -2352,6 +2451,7 @@ async function init(){
   document.getElementById('loadBackupBtn').addEventListener('click', triggerLoadBackup);
   document.getElementById('backupFileInput').addEventListener('change', handleBackupFile);
   document.getElementById('addProyectadoBtn').addEventListener('click', addProyectado);
+  document.getElementById('addAllSugBtn').addEventListener('click', addAllSugerencias);
   document.getElementById('pRole').addEventListener('change', updateProyectadoCostPreview);
   document.getElementById('pCC').addEventListener('change', updateProyectadoCostPreview);
   document.getElementById('pRut').addEventListener('input', validateProyectadoRut);
