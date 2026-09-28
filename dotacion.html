@@ -488,6 +488,14 @@
       <label for="cargoFiltro">Cargo</label>
       <select id="cargoFiltro"><option value="">Todos los cargos</option></select>
     </div>
+    <div class="field">
+      <label for="estadoOrigenFiltro">Vigente / Proyectado</label>
+      <select id="estadoOrigenFiltro">
+        <option value="">Todos</option>
+        <option value="vigente">Vigentes</option>
+        <option value="proyectado">Proyectados</option>
+      </select>
+    </div>
     <div class="field search">
       <label for="searchBox">Buscar</label>
       <input type="text" id="searchBox" placeholder="Nombre, rut o cargo...">
@@ -1320,6 +1328,7 @@ let meta = { ultimoMesReal: 7 }; // 1-12
 let activeCC = 'todos';
 let periodoFiltro = '';
 let cargoFiltro = '';
+let estadoOrigenFiltro = '';
 const CARGOS_LIST = ["Administrador de Obra","Administrativo RRHH","Albañil","Andamiero","Asistente Prevencionista de Riesgo","Asistente de Bodega","Asistente de Calidad","Asistente de Oficina Técnica","Asistente de Terreno","Ayudante Albañil","Ayudante de Trazador","Ayudante de Urbanización","Carpintero","Encargado de Calidad","Encargado de Mantención","Encargado de Oficina Técnica","Jefe General de terreno de Urbanización","Jefe de Bodega","Jefe de Terreno","Jornal","Jornal Canguero","Maestro Multifuncional","Maestro Urbanización","Operador de Maquinaria","Pañolero","Prevencionista de Riesgo","Supervisor","Supervisor de urbanización","Topógrafo","Trazador"];
 let pendingExitId = null;
 let costoAutoFilled = false;
@@ -1510,6 +1519,19 @@ function renderCargoFiltro(){
     cargosEnUso.map(c=>`<option value="${c}">${c}</option>`).join('');
   sel.value = cargoFiltro;
   sel.onchange = () => { cargoFiltro = sel.value; renderRoster(); };
+}
+
+// Vigente = tiene costo empresa según el Excel de nómina (source 'excel') o
+// fue agregado desde una marca real de Asistencia BUK (source 'ingreso').
+// Proyectado = lo agregaste a mano en "Agregar personal proyectado".
+function esVigente(w){ return w.source === 'excel' || w.source === 'ingreso'; }
+function esProyectado(w){ return w.source === 'proyectado'; }
+
+function renderEstadoOrigenFiltro(){
+  const sel = document.getElementById('estadoOrigenFiltro');
+  if(!sel) return;
+  sel.value = estadoOrigenFiltro;
+  sel.onchange = () => { estadoOrigenFiltro = sel.value; renderRoster(); };
 }
 
 function computeResumenPorCentro(){
@@ -1745,7 +1767,8 @@ function renderRoster(){
   const q = document.getElementById('searchBox').value.trim();
   let list = workers.filter(w => (activeCC==='todos' || w.cc===activeCC) && matchesSearch(w,q)
     && (cargoFiltro==='' || w.role===cargoFiltro)
-    && (periodoFiltro==='' || vigenteEnMes(w, parseInt(periodoFiltro,10))));
+    && (periodoFiltro==='' || vigenteEnMes(w, parseInt(periodoFiltro,10)))
+    && (estadoOrigenFiltro==='' || (estadoOrigenFiltro==='vigente' ? esVigente(w) : esProyectado(w))));
   list = list.slice().sort((a,b)=> (isDeparted(a))-(isDeparted(b)) || a.name.localeCompare(b.name));
 
   document.getElementById('activeCount').textContent = workers.filter(w=>!isDeparted(w)).length + ' de ' + workers.length;
@@ -2425,6 +2448,7 @@ function renderAll(){
   renderCCChips();
   renderPeriodoFiltro();
   renderCargoFiltro();
+  renderEstadoOrigenFiltro();
   renderRoster();
   renderSugerencias();
   renderExportPreview();
