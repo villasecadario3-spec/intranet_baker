@@ -170,6 +170,9 @@ input[type=file] { display: none; }
     <button class="tab-btn" id="tabBtnConciliacion" onclick="cambiarTab('conciliacion')" style="padding:12px 22px;font-family:inherit;font-size:0.86rem;font-weight:600;background:transparent;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;color:var(--ink2);">
       Calificación Energética
     </button>
+    <button class="tab-btn" id="tabBtnDS19" onclick="cambiarTab('ds19')" style="padding:12px 22px;font-family:inherit;font-size:0.86rem;font-weight:600;background:transparent;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;color:var(--ink2);">
+      Formulario DS19
+    </button>
   </div>
 
   <div id="panelCartas">
@@ -280,6 +283,36 @@ input[type=file] { display: none; }
     </div>
 
   </div><!-- /panelConciliacion -->
+
+  <div id="panelDS19" style="display:none;">
+    <div class="dropzone" style="cursor:default;">
+      <div style="background:#fafafa;border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:20px;text-align:left;">
+        <div style="font-weight:700;font-size:0.9rem;margin-bottom:10px;">Datos generales del proyecto</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;" id="ds19-carpeta" placeholder="Nombre Carpeta de Solicitud">
+          <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;" id="ds19-vendedor" placeholder="Vendedor (Inmobiliaria/Constructora)">
+          <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;" id="ds19-codigo" placeholder="Código Proyecto">
+          <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;" id="ds19-nombreproyecto" placeholder="Nombre Proyecto">
+          <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;" id="ds19-resoluciones" placeholder="N° Resolución(es) y Fecha(s)">
+          <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;" id="ds19-ano" placeholder="Año Beneficio">
+        </div>
+      </div>
+
+      <div style="text-align:left;margin-bottom:16px;">
+        <div style="font-weight:700;font-size:0.9rem;margin-bottom:8px;">Escrituras (hasta 10, una por comprador)</div>
+        <input type="file" id="ds19-file-input" accept=".pdf" multiple style="margin-bottom:10px;">
+        <br>
+        <button class="btn btn-primary" onclick="ds19SubirEscrituras()">Subir y procesar</button>
+      </div>
+    </div>
+
+    <div id="ds19-lista-procesando" style="text-align:left;"></div>
+    <div id="ds19-tabla-revision" style="text-align:left;"></div>
+
+    <div style="margin-top:20px;display:none;text-align:left;" id="ds19-generar-wrap">
+      <button class="btn btn-primary" onclick="ds19GenerarFormulario()">📄 Generar formulario Word</button>
+    </div>
+  </div><!-- /panelDS19 -->
 
 </div>
 
@@ -679,11 +712,14 @@ async function cargarHistorial() {
 function cambiarTab(tab) {
   document.getElementById('panelCartas').style.display = tab === 'cartas' ? 'block' : 'none';
   document.getElementById('panelConciliacion').style.display = tab === 'conciliacion' ? 'block' : 'none';
-  const btnC = document.getElementById('tabBtnCartas'), btnE = document.getElementById('tabBtnConciliacion');
+  document.getElementById('panelDS19').style.display = tab === 'ds19' ? 'block' : 'none';
+  const btnC = document.getElementById('tabBtnCartas'), btnE = document.getElementById('tabBtnConciliacion'), btnD = document.getElementById('tabBtnDS19');
   btnC.style.color = tab === 'cartas' ? 'var(--cyan)' : 'var(--ink2)';
   btnC.style.borderBottomColor = tab === 'cartas' ? 'var(--cyan)' : 'transparent';
   btnE.style.color = tab === 'conciliacion' ? 'var(--cyan)' : 'var(--ink2)';
   btnE.style.borderBottomColor = tab === 'conciliacion' ? 'var(--cyan)' : 'transparent';
+  btnD.style.color = tab === 'ds19' ? 'var(--cyan)' : 'var(--ink2)';
+  btnD.style.borderBottomColor = tab === 'ds19' ? 'var(--cyan)' : 'transparent';
 }
 
 // ── CONCILIACIÓN ENERGÉTICO ──────────────────────────────────
@@ -920,6 +956,158 @@ async function enviarCorreosMasivo() {
   progreso.textContent = `Listo — ${enviados} de ${n} enviados${fallidos.length ? `, ${fallidos.length} con error (ver consola)` : ''}.`;
   if (fallidos.length) console.error('Correos que fallaron:', fallidos);
   toast(fallidos.length ? `${enviados}/${n} enviados, ${fallidos.length} fallaron` : `${enviados} correo(s) enviados correctamente`, fallidos.length > 0);
+}
+
+// ── FORMULARIO DS19 ──────────────────────────────────────────
+const REQUISITOS_DS19 = [
+  'Permiso Edificación', 'Recepción Final', 'N° y fecha Resolución',
+  'Estacionamiento', 'Individualización vivienda', 'Precio compraventa',
+  'Seguro incendio y sismo', 'Seguro desgravamen e invalidez 2/3',
+  'Seguro desempleo e incapacidad temporal',
+  'Prohibiciones de enajenar, ceder uso y goce y habitar en favor de Serviu',
+  'Mandato cobro subsidio', 'Exención IVA o Contrato suma alzada',
+  'Nómina de Profesionales, articulo 18. Ley General de U.',
+];
+let ds19Compradores = []; // [{rut, nombre, requisitos:{...}, archivoNombre}]
+
+function ds19LeerArchivoBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function ds19SubirEscrituras() {
+  const input = document.getElementById('ds19-file-input');
+  const archivos = Array.from(input.files || []).slice(0, 10);
+  if (!archivos.length) { toast('Selecciona al menos un PDF', true); return; }
+
+  const contProcesando = document.getElementById('ds19-lista-procesando');
+  contProcesando.innerHTML = archivos.map(f => `
+    <div id="ds19-job-${f.name.replace(/[^a-zA-Z0-9]/g,'_')}" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;font-size:0.82rem;">
+      ⏳ ${f.name} — subiendo y procesando (puede tardar varios minutos)…
+    </div>`).join('');
+
+  for (const file of archivos) {
+    try {
+      const base64 = await ds19LeerArchivoBase64(file);
+      const res = await fetch(`${API_BASE}/ds19/procesar-escritura`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ archivoBase64: base64, nombreArchivo: file.name })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al subir');
+      ds19EsperarResultado(data.jobId, file.name);
+    } catch(e) {
+      const divId = `ds19-job-${file.name.replace(/[^a-zA-Z0-9]/g,'_')}`;
+      const div = document.getElementById(divId);
+      if (div) div.innerHTML = `❌ ${file.name} — error: ${e.message}`;
+    }
+  }
+}
+
+async function ds19EsperarResultado(jobId, nombreArchivo) {
+  const divId = `ds19-job-${nombreArchivo.replace(/[^a-zA-Z0-9]/g,'_')}`;
+  const div = document.getElementById(divId);
+  const maxIntentos = 60; // ~15 minutos tope (60 × 15s)
+  for (let i = 0; i < maxIntentos; i++) {
+    await new Promise(r => setTimeout(r, 15000));
+    try {
+      const res = await fetch(`${API_BASE}/ds19/estado/${jobId}`);
+      const data = await res.json();
+      if (data.estado === 'listo') {
+        if (div) div.innerHTML = `✅ ${nombreArchivo} — procesado`;
+        ds19AgregarComprador(data.resultado, nombreArchivo);
+        return;
+      } else if (data.estado === 'error') {
+        if (div) div.innerHTML = `❌ ${nombreArchivo} — error: ${data.error}`;
+        return;
+      }
+    } catch(e) { /* sigue esperando */ }
+  }
+  if (div) div.innerHTML = `⚠ ${nombreArchivo} — está tardando más de lo normal, revisa la consola del servidor`;
+}
+
+function ds19AgregarComprador(resultado, nombreArchivo) {
+  const candidato = (resultado.candidatos_comprador || [])[0] || {};
+  const requisitos = {};
+  REQUISITOS_DS19.forEach(nombre => {
+    const r = resultado.requisitos?.[nombre];
+    requisitos[nombre] = r ? String(r.clausula ?? '') : '';
+  });
+  ds19Compradores.push({
+    rut: candidato.rut || '',
+    nombre: candidato.nombre || '',
+    programa: resultado.programa_detectado || '',
+    requisitos,
+    archivoNombre: nombreArchivo,
+  });
+  ds19RenderTablaRevision();
+}
+
+function ds19RenderTablaRevision() {
+  const cont = document.getElementById('ds19-tabla-revision');
+  if (!ds19Compradores.length) { cont.innerHTML = ''; return; }
+  cont.innerHTML = `
+    <div style="font-weight:700;font-size:0.9rem;margin:16px 0 8px;">Revisa y corrige antes de generar el formulario</div>
+    <div style="overflow-x:auto;">
+    <table style="border-collapse:collapse;width:100%;font-size:0.78rem;">
+      <thead><tr style="background:var(--bg2,#f0f0f0);">
+        <th style="padding:6px;border:1px solid var(--border);text-align:left;">Archivo</th>
+        <th style="padding:6px;border:1px solid var(--border);">RUT</th>
+        <th style="padding:6px;border:1px solid var(--border);">Nombre</th>
+        ${REQUISITOS_DS19.map(r => `<th style="padding:6px;border:1px solid var(--border);min-width:90px;">${r}</th>`).join('')}
+      </tr></thead>
+      <tbody>
+        ${ds19Compradores.map((c, i) => `
+        <tr>
+          <td style="padding:4px;border:1px solid var(--border);">${c.archivoNombre}</td>
+          <td style="padding:2px;border:1px solid var(--border);"><input style="width:90px;border:none;" value="${c.rut}" onchange="ds19Compradores[${i}].rut=this.value"></td>
+          <td style="padding:2px;border:1px solid var(--border);"><input style="width:160px;border:none;" value="${c.nombre}" onchange="ds19Compradores[${i}].nombre=this.value"></td>
+          ${REQUISITOS_DS19.map(r => `<td style="padding:2px;border:1px solid var(--border);"><input style="width:40px;border:none;text-align:center;" value="${c.requisitos[r]}" onchange="ds19Compradores[${i}].requisitos['${r.replace(/'/g,"\\'")}']=this.value"></td>`).join('')}
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    </div>`;
+  document.getElementById('ds19-generar-wrap').style.display = 'block';
+}
+
+async function ds19GenerarFormulario() {
+  const programaDetectado = ds19Compradores.find(c => c.programa)?.programa || '';
+  const payload = {
+    proyecto: {
+      fecha_ingreso: new Date().toLocaleDateString('es-CL'),
+      nombre_carpeta: document.getElementById('ds19-carpeta').value,
+      vendedor: document.getElementById('ds19-vendedor').value,
+      codigo_proyecto: document.getElementById('ds19-codigo').value,
+      nombre_proyecto: document.getElementById('ds19-nombreproyecto').value,
+      resoluciones_texto: document.getElementById('ds19-resoluciones').value,
+      programa: programaDetectado,
+      ano_beneficio: document.getElementById('ds19-ano').value,
+      tramo: '',
+    },
+    compradores: ds19Compradores.map(c => ({
+      rut: c.rut, nombre: c.nombre, requisitos: c.requisitos,
+    })),
+  };
+  try {
+    const res = await fetch(`${API_BASE}/ds19/generar-formulario`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Error'); }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'Formulario_DS19_completado.docx';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Formulario generado y descargado');
+  } catch(e) {
+    toast('Error al generar el formulario: ' + e.message, true);
+  }
 }
 
 // ── INIT ──────────────────────────────────────────────────────
