@@ -659,20 +659,12 @@
                 <div class="mod-desc">Divisor de cartas oferta y conciliación energético para el equipo de escrituración.</div>
                 <div class="mod-link">Acceder <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
             </a>
-            <a class="mod-card" href="estacionamientos.html" data-modulo="estacionamientos.html" data-nombre="Estacionamientos">
+            <a class="mod-card" href="rutas-estacionamientos.html" data-modulo="rutas-estacionamientos.html" data-nombre="Planificación de Rutas / Estacionamientos">
                 <div class="mod-top">
                     <div class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M9 10h4a2 2 0 012 2v2H9v-4z"/></svg></div>
                 </div>
-                <div class="mod-nombre">Estacionamientos</div>
-                <div class="mod-desc">Libera tu estacionamiento cuando no lo uses, o reserva uno disponible.</div>
-                <div class="mod-link">Acceder <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
-            </a>
-            <a class="mod-card" href="teletrabajo.html" data-modulo="teletrabajo.html" data-nombre="Teletrabajo">
-                <div class="mod-top">
-                    <div class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg></div>
-                </div>
-                <div class="mod-nombre">Teletrabajo</div>
-                <div class="mod-desc">Configura tus días remotos fijos y consulta al equipo por semana.</div>
+                <div class="mod-nombre">Planificación de Rutas / Estacionamientos</div>
+                <div class="mod-desc">Libera o reserva un estacionamiento, y configura tu ruta semanal (teletrabajo, visita a obra).</div>
                 <div class="mod-link">Acceder <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
             </a>
             <a class="mod-card" href="control-bodega.html" data-modulo="control-bodega.html" data-nombre="Control de Bodega">
@@ -948,8 +940,7 @@ init();
 
 // ── CONTROL DE VISIBILIDAD DE MÓDULOS ────────────────────────
 const ACCESOS_MODULOS = {
-    "estacionamientos.html": ["dvillaseca@ibaker.cl","jcumplido@ibaker.cl"],
-    "teletrabajo.html": ["dvillaseca@ibaker.cl","jcumplido@ibaker.cl"],
+    "rutas-estacionamientos.html": ["dvillaseca@ibaker.cl","jcumplido@ibaker.cl","kyepez@ibaker.cl"],
     "softland.html": [
         "dvillaseca@ibaker.cl","informatica@ibaker.cl","alarrain@ibaker.cl",
         "jcumplido@ibaker.cl","bsilva@ibaker.cl","ccampos@ibaker.cl",
@@ -986,15 +977,11 @@ const ACCESOS_MODULOS = {
 };
 async function aplicarAccesos(email) {
     const correo = (email || '').toLowerCase();
-    // Estacionamientos y Teletrabajo usan una lista dinámica (se administra
-    // desde dentro de esos módulos), no la lista fija de abajo.
+    // Rutas / Estacionamientos usa una lista dinámica (se administra desde
+    // dentro del propio módulo), no la lista fija de abajo.
     try {
-        const [listaEstac, listaTele] = await Promise.all([
-            fetch('https://api.ibaker.cl/acceso-beta/estacionamientos').then(r => r.json()),
-            fetch('https://api.ibaker.cl/acceso-beta/teletrabajo').then(r => r.json()),
-        ]);
-        ACCESOS_MODULOS['estacionamientos.html'] = listaEstac;
-        ACCESOS_MODULOS['teletrabajo.html'] = listaTele;
+        const lista = await fetch('https://api.ibaker.cl/acceso-beta/rutas-estacionamientos').then(r => r.json());
+        ACCESOS_MODULOS['rutas-estacionamientos.html'] = lista;
     } catch(e) { console.warn('No se pudo cargar la lista de acceso beta:', e.message); }
     document.querySelectorAll('[data-modulo]').forEach(card => {
         const modulo = card.getAttribute('data-modulo');
