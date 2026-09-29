@@ -201,11 +201,16 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
                             <option value="remoto">Remoto</option>
                             <option value="visita_obra">Visita a Obra</option>
                             <option value="presencial">Presencial</option>
+                            <option value="otros">Otros motivos</option>
                         </select>
                     </div>
                     <div class="form-group" id="exc-obra-wrap" style="display:none;">
                         <label class="form-label">Obra(s)</label>
                         <div id="exc-obra-chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+                    </div>
+                    <div class="form-group" id="exc-otros-wrap" style="display:none;">
+                        <label class="form-label">¿Dónde estarás? (opcional)</label>
+                        <input class="form-input" id="exc-otros-detalle" placeholder="Ej. trámite en SERVIU, reunión con Municipalidad">
                     </div>
                     <button class="btn btn-primary btn-sm" onclick="guardarExcepcion()">Agregar</button>
                 </div>
@@ -228,7 +233,7 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
                 <tbody id="semana-body"></tbody>
             </table>
             <div style="margin-top:14px;font-size:0.78rem;color:var(--txt-dim);">
-                <span class="dot dot-remoto"></span> Remoto &nbsp;&nbsp; <span class="dot dot-visita_obra"></span> Visita a Obra &nbsp;&nbsp; <span class="dot dot-presencial"></span> Presencial
+                <span class="dot dot-remoto"></span> Remoto &nbsp;&nbsp; <span class="dot dot-visita_obra"></span> Visita a Obra &nbsp;&nbsp; <span class="dot dot-presencial"></span> Presencial &nbsp;&nbsp; <span class="dot dot-otros"></span> Otros
             </div>
         </div>
     </div>
@@ -268,7 +273,7 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
 <div class="modal-overlay" id="modal-solicitar">
     <div class="modal">
         <h3>Solicitar un estacionamiento</h3>
-        <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Elige un estacionamiento y el dueño recibirá un aviso para aprobar o rechazar tu solicitud.</p>
+        <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Elige un estacionamiento, fecha y hora — queda tomado al instante, sin necesitar aprobación de nadie.</p>
         <div class="form-group">
             <label class="form-label">Estacionamiento</label>
             <select class="form-input" id="sol-spot"></select>
@@ -283,7 +288,7 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
         </div>
         <div class="modal-btns">
             <button class="btn btn-outline btn-sm" onclick="cerrarModal('modal-solicitar')">Cancelar</button>
-            <button class="btn btn-primary btn-sm" onclick="confirmarSolicitar()">Enviar solicitud</button>
+            <button class="btn btn-primary btn-sm" onclick="confirmarSolicitar()">Confirmar</button>
         </div>
     </div>
 </div>
@@ -690,9 +695,7 @@ async function confirmarSolicitar() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Error');
         cerrarModal('modal-solicitar');
-        toast('Solicitud enviada — avisando al dueño por correo…');
-        const horaTxt = (horaInicio || horaFin) ? `${horaInicio||'00:00'} a ${horaFin||'23:59'}` : '';
-        avisarDuenoPorCorreo(data.duenoEmail, data.duenoNombre, spots.find(s=>s.id===estacionamientoId)?.numero, fmt(fecha), horaTxt, data.id);
+        toast('Estacionamiento tomado');
         cargarTodo();
     } catch(e) { toast('Error: ' + e.message); }
 }
@@ -830,8 +833,8 @@ async function guardarPatron() {
 let excObrasSeleccionadas = new Set();
 function toggleObraExcepcion() {
     const tipo = document.getElementById('exc-tipo').value;
-    const wrap = document.getElementById('exc-obra-wrap');
-    wrap.style.display = tipo === 'visita_obra' ? 'block' : 'none';
+    document.getElementById('exc-obra-wrap').style.display = tipo === 'visita_obra' ? 'block' : 'none';
+    document.getElementById('exc-otros-wrap').style.display = tipo === 'otros' ? 'block' : 'none';
     if (tipo === 'visita_obra') {
         excObrasSeleccionadas = new Set();
         renderExcObraChips();
@@ -852,17 +855,19 @@ async function guardarExcepcion() {
     const fecha = document.getElementById('exc-fecha').value;
     const tipo = document.getElementById('exc-tipo').value;
     const obras = tipo === 'visita_obra' ? [...excObrasSeleccionadas] : undefined;
+    const detalle = tipo === 'otros' ? document.getElementById('exc-otros-detalle').value.trim() : undefined;
     if (!fecha) { alert('Elige una fecha'); return; }
     if (tipo === 'visita_obra' && !obras.length) { alert('Selecciona al menos una obra'); return; }
     try {
         const res = await fetch(`${API}/teletrabajo/excepcion`, {
             method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ email: emailActual, fecha, tipo, obras })
+            body: JSON.stringify({ email: emailActual, fecha, tipo, obras, detalle })
         });
         if (!res.ok) throw new Error((await res.json()).error || 'Error al guardar');
         dataTeletrabajo.excepciones = dataTeletrabajo.excepciones.filter(e => !(e.email===emailActual && e.fecha===fecha));
-        dataTeletrabajo.excepciones.push({ email: emailActual, fecha, tipo, obras });
+        dataTeletrabajo.excepciones.push({ email: emailActual, fecha, tipo, obras, detalle });
         toast('Excepción agregada');
+        document.getElementById('exc-otros-detalle').value = '';
         renderExcepciones();
         renderSemana();
     } catch(e) { toast('Error: ' + e.message); }
@@ -883,11 +888,16 @@ function renderExcepciones() {
     const mias = dataTeletrabajo.excepciones.filter(e => e.email === emailActual && e.fecha >= hoy).sort((a,b)=>a.fecha.localeCompare(b.fecha));
     const cont = document.getElementById('lista-excepciones');
     if (!mias.length) { cont.innerHTML = `<div class="empty">No tienes excepciones próximas.</div>`; return; }
-    cont.innerHTML = mias.map(e => `
+    cont.innerHTML = mias.map(e => {
+        const etiqueta = e.tipo === 'visita_obra' ? (e.obras && e.obras.length ? e.obras.join(', ') : 'Visita a Obra')
+            : e.tipo === 'otros' ? (e.detalle ? `Otros — ${e.detalle}` : 'Otros motivos')
+            : e.tipo;
+        return `
         <div class="excepcion-item">
-            <span>${fmt(e.fecha)} — <span class="tag tag-${e.tipo}">${e.tipo === 'visita_obra' ? (e.obras && e.obras.length ? e.obras.join(', ') : 'Visita a Obra') : e.tipo}</span></span>
+            <span>${fmt(e.fecha)} — <span class="tag tag-${e.tipo}">${etiqueta}</span></span>
             <button class="btn btn-outline btn-sm" onclick="borrarExcepcion('${e.fecha}')">Quitar</button>
-        </div>`).join('');
+        </div>`;
+    }).join('');
 }
 
 function inicioSemana(offset) {
@@ -908,12 +918,12 @@ function cambiarSemana(delta) {
 // Estado efectivo de una persona en una fecha: excepción propia si existe, si no su patrón fijo según el día de la semana.
 function estadoEnFecha(email, fechaISO, diaSemana) {
     const exc = dataTeletrabajo.excepciones.find(e => e.email === email && e.fecha === fechaISO);
-    if (exc) return { estado: exc.tipo, obras: exc.obras || [] };
+    if (exc) return { estado: exc.tipo, obras: exc.obras || [], detalle: exc.detalle || '' };
     const patron = dataTeletrabajo.patrones[email] || { teletrabajoDia: null, visitaObra: [] };
-    if (patron.teletrabajoDia === diaSemana) return { estado: 'remoto', obras: [] };
+    if (patron.teletrabajoDia === diaSemana) return { estado: 'remoto', obras: [], detalle: '' };
     const item = (patron.visitaObra || []).find(v => v.dia === diaSemana);
-    if (item) return { estado: 'visita_obra', obras: item.obras || [] };
-    return { estado: 'presencial', obras: [] };
+    if (item) return { estado: 'visita_obra', obras: item.obras || [], detalle: '' };
+    return { estado: 'presencial', obras: [], detalle: '' };
 }
 
 function renderSemana() {
@@ -939,8 +949,11 @@ function renderSemana() {
 
     document.getElementById('semana-body').innerHTML = personas.map(email => {
         const celdas = DIAS.map((dia,i) => {
-            const { estado, obras } = estadoEnFecha(email, fechas[i], dia);
-            const label = estado === 'remoto' ? 'Remoto' : estado === 'visita_obra' ? (obras.length ? obras.join(', ') : 'Visita a Obra') : 'Presencial';
+            const { estado, obras, detalle } = estadoEnFecha(email, fechas[i], dia);
+            const label = estado === 'remoto' ? 'Remoto'
+                : estado === 'visita_obra' ? (obras.length ? obras.join(', ') : 'Visita a Obra')
+                : estado === 'otros' ? (detalle ? `Otros — ${detalle}` : 'Otros motivos')
+                : 'Presencial';
             return `<td><span class="dot dot-${estado}"></span> ${label}</td>`;
         }).join('');
         return `<tr><td>${email}${email===emailActual?' (tú)':''}</td>${celdas}</tr>`;
