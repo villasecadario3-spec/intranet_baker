@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planificación de Rutas / Estacionamientos — Baker</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+<style>
+:root{
+    --rojo:#C0392B; --rojo-dark:#96281B; --rojo-light:rgba(192,57,43,0.08);
+    --negro:#111010; --negro-2:#1A1918; --negro-3:#242220; --borde-dark:#2E2C2A;
+    --crema:#F8F6F3; --gris-1:#F0EDE9; --gris-2:#E2DED9; --gris-3:#B5B0AA;
+    --txt:#1C1A18; --txt-mid:#6B6762; --txt-dim:#A09C97;
+    --verde:#1a7a4a; --verde-bg:rgba(26,122,74,0.08);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans',sans-serif;background:var(--crema);color:var(--txt);min-height:100vh;}
+nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px solid var(--borde-dark);height:60px;display:flex;align-items:center;padding:0 32px;gap:16px;position:sticky;top:0;z-index:100;}
+.nav-back{display:flex;align-items:center;gap:6px;color:#B5B0AA;text-decoration:none;font-size:0.8rem;font-weight:500;}
+.nav-back svg{width:14px;height:14px;}
+.nav-sep{width:1px;height:18px;background:var(--borde-dark);}
+.nav-title{font-family:'DM Mono',monospace;font-size:0.72rem;color:#B5B0AA;letter-spacing:0.08em;text-transform:uppercase;}
+.nav-spacer{flex:1;}
+.user-chip{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;background:var(--negro-3);border:1px solid var(--borde-dark);border-radius:100px;}
+.user-av{width:26px;height:26px;border-radius:50%;background:var(--rojo);display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:0.72rem;font-weight:700;color:white;}
+.user-nm{font-size:0.78rem;font-weight:500;color:white;}
+.page-header{background:var(--negro);padding:36px 32px 30px;border-bottom:1px solid var(--borde-dark);}
+.page-eyebrow{font-size:0.65rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--rojo);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.page-eyebrow::before{content:'';width:16px;height:1px;background:var(--rojo);}
+.page-header h1{font-family:'Playfair Display',serif;font-size:1.9rem;font-weight:900;color:white;letter-spacing:-0.02em;}
+.page-header-sub{font-size:0.82rem;color:#6b6762;margin-top:6px;}
+.main{padding:28px 32px 60px;max-width:1200px;margin:0 auto;}
+
+/* Pestañas — se reutiliza el mismo estilo para el nivel principal
+   (Estacionamientos / Teletrabajo) y para las sub-pestañas de Teletrabajo
+   (Mi teletrabajo / Ver equipo), cada una con su propio contenedor. */
+.tabs{display:flex;gap:0;border-bottom:2px solid var(--gris-2);margin-bottom:22px;}
+.tabs.tabs-principal{margin-bottom:26px;}
+.tab{padding:11px 20px;font-size:0.85rem;font-weight:600;color:var(--txt-dim);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;}
+.tab.activo{color:var(--rojo);border-bottom-color:var(--rojo);}
+.panel{display:none;}
+.panel.activo{display:block;}
+
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;}
+.btn{display:flex;align-items:center;gap:7px;padding:10px 18px;border-radius:9px;border:none;font-family:'DM Sans',sans-serif;font-size:0.85rem;font-weight:600;cursor:pointer;transition:all 0.15s;}
+.btn-primary{background:var(--negro);color:white;}
+.btn-primary:hover{background:var(--rojo);}
+.btn-outline{background:white;border:1px solid var(--gris-2);color:var(--txt-mid);}
+.btn-outline:hover{border-color:var(--rojo);color:var(--rojo);}
+.btn-sm{padding:6px 12px;font-size:0.76rem;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
+.spot-card{background:white;border:1px solid var(--gris-2);border-radius:14px;padding:18px;}
+.spot-card.libre{border-color:rgba(26,122,74,0.35);background:var(--verde-bg);}
+.spot-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
+.spot-num{font-family:'Playfair Display',serif;font-size:1.3rem;font-weight:900;}
+.spot-badge{font-size:0.65rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;padding:3px 9px;border-radius:100px;white-space:nowrap;}
+.badge-ocupado{background:var(--gris-1);color:var(--txt-dim);}
+.badge-libre{background:var(--verde-bg);color:var(--verde);border:1px solid rgba(26,122,74,0.25);}
+.badge-reservado{background:rgba(192,57,43,0.08);color:var(--rojo);border:1px solid rgba(192,57,43,0.2);}
+.spot-dueno{font-size:0.82rem;color:var(--txt-mid);margin-bottom:12px;}
+.spot-info{font-size:0.76rem;color:var(--txt-dim);margin-bottom:10px;line-height:1.5;}
+.spot-acciones{display:flex;gap:8px;flex-wrap:wrap;}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.visible{display:flex;}
+.modal{background:white;border-radius:16px;padding:26px;max-width:420px;width:100%;}
+.modal h3{font-family:'Playfair Display',serif;font-size:1.15rem;margin-bottom:16px;}
+.form-group{margin-bottom:14px;}
+.form-label{font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--txt-dim);display:block;margin-bottom:5px;}
+.form-input,.form-select{width:100%;padding:9px 12px;border:1px solid var(--gris-2);border-radius:8px;font-family:inherit;font-size:0.85rem;}
+.modal-btns{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
+.empty{text-align:center;padding:50px 20px;color:var(--txt-dim);}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--negro);color:white;padding:12px 20px;border-radius:9px;font-size:0.85rem;transition:transform 0.25s;z-index:300;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+.admin-box{background:white;border:1px solid var(--gris-2);border-radius:14px;padding:18px;margin-bottom:20px;}
+.admin-row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+.admin-row input{flex:1;min-width:120px;padding:8px 10px;border:1px solid var(--gris-2);border-radius:7px;font-size:0.82rem;}
+
+/* Teletrabajo */
+.card{background:white;border:1px solid var(--gris-2);border-radius:14px;padding:22px;margin-bottom:18px;}
+.card h3{font-family:'Playfair Display',serif;font-size:1.05rem;margin-bottom:14px;}
+.dias-grid{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+.obra-dia-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gris-1);flex-wrap:wrap;}
+.obra-dia-row:last-child{border-bottom:none;}
+.obra-dia-check{display:flex;align-items:center;gap:8px;min-width:110px;font-size:0.85rem;font-weight:500;cursor:pointer;}
+.obra-dia-check input{width:16px;height:16px;accent-color:var(--negro);cursor:pointer;}
+.obra-dia-select{flex:1;min-width:180px;padding:7px 10px;border:1px solid var(--gris-2);border-radius:7px;font-family:inherit;font-size:0.82rem;}
+.obra-dia-select:disabled{background:var(--gris-1);color:var(--txt-dim);}
+.dia-chip{padding:10px 16px;border-radius:9px;border:1px solid var(--gris-2);background:var(--crema);font-size:0.82rem;font-weight:600;cursor:pointer;transition:all 0.15s;}
+.dia-chip.activo{background:var(--negro);color:white;border-color:var(--negro);}
+.form-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+.excepcion-item{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border:1px solid var(--gris-2);border-radius:9px;margin-bottom:8px;font-size:0.82rem;}
+.tag{padding:2px 9px;border-radius:100px;font-size:0.68rem;font-weight:700;text-transform:uppercase;}
+.tag-remoto{background:var(--verde-bg);color:var(--verde);}
+.tag-visita_obra{background:rgba(184,134,11,0.1);color:#8a6508;}
+.tag-presencial{background:rgba(192,57,43,0.08);color:var(--rojo);}
+.tag-otros{background:rgba(107,103,98,0.1);color:var(--txt-mid);}
+.week-nav{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
+.week-nav button{background:white;border:1px solid var(--gris-2);border-radius:8px;padding:7px 12px;cursor:pointer;}
+.week-label{font-weight:600;font-size:0.9rem;}
+.tabla-semana{width:100%;border-collapse:collapse;background:white;border:1px solid var(--gris-2);border-radius:12px;overflow:hidden;}
+.tabla-semana th{background:var(--negro);color:#B5B0AA;font-family:'DM Mono',monospace;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.05em;padding:10px;text-align:left;}
+.tabla-semana td{padding:10px;border-bottom:1px solid var(--gris-1);font-size:0.82rem;}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
+.dot-remoto{background:var(--verde);}
+.dot-visita_obra{background:#B8860B;}
+.dot-presencial{background:var(--gris-3);}
+.dot-otros{background:var(--txt-mid);}
+</style>
+</head>
+<body>
+<nav>
+    <a class="nav-back" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        Volver a la intranet
+    </a>
+    <div class="nav-sep"></div>
+    <div class="nav-title">Rutas / Estacionamientos</div>
+    <div class="nav-spacer"></div>
+    <div id="auth-area"></div>
+</nav>
+<div class="page-header">
+    <div class="page-eyebrow">Grupo Baker</div>
+    <h1>Planificación de Rutas / Estacionamientos</h1>
+    <div class="page-header-sub">Gestiona tu estacionamiento y tu ruta semanal (teletrabajo, visita a obra) en un solo lugar.</div>
+</div>
+<div class="main">
+
+    <div id="admin-acceso-wrap" style="display:none;">
+        <div class="admin-box">
+            <div style="font-weight:700;font-size:0.85rem;margin-bottom:10px;">👥 Acceso al módulo (mientras está en pruebas)</div>
+            <div class="admin-row">
+                <input id="acceso-nuevo" placeholder="correo@ibaker.cl">
+                <button class="btn btn-primary btn-sm" onclick="agregarAcceso()">Agregar acceso</button>
+            </div>
+            <div id="acceso-lista"></div>
+        </div>
+    </div>
+
+    <div class="tabs tabs-principal" id="tabs-principal">
+        <div class="tab activo" data-tab-principal="estacionamientos" onclick="cambiarTabPrincipal('estacionamientos')">🚗 Estacionamientos</div>
+        <div class="tab" data-tab-principal="teletrabajo" onclick="cambiarTabPrincipal('teletrabajo')">🗺️ Teletrabajo / Rutas</div>
+    </div>
+
+    <!-- ═══════════ PANEL: ESTACIONAMIENTOS ═══════════ -->
+    <div class="panel activo" id="panel-principal-estacionamientos">
+        <div id="admin-wrap" style="display:none;">
+            <div class="admin-box">
+                <div style="font-weight:700;font-size:0.85rem;margin-bottom:10px;">⚙ Agregar / editar estacionamiento</div>
+                <div class="admin-row">
+                    <input id="a-numero" placeholder="N° estacionamiento (ej. 5)">
+                    <input id="a-dueno-email" placeholder="correo del dueño">
+                    <input id="a-dueno-nombre" placeholder="nombre del dueño">
+                    <button class="btn btn-primary btn-sm" onclick="guardarSpot()">Guardar</button>
+                </div>
+                <div id="admin-lista" style="margin-top:14px;"></div>
+            </div>
+        </div>
+        <div class="toolbar">
+            <div style="font-size:0.82rem;color:var(--txt-dim);">Hoy: <b id="fecha-hoy"></b></div>
+            <div style="display:flex;gap:8px;">
+                <button class="btn btn-primary btn-sm" onclick="abrirSolicitar()">🙋 Solicitar estacionamiento</button>
+                <button class="btn btn-outline btn-sm" onclick="cargarTodo()">↻ Actualizar</button>
+            </div>
+        </div>
+        <div class="grid" id="grid-spots"></div>
+    </div>
+
+    <!-- ═══════════ PANEL: TELETRABAJO / RUTAS ═══════════ -->
+    <div class="panel" id="panel-principal-teletrabajo">
+        <div class="tabs" id="tabs-teletrabajo">
+            <div class="tab activo" onclick="cambiarTab('mio')">Mi ruta</div>
+            <div class="tab" onclick="cambiarTab('equipo')">Ver equipo por semana</div>
+        </div>
+
+        <div class="panel activo" id="panel-mio">
+            <div class="card">
+                <h3>Día de Teletrabajo</h3>
+                <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Elige como máximo un día fijo, entre martes, miércoles o jueves.</p>
+                <div class="dias-grid" id="dias-teletrabajo">
+                    <div class="dia-chip" data-dia="martes">Martes</div>
+                    <div class="dia-chip" data-dia="miercoles">Miércoles</div>
+                    <div class="dia-chip" data-dia="jueves">Jueves</div>
+                </div>
+                <h3 style="margin-top:20px;">Visita a Obra</h3>
+                <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Marca los días en que normalmente estás en terreno, no en la oficina. Aquí sí puedes elegir varios días.</p>
+                <div id="dias-obra"></div>
+                <button class="btn btn-primary btn-sm" onclick="guardarPatron()">Guardar patrón</button>
+            </div>
+
+            <div class="card">
+                <h3>Excepción para un día puntual</h3>
+                <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Para cambiar un día específico sin tocar tu patrón fijo (ej. esta semana trabajas remoto un día distinto al habitual).</p>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" type="date" id="exc-fecha"></div>
+                    <div class="form-group">
+                        <label class="form-label">Ese día voy a estar</label>
+                        <select class="form-select" id="exc-tipo" onchange="toggleObraExcepcion()">
+                            <option value="remoto">Remoto</option>
+                            <option value="visita_obra">Visita a Obra</option>
+                            <option value="presencial">Presencial</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="exc-obra-wrap" style="display:none;">
+                        <label class="form-label">Obra(s)</label>
+                        <div id="exc-obra-chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="guardarExcepcion()">Agregar</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Mis excepciones próximas</h3>
+                <div id="lista-excepciones"></div>
+            </div>
+        </div>
+
+        <div class="panel" id="panel-equipo">
+            <div class="week-nav">
+                <button onclick="cambiarSemana(-1)">‹ Semana anterior</button>
+                <div class="week-label" id="week-label"></div>
+                <button onclick="cambiarSemana(1)">Semana siguiente ›</button>
+            </div>
+            <table class="tabla-semana">
+                <thead><tr id="semana-head"></tr></thead>
+                <tbody id="semana-body"></tbody>
+            </table>
+            <div style="margin-top:14px;font-size:0.78rem;color:var(--txt-dim);">
+                <span class="dot dot-remoto"></span> Remoto &nbsp;&nbsp; <span class="dot dot-visita_obra"></span> Visita a Obra &nbsp;&nbsp; <span class="dot dot-presencial"></span> Presencial
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="modal-overlay" id="modal-liberar">
+    <div class="modal">
+        <h3>Liberar tu estacionamiento</h3>
+        <div class="form-group"><label class="form-label">Desde</label><input class="form-input" type="date" id="lib-desde"></div>
+        <div class="form-group"><label class="form-label">Hasta</label><input class="form-input" type="date" id="lib-hasta"></div>
+        <div class="form-group">
+            <label class="form-label">Horario (opcional — vacío = todo el día)</label>
+            <div style="display:flex;gap:8px;">
+                <input class="form-input" type="time" id="lib-hora-desde">
+                <input class="form-input" type="time" id="lib-hora-hasta">
+            </div>
+        </div>
+        <div class="modal-btns">
+            <button class="btn btn-outline btn-sm" onclick="cerrarModal('modal-liberar')">Cancelar</button>
+            <button class="btn btn-primary btn-sm" onclick="confirmarLiberar()">Liberar</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-reservar">
+    <div class="modal">
+        <h3>Reservar este estacionamiento</h3>
+        <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;" id="reservar-rango-info"></p>
+        <div class="modal-btns">
+            <button class="btn btn-outline btn-sm" onclick="cerrarModal('modal-reservar')">Cancelar</button>
+            <button class="btn btn-primary btn-sm" onclick="confirmarReservar()">Confirmar reserva</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-solicitar">
+    <div class="modal">
+        <h3>Solicitar un estacionamiento</h3>
+        <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Elige un estacionamiento y el dueño recibirá un aviso para aprobar o rechazar tu solicitud.</p>
+        <div class="form-group">
+            <label class="form-label">Estacionamiento</label>
+            <select class="form-input" id="sol-spot"></select>
+        </div>
+        <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" type="date" id="sol-fecha"></div>
+        <div class="form-group">
+            <label class="form-label">Horario (opcional — vacío = todo el día)</label>
+            <div style="display:flex;gap:8px;">
+                <input class="form-input" type="time" id="sol-hora-desde">
+                <input class="form-input" type="time" id="sol-hora-hasta">
+            </div>
+        </div>
+        <div class="modal-btns">
+            <button class="btn btn-outline btn-sm" onclick="cerrarModal('modal-solicitar')">Cancelar</button>
+            <button class="btn btn-primary btn-sm" onclick="confirmarSolicitar()">Enviar solicitud</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'https://api.ibaker.cl';
+// Administradores del módulo combinado — se mantienen los que ya
+// administraban Estacionamientos/Teletrabajo, más Karollihn Yépez.
+const ADMINISTRADORES = ['dvillaseca@ibaker.cl', 'jcumplido@ibaker.cl', 'kyepez@ibaker.cl'];
+let emailActual = '', nombreActual = '';
+
+const msalConfig = {
+    auth: {
+        clientId: "9a56ab1c-d3c4-4460-9892-1d4da768ecfb",
+        authority: "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
+        redirectUri: window.location.origin + window.location.pathname,
+    },
+    cache: { cacheLocation: "sessionStorage" }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+async function initAuth() {
+    try {
+        await msalInstance.initialize();
+        const accounts = msalInstance.getAllAccounts();
+        if (accounts.length > 0) {
+            const u = accounts[0];
+            emailActual = u.username.toLowerCase();
+            let listaAcceso = [];
+            try { listaAcceso = await fetch(`${API}/acceso-beta/rutas-estacionamientos`).then(r => r.json()); } catch(e) { listaAcceso = ADMINISTRADORES; }
+            if (!listaAcceso.includes(emailActual)) {
+                window.location.href = 'index.html';
+                return;
+            }
+            nombreActual = u.name || u.username;
+            const iniciales = nombreActual.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+            document.getElementById('auth-area').innerHTML = `<div class="user-chip"><div class="user-av">${iniciales}</div><span class="user-nm">${nombreActual.split(' ').slice(0,2).join(' ')}</span></div>`;
+            if (ADMINISTRADORES.includes(emailActual)) {
+                document.getElementById('admin-wrap').style.display = 'block';
+                document.getElementById('admin-acceso-wrap').style.display = 'block';
+                renderAccesoLista(listaAcceso);
+            }
+            document.getElementById('fecha-hoy').textContent = new Date().toLocaleDateString('es-CL', {weekday:'long', day:'numeric', month:'long'});
+
+            // Listeners del patrón de Teletrabajo (se activan una sola vez).
+            document.querySelectorAll('#dias-teletrabajo .dia-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    const dia = chip.dataset.dia;
+                    if (visitaObra.has(dia)) { toast('Ese día ya está marcado como Visita a Obra'); return; }
+                    teletrabajoDia = (teletrabajoDia === dia) ? null : dia;
+                    renderChipsPatron();
+                });
+            });
+            renderFilasObra();
+
+            cargarTodo();       // Estacionamientos
+            await cargarDatos(); // Teletrabajo
+        } else {
+            window.location.href = 'index.html';
+        }
+    } catch(e) { window.location.href = 'index.html'; }
+}
+
+function renderAccesoLista(lista) {
+    const cont = document.getElementById('acceso-lista');
+    if (!cont) return;
+    cont.innerHTML = lista.map(email => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;border:1px solid var(--gris-2);border-radius:7px;margin-bottom:6px;font-size:0.8rem;">
+            <span>${email}</span>
+            ${ADMINISTRADORES.includes(email) ? '<span style="font-size:0.68rem;color:var(--txt-dim);">Admin fijo</span>' : `<button class="btn btn-outline btn-sm" onclick="quitarAcceso('${email}')">Quitar</button>`}
+        </div>`).join('');
+}
+async function agregarAcceso() {
+    const email = document.getElementById('acceso-nuevo').value.trim().toLowerCase();
+    if (!email) return;
+    try {
+        const res = await fetch(`${API}/acceso-beta/rutas-estacionamientos`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ email, emailQuienPide: emailActual })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error');
+        document.getElementById('acceso-nuevo').value = '';
+        renderAccesoLista(data.lista);
+        toast('Acceso agregado');
+    } catch(e) { toast('Error: ' + e.message); }
+}
+async function quitarAcceso(email) {
+    if (!confirm(`¿Quitar el acceso a ${email}?`)) return;
+    try {
+        const res = await fetch(`${API}/acceso-beta/rutas-estacionamientos/${encodeURIComponent(email)}?emailQuienPide=${encodeURIComponent(emailActual)}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error');
+        renderAccesoLista(data.lista);
+        toast('Acceso quitado');
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+}
+function fmt(iso) { const [y,m,d] = iso.split('-'); return `${d}-${m}-${y}`; }
+
+function cambiarTabPrincipal(tab) {
+    document.querySelectorAll('#tabs-principal .tab').forEach(t => t.classList.toggle('activo', t.dataset.tabPrincipal === tab));
+    document.getElementById('panel-principal-estacionamientos').classList.toggle('activo', tab === 'estacionamientos');
+    document.getElementById('panel-principal-teletrabajo').classList.toggle('activo', tab === 'teletrabajo');
+    if (tab === 'teletrabajo') renderSemana();
+}
+
+// ══════════════════ ESTACIONAMIENTOS ══════════════════
+let spots = [], reservas = [];
+let liberarSpotId = null, reservarLiberacionId = null;
+
+// se manda desde la cuenta de quien solicita (mismo patrón que en
+// Escrituración), pidiendo el permiso Mail.Send la primera vez que se usa.
+async function getTokenCorreo() {
+    const accounts = msalInstance.getAllAccounts();
+    if (!accounts.length) return null;
+    try {
+        const res = await msalInstance.acquireTokenSilent({ scopes: ['Mail.Send'], account: accounts[0] });
+        return res.accessToken;
+    } catch(e) {
+        try {
+            const res = await msalInstance.acquireTokenPopup({ scopes: ['Mail.Send'] });
+            return res.accessToken;
+        } catch(e2) {
+            console.warn('No se pudo autorizar el envío de correo:', e2.message);
+            return null;
+        }
+    }
+}
+async function avisarDuenoPorCorreo(duenoEmail, duenoNombre, spotNumero, fecha, horaTxt, solicitudId) {
+    const token = await getTokenCorreo();
+    if (!token) { toast('Solicitud enviada, pero no se pudo avisar por correo al dueño'); return; }
+    try {
+        const base = window.location.origin + '/';
+        const linkAprobar  = `${base}estacionamiento-responder.html?id=${encodeURIComponent(solicitudId)}&decision=aprobar`;
+        const linkRechazar = `${base}estacionamiento-responder.html?id=${encodeURIComponent(solicitudId)}&decision=rechazar`;
+        const html = `
+            <div style="font-family:Arial,sans-serif;color:#1C1A18;">
+                <p>Hola ${duenoNombre || ''},</p>
+                <p><b>${nombreActual}</b> solicitó usar tu estacionamiento <b>N° ${spotNumero}</b> el <b>${fecha}</b>${horaTxt ? ' ('+horaTxt+')' : ''}.</p>
+                <table cellpadding="0" cellspacing="0" style="margin:20px 0;">
+                    <tr>
+                        <td style="padding-right:10px;">
+                            <a href="${linkAprobar}" style="background:#1a7a4a;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold;display:inline-block;">✅ Aprobar</a>
+                        </td>
+                        <td>
+                            <a href="${linkRechazar}" style="background:#C0392B;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold;display:inline-block;">✕ Rechazar</a>
+                        </td>
+                    </tr>
+                </table>
+                <p style="font-size:0.85rem;color:#6B6762;">Si los botones no funcionan, entra al módulo de Rutas / Estacionamientos en la intranet y responde ahí directamente.</p>
+            </div>`;
+        await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: {
+                    subject: `Solicitud de estacionamiento N° ${spotNumero}`,
+                    body: { contentType: 'HTML', content: html },
+                    toRecipients: [{ emailAddress: { address: duenoEmail } }],
+                },
+            }),
+        });
+    } catch(e) { console.warn('Error enviando correo:', e.message); }
+}
+
+function hoyISO() { return new Date().toISOString().slice(0,10); }
+
+async function cargarTodo() {
+    try {
+        const [spotsRes, reservasRes] = await Promise.all([
+            fetch(`${API}/estacionamientos`),
+            fetch(`${API}/estacionamientos/reservas`)
+        ]);
+        spots = await spotsRes.json();
+        reservas = await reservasRes.json();
+        render();
+        if (ADMINISTRADORES.includes(emailActual)) renderAdminLista();
+    } catch(e) {
+        toast('Error al cargar: ' + e.message);
+    }
+}
+
+function renderAdminLista() {
+    const cont = document.getElementById('admin-lista');
+    if (!spots.length) { cont.innerHTML = `<div style="font-size:0.8rem;color:var(--txt-dim);">Todavía no hay estacionamientos cargados.</div>`; return; }
+    const ordenados = [...spots].sort((a,b) => a.numero.localeCompare(b.numero, undefined, {numeric:true}));
+    cont.innerHTML = `
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--txt-dim);margin-bottom:8px;">
+            ${spots.length} estacionamiento${spots.length!==1?'s':''} cargados
+        </div>
+        ${ordenados.map(s => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border:1px solid var(--gris-2);border-radius:8px;margin-bottom:6px;font-size:0.8rem;">
+                <span><b>N° ${s.numero}</b> — ${s.duenoNombre || s.duenoEmail} <span style="color:var(--txt-dim);">(${s.duenoEmail})</span></span>
+                <span style="display:flex;gap:6px;">
+                    <button class="btn btn-outline btn-sm" onclick="editarSpot('${s.id}')">Editar</button>
+                    <button class="btn btn-outline btn-sm" style="color:var(--rojo);border-color:var(--rojo);" onclick="borrarSpot('${s.id}')">Eliminar</button>
+                </span>
+            </div>`).join('')}
+    `;
+}
+
+function editarSpot(id) {
+    const s = spots.find(x => x.id === id);
+    if (!s) return;
+    document.getElementById('a-numero').value = s.numero;
+    document.getElementById('a-dueno-email').value = s.duenoEmail;
+    document.getElementById('a-dueno-nombre').value = s.duenoNombre || '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function borrarSpot(id) {
+    const s = spots.find(x => x.id === id);
+    if (!confirm(`¿Eliminar el estacionamiento N° ${s?.numero}? Esto no borra las reservas ya hechas, solo el estacionamiento de la lista.`)) return;
+    try {
+        const res = await fetch(`${API}/estacionamientos/${id}?email=${encodeURIComponent(emailActual)}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        toast('Estacionamiento eliminado');
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+// Encuentra la liberación vigente HOY para un estacionamiento (si existe).
+// Revisa si un rango de fecha (y opcionalmente hora) está vigente ahora mismo.
+function estaVigenteAhora(fechaInicio, fechaFin, horaInicio, horaFin) {
+    const ahora = new Date();
+    const hoy = hoyISO();
+    if (fechaInicio > hoy || fechaFin < hoy) return false;
+    if (!horaInicio && !horaFin) return true;
+    const horaActual = ahora.toTimeString().slice(0,5);
+    if (horaInicio && horaActual < horaInicio) return false;
+    if (horaFin && horaActual > horaFin) return false;
+    return true;
+}
+
+function liberacionVigente(spotId) {
+    return reservas.find(r => r.estacionamientoId === spotId && r.tipo === 'liberado' && estaVigenteAhora(r.fechaInicio, r.fechaFin, r.horaInicio, r.horaFin));
+}
+function solicitudVigente(spotId, estado) {
+    return reservas.find(r => r.estacionamientoId === spotId && r.tipo === 'solicitud' && r.estado === estado && estaVigenteAhora(r.fechaInicio, r.fechaFin, r.horaInicio, r.horaFin));
+}
+function horarioTexto(r) {
+    return (r.horaInicio || r.horaFin) ? `${r.horaInicio||'00:00'} a ${r.horaFin||'23:59'}` : 'todo el día';
+}
+
+function render() {
+    const grid = document.getElementById('grid-spots');
+    if (!spots.length) {
+        grid.innerHTML = `<div class="empty">Todavía no hay estacionamientos cargados.</div>`;
+        return;
+    }
+    grid.innerHTML = spots.map(s => {
+        const esMio = s.duenoEmail === emailActual;
+        const aprobada = solicitudVigente(s.id, 'aprobada');
+        const pendiente = solicitudVigente(s.id, 'pendiente');
+        const lib = liberacionVigente(s.id);
+        let badge, info, acciones = '';
+
+        if (aprobada) {
+            // Solicitud aprobada por el dueño: queda "Ocupado por" esa persona.
+            badge = `<span class="spot-badge badge-reservado">Ocupado</span>`;
+            info = `Ocupado por: ${aprobada.solicitanteNombre || aprobada.solicitanteEmail} (${horarioTexto(aprobada)})`;
+            if (esMio || aprobada.solicitanteEmail === emailActual || ADMINISTRADORES.includes(emailActual)) {
+                acciones = `<button class="btn btn-outline btn-sm" onclick="cancelarReserva('${aprobada.id}')">Cancelar</button>`;
+            }
+        } else if (pendiente && esMio) {
+            // El dueño ve la solicitud pendiente con botones para responder.
+            badge = `<span class="spot-badge badge-reservado">Solicitud pendiente</span>`;
+            info = `${pendiente.solicitanteNombre || pendiente.solicitanteEmail} pidió usarlo (${horarioTexto(pendiente)})`;
+            acciones = `
+                <button class="btn btn-primary btn-sm" onclick="responderSolicitud('${pendiente.id}', true)">✅ Aprobar</button>
+                <button class="btn btn-outline btn-sm" onclick="responderSolicitud('${pendiente.id}', false)">✕ Rechazar</button>`;
+        } else if (pendiente) {
+            badge = `<span class="spot-badge badge-ocupado">Solicitud en revisión</span>`;
+            info = `Esperando que el dueño apruebe (${horarioTexto(pendiente)})`;
+        } else if (!lib) {
+            badge = `<span class="spot-badge badge-ocupado">Ocupado</span>`;
+            info = '';
+            if (esMio) acciones = `
+                <button class="btn btn-primary btn-sm" onclick="liberarHoy('${s.id}')">✅ Queda libre hoy</button>
+                <button class="btn btn-outline btn-sm" onclick="abrirLiberar('${s.id}')">Liberar otro período</button>`;
+        } else if (lib.reservadoPor) {
+            const soyYo = lib.reservadoPor === emailActual;
+            badge = `<span class="spot-badge badge-reservado">Reservado${soyYo?' por ti':''}</span>`;
+            info = `Por ${lib.reservadoPorNombre || lib.reservadoPor}, del ${fmt(lib.fechaInicio)} al ${fmt(lib.fechaFin)} (${horarioTexto(lib)})`;
+            if (soyYo || esMio || ADMINISTRADORES.includes(emailActual)) {
+                acciones = `<button class="btn btn-outline btn-sm" onclick="cancelarReserva('${lib.id}')">Cancelar</button>`;
+            }
+        } else {
+            badge = `<span class="spot-badge badge-libre">Disponible</span>`;
+            info = `Libre del ${fmt(lib.fechaInicio)} al ${fmt(lib.fechaFin)} (${horarioTexto(lib)})`;
+            if (!esMio) acciones = `<button class="btn btn-primary btn-sm" onclick="abrirReservar('${lib.id}','${lib.fechaInicio}','${lib.fechaFin}')">Reservar</button>`;
+            if (esMio) acciones += ` <button class="btn btn-outline btn-sm" onclick="cancelarReserva('${lib.id}')">🚗 Lo estoy usando</button>`;
+            else acciones += ` <button class="btn btn-outline btn-sm" onclick="cancelarReserva('${lib.id}')">Anular liberación</button>`;
+        }
+        return `
+        <div class="spot-card ${lib && !lib.reservadoPor && !aprobada && !pendiente ? 'libre' : ''}">
+            <div class="spot-top">
+                <div class="spot-num">N° ${s.numero}</div>
+                ${badge}
+            </div>
+            <div class="spot-dueno">Dueño: ${s.duenoNombre || s.duenoEmail}</div>
+            ${info ? `<div class="spot-info">${info}</div>` : ''}
+            <div class="spot-acciones">${acciones}</div>
+        </div>`;
+    }).join('');
+}
+
+async function liberarHoy(spotId) {
+    try {
+        const hoy = hoyISO();
+        const res = await fetch(`${API}/estacionamientos/liberar`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ estacionamientoId: spotId, fechaInicio: hoy, fechaFin: hoy, email: emailActual })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        toast('Liberado por hoy');
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+function abrirLiberar(spotId) {
+    liberarSpotId = spotId;
+    document.getElementById('lib-desde').value = hoyISO();
+    document.getElementById('lib-hasta').value = hoyISO();
+    document.getElementById('modal-liberar').classList.add('visible');
+}
+function cerrarModal(id) { document.getElementById(id).classList.remove('visible'); }
+
+async function confirmarLiberar() {
+    const fechaInicio = document.getElementById('lib-desde').value;
+    const fechaFin = document.getElementById('lib-hasta').value;
+    const horaInicio = document.getElementById('lib-hora-desde').value || null;
+    const horaFin = document.getElementById('lib-hora-hasta').value || null;
+    if (!fechaInicio || !fechaFin || fechaFin < fechaInicio) { alert('Revisa las fechas'); return; }
+    try {
+        const res = await fetch(`${API}/estacionamientos/liberar`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ estacionamientoId: liberarSpotId, fechaInicio, fechaFin, horaInicio, horaFin, email: emailActual })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        cerrarModal('modal-liberar');
+        toast('Estacionamiento liberado');
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+function abrirReservar(liberacionId, fechaInicio, fechaFin) {
+    reservarLiberacionId = liberacionId;
+    document.getElementById('reservar-rango-info').textContent = `Del ${fmt(fechaInicio)} al ${fmt(fechaFin)}`;
+    document.getElementById('modal-reservar').classList.add('visible');
+}
+async function confirmarReservar() {
+    try {
+        const res = await fetch(`${API}/estacionamientos/reservar`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ liberacionId: reservarLiberacionId, email: emailActual, nombre: nombreActual })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        cerrarModal('modal-reservar');
+        toast('Estacionamiento reservado');
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function cancelarReserva(id) {
+    if (!confirm('¿Cancelar esto?')) return;
+    try {
+        const res = await fetch(`${API}/estacionamientos/reservas/${id}?email=${encodeURIComponent(emailActual)}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        toast('Cancelado');
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+function abrirSolicitar() {
+    const sel = document.getElementById('sol-spot');
+    sel.innerHTML = spots.map(s => `<option value="${s.id}">N° ${s.numero} — ${s.duenoNombre || s.duenoEmail}</option>`).join('');
+    document.getElementById('sol-fecha').value = hoyISO();
+    document.getElementById('sol-hora-desde').value = '';
+    document.getElementById('sol-hora-hasta').value = '';
+    document.getElementById('modal-solicitar').classList.add('visible');
+}
+
+async function confirmarSolicitar() {
+    const estacionamientoId = document.getElementById('sol-spot').value;
+    const fecha = document.getElementById('sol-fecha').value;
+    const horaInicio = document.getElementById('sol-hora-desde').value || null;
+    const horaFin = document.getElementById('sol-hora-hasta').value || null;
+    if (!estacionamientoId || !fecha) { alert('Completa estacionamiento y fecha'); return; }
+    try {
+        const res = await fetch(`${API}/estacionamientos/solicitar`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ estacionamientoId, email: emailActual, nombre: nombreActual, fecha, horaInicio, horaFin })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error');
+        cerrarModal('modal-solicitar');
+        toast('Solicitud enviada — avisando al dueño por correo…');
+        const horaTxt = (horaInicio || horaFin) ? `${horaInicio||'00:00'} a ${horaFin||'23:59'}` : '';
+        avisarDuenoPorCorreo(data.duenoEmail, data.duenoNombre, spots.find(s=>s.id===estacionamientoId)?.numero, fmt(fecha), horaTxt, data.id);
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function responderSolicitud(id, aprobar) {
+    try {
+        const res = await fetch(`${API}/estacionamientos/solicitudes/${id}/responder`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ email: emailActual, aprobar })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        toast(aprobar ? 'Solicitud aprobada' : 'Solicitud rechazada');
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function guardarSpot() {
+    const numero = document.getElementById('a-numero').value.trim();
+    const duenoEmail = document.getElementById('a-dueno-email').value.trim();
+    const duenoNombre = document.getElementById('a-dueno-nombre').value.trim();
+    if (!numero || !duenoEmail) { alert('Completa número y correo del dueño'); return; }
+    try {
+        const res = await fetch(`${API}/estacionamientos`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ email: emailActual, numero, duenoEmail, duenoNombre })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        document.getElementById('a-numero').value = '';
+        document.getElementById('a-dueno-email').value = '';
+        document.getElementById('a-dueno-nombre').value = '';
+        toast('Estacionamiento guardado');
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+// ══════════════════ TELETRABAJO / RUTAS ══════════════════
+let dataTeletrabajo = { patrones: {}, excepciones: [] };
+let teletrabajoDia = null;
+let visitaObra = new Map(); // dia -> Set<obra>
+const OBRAS_ACTIVAS = ['Los Molinos', 'Portal el Abra', 'Mirador El Águila', 'Portal Los Maitenes', 'Portal Oriente', 'Mirador El Pino'];
+const DIAS_OBRA = ['lunes','martes','miercoles','jueves','viernes'];
+let semanaOffset = 0;
+const DIAS = ['lunes','martes','miercoles','jueves','viernes'];
+const DIAS_LABEL = {lunes:'Lunes',martes:'Martes',miercoles:'Miércoles',jueves:'Jueves',viernes:'Viernes'};
+
+function renderChipsPatron() {
+    document.querySelectorAll('#dias-teletrabajo .dia-chip').forEach(chip => {
+        chip.classList.toggle('activo', chip.dataset.dia === teletrabajoDia);
+    });
+    renderFilasObra();
+}
+
+const DIA_LABEL_OBRA = {lunes:'Lunes',martes:'Martes',miercoles:'Miércoles',jueves:'Jueves',viernes:'Viernes'};
+
+function renderFilasObra() {
+    const cont = document.getElementById('dias-obra');
+    cont.innerHTML = DIAS_OBRA.map(dia => {
+        const marcado = visitaObra.has(dia);
+        const obrasDia = visitaObra.get(dia) || new Set();
+        const bloqueadoPorTeletrabajo = teletrabajoDia === dia;
+        return `
+        <div class="obra-dia-row" style="flex-direction:column;align-items:flex-start;">
+            <label class="obra-dia-check">
+                <input type="checkbox" ${marcado?'checked':''} ${bloqueadoPorTeletrabajo?'disabled':''}
+                    onchange="toggleDiaObra('${dia}', this.checked)">
+                ${DIA_LABEL_OBRA[dia]}
+            </label>
+            ${marcado ? `
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px 26px;">
+                ${OBRAS_ACTIVAS.map(o => `
+                    <div class="dia-chip" style="padding:6px 12px;font-size:0.76rem;${obrasDia.has(o)?'background:var(--negro);color:#fff;border-color:var(--negro);':''}"
+                         onclick="toggleObraEnDia('${dia}', '${o.replace(/'/g,"\\'")}')">${o}</div>
+                `).join('')}
+            </div>
+            <div style="font-size:0.7rem;color:var(--txt-dim);margin-left:26px;">Puedes elegir más de una obra para ese día</div>
+            ` : ''}
+        </div>`;
+    }).join('');
+}
+
+function toggleDiaObra(dia, marcado) {
+    if (marcado) {
+        if (teletrabajoDia === dia) { toast('Ese día ya está marcado como Teletrabajo'); renderFilasObra(); return; }
+        visitaObra.set(dia, new Set());
+    } else {
+        visitaObra.delete(dia);
+    }
+    renderFilasObra();
+}
+function toggleObraEnDia(dia, obra) {
+    const set = visitaObra.get(dia);
+    if (!set) return;
+    if (set.has(obra)) set.delete(obra); else set.add(obra);
+    renderFilasObra();
+}
+
+async function cargarDatos() {
+    try {
+        const res = await fetch(`${API}/teletrabajo`);
+        dataTeletrabajo = await res.json();
+        const miPatron = dataTeletrabajo.patrones[emailActual] || { teletrabajoDia: null, visitaObra: [] };
+        teletrabajoDia = miPatron.teletrabajoDia || null;
+        visitaObra = new Map((miPatron.visitaObra || []).map(item => [item.dia, new Set(item.obras || (item.obra ? [item.obra] : []))]));
+        renderChipsPatron();
+        renderExcepciones();
+        renderSemana();
+    } catch(e) {
+        toast('Error al cargar: ' + e.message);
+    }
+}
+
+function cambiarTab(tab) {
+    document.querySelectorAll('#tabs-teletrabajo .tab').forEach((t,i) => t.classList.toggle('activo', (i===0 && tab==='mio') || (i===1 && tab==='equipo')));
+    document.getElementById('panel-mio').classList.toggle('activo', tab==='mio');
+    document.getElementById('panel-equipo').classList.toggle('activo', tab==='equipo');
+    if (tab === 'equipo') renderSemana();
+}
+
+async function guardarPatron() {
+    const sinObra = [...visitaObra.entries()].find(([dia, obras]) => !obras.size);
+    if (sinObra) { toast(`Falta elegir al menos una obra para el ${DIA_LABEL_OBRA[sinObra[0]]}`); return; }
+    const visitaObraArr = [...visitaObra.entries()].map(([dia, obras]) => ({ dia, obras: [...obras] }));
+    try {
+        const res = await fetch(`${API}/teletrabajo/patron`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ email: emailActual, teletrabajoDia, visitaObra: visitaObraArr })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error al guardar');
+        dataTeletrabajo.patrones[emailActual] = { teletrabajoDia, visitaObra: visitaObraArr };
+        toast('Patrón guardado');
+        renderSemana();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+let excObrasSeleccionadas = new Set();
+function toggleObraExcepcion() {
+    const tipo = document.getElementById('exc-tipo').value;
+    const wrap = document.getElementById('exc-obra-wrap');
+    wrap.style.display = tipo === 'visita_obra' ? 'block' : 'none';
+    if (tipo === 'visita_obra') {
+        excObrasSeleccionadas = new Set();
+        renderExcObraChips();
+    }
+}
+function renderExcObraChips() {
+    document.getElementById('exc-obra-chips').innerHTML = OBRAS_ACTIVAS.map(o => `
+        <div class="dia-chip" style="padding:6px 12px;font-size:0.76rem;${excObrasSeleccionadas.has(o)?'background:var(--negro);color:#fff;border-color:var(--negro);':''}"
+             onclick="toggleExcObra('${o.replace(/'/g,"\\'")}')">${o}</div>
+    `).join('');
+}
+function toggleExcObra(o) {
+    if (excObrasSeleccionadas.has(o)) excObrasSeleccionadas.delete(o); else excObrasSeleccionadas.add(o);
+    renderExcObraChips();
+}
+
+async function guardarExcepcion() {
+    const fecha = document.getElementById('exc-fecha').value;
+    const tipo = document.getElementById('exc-tipo').value;
+    const obras = tipo === 'visita_obra' ? [...excObrasSeleccionadas] : undefined;
+    if (!fecha) { alert('Elige una fecha'); return; }
+    if (tipo === 'visita_obra' && !obras.length) { alert('Selecciona al menos una obra'); return; }
+    try {
+        const res = await fetch(`${API}/teletrabajo/excepcion`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ email: emailActual, fecha, tipo, obras })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error al guardar');
+        dataTeletrabajo.excepciones = dataTeletrabajo.excepciones.filter(e => !(e.email===emailActual && e.fecha===fecha));
+        dataTeletrabajo.excepciones.push({ email: emailActual, fecha, tipo, obras });
+        toast('Excepción agregada');
+        renderExcepciones();
+        renderSemana();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function borrarExcepcion(fecha) {
+    try {
+        await fetch(`${API}/teletrabajo/excepcion?email=${encodeURIComponent(emailActual)}&fecha=${fecha}`, { method: 'DELETE' });
+        dataTeletrabajo.excepciones = dataTeletrabajo.excepciones.filter(e => !(e.email===emailActual && e.fecha===fecha));
+        renderExcepciones();
+        renderSemana();
+        toast('Excepción eliminada');
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+function renderExcepciones() {
+    const hoy = new Date().toISOString().slice(0,10);
+    const mias = dataTeletrabajo.excepciones.filter(e => e.email === emailActual && e.fecha >= hoy).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+    const cont = document.getElementById('lista-excepciones');
+    if (!mias.length) { cont.innerHTML = `<div class="empty">No tienes excepciones próximas.</div>`; return; }
+    cont.innerHTML = mias.map(e => `
+        <div class="excepcion-item">
+            <span>${fmt(e.fecha)} — <span class="tag tag-${e.tipo}">${e.tipo === 'visita_obra' ? (e.obras && e.obras.length ? e.obras.join(', ') : 'Visita a Obra') : e.tipo}</span></span>
+            <button class="btn btn-outline btn-sm" onclick="borrarExcepcion('${e.fecha}')">Quitar</button>
+        </div>`).join('');
+}
+
+function inicioSemana(offset) {
+    const hoy = new Date();
+    const dia = hoy.getDay(); // 0=domingo
+    const diff = (dia === 0 ? -6 : 1) - dia; // lunes de esta semana
+    const lunes = new Date(hoy);
+    lunes.setDate(hoy.getDate() + diff + offset*7);
+    lunes.setHours(0,0,0,0);
+    return lunes;
+}
+
+function cambiarSemana(delta) {
+    semanaOffset += delta;
+    renderSemana();
+}
+
+// Estado efectivo de una persona en una fecha: excepción propia si existe, si no su patrón fijo según el día de la semana.
+function estadoEnFecha(email, fechaISO, diaSemana) {
+    const exc = dataTeletrabajo.excepciones.find(e => e.email === email && e.fecha === fechaISO);
+    if (exc) return { estado: exc.tipo, obras: exc.obras || [] };
+    const patron = dataTeletrabajo.patrones[email] || { teletrabajoDia: null, visitaObra: [] };
+    if (patron.teletrabajoDia === diaSemana) return { estado: 'remoto', obras: [] };
+    const item = (patron.visitaObra || []).find(v => v.dia === diaSemana);
+    if (item) return { estado: 'visita_obra', obras: item.obras || [] };
+    return { estado: 'presencial', obras: [] };
+}
+
+function renderSemana() {
+    const lunes = inicioSemana(semanaOffset);
+    const fechas = DIAS.map((_, i) => {
+        const d = new Date(lunes);
+        d.setDate(lunes.getDate() + i);
+        return d.toISOString().slice(0,10);
+    });
+    document.getElementById('week-label').textContent = `${fmt(fechas[0])} — ${fmt(fechas[4])}`;
+
+    document.getElementById('semana-head').innerHTML =
+        '<th>Persona</th>' + DIAS.map((d,i) => `<th>${DIAS_LABEL[d]}<br><span style="font-weight:400;">${fmt(fechas[i])}</span></th>`).join('');
+
+    const personas = Object.keys(dataTeletrabajo.patrones);
+    // Asegura que la propia persona aparezca aunque aún no tenga patrón guardado.
+    if (!personas.includes(emailActual)) personas.push(emailActual);
+
+    if (!personas.length) {
+        document.getElementById('semana-body').innerHTML = `<tr><td colspan="6" class="empty">Todavía nadie configuró su patrón de teletrabajo.</td></tr>`;
+        return;
+    }
+
+    document.getElementById('semana-body').innerHTML = personas.map(email => {
+        const celdas = DIAS.map((dia,i) => {
+            const { estado, obras } = estadoEnFecha(email, fechas[i], dia);
+            const label = estado === 'remoto' ? 'Remoto' : estado === 'visita_obra' ? (obras.length ? obras.join(', ') : 'Visita a Obra') : 'Presencial';
+            return `<td><span class="dot dot-${estado}"></span> ${label}</td>`;
+        }).join('');
+        return `<tr><td>${email}${email===emailActual?' (tú)':''}</td>${celdas}</tr>`;
+    }).join('');
+}
+
+initAuth();
+</script>
+</body>
+</html>
