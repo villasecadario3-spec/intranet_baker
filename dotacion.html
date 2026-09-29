@@ -498,6 +498,27 @@
         <option value="proyectado">Proyectados</option>
       </select>
     </div>
+    <div class="field">
+      <label for="motivoFiltro">Motivo de salida</label>
+      <select id="motivoFiltro">
+        <option value="">Todos</option>
+        <option value="renuncia">Renuncia</option>
+        <option value="vencimiento_plazo">Vencimiento de plazo</option>
+        <option value="necesidades_empresa">Necesidades de la empresa</option>
+        <option value="no_concurrencia">No concurrencia</option>
+        <option value="cambio_obra">Cambio de obra</option>
+        <option value="muerte">Fallecimiento</option>
+        <option value="otro">Otro</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="fechaSalidaDesde">Salida desde</label>
+      <input type="date" id="fechaSalidaDesde">
+    </div>
+    <div class="field">
+      <label for="fechaSalidaHasta">Salida hasta</label>
+      <input type="date" id="fechaSalidaHasta">
+    </div>
     <div class="field search">
       <label for="searchBox">Buscar</label>
       <input type="text" id="searchBox" placeholder="Nombre, rut o cargo...">
@@ -1331,6 +1352,9 @@ let activeCC = 'todos';
 let periodoFiltro = '';
 let cargoFiltro = '';
 let estadoOrigenFiltro = '';
+let motivoFiltro = '';
+let fechaSalidaDesdeFiltro = '';
+let fechaSalidaHastaFiltro = '';
 const CARGOS_LIST = ["Administrador de Obra","Administrativo RRHH","Albañil","Andamiero","Asistente Prevencionista de Riesgo","Asistente de Bodega","Asistente de Calidad","Asistente de Oficina Técnica","Asistente de Terreno","Ayudante Albañil","Ayudante de Trazador","Ayudante de Urbanización","Carpintero","Encargado de Calidad","Encargado de Mantención","Encargado de Oficina Técnica","Jefe General de terreno de Urbanización","Jefe de Bodega","Jefe de Terreno","Jornal","Jornal Canguero","Maestro Multifuncional","Maestro Urbanización","Operador de Maquinaria","Pañolero","Prevencionista de Riesgo","Supervisor","Supervisor de urbanización","Topógrafo","Trazador"];
 let pendingExitId = null;
 let costoAutoFilled = false;
@@ -1534,6 +1558,23 @@ function renderEstadoOrigenFiltro(){
   if(!sel) return;
   sel.value = estadoOrigenFiltro;
   sel.onchange = () => { estadoOrigenFiltro = sel.value; renderRoster(); };
+}
+
+function renderMotivoFiltro(){
+  const sel = document.getElementById('motivoFiltro');
+  if(!sel) return;
+  sel.value = motivoFiltro;
+  sel.onchange = () => { motivoFiltro = sel.value; renderRoster(); };
+}
+
+function renderFechaSalidaFiltro(){
+  const desde = document.getElementById('fechaSalidaDesde');
+  const hasta = document.getElementById('fechaSalidaHasta');
+  if(!desde || !hasta) return;
+  desde.value = fechaSalidaDesdeFiltro;
+  hasta.value = fechaSalidaHastaFiltro;
+  desde.onchange = () => { fechaSalidaDesdeFiltro = desde.value; renderRoster(); };
+  hasta.onchange = () => { fechaSalidaHastaFiltro = hasta.value; renderRoster(); };
 }
 
 function computeResumenPorCentro(){
@@ -1925,7 +1966,10 @@ function renderRoster(){
   let list = workers.filter(w => (activeCC==='todos' || w.cc===activeCC) && matchesSearch(w,q)
     && (cargoFiltro==='' || w.role===cargoFiltro)
     && (periodoFiltro==='' || vigenteEnMes(w, parseInt(periodoFiltro,10)))
-    && (estadoOrigenFiltro==='' || (estadoOrigenFiltro==='vigente' ? esVigente(w) : esProyectado(w))));
+    && (estadoOrigenFiltro==='' || (estadoOrigenFiltro==='vigente' ? esVigente(w) : esProyectado(w)))
+    && (motivoFiltro==='' || w.motivo===motivoFiltro)
+    && (fechaSalidaDesdeFiltro==='' || (w.fs && w.fs>=fechaSalidaDesdeFiltro))
+    && (fechaSalidaHastaFiltro==='' || (w.fs && w.fs<=fechaSalidaHastaFiltro)));
   list = list.slice().sort((a,b)=> (isDeparted(a))-(isDeparted(b)) || a.name.localeCompare(b.name));
 
   document.getElementById('activeCount').textContent = workers.filter(w=>!isDeparted(w)).length + ' de ' + workers.length;
@@ -2608,6 +2652,8 @@ function renderAll(){
   renderPeriodoFiltro();
   renderCargoFiltro();
   renderEstadoOrigenFiltro();
+  renderMotivoFiltro();
+  renderFechaSalidaFiltro();
   renderRoster();
   renderSugerencias();
   renderExportPreview();
