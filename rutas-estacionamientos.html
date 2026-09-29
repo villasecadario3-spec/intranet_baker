@@ -108,6 +108,29 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
 .dot-visita_obra{background:#B8860B;}
 .dot-presencial{background:var(--gris-3);}
 .dot-otros{background:var(--txt-mid);}
+
+/* Vista semanal de Estacionamientos (adaptada de Salas de Reuniones) */
+.estac-tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--gris-2);flex-wrap:wrap;}
+.estac-tab{padding:9px 16px;background:transparent;border:none;color:var(--txt-dim);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.estac-tab.activo{color:var(--rojo);border-bottom-color:var(--rojo);}
+.semana-grid{display:grid;grid-template-columns:54px repeat(5,1fr);min-width:700px;border:1px solid var(--gris-2);border-radius:10px;overflow:hidden;}
+.sg-corner{background:var(--gris-1);border-bottom:1px solid var(--gris-2);}
+.sg-dia-header{background:var(--gris-1);border-bottom:1px solid var(--gris-2);border-left:1px solid var(--gris-2);padding:10px 8px;text-align:center;}
+.sg-dia-nombre{font-size:0.66rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--txt-dim);}
+.sg-dia-num{font-size:1.2rem;font-weight:700;line-height:1;margin-top:2px;}
+.sg-dia-header.hoy .sg-dia-num, .sg-dia-header.hoy .sg-dia-nombre{color:var(--rojo);}
+.sg-hora-cell{padding:0 8px;display:flex;align-items:flex-start;justify-content:flex-end;border-right:1px solid var(--gris-2);}
+.sg-hora-label{font-size:0.66rem;color:var(--txt-dim);transform:translateY(-8px);white-space:nowrap;}
+.sg-day-col{border-left:1px solid var(--gris-2);position:relative;background:var(--gris-1);}
+.sg-bloque{position:absolute;left:3px;right:3px;border-radius:5px;display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:2;font-size:0.7rem;font-weight:700;color:#fff;text-align:center;padding:2px 4px;}
+.sg-bloque-ocupado{background:rgba(107,103,98,0.7);}
+.sg-bloque-libre{background:var(--verde);cursor:pointer;}
+.sg-bloque-libre:hover{background:#155f3b;}
+.sg-bloque-reservado{background:var(--rojo);}
+.sg-bloque-auto{background:rgba(26,122,74,0.55);border:1px dashed rgba(255,255,255,0.6);cursor:pointer;}
+.sg-linea-ahora{position:absolute;left:0;right:0;height:2px;background:var(--rojo);z-index:10;pointer-events:none;}
+.estac-leyenda{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:0.76rem;color:var(--txt-dim);align-items:center;}
+.estac-leyenda .dot-cuad{width:11px;height:11px;border-radius:3px;display:inline-block;margin-right:4px;vertical-align:middle;}
 </style>
 </head>
 <body>
@@ -161,11 +184,25 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
         <div class="toolbar">
             <div style="font-size:0.82rem;color:var(--txt-dim);">Hoy: <b id="fecha-hoy"></b></div>
             <div style="display:flex;gap:8px;">
+                <button class="btn btn-outline btn-sm" id="btn-vista-toggle" onclick="alternarVistaEstac()">📅 Ver vista semanal</button>
                 <button class="btn btn-primary btn-sm" onclick="abrirSolicitar()">🙋 Solicitar estacionamiento</button>
                 <button class="btn btn-outline btn-sm" onclick="cargarTodo()">↻ Actualizar</button>
             </div>
         </div>
         <div class="grid" id="grid-spots"></div>
+
+        <div id="vista-semanal-estac" style="display:none;">
+            <div class="estac-tabs" id="estac-tabs"></div>
+            <div style="overflow-x:auto;">
+                <div class="semana-grid" id="estac-semana-grid"></div>
+            </div>
+            <div class="estac-leyenda">
+                <span><span class="dot-cuad" style="background:var(--gris-3);"></span>Ocupado</span>
+                <span><span class="dot-cuad" style="background:var(--verde);"></span>Liberado — disponible</span>
+                <span><span class="dot-cuad" style="background:rgba(26,122,74,0.55);border:1px dashed #fff;"></span>Automático (por su ruta)</span>
+                <span><span class="dot-cuad" style="background:var(--rojo);"></span>Reservado</span>
+            </div>
+        </div>
     </div>
 
     <!-- ═══════════ PANEL: TELETRABAJO / RUTAS ═══════════ -->
@@ -187,7 +224,11 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
                 <h3 style="margin-top:20px;">Visita a Obra</h3>
                 <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Marca los días en que normalmente estás en terreno, no en la oficina. Aquí sí puedes elegir varios días.</p>
                 <div id="dias-obra"></div>
-                <button class="btn btn-primary btn-sm" onclick="guardarPatron()">Guardar patrón</button>
+                <h3 style="margin-top:20px;">Otros motivos</h3>
+                <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Para días fijos en que sueles tener trámites, reuniones externas u otra razón para no estar en la oficina, distinta a visita a obra.</p>
+                <div id="dias-otros"></div>
+                <button class="btn btn-primary btn-sm" onclick="guardarPatron()">Proponer patrón semanal</button>
+                <p style="font-size:0.76rem;color:var(--txt-dim);margin-top:10px;" id="estado-propuesta-patron"></p>
             </div>
 
             <div class="card">
@@ -219,6 +260,11 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
             <div class="card">
                 <h3>Mis excepciones próximas</h3>
                 <div id="lista-excepciones"></div>
+            </div>
+
+            <div class="card" id="aprobaciones-card" style="display:none;">
+                <h3>📋 Rutas semanales pendientes de aprobación</h3>
+                <div id="lista-aprobaciones"></div>
             </div>
         </div>
 
@@ -340,14 +386,15 @@ async function initAuth() {
                 chip.addEventListener('click', () => {
                     const dia = chip.dataset.dia;
                     if (visitaObra.has(dia)) { toast('Ese día ya está marcado como Visita a Obra'); return; }
+                    if (otrosPatron.has(dia)) { toast('Ese día ya está marcado como Otros motivos'); return; }
                     teletrabajoDia = (teletrabajoDia === dia) ? null : dia;
                     renderChipsPatron();
                 });
             });
             renderFilasObra();
 
+            await cargarDatos(); // Teletrabajo — primero, porque estacionamientos ahora depende de su patrón
             cargarTodo();       // Estacionamientos
-            await cargarDatos(); // Teletrabajo
         } else {
             window.location.href = 'index.html';
         }
@@ -542,6 +589,53 @@ function horarioTexto(r) {
     return (r.horaInicio || r.horaFin) ? `${r.horaInicio||'00:00'} a ${r.horaFin||'23:59'}` : 'todo el día';
 }
 
+// Fase 3: si el dueño de un estacionamiento tiene, según su ruta de hoy
+// (patrón o excepción), un motivo que lo saca de la oficina (remoto, visita a
+// obra, u otros) y NO hay ningún registro real para hoy en ese
+// estacionamiento, se calcula una liberación "automática" — el día completo,
+// hasta que alguien la tome o el propio dueño la bloquee.
+function diaSemanaDeHoy() {
+    const idx = new Date().getDay(); // 0=domingo
+    return ['domingo','lunes','martes','miercoles','jueves','viernes','sabado'][idx];
+}
+function liberacionAutoPorRuta(spot) {
+    const diaHoy = diaSemanaDeHoy();
+    if (!DIAS.includes(diaHoy)) return null; // fin de semana, no aplica
+    const { estado } = estadoEnFecha(spot.duenoEmail, hoyISO(), diaHoy);
+    if (estado === 'presencial') return null;
+    return {
+        id: null, estacionamientoId: spot.id, fechaInicio: hoyISO(), fechaFin: hoyISO(),
+        horaInicio: null, horaFin: null, reservadoPor: null, reservadoPorNombre: null,
+        esAuto: true, motivoAuto: estado,
+    };
+}
+
+async function bloquearHoy(spotId) {
+    try {
+        const res = await fetch(`${API}/estacionamientos/bloquear-hoy`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ estacionamientoId: spotId, email: emailActual })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        toast('Estacionamiento bloqueado para hoy');
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function reservarAuto(spotId) {
+    try {
+        const res = await fetch(`${API}/estacionamientos/solicitar`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ estacionamientoId: spotId, email: emailActual, nombre: nombreActual, fecha: hoyISO() })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        toast('Estacionamiento tomado');
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+const MOTIVO_AUTO_LABEL = { remoto: 'teletrabajo', visita_obra: 'visita a obra', otros: 'otros motivos' };
+
 function render() {
     const grid = document.getElementById('grid-spots');
     if (!spots.length) {
@@ -552,7 +646,9 @@ function render() {
         const esMio = s.duenoEmail === emailActual;
         const aprobada = solicitudVigente(s.id, 'aprobada');
         const pendiente = solicitudVigente(s.id, 'pendiente');
-        const lib = liberacionVigente(s.id);
+        let lib = liberacionVigente(s.id);
+        const libEsAuto = !lib && !aprobada && !pendiente;
+        if (libEsAuto) lib = liberacionAutoPorRuta(s);
         let badge, info, acciones = '';
 
         if (aprobada) {
@@ -578,13 +674,23 @@ function render() {
             if (esMio) acciones = `
                 <button class="btn btn-primary btn-sm" onclick="liberarHoy('${s.id}')">✅ Queda libre hoy</button>
                 <button class="btn btn-outline btn-sm" onclick="abrirLiberar('${s.id}')">Liberar otro período</button>`;
+            else if (ADMINISTRADORES.includes(emailActual)) acciones = `
+                <button class="btn btn-outline btn-sm" onclick="abrirLiberar('${s.id}')">Liberar por el dueño</button>`;
         } else if (lib.reservadoPor) {
             const soyYo = lib.reservadoPor === emailActual;
             badge = `<span class="spot-badge badge-reservado">Reservado${soyYo?' por ti':''}</span>`;
             info = `Por ${lib.reservadoPorNombre || lib.reservadoPor}, del ${fmt(lib.fechaInicio)} al ${fmt(lib.fechaFin)} (${horarioTexto(lib)})`;
             if (soyYo || esMio || ADMINISTRADORES.includes(emailActual)) {
-                acciones = `<button class="btn btn-outline btn-sm" onclick="cancelarReserva('${lib.id}')">Cancelar</button>`;
+                acciones = lib.esAuto ? '' : `<button class="btn btn-outline btn-sm" onclick="cancelarReserva('${lib.id}')">Cancelar</button>`;
             }
+        } else if (lib.esAuto) {
+            // Liberación automática por la ruta del día — nadie la ha tomado
+            // todavía y el dueño no la ha bloqueado.
+            badge = `<span class="spot-badge badge-libre">Disponible (automático)</span>`;
+            info = `Libre hoy — ${s.duenoNombre || s.duenoEmail} tiene ${MOTIVO_AUTO_LABEL[lib.motivoAuto] || 'otro motivo'} registrado en su ruta.`;
+            if (!esMio) acciones = `<button class="btn btn-primary btn-sm" onclick="reservarAuto('${s.id}')">Reservar</button>`;
+            if (esMio || ADMINISTRADORES.includes(emailActual)) acciones += ` <button class="btn btn-outline btn-sm" onclick="bloquearHoy('${s.id}')">🚗 Lo necesito hoy de todas formas</button>`;
+            if (ADMINISTRADORES.includes(emailActual)) acciones += ` <button class="btn btn-outline btn-sm" onclick="abrirLiberar('${s.id}')">Ajustar a medio día</button>`;
         } else {
             badge = `<span class="spot-badge badge-libre">Disponible</span>`;
             info = `Libre del ${fmt(lib.fechaInicio)} al ${fmt(lib.fechaFin)} (${horarioTexto(lib)})`;
@@ -603,6 +709,7 @@ function render() {
             <div class="spot-acciones">${acciones}</div>
         </div>`;
     }).join('');
+    if (vistaEstacActiva) renderVistaSemanalEstac();
 }
 
 async function liberarHoy(spotId) {
@@ -731,21 +838,143 @@ async function guardarSpot() {
     } catch(e) { toast('Error: ' + e.message); }
 }
 
+// ══════════════════ VISTA SEMANAL (estilo Salas de Reuniones) ══════════════════
+const HORA_INI_ESTAC = 8, HORA_FIN_ESTAC = 20, SLOT_H_ESTAC = 44;
+let spotActivo = 0, vistaEstacActiva = false;
+
+function alternarVistaEstac() {
+    vistaEstacActiva = !vistaEstacActiva;
+    document.getElementById('grid-spots').style.display = vistaEstacActiva ? 'none' : 'grid';
+    document.getElementById('vista-semanal-estac').style.display = vistaEstacActiva ? 'block' : 'none';
+    document.getElementById('btn-vista-toggle').textContent = vistaEstacActiva ? '🗂️ Ver tarjetas' : '📅 Ver vista semanal';
+    if (vistaEstacActiva) renderVistaSemanalEstac();
+}
+
+function lunesDeEstaSemana() {
+    const hoy = new Date();
+    const dia = hoy.getDay();
+    const diff = (dia === 0 ? -6 : 1) - dia;
+    const l = new Date(hoy);
+    l.setDate(hoy.getDate() + diff);
+    l.setHours(0,0,0,0);
+    return l;
+}
+
+function renderVistaSemanalEstac() {
+    if (!spots.length) {
+        document.getElementById('estac-tabs').innerHTML = '';
+        document.getElementById('estac-semana-grid').innerHTML = '<div class="empty">Todavía no hay estacionamientos cargados.</div>';
+        return;
+    }
+    if (spotActivo >= spots.length) spotActivo = 0;
+    document.getElementById('estac-tabs').innerHTML = spots.map((s,i) => `
+        <button class="estac-tab ${i===spotActivo?'activo':''}" onclick="setSpotActivo(${i})">N° ${s.numero} — ${s.duenoNombre || s.duenoEmail}</button>
+    `).join('');
+    buildGridEstacionamiento();
+}
+function setSpotActivo(i) { spotActivo = i; renderVistaSemanalEstac(); }
+
+function buildGridEstacionamiento() {
+    const grid = document.getElementById('estac-semana-grid');
+    const spot = spots[spotActivo];
+    if (!spot) return;
+    const lunes = lunesDeEstaSemana();
+    const diasLabel = ['Lun','Mar','Mié','Jue','Vie'];
+    const totalHoras = HORA_FIN_ESTAC - HORA_INI_ESTAC;
+
+    let html = `<div class="sg-corner" style="height:48px"></div>`;
+    const fechasSemana = [];
+    for (let d=0; d<5; d++) {
+        const dia = new Date(lunes); dia.setDate(lunes.getDate()+d);
+        fechasSemana.push(dia.toISOString().slice(0,10));
+        const esHoy = dia.toISOString().slice(0,10) === hoyISO();
+        html += `<div class="sg-dia-header ${esHoy?'hoy':''}"><div class="sg-dia-nombre">${diasLabel[d]}</div><div class="sg-dia-num">${dia.getDate()}</div></div>`;
+    }
+    for (let h=HORA_INI_ESTAC; h<=HORA_FIN_ESTAC; h++) {
+        const label = h<HORA_FIN_ESTAC ? `${String(h).padStart(2,'0')}:00` : '';
+        html += `<div class="sg-hora-cell" style="height:${SLOT_H_ESTAC}px"><span class="sg-hora-label">${label}</span></div>`;
+        if (h<HORA_FIN_ESTAC) for (let d=0; d<5; d++) html += `<div class="sg-day-col" id="ecol-${d}-${h}" style="height:${SLOT_H_ESTAC}px"></div>`;
+    }
+    grid.style.gridTemplateRows = `48px repeat(${totalHoras},${SLOT_H_ESTAC}px)`;
+    grid.innerHTML = html;
+
+    fechasSemana.forEach((fechaStr, d) => {
+        const diaSemanaTxt = ['domingo','lunes','martes','miercoles','jueves','viernes','sabado'][new Date(fechaStr+'T00:00:00').getDay()];
+        let estado = 'ocupado', label = 'Ocupado', horaIni = HORA_INI_ESTAC, horaFin = HORA_FIN_ESTAC, accion = null;
+
+        const aprobada = reservas.find(r => r.estacionamientoId===spot.id && r.tipo==='solicitud' && r.estado==='aprobada' && r.fechaInicio<=fechaStr && r.fechaFin>=fechaStr);
+        const explicita = reservas.find(r => r.estacionamientoId===spot.id && r.tipo==='liberado' && r.fechaInicio<=fechaStr && r.fechaFin>=fechaStr);
+
+        if (aprobada) {
+            estado = 'reservado'; label = aprobada.solicitanteNombre || aprobada.solicitanteEmail;
+            if (aprobada.horaInicio) horaIni = parseInt(aprobada.horaInicio,10);
+            if (aprobada.horaFin) horaFin = parseInt(aprobada.horaFin,10)+1;
+        } else if (explicita) {
+            if (explicita.reservadoPor) {
+                estado = 'reservado'; label = explicita.reservadoPorNombre || explicita.reservadoPor;
+            } else {
+                estado = 'libre'; label = 'Disponible'; accion = () => abrirReservar(explicita.id, explicita.fechaInicio, explicita.fechaFin);
+            }
+            if (explicita.horaInicio) horaIni = parseInt(explicita.horaInicio,10);
+            if (explicita.horaFin) horaFin = parseInt(explicita.horaFin,10)+1;
+        } else if (fechaStr === hoyISO() && DIAS.includes(diaSemanaTxt)) {
+            const { estado: estRuta } = estadoEnFecha(spot.duenoEmail, fechaStr, diaSemanaTxt);
+            if (estRuta !== 'presencial') {
+                estado = 'auto'; label = 'Automático'; accion = () => reservarAuto(spot.id);
+            }
+        }
+
+        horaIni = Math.max(horaIni, HORA_INI_ESTAC);
+        horaFin = Math.min(horaFin, HORA_FIN_ESTAC);
+        const colEl = document.getElementById(`ecol-${d}-${horaIni}`);
+        if (!colEl) return;
+        const alto = (horaFin - horaIni) * SLOT_H_ESTAC - 4;
+        const bloque = document.createElement('div');
+        bloque.className = `sg-bloque sg-bloque-${estado}`;
+        bloque.style.cssText = `top:2px;height:${alto}px;`;
+        bloque.textContent = label;
+        bloque.title = label;
+        if (accion) bloque.onclick = accion;
+        colEl.style.position = 'relative';
+        colEl.appendChild(bloque);
+
+        if (fechaStr === hoyISO()) {
+            const ahora = new Date();
+            const min = (ahora.getHours()-HORA_INI_ESTAC)*60 + ahora.getMinutes();
+            if (min>=0 && min<=totalHorasEstac()*60) {
+                const col = document.getElementById(`ecol-${d}-${HORA_INI_ESTAC}`);
+                if (col) {
+                    const l = document.createElement('div');
+                    l.className = 'sg-linea-ahora';
+                    l.style.top = `${(min/60)*SLOT_H_ESTAC}px`;
+                    col.style.position = 'relative';
+                    col.appendChild(l);
+                }
+            }
+        }
+    });
+}
+function totalHorasEstac() { return HORA_FIN_ESTAC - HORA_INI_ESTAC; }
+
 // ══════════════════ TELETRABAJO / RUTAS ══════════════════
 let dataTeletrabajo = { patrones: {}, excepciones: [] };
 let teletrabajoDia = null;
 let visitaObra = new Map(); // dia -> Set<obra>
+let otrosPatron = new Map(); // dia -> detalle (texto libre)
 const OBRAS_ACTIVAS = ['Los Molinos', 'Portal el Abra', 'Mirador El Águila', 'Portal Los Maitenes', 'Portal Oriente', 'Mirador El Pino'];
 const DIAS_OBRA = ['lunes','martes','miercoles','jueves','viernes'];
 let semanaOffset = 0;
 const DIAS = ['lunes','martes','miercoles','jueves','viernes'];
 const DIAS_LABEL = {lunes:'Lunes',martes:'Martes',miercoles:'Miércoles',jueves:'Jueves',viernes:'Viernes'};
+// Jefatura que aprueba las rutas semanales propuestas (Fase 5).
+const APROBADORES_RUTA = ['jcumplido@ibaker.cl', 'bsilva@ibaker.cl'];
 
 function renderChipsPatron() {
     document.querySelectorAll('#dias-teletrabajo .dia-chip').forEach(chip => {
         chip.classList.toggle('activo', chip.dataset.dia === teletrabajoDia);
     });
     renderFilasObra();
+    renderFilasOtros();
 }
 
 const DIA_LABEL_OBRA = {lunes:'Lunes',martes:'Martes',miercoles:'Miércoles',jueves:'Jueves',viernes:'Viernes'};
@@ -755,7 +984,7 @@ function renderFilasObra() {
     cont.innerHTML = DIAS_OBRA.map(dia => {
         const marcado = visitaObra.has(dia);
         const obrasDia = visitaObra.get(dia) || new Set();
-        const bloqueadoPorTeletrabajo = teletrabajoDia === dia;
+        const bloqueadoPorTeletrabajo = teletrabajoDia === dia || otrosPatron.has(dia);
         return `
         <div class="obra-dia-row" style="flex-direction:column;align-items:flex-start;">
             <label class="obra-dia-check">
@@ -779,6 +1008,7 @@ function renderFilasObra() {
 function toggleDiaObra(dia, marcado) {
     if (marcado) {
         if (teletrabajoDia === dia) { toast('Ese día ya está marcado como Teletrabajo'); renderFilasObra(); return; }
+        if (otrosPatron.has(dia)) { toast('Ese día ya está marcado como Otros motivos'); renderFilasObra(); return; }
         visitaObra.set(dia, new Set());
     } else {
         visitaObra.delete(dia);
@@ -792,19 +1022,117 @@ function toggleObraEnDia(dia, obra) {
     renderFilasObra();
 }
 
+function renderFilasOtros() {
+    const cont = document.getElementById('dias-otros');
+    if (!cont) return;
+    cont.innerHTML = DIAS_OBRA.map(dia => {
+        const marcado = otrosPatron.has(dia);
+        const detalle = otrosPatron.get(dia) || '';
+        const bloqueado = teletrabajoDia === dia || visitaObra.has(dia);
+        return `
+        <div class="obra-dia-row" style="flex-direction:column;align-items:flex-start;">
+            <label class="obra-dia-check">
+                <input type="checkbox" ${marcado?'checked':''} ${bloqueado?'disabled':''}
+                    onchange="toggleDiaOtros('${dia}', this.checked)">
+                ${DIA_LABEL_OBRA[dia]}
+            </label>
+            ${marcado ? `
+            <div style="margin:6px 0 4px 26px;width:calc(100% - 26px);">
+                <input class="form-input" style="font-size:0.8rem;" placeholder="¿Dónde estarás? (opcional)"
+                    value="${detalle.replace(/"/g,'&quot;')}" onchange="otrosPatron.set('${dia}', this.value)">
+            </div>
+            ` : ''}
+        </div>`;
+    }).join('');
+}
+function toggleDiaOtros(dia, marcado) {
+    if (marcado) {
+        if (teletrabajoDia === dia) { toast('Ese día ya está marcado como Teletrabajo'); renderFilasOtros(); return; }
+        if (visitaObra.has(dia)) { toast('Ese día ya está marcado como Visita a Obra'); renderFilasOtros(); return; }
+        otrosPatron.set(dia, '');
+    } else {
+        otrosPatron.delete(dia);
+    }
+    renderFilasOtros();
+}
+
 async function cargarDatos() {
     try {
         const res = await fetch(`${API}/teletrabajo`);
         dataTeletrabajo = await res.json();
-        const miPatron = dataTeletrabajo.patrones[emailActual] || { teletrabajoDia: null, visitaObra: [] };
+        const miPatron = dataTeletrabajo.patrones[emailActual] || { teletrabajoDia: null, visitaObra: [], otros: [] };
         teletrabajoDia = miPatron.teletrabajoDia || null;
         visitaObra = new Map((miPatron.visitaObra || []).map(item => [item.dia, new Set(item.obras || (item.obra ? [item.obra] : []))]));
+        otrosPatron = new Map((miPatron.otros || []).map(item => [item.dia, item.detalle || '']));
         renderChipsPatron();
         renderExcepciones();
         renderSemana();
+        await cargarPropuestas();
     } catch(e) {
         toast('Error al cargar: ' + e.message);
     }
+}
+
+async function cargarPropuestas() {
+    try {
+        const res = await fetch(`${API}/teletrabajo/propuestas`);
+        dataTeletrabajo.propuestas = await res.json();
+        renderEstadoPropuesta();
+        if (APROBADORES_RUTA.includes(emailActual) || ADMINISTRADORES.includes(emailActual)) {
+            document.getElementById('aprobaciones-card').style.display = 'block';
+            renderAprobaciones();
+        }
+    } catch(e) { console.warn('No se pudieron cargar las propuestas:', e.message); }
+}
+
+function renderAprobaciones() {
+    const cont = document.getElementById('lista-aprobaciones');
+    const pendientes = (dataTeletrabajo.propuestas||[]).filter(p => p.estado === 'pendiente').sort((a,b)=>a.creadoEn.localeCompare(b.creadoEn));
+    if (!pendientes.length) { cont.innerHTML = `<div class="empty">No hay rutas pendientes de aprobación.</div>`; return; }
+    cont.innerHTML = pendientes.map(p => `
+        <div class="excepcion-item" style="align-items:flex-start;flex-direction:column;gap:8px;">
+            <div><b>${p.email}</b> — ${new Date(p.creadoEn).toLocaleDateString('es-CL')}</div>
+            <div style="font-size:0.78rem;color:var(--txt-mid);">${resumenPatronTexto(p)}</div>
+            <div style="display:flex;gap:8px;">
+                <button class="btn btn-primary btn-sm" onclick="responderPropuesta('${p.id}', true)">✅ Aprobar</button>
+                <button class="btn btn-outline btn-sm" onclick="responderPropuesta('${p.id}', false)">✕ Rechazar</button>
+            </div>
+        </div>`).join('');
+}
+
+async function responderPropuesta(id, aprobar) {
+    try {
+        const res = await fetch(`${API}/teletrabajo/propuestas/${id}/responder`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ email: emailActual, aprobar })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        toast(aprobar ? 'Ruta aprobada' : 'Ruta rechazada');
+        await cargarDatos();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function avisarAprobadoresNuevaPropuesta() {
+    const token = await getTokenCorreo();
+    if (!token) return; // silencioso — la propuesta ya quedó guardada igual
+    try {
+        const html = `
+            <div style="font-family:Arial,sans-serif;color:#1C1A18;">
+                <p><b>${nombreActual}</b> (${emailActual}) propuso una nueva ruta semanal, pendiente de tu aprobación.</p>
+                <p style="margin-top:10px;">Entra al módulo de Rutas / Estacionamientos, pestaña "Teletrabajo / Rutas" → "Mi ruta", para revisarla y aprobarla o rechazarla.</p>
+            </div>`;
+        await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: {
+                    subject: `Nueva ruta semanal propuesta — ${nombreActual}`,
+                    body: { contentType: 'HTML', content: html },
+                    toRecipients: APROBADORES_RUTA.map(email => ({ emailAddress: { address: email } })),
+                },
+            }),
+        });
+    } catch(e) { console.warn('No se pudo avisar a los aprobadores:', e.message); }
 }
 
 function cambiarTab(tab) {
@@ -818,16 +1146,39 @@ async function guardarPatron() {
     const sinObra = [...visitaObra.entries()].find(([dia, obras]) => !obras.size);
     if (sinObra) { toast(`Falta elegir al menos una obra para el ${DIA_LABEL_OBRA[sinObra[0]]}`); return; }
     const visitaObraArr = [...visitaObra.entries()].map(([dia, obras]) => ({ dia, obras: [...obras] }));
+    const otrosArr = [...otrosPatron.entries()].map(([dia, detalle]) => ({ dia, detalle }));
     try {
-        const res = await fetch(`${API}/teletrabajo/patron`, {
+        const res = await fetch(`${API}/teletrabajo/proponer`, {
             method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ email: emailActual, teletrabajoDia, visitaObra: visitaObraArr })
+            body: JSON.stringify({ email: emailActual, teletrabajoDia, visitaObra: visitaObraArr, otros: otrosArr })
         });
-        if (!res.ok) throw new Error((await res.json()).error || 'Error al guardar');
-        dataTeletrabajo.patrones[emailActual] = { teletrabajoDia, visitaObra: visitaObraArr };
-        toast('Patrón guardado');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al guardar');
+        if (data.autoAprobada) {
+            dataTeletrabajo.patrones[emailActual] = { teletrabajoDia, visitaObra: visitaObraArr, otros: otrosArr };
+            toast('Patrón guardado');
+        } else {
+            toast('Ruta enviada — queda pendiente de aprobación de jefatura');
+            avisarAprobadoresNuevaPropuesta();
+        }
+        await cargarPropuestas();
         renderSemana();
     } catch(e) { toast('Error: ' + e.message); }
+}
+
+function resumenPatronTexto(p) {
+    const partes = [];
+    if (p.teletrabajoDia) partes.push(`Teletrabajo: ${DIA_LABEL_OBRA[p.teletrabajoDia]}`);
+    (p.visitaObra||[]).forEach(v => partes.push(`Visita a obra ${DIA_LABEL_OBRA[v.dia]}: ${v.obras.join(', ')}`));
+    (p.otros||[]).forEach(o => partes.push(`Otros ${DIA_LABEL_OBRA[o.dia]}${o.detalle ? ': '+o.detalle : ''}`));
+    return partes.length ? partes.join(' · ') : 'Sin días marcados (presencial toda la semana)';
+}
+
+function renderEstadoPropuesta() {
+    const el = document.getElementById('estado-propuesta-patron');
+    if (!el) return;
+    const miPendiente = (dataTeletrabajo.propuestas||[]).find(p => p.email === emailActual && p.estado === 'pendiente');
+    el.textContent = miPendiente ? `⏳ Tienes una propuesta de ruta pendiente de aprobación (enviada ${new Date(miPendiente.creadoEn).toLocaleDateString('es-CL')}).` : '';
 }
 
 let excObrasSeleccionadas = new Set();
@@ -919,10 +1270,12 @@ function cambiarSemana(delta) {
 function estadoEnFecha(email, fechaISO, diaSemana) {
     const exc = dataTeletrabajo.excepciones.find(e => e.email === email && e.fecha === fechaISO);
     if (exc) return { estado: exc.tipo, obras: exc.obras || [], detalle: exc.detalle || '' };
-    const patron = dataTeletrabajo.patrones[email] || { teletrabajoDia: null, visitaObra: [] };
+    const patron = dataTeletrabajo.patrones[email] || { teletrabajoDia: null, visitaObra: [], otros: [] };
     if (patron.teletrabajoDia === diaSemana) return { estado: 'remoto', obras: [], detalle: '' };
     const item = (patron.visitaObra || []).find(v => v.dia === diaSemana);
     if (item) return { estado: 'visita_obra', obras: item.obras || [], detalle: '' };
+    const itemOtros = (patron.otros || []).find(v => v.dia === diaSemana);
+    if (itemOtros) return { estado: 'otros', obras: [], detalle: itemOtros.detalle || '' };
     return { estado: 'presencial', obras: [], detalle: '' };
 }
 
