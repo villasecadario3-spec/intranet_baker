@@ -1828,6 +1828,7 @@ function formatNumOrDash(n){
 // de arriba, para que ambas partes muestren siempre lo mismo.
 function pasaFiltrosDotacion(w){
   return (cargoFiltro==='' || w.role===cargoFiltro)
+    && (periodoFiltro==='' || vigenteDesdeMes(w, parseInt(periodoFiltro,10)))
     && (estadoOrigenFiltro==='' || (estadoOrigenFiltro==='vigente' ? esVigente(w) : esProyectado(w)))
     && (motivoFiltro==='' || w.motivo===motivoFiltro)
     && (obraFiltro==='' || w.cc.startsWith(obraFiltro))
@@ -1838,7 +1839,7 @@ function pasaFiltrosDotacion(w){
 // (no solo el centro de gestión) — determina si las tablas de resumen deben
 // recalcularse persona por persona en vez de usar el agregado rápido.
 function hayFiltrosPersonaActivos(){
-  return cargoFiltro!=='' || estadoOrigenFiltro!=='' || motivoFiltro!=='' || fechaSalidaDesdeFiltro!=='' || fechaSalidaHastaFiltro!=='';
+  return cargoFiltro!=='' || periodoFiltro!=='' || estadoOrigenFiltro!=='' || motivoFiltro!=='' || fechaSalidaDesdeFiltro!=='' || fechaSalidaHastaFiltro!=='';
 }
 
 function computeMonthlyBreakdown(){
@@ -2222,7 +2223,6 @@ function renderRoster(){
   const body = document.getElementById('rosterBody');
   const q = document.getElementById('searchBox').value.trim();
   let list = workers.filter(w => (activeCC==='todos' || w.cc===activeCC) && matchesSearch(w,q)
-    && (periodoFiltro==='' || vigenteDesdeMes(w, parseInt(periodoFiltro,10)))
     && pasaFiltrosDotacion(w));
   list = list.slice().sort((a,b)=> (isDeparted(a))-(isDeparted(b)) || a.name.localeCompare(b.name));
 
