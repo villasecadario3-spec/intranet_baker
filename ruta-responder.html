@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Responder ruta semanal — Rutas / Estacionamientos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,900&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+<style>
+:root{--rojo:#C0392B;--negro:#111010;--crema:#F8F6F3;--verde:#1a7a4a;--txt:#1C1A18;--txt-mid:#6B6762;}
+*{box-sizing:border-box;}
+body{margin:0;font-family:'DM Sans',sans-serif;background:var(--crema);color:var(--txt);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+.card{background:white;border-radius:16px;padding:32px 28px;max-width:440px;width:100%;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.08);}
+.icono{font-size:2.4rem;margin-bottom:14px;}
+h1{font-family:'Playfair Display',serif;font-size:1.2rem;margin:0 0 10px;}
+p{font-size:0.88rem;color:var(--txt-mid);line-height:1.6;margin:0 0 6px;}
+.resumen{background:var(--crema);border-radius:8px;padding:10px 14px;font-size:0.82rem;text-align:left;margin:14px 0;}
+.spinner{width:26px;height:26px;border:3px solid #e2ded9;border-top-color:var(--rojo);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+a.volver{display:inline-block;margin-top:18px;color:var(--rojo);font-size:0.82rem;font-weight:600;text-decoration:none;}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+    <div class="spinner"></div>
+    <p>Procesando tu respuesta…</p>
+</div>
+
+<script>
+const API = 'https://api.ibaker.cl';
+const params = new URLSearchParams(window.location.search);
+const propuestaId = params.get('id');
+const decision = params.get('decision'); // 'aprobar' | 'rechazar'
+// La jefatura aprobadora ahora se define por grupo (ver /teletrabajo/grupos), no como lista fija.
+const DIA_LABEL_OBRA = {lunes:'Lunes',martes:'Martes',miercoles:'Miércoles',jueves:'Jueves',viernes:'Viernes'};
+
+const msalConfig = {
+    auth: {
+        clientId: "9a56ab1c-d3c4-4460-9892-1d4da768ecfb",
+        authority: "https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",
+        redirectUri: window.location.origin + window.location.pathname,
+    },
+    cache: { cacheLocation: "sessionStorage" }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+function resumenPatronTexto(p) {
+    const partes = [];
+    if (p.teletrabajoDia) partes.push(`Teletrabajo: ${DIA_LABEL_OBRA[p.teletrabajoDia]}`);
+    (p.visitaObra||[]).forEach(v => partes.push(`Visita a obra ${DIA_LABEL_OBRA[v.dia]}: ${v.obras.join(', ')}`));
+    (p.otros||[]).forEach(o => partes.push(`Otros ${DIA_LABEL_OBRA[o.dia]}${o.detalle ? ': '+o.detalle : ''}`));
+    return partes.length ? partes.join(' · ') : 'Sin días marcados (presencial toda la semana)';
+}
+
+function mostrar(icono, titulo, texto, resumen) {
+    document.getElementById('card').innerHTML = `
+        <div class="icono">${icono}</div>
+        <h1>${titulo}</h1>
+        <p>${texto}</p>
+        ${resumen ? `<div class="resumen">${resumen}</div>` : ''}
+        <a class="volver" href="rutas-estacionamientos.html">Ir al módulo de Rutas / Estacionamientos</a>
+    `;
+}
+
+async function getTokenCorreo(account) {
+    try {
+        const res = await msalInstance.acquireTokenSilent({ scopes: ['Mail.Send'], account });
+        return res.accessToken;
+    } catch(e) {
+        try {
+            const res = await msalInstance.acquireTokenPopup({ scopes: ['Mail.Send'] });
+            return res.accessToken;
+        } catch(e2) { return null; }
+    }
+}
+
+async function avisarResultado(token, propuesta, aprobar) {
+    if (!token) return;
+    try {
+        const mensaje = {
+            message: {
+                subject: `Tu ruta semanal propuesta fue ${aprobar ? 'aprobada' : 'rechazada'}`,
+                body: { contentType: 'Text', content: `Hola ${propuesta.nombre || ''},\n\nTu ruta semanal propuesta fue ${aprobar ? 'APROBADA ✅' : 'RECHAZADA ✕'}.\n\n${resumenPatronTexto(propuesta)}` },
+                toRecipients: [{ emailAddress: { address: propuesta.email } }],
+            },
+            saveToSentItems: true,
+        };
+        await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(mensaje),
+        });
+    } catch(e) { console.warn('No se pudo avisar el resultado por correo:', e.message); }
+}
+
+async function procesar() {
+    await msalInstance.initialize();
+    await msalInstance.handleRedirectPromise().catch(() => {});
+
+    let idFinal = propuestaId, decisionFinal = decision;
+    if (!idFinal || !decisionFinal) {
+        const guardado = sessionStorage.getItem('ruta_pendiente');
+        if (guardado) {
+            const datos = JSON.parse(guardado);
+            idFinal = datos.id; decisionFinal = datos.decision;
+        }
+    }
+
+    if (!idFinal || !['aprobar','rechazar'].includes(decisionFinal)) {
+        mostrar('⚠️', 'Link inválido', 'Este enlace no tiene los datos necesarios para procesar la propuesta.');
+        return;
+    }
+
+    try {
+        let accounts = msalInstance.getAllAccounts();
+        if (!accounts.length) {
+            sessionStorage.setItem('ruta_pendiente', JSON.stringify({ id: idFinal, decision: decisionFinal }));
+            await msalInstance.loginRedirect({ scopes: ['User.Read'] });
+            return;
+        }
+        sessionStorage.removeItem('ruta_pendiente');
+        const account = accounts[0];
+        const emailActual = account.username.toLowerCase();
+
+        const [propuestas, grupos] = await Promise.all([
+            fetch(`${API}/teletrabajo/propuestas`).then(r => r.json()),
+            fetch(`${API}/teletrabajo/grupos`).then(r => r.json()),
+        ]);
+        const propuesta = propuestas.find(p => p.id === idFinal);
+        if (!propuesta) { mostrar('⚠️', 'Propuesta no encontrada', 'Puede que ya haya sido respondida o eliminada.'); return; }
+
+        const grupoDeLaPersona = grupos.find(g => g.miembros.includes(propuesta.email));
+        const aprobadoresDeEsaPropuesta = grupoDeLaPersona ? grupoDeLaPersona.aprobadores : ((grupos.find(g => g.id === 'seed-1') || grupos[0])?.aprobadores || []);
+        if (!aprobadoresDeEsaPropuesta.includes(emailActual)) {
+            mostrar('🚫', 'Sin permiso', 'No eres aprobador del grupo al que pertenece esta persona.');
+            return;
+        }
+
+        if (propuesta.estado !== 'pendiente') {
+            mostrar('ℹ️', 'Ya fue respondida', `Esta propuesta ya estaba marcada como "${propuesta.estado}".`, resumenPatronTexto(propuesta));
+            return;
+        }
+
+        const aprobar = decisionFinal === 'aprobar';
+        const res = await fetch(`${API}/teletrabajo/propuestas/${idFinal}/responder`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ email: emailActual, aprobar }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error al responder');
+
+        mostrar(
+            aprobar ? '✅' : '✕',
+            aprobar ? 'Ruta aprobada' : 'Ruta rechazada',
+            `La ruta de ${propuesta.nombre || propuesta.email} quedó ${aprobar ? 'aprobada y publicada' : 'rechazada'}. Le estamos avisando por correo.`,
+            resumenPatronTexto(propuesta)
+        );
+
+        const tokenCorreo = await getTokenCorreo(account);
+        avisarResultado(tokenCorreo, propuesta, aprobar);
+    } catch(e) {
+        mostrar('⚠️', 'Error', e.message || 'Ocurrió un problema al procesar tu respuesta.');
+    }
+}
+
+procesar();
+</script>
+</body>
+</html>
