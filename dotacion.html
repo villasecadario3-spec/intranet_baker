@@ -338,7 +338,7 @@
   }
   .sugerencias-list{ max-height:420px; overflow-y:auto; }
   .sugerencia-row{
-    display:grid; grid-template-columns: 1.6fr 1fr 1fr 110px 90px 100px;
+    display:grid; grid-template-columns: 1.6fr 1fr 1fr 110px 90px 130px 1fr auto;
     gap:10px; padding:10px 18px; align-items:center; border-bottom:1px solid var(--line);
     font-size:13px;
   }
@@ -2504,7 +2504,10 @@ function renderSugerencias(){
     list.innerHTML = `<div class="empty">Sin discrepancias — todas las personas de Asistencia BUK están en la dotación activa.</div>`;
     return;
   }
-  list.innerHTML = pending.map(a => `
+  list.innerHTML = pending.map((a,i) => {
+    const found = COSTOS.find(c => c.cc === a.cc && (c.role||'').toLowerCase().trim() === (a.role||'').toLowerCase().trim());
+    const costoSugerido = found ? Math.round(Number(found.amt)) : '';
+    return `
     <div class="sugerencia-row">
       <div>
         <div style="font-weight:600;">${a.name}</div>
@@ -2514,6 +2517,7 @@ function renderSugerencias(){
       <div class="cc" style="font-size:12px;color:var(--steel);">${a.cc}</div>
       <div>${a.meses.map(m=>`<span class="mes-badge">${mesLabel(m)}</span>`).join(' ')}</div>
       <div style="font-size:12px;color:var(--steel);">${a.primera_fecha}</div>
+      <div><input type="number" id="sug-costo-${i}" value="${costoSugerido}" placeholder="Costo empresa" style="width:120px;padding:5px 8px;"></div>
       <div style="font-size:11px;color:var(--steel);font-style:italic;">${(()=>{
         const same_rut = workers.filter(w => w.rutlimpio === a.rutlimpio);
         if(same_rut.length > 0){
@@ -2522,29 +2526,32 @@ function renderSugerencias(){
         }
         return 'Sin coincidencia en dotación';
       })()}</div>
-      <div><button class="btn btn-primary btn-sm" data-add-sug="${a.rutlimpio}#${a.cc}#${a.role}">Agregar</button></div>
+      <div><button class="btn btn-primary btn-sm" data-add-sug="${a.rutlimpio}#${a.cc}#${a.role}" data-idx="${i}">Agregar</button></div>
     </div>
-  `).join('');
+  `;}).join('');
 
   list.querySelectorAll('[data-add-sug]').forEach(btn=>{
     btn.onclick = () => {
       const a = ASISTENCIA_NUEVOS.find(x => `${x.rutlimpio}#${x.cc}#${x.role}` === btn.dataset.addSug);
-      if(a) addFromSugerencia(a);
+      const inputCosto = document.getElementById(`sug-costo-${btn.dataset.idx}`);
+      const costoManual = inputCosto && inputCosto.value !== '' && Number.isFinite(Number(inputCosto.value)) ? Math.round(Number(inputCosto.value)) : null;
+      if(a) addFromSugerencia(a, costoManual);
     };
   });
 }
 
-function addFromSugerencia(a){
+function addFromSugerencia(a, costoManual){
   const id = `${a.rutlimpio}#${a.cc}#${a.role}`;
   if(workers.some(w => w.id === id)) return;
   workers.push({
     id, rutlimpio: a.rutlimpio, cc: a.cc, role: a.role, name: a.name,
     rut: a.rutlimpio, fc: a.primera_fecha, status: 'activo', fs: null, motivo: null,
-    source: 'ingreso'
+    source: 'ingreso', costoManual: (costoManual !== undefined && costoManual !== null) ? costoManual : null
   });
   renderCCChips();
   renderRoster();
   renderSugerencias();
+  renderReemplazoProyectado();
   renderExportPreview();
   toast(`${a.name} agregado — no olvides Guardar cambios`);
 }
@@ -2556,16 +2563,19 @@ function addAllSugerencias(){
   pending.forEach(a => {
     const id = `${a.rutlimpio}#${a.cc}#${a.role}`;
     if(!workers.some(w => w.id === id)){
+      const found = COSTOS.find(c => c.cc === a.cc && (c.role||'').toLowerCase().trim() === (a.role||'').toLowerCase().trim());
+      const costoManual = found ? Math.round(Number(found.amt)) : null;
       workers.push({
         id, rutlimpio: a.rutlimpio, cc: a.cc, role: a.role, name: a.name,
         rut: a.rutlimpio, fc: a.primera_fecha, status: 'activo', fs: null, motivo: null,
-        source: 'ingreso'
+        source: 'ingreso', costoManual
       });
     }
   });
   renderCCChips();
   renderRoster();
   renderSugerencias();
+  renderReemplazoProyectado();
   renderExportPreview();
   toast(`${pending.length} personas agregadas — no olvides Guardar cambios`);
 }
