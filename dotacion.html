@@ -2190,7 +2190,11 @@ function renderRoster(){
           ? `<input type="date" data-action="editar-inicio" value="${w.fc||''}" min="2026-01-01" max="2027-10-31" style="font-size:12px;padding:3px 5px;border:1px solid var(--line);border-radius:5px;width:125px;">`
           : (w.fc||'-')
       }</div>
-      <div style="font-size:12.5px;color:var(--ink);">${formatCLP(costoMensual(w))}</div>
+      <div style="font-size:12.5px;color:var(--ink);">
+        <input type="number" data-action="editar-costo" value="${w.costoManual ?? costoMensual(w) ?? ''}" placeholder="Sin dato"
+          style="width:110px;padding:3px 5px;border:1px solid ${w.costoManual!=null?'var(--orange)':'var(--line)'};border-radius:5px;font-size:12px;${w.costoManual!=null?'background:#FFF7ED;':''}">
+        ${w.costoManual!=null ? `<button class="btn btn-ghost btn-sm" data-action="quitar-costo-manual" title="Volver al cálculo automático" style="font-size:10px;padding:1px 5px;">↺ auto</button>` : ''}
+      </div>
       <div style="font-size:12px;color:var(--steel);">${prev ? formatCLP(prevCosto) : '—'}</div>
       <div style="font-size:12.5px;color:var(--ink);">
         ${hasEnd ? formatCLP(montoFiniquito(w)) : '—'}
@@ -2221,7 +2225,31 @@ function renderRoster(){
     if(editBtn) editBtn.onclick = () => openExitModal(id);
     const fcInput = row.querySelector('[data-action="editar-inicio"]');
     if(fcInput) fcInput.onchange = () => setFechaInicio(id, fcInput.value);
+    const costoInput = row.querySelector('[data-action="editar-costo"]');
+    if(costoInput) costoInput.onchange = () => setCostoManual(id, costoInput.value);
+    const quitarCostoBtn = row.querySelector('[data-action="quitar-costo-manual"]');
+    if(quitarCostoBtn) quitarCostoBtn.onclick = () => quitarCostoManual(id);
   });
+}
+
+function setCostoManual(id, value){
+  const w = workers.find(x=>x.id===id);
+  if(!w) return;
+  const n = Number(value);
+  if(value === '' || !Number.isFinite(n)){ toast('Ingresa un costo empresa válido'); renderRoster(); return; }
+  w.costoManual = Math.round(n);
+  renderRoster();
+  renderExportPreview();
+  toast(`Costo empresa de ${w.name} fijado a mano en ${formatCLP(w.costoManual)} — no olvides Guardar cambios`);
+}
+
+function quitarCostoManual(id){
+  const w = workers.find(x=>x.id===id);
+  if(!w) return;
+  delete w.costoManual;
+  renderRoster();
+  renderExportPreview();
+  toast(`${w.name} vuelve al cálculo automático — no olvides Guardar cambios`);
 }
 
 function motivoLabel(m){
