@@ -1088,10 +1088,19 @@ async function cargarDesdeBUK() {
     const id = `${rutlimpio}#${cc}#${role}`;
     const periodoStr = parseFechaExcelBUK(r[COL_PERIODO_BUK]);
     const mes = periodoStr ? Number(periodoStr.slice(5,7)) : null;
-    const gasto = Number(r[COL_GASTO_BUK]);
+    // El Excel trae esta columna a veces como número real, a veces como
+    // texto con formato chileno (puntos de miles y espacios, ej. " 4.111.486 ")
+    // — Number() directo falla con el segundo caso y descartaba la fila en
+    // silencio, dejando a algunas personas con un mes más viejo del que
+    // realmente tienen registrado.
+    const gastoRaw = r[COL_GASTO_BUK];
+    const gasto = typeof gastoRaw === 'number' ? gastoRaw : Number(String(gastoRaw ?? '').trim().replace(/\./g, '').replace(/\s/g, ''));
     const fc = parseFechaExcelBUK(r[COL_FING_BUK]);
     const fs = parseFechaExcelBUK(r[COL_FTERM_BUK]);
 
+    if (mes && gastoRaw !== undefined && gastoRaw !== null && gastoRaw !== '' && !Number.isFinite(gasto)) {
+      console.warn(`[BUK] No se pudo leer "Gasto Empresa" para ${name} (${id}), mes ${mes} — valor crudo:`, gastoRaw);
+    }
     if (mes && Number.isFinite(gasto)) {
       gastoMes[id] = gastoMes[id] || {};
       gastoMes[id][mes] = Math.round(gasto);
