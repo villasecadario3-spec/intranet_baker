@@ -511,7 +511,7 @@
       <div class="chips" id="ccChips"></div>
     </div>
     <div class="field">
-      <label for="periodoFiltro">Vigentes en</label>
+      <label for="periodoFiltro">Vigentes desde</label>
       <select id="periodoFiltro"><option value="">Todos los periodos</option></select>
     </div>
     <div class="field">
@@ -1276,6 +1276,17 @@ function promedioRutCargo(w, mes){
   return Math.round(base.reduce((s,v)=>s+v,0) / base.length);
 }
 
+function ultimoCostoRegistrado(w, mes){
+  const reg = GASTO_MES[`${w.rutlimpio}#${w.cc}#${w.role}`];
+  if(!reg) return null;
+  const mesesDisponibles = Object.keys(reg).map(Number).filter(m => !mes || m < mes);
+  const baseMeses = mesesDisponibles.length ? mesesDisponibles : Object.keys(reg).map(Number);
+  if(!baseMeses.length) return null;
+  const ultimoMes = Math.max(...baseMeses);
+  const val = Number(reg[String(ultimoMes)]);
+  return Number.isFinite(val) ? Math.round(val) : null;
+}
+
 function costoMensual(w, mes){
   if(w.costoManual !== undefined && w.costoManual !== null && Number.isFinite(Number(w.costoManual))){
     return Math.round(Number(w.costoManual));
@@ -1285,15 +1296,18 @@ function costoMensual(w, mes){
     const real = gastoMesReal(w, mes);
     if(real !== null) return real;
   }
-  // Si no, promedio por rut y cargo de los sueldos anteriores.
-  const prom = promedioRutCargo(w, mes);
-  if(prom !== null) return prom;
-  // 1st: exact match cc+role in promedio NN
+  // Proyección de meses sin liquidación todavía: se usa el ÚLTIMO costo
+  // empresa registrado para esa persona en el Excel MO BUK (columna G) — no
+  // un promedio de meses anteriores.
+  const ultimo = ultimoCostoRegistrado(w, mes);
+  if(ultimo !== null) return ultimo;
+
+  // Sin ningún historial real (persona nueva sin liquidaciones aún): cae a
+  // la tabla de costos de referencia por cargo.
   let costoProm = null;
   const found = COSTOS.find(c => c.cc === w.cc && (c.role||'').toLowerCase().trim() === (w.role||'').toLowerCase().trim());
   if(found){ const n = Number(found.amt); if(Number.isFinite(n)) costoProm = Math.round(n); }
 
-  // 2nd: if no exact match, use same role in ANY cc as reference (average across ccs)
   if(costoProm === null){
     const sameRole = COSTOS.filter(c => (c.role||'').toLowerCase().trim() === (w.role||'').toLowerCase().trim());
     if(sameRole.length > 0){
@@ -1301,16 +1315,7 @@ function costoMensual(w, mes){
       if(Number.isFinite(avg)) costoProm = Math.round(avg);
     }
   }
-
-  // 3rd: max historical real cost for this person+cc
-  let costoMax = null;
-  const maxReal = ULTIMO_COSTO_MAX.find(u => u.key === `${w.rutlimpio}#${w.cc}`);
-  if(maxReal && Number.isFinite(Number(maxReal.amt))) costoMax = Math.round(Number(maxReal.amt));
-
-  if(costoProm !== null && costoMax !== null) return Math.max(costoProm, costoMax);
-  if(costoProm !== null) return costoProm;
-  if(costoMax !== null) return costoMax;
-  return null;
+  return costoProm;
 }
 
 function formatCLP(n){
@@ -1601,6 +1606,15 @@ function vigenteEnMes(w, idx){
   }
   const st = computeMonthStates(w);
   return st[idx] && st[idx] !== 'before';
+}
+
+// Vigente desde un mes en adelante: alcanza con que esté vigente en ESE mes
+// o en cualquier mes posterior dentro del horizonte, no solo en el exacto.
+function vigenteDesdeMes(w, idxDesde){
+  for(let idx = idxDesde; idx < HORIZON; idx++){
+    if(vigenteEnMes(w, idx)) return true;
+  }
+  return false;
 }
 
 function renderPeriodoFiltro(){
@@ -2040,7 +2054,7 @@ function renderRoster(){
   const q = document.getElementById('searchBox').value.trim();
   let list = workers.filter(w => (activeCC==='todos' || w.cc===activeCC) && matchesSearch(w,q)
     && (cargoFiltro==='' || w.role===cargoFiltro)
-    && (periodoFiltro==='' || vigenteEnMes(w, parseInt(periodoFiltro,10)))
+    && (periodoFiltro==='' || vigenteDesdeMes(w, parseInt(periodoFiltro,10)))
     && (estadoOrigenFiltro==='' || (estadoOrigenFiltro==='vigente' ? esVigente(w) : esProyectado(w)))
     && (motivoFiltro==='' || w.motivo===motivoFiltro)
     && (fechaSalidaDesdeFiltro==='' || (w.fs && w.fs>=fechaSalidaDesdeFiltro))
