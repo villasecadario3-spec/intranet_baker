@@ -2064,14 +2064,14 @@ function attachToggleSubListeners(){
 // Nombres activos en un mes puntual, para un cc + cargo + criterio (vigente/proyectado).
 function nombresActivosEnMes(cc, role, predicado, mesIdx){
   return workers
-    .filter(w => w.cc === cc && w.role === role && predicado(w) && computeMonthStates(w)[mesIdx] !== 'before')
+    .filter(w => w.cc === cc && w.role === role && predicado(w) && pasaFiltrosDotacion(w) && computeMonthStates(w)[mesIdx] !== 'before')
     .map(w => w.name)
     .sort();
 }
 
 function renderDesgloseCargos(cc, tipo, startIdx){
   const predicado = tipo === 'vigente' ? esVigente : esProyectado;
-  const roles = [...new Set(workers.filter(w => w.cc === cc && predicado(w)).map(w => w.role).filter(Boolean))].sort();
+  const roles = [...new Set(workers.filter(w => w.cc === cc && predicado(w) && pasaFiltrosDotacion(w)).map(w => w.role).filter(Boolean))].sort();
   if(roles.length === 0) return '';
 
   return roles.map(role => {
