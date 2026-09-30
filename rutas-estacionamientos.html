@@ -221,12 +221,21 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
                     <div class="dia-chip" data-dia="miercoles">Miércoles</div>
                     <div class="dia-chip" data-dia="jueves">Jueves</div>
                 </div>
-                <h3 style="margin-top:20px;">Visita a Obra</h3>
+            </div>
+
+            <div class="card">
+                <h3>Visita a Obra</h3>
                 <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Marca los días en que normalmente estás en terreno, no en la oficina. Aquí sí puedes elegir varios días.</p>
                 <div id="dias-obra"></div>
-                <h3 style="margin-top:20px;">Otros motivos</h3>
+            </div>
+
+            <div class="card">
+                <h3>Otros motivos</h3>
                 <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Para días fijos en que sueles tener trámites, reuniones externas u otra razón para no estar en la oficina, distinta a visita a obra.</p>
                 <div id="dias-otros"></div>
+            </div>
+
+            <div class="card">
                 <button class="btn btn-primary btn-sm" onclick="guardarPatron()">Proponer patrón semanal</button>
                 <p style="font-size:0.76rem;color:var(--txt-dim);margin-top:10px;" id="estado-propuesta-patron"></p>
             </div>
@@ -312,6 +321,24 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
         <div class="modal-btns">
             <button class="btn btn-outline btn-sm" onclick="cerrarModal('modal-reservar')">Cancelar</button>
             <button class="btn btn-primary btn-sm" onclick="confirmarReservar()">Confirmar reserva</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-reservar-dia">
+    <div class="modal">
+        <h3>Reservar para ese día</h3>
+        <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;" id="reservar-dia-info"></p>
+        <div class="form-group">
+            <label class="form-label">Horario (opcional — vacío = todo el día)</label>
+            <div style="display:flex;gap:8px;">
+                <input class="form-input" type="time" id="reservar-dia-hora-desde">
+                <input class="form-input" type="time" id="reservar-dia-hora-hasta">
+            </div>
+        </div>
+        <div class="modal-btns">
+            <button class="btn btn-outline btn-sm" onclick="cerrarModal('modal-reservar-dia')">Cancelar</button>
+            <button class="btn btn-primary btn-sm" onclick="confirmarReservarDia()">Confirmar reserva</button>
         </div>
     </div>
 </div>
@@ -622,6 +649,35 @@ async function bloquearHoy(spotId) {
     } catch(e) { toast('Error: ' + e.message); }
 }
 
+let reservarDiaSpotId = null, reservarDiaFecha = null;
+function abrirReservarDia(spotId, fechaStr) {
+    reservarDiaSpotId = spotId;
+    reservarDiaFecha = fechaStr;
+    document.getElementById('reservar-dia-info').textContent = `Para el ${fmt(fechaStr)}`;
+    document.getElementById('reservar-dia-hora-desde').value = '';
+    document.getElementById('reservar-dia-hora-hasta').value = '';
+    document.getElementById('modal-reservar-dia').classList.add('visible');
+}
+async function confirmarReservarDia() {
+    const horaInicio = document.getElementById('reservar-dia-hora-desde').value || null;
+    const horaFin = document.getElementById('reservar-dia-hora-hasta').value || null;
+    try {
+        const res = await fetch(`${API}/estacionamientos/solicitar`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ estacionamientoId: reservarDiaSpotId, email: emailActual, nombre: nombreActual, fecha: reservarDiaFecha, horaInicio, horaFin })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        cerrarModal('modal-reservar-dia');
+        toast('Estacionamiento reservado para ese día');
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function cancelarReservaDesdeGrid(id, label) {
+    if (!confirm(`¿Cancelar la reserva de ${label}?`)) return;
+    await cancelarReserva(id);
+}
+
 async function reservarAuto(spotId) {
     try {
         const res = await fetch(`${API}/estacionamientos/solicitar`, {
@@ -909,11 +965,17 @@ function buildGridEstacionamiento() {
             estado = 'reservado'; label = aprobada.solicitanteNombre || aprobada.solicitanteEmail;
             if (aprobada.horaInicio) horaIni = parseInt(aprobada.horaInicio,10);
             if (aprobada.horaFin) horaFin = parseInt(aprobada.horaFin,10)+1;
+            if (aprobada.solicitanteEmail === emailActual || spot.duenoEmail === emailActual || ADMINISTRADORES.includes(emailActual)) {
+                accion = () => cancelarReservaDesdeGrid(aprobada.id, label);
+            }
         } else if (explicita) {
             if (explicita.reservadoPor) {
                 estado = 'reservado'; label = explicita.reservadoPorNombre || explicita.reservadoPor;
+                if (explicita.reservadoPor === emailActual || spot.duenoEmail === emailActual || ADMINISTRADORES.includes(emailActual)) {
+                    accion = () => cancelarReservaDesdeGrid(explicita.id, label);
+                }
             } else {
-                estado = 'libre'; label = 'Disponible'; accion = () => abrirReservar(explicita.id, explicita.fechaInicio, explicita.fechaFin);
+                estado = 'libre'; label = 'Disponible'; accion = () => abrirReservarDia(spot.id, fechaStr);
             }
             if (explicita.horaInicio) horaIni = parseInt(explicita.horaInicio,10);
             if (explicita.horaFin) horaFin = parseInt(explicita.horaFin,10)+1;
@@ -1091,7 +1153,7 @@ function renderAprobaciones() {
     if (!pendientes.length) { cont.innerHTML = `<div class="empty">No hay rutas pendientes de aprobación.</div>`; return; }
     cont.innerHTML = pendientes.map(p => `
         <div class="excepcion-item" style="align-items:flex-start;flex-direction:column;gap:8px;">
-            <div><b>${p.email}</b> — ${new Date(p.creadoEn).toLocaleDateString('es-CL')}</div>
+            <div><b>${p.nombre || p.email}</b> ${p.nombre ? `<span style="color:var(--txt-dim);">(${p.email})</span>` : ''} — ${new Date(p.creadoEn).toLocaleDateString('es-CL')}</div>
             <div style="font-size:0.78rem;color:var(--txt-mid);">${resumenPatronTexto(p)}</div>
             <div style="display:flex;gap:8px;">
                 <button class="btn btn-primary btn-sm" onclick="responderPropuesta('${p.id}', true)">✅ Aprobar</button>
@@ -1112,14 +1174,28 @@ async function responderPropuesta(id, aprobar) {
     } catch(e) { toast('Error: ' + e.message); }
 }
 
-async function avisarAprobadoresNuevaPropuesta() {
+async function avisarAprobadoresNuevaPropuesta(resumen, propuestaId) {
     const token = await getTokenCorreo();
     if (!token) return; // silencioso — la propuesta ya quedó guardada igual
     try {
+        const base = window.location.origin + '/';
+        const linkAprobar  = `${base}ruta-responder.html?id=${encodeURIComponent(propuestaId)}&decision=aprobar`;
+        const linkRechazar = `${base}ruta-responder.html?id=${encodeURIComponent(propuestaId)}&decision=rechazar`;
         const html = `
             <div style="font-family:Arial,sans-serif;color:#1C1A18;">
-                <p><b>${nombreActual}</b> (${emailActual}) propuso una nueva ruta semanal, pendiente de tu aprobación.</p>
-                <p style="margin-top:10px;">Entra al módulo de Rutas / Estacionamientos, pestaña "Teletrabajo / Rutas" → "Mi ruta", para revisarla y aprobarla o rechazarla.</p>
+                <p><b>${nombreActual}</b> (${emailActual}) propuso una nueva ruta semanal:</p>
+                <p style="background:#F8F6F3;border-radius:8px;padding:10px 14px;font-size:0.9rem;">${resumen}</p>
+                <table cellpadding="0" cellspacing="0" style="margin:20px 0;">
+                    <tr>
+                        <td style="padding-right:10px;">
+                            <a href="${linkAprobar}" style="background:#1a7a4a;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold;display:inline-block;">✅ Aprobar</a>
+                        </td>
+                        <td>
+                            <a href="${linkRechazar}" style="background:#C0392B;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold;display:inline-block;">✕ Rechazar</a>
+                        </td>
+                    </tr>
+                </table>
+                <p style="font-size:0.85rem;color:#6B6762;">Si los botones no funcionan, entra al módulo de Rutas / Estacionamientos, pestaña "Teletrabajo / Rutas" → "Mi ruta", y respóndela ahí directamente.</p>
             </div>`;
         await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
             method: 'POST',
@@ -1150,7 +1226,7 @@ async function guardarPatron() {
     try {
         const res = await fetch(`${API}/teletrabajo/proponer`, {
             method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ email: emailActual, teletrabajoDia, visitaObra: visitaObraArr, otros: otrosArr })
+            body: JSON.stringify({ email: emailActual, nombre: nombreActual, teletrabajoDia, visitaObra: visitaObraArr, otros: otrosArr })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Error al guardar');
@@ -1159,7 +1235,7 @@ async function guardarPatron() {
             toast('Patrón guardado');
         } else {
             toast('Ruta enviada — queda pendiente de aprobación de jefatura');
-            avisarAprobadoresNuevaPropuesta();
+            avisarAprobadoresNuevaPropuesta(resumenPatronTexto({ teletrabajoDia, visitaObra: visitaObraArr, otros: otrosArr }), data.id);
         }
         await cargarPropuestas();
         renderSemana();
