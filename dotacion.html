@@ -599,6 +599,20 @@
     <div id="sugerenciasList"></div>
   </div>
 
+  <div class="section-title">
+    Proyectados que podrían ser una persona real
+    <span class="n" id="reemplazoProyectadoCount">0</span>
+  </div>
+  <div class="ingreso-card" style="margin-bottom:20px;">
+    <div style="font-size:12px;color:var(--steel);margin-bottom:10px;">
+      Estas son personas <b>proyectadas</b> (agregadas a mano, sin nombre real todavía) que
+      comparten cargo y centro de gestión con alguien que SÍ está marcando asistencia real,
+      pero que todavía no está en la dotación. Probablemente sean la misma persona —
+      revisa y reemplaza si corresponde.
+    </div>
+    <div id="reemplazoProyectadoList"></div>
+  </div>
+
   <div class="section-title">Agregar personal proyectado</div>
   <div class="ingreso-card">
     <div class="ingreso-grid" style="grid-template-columns:repeat(7,1fr);gap:12px;margin-bottom:12px;">
@@ -2405,6 +2419,79 @@ function pendingSugerencias(){
   return ASISTENCIA_NUEVOS.filter(a => !existing.has(`${a.rutlimpio}#${a.cc}#${(a.role||'').toLowerCase().trim()}`));
 }
 
+// Cruza los "proyectados" (agregados a mano, sin nombre real) contra las
+// personas que sí marcan asistencia real pero no están en la dotación —
+// si comparten cargo + centro de gestión, probablemente sean la misma
+// persona esperando a que alguien haga el reemplazo.
+function sugerenciasReemplazoProyectado(){
+  const pendientesAsis = pendingSugerencias();
+  const proyectados = workers.filter(w => esProyectado(w));
+  const matches = [];
+  proyectados.forEach(p => {
+    const candidato = pendientesAsis.find(a =>
+      a.cc === p.cc && (a.role||'').toLowerCase().trim() === (p.role||'').toLowerCase().trim()
+      && !reemplazosDescartados.has(`${p.id}__${a.rutlimpio}`)
+    );
+    if(candidato) matches.push({ proyectado: p, asistencia: candidato });
+  });
+  return matches;
+}
+
+function renderReemplazoProyectado(){
+  const cont = document.getElementById('reemplazoProyectadoList');
+  const countEl = document.getElementById('reemplazoProyectadoCount');
+  if(!cont) return;
+  const matches = sugerenciasReemplazoProyectado();
+  if(countEl) countEl.textContent = matches.length;
+  if(!matches.length){ cont.innerHTML = `<div class="empty">No hay coincidencias pendientes por ahora.</div>`; return; }
+  cont.innerHTML = matches.map((m,i) => {
+    const costoRef = (() => {
+      const found = COSTOS.find(c => c.cc === m.proyectado.cc && (c.role||'').toLowerCase().trim() === (m.proyectado.role||'').toLowerCase().trim());
+      return found ? Math.round(Number(found.amt)) : '';
+    })();
+    return `
+    <div style="border:1px solid var(--line,#ddd);border-radius:8px;padding:10px 14px;margin-bottom:10px;">
+      <div style="font-size:13px;margin-bottom:6px;">
+        Proyectado <b>${m.proyectado.role}</b> (${m.proyectado.cc}) podría ser <b>${m.asistencia.name}</b> — marca asistencia real desde ${m.asistencia.primera_fecha}.
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <label style="font-size:12px;color:var(--steel);">Costo empresa:</label>
+        <input type="number" id="reemplazo-costo-${i}" value="${costoRef}" placeholder="Según cargo" style="width:140px;padding:5px 8px;">
+        <button class="btn btn-primary btn-sm" onclick="confirmarReemplazoProyectado(${i})">Reemplazar</button>
+        <button class="btn btn-ghost btn-sm" onclick="descartarReemplazoProyectado(${i})">No es la misma persona</button>
+      </div>
+    </div>`;
+  }).join('');
+  cont.dataset.matches = JSON.stringify(matches.map(m => ({ proyectadoId: m.proyectado.id, asistenciaKey: `${m.asistencia.rutlimpio}#${m.asistencia.cc}#${m.asistencia.role}` })));
+}
+
+function confirmarReemplazoProyectado(i){
+  const matches = sugerenciasReemplazoProyectado();
+  const m = matches[i];
+  if(!m) return;
+  const inputCosto = document.getElementById(`reemplazo-costo-${i}`);
+  const costoManual = inputCosto && inputCosto.value !== '' && Number.isFinite(Number(inputCosto.value)) ? Math.round(Number(inputCosto.value)) : null;
+  if(!confirm(`¿Reemplazar el proyectado "${m.proyectado.role} (${m.proyectado.cc})" por ${m.asistencia.name}?`)) return;
+  workers = workers.filter(w => w.id !== m.proyectado.id);
+  const id = `${m.asistencia.rutlimpio}#${m.asistencia.cc}#${m.asistencia.role}`;
+  workers.push({
+    id, rutlimpio: m.asistencia.rutlimpio, cc: m.asistencia.cc, role: m.asistencia.role, name: m.asistencia.name,
+    rut: m.asistencia.rutlimpio, fc: m.asistencia.primera_fecha, status: 'activo', fs: null, motivo: null,
+    source: 'ingreso', costoManual
+  });
+  renderCCChips(); renderCargoFiltro(); renderRoster(); renderSugerencias(); renderReemplazoProyectado(); renderExportPreview();
+  toast(`${m.asistencia.name} agregado en reemplazo del proyectado — no olvides Guardar cambios`);
+}
+
+let reemplazosDescartados = new Set();
+function descartarReemplazoProyectado(i){
+  const matches = sugerenciasReemplazoProyectado();
+  const m = matches[i];
+  if(!m) return;
+  reemplazosDescartados.add(`${m.proyectado.id}__${m.asistencia.rutlimpio}`);
+  renderReemplazoProyectado();
+}
+
 function mesLabel(mes){
   return MONTH_NAMES_BASE[mes-1] || `Mes ${mes}`;
 }
@@ -2754,6 +2841,7 @@ function renderAll(){
   renderFechaSalidaFiltro();
   renderRoster();
   renderSugerencias();
+  renderReemplazoProyectado();
   renderExportPreview();
 }
 
