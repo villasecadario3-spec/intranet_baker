@@ -527,6 +527,14 @@
       </select>
     </div>
     <div class="field">
+      <label for="obraFiltro">Obra</label>
+      <select id="obraFiltro">
+        <option value="">Todas</option>
+        <option value="CG019">Mirador El Pino</option>
+        <option value="CG027">Mirador El Pino Urbanización</option>
+      </select>
+    </div>
+    <div class="field">
       <label for="motivoFiltro">Motivo de salida</label>
       <select id="motivoFiltro">
         <option value="">Todos</option>
@@ -1491,6 +1499,7 @@ let periodoFiltro = '';
 let cargoFiltro = '';
 let estadoOrigenFiltro = '';
 let motivoFiltro = '';
+let obraFiltro = '';
 let fechaSalidaDesdeFiltro = '';
 let fechaSalidaHastaFiltro = '';
 const CARGOS_LIST = ["Administrador de Obra","Administrativo RRHH","Albañil","Andamiero","Asistente Prevencionista de Riesgo","Asistente de Bodega","Asistente de Calidad","Asistente de Oficina Técnica","Asistente de Terreno","Ayudante Albañil","Ayudante de Trazador","Ayudante de Urbanización","Carpintero","Encargado de Calidad","Encargado de Mantención","Encargado de Oficina Técnica","Jefe General de terreno de Urbanización","Jefe de Bodega","Jefe de Terreno","Jornal","Jornal Canguero","Maestro Multifuncional","Maestro Urbanización","Operador de Maquinaria","Pañolero","Prevencionista de Riesgo","Supervisor","Supervisor de urbanización","Topógrafo","Trazador"];
@@ -1712,6 +1721,13 @@ function renderMotivoFiltro(){
   if(!sel) return;
   sel.value = motivoFiltro;
   sel.onchange = () => { motivoFiltro = sel.value; renderRoster(); };
+}
+
+function renderObraFiltro(){
+  const sel = document.getElementById('obraFiltro');
+  if(!sel) return;
+  sel.value = obraFiltro;
+  sel.onchange = () => { obraFiltro = sel.value; renderRoster(); };
 }
 
 function renderFechaSalidaFiltro(){
@@ -2115,6 +2131,7 @@ function renderRoster(){
     && (periodoFiltro==='' || vigenteDesdeMes(w, parseInt(periodoFiltro,10)))
     && (estadoOrigenFiltro==='' || (estadoOrigenFiltro==='vigente' ? esVigente(w) : esProyectado(w)))
     && (motivoFiltro==='' || w.motivo===motivoFiltro)
+    && (obraFiltro==='' || w.cc.startsWith(obraFiltro))
     && (fechaSalidaDesdeFiltro==='' || (w.fs && w.fs>=fechaSalidaDesdeFiltro))
     && (fechaSalidaHastaFiltro==='' || (w.fs && w.fs<=fechaSalidaHastaFiltro)));
   list = list.slice().sort((a,b)=> (isDeparted(a))-(isDeparted(b)) || a.name.localeCompare(b.name));
@@ -2883,6 +2900,7 @@ function renderAll(){
   renderCargoFiltro();
   renderEstadoOrigenFiltro();
   renderMotivoFiltro();
+  renderObraFiltro();
   renderFechaSalidaFiltro();
   renderRoster();
   renderSugerencias();
