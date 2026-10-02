@@ -173,6 +173,9 @@ input[type=file] { display: none; }
     <button class="tab-btn" id="tabBtnDS19" onclick="cambiarTab('ds19')" style="padding:12px 22px;font-family:inherit;font-size:0.86rem;font-weight:600;background:transparent;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;color:var(--ink2);">
       Formulario DS19
     </button>
+    <button class="tab-btn" id="tabBtnCortar" onclick="cambiarTab('cortar')" style="padding:12px 22px;font-family:inherit;font-size:0.86rem;font-weight:600;background:transparent;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;color:var(--ink2);">
+      Cortar Escrituras
+    </button>
   </div>
 
   <div id="panelCartas">
@@ -329,6 +332,24 @@ input[type=file] { display: none; }
       <div id="ds19-lotes"></div>
     </div>
   </div><!-- /panelDS19 -->
+
+  <div id="panelCortar" style="display:none;">
+    <div style="font-size:0.84rem;color:var(--ink2);margin-bottom:14px;">
+      Sube varias escrituras de una vez — a cada una se le detecta automáticamente dónde terminan las firmas de todos los otorgantes, y se corta ahí (descartando reversos en blanco, timbres, etc. que SERVIU no necesita).
+    </div>
+    <div class="dropzone" id="cortar-dropzone" onclick="document.getElementById('cortar-file-input').click()">
+      <input type="file" id="cortar-file-input" accept=".pdf" multiple onchange="cortarMostrarSeleccion()">
+      <div class="dropzone-icon">✂️</div>
+      <div class="dropzone-title">Haz clic para seleccionar varias escrituras en PDF</div>
+      <div class="dropzone-sub" id="cortar-archivos-elegidos">Ningún archivo seleccionado todavía</div>
+    </div>
+    <button class="btn btn-primary" onclick="cortarSubirLote()" style="margin-bottom:20px;">Subir y cortar</button>
+
+    <div id="cortar-progreso" style="color:var(--ink);"></div>
+    <div id="cortar-descarga" style="display:none;margin-top:16px;">
+      <button class="btn btn-primary" onclick="cortarDescargarZip()">📦 Descargar escrituras cortadas (ZIP)</button>
+    </div>
+  </div><!-- /panelCortar -->
 
 </div>
 
@@ -729,13 +750,16 @@ function cambiarTab(tab) {
   document.getElementById('panelCartas').style.display = tab === 'cartas' ? 'block' : 'none';
   document.getElementById('panelConciliacion').style.display = tab === 'conciliacion' ? 'block' : 'none';
   document.getElementById('panelDS19').style.display = tab === 'ds19' ? 'block' : 'none';
-  const btnC = document.getElementById('tabBtnCartas'), btnE = document.getElementById('tabBtnConciliacion'), btnD = document.getElementById('tabBtnDS19');
+  document.getElementById('panelCortar').style.display = tab === 'cortar' ? 'block' : 'none';
+  const btnC = document.getElementById('tabBtnCartas'), btnE = document.getElementById('tabBtnConciliacion'), btnD = document.getElementById('tabBtnDS19'), btnK = document.getElementById('tabBtnCortar');
   btnC.style.color = tab === 'cartas' ? 'var(--cyan)' : 'var(--ink2)';
   btnC.style.borderBottomColor = tab === 'cartas' ? 'var(--cyan)' : 'transparent';
   btnE.style.color = tab === 'conciliacion' ? 'var(--cyan)' : 'var(--ink2)';
   btnE.style.borderBottomColor = tab === 'conciliacion' ? 'var(--cyan)' : 'transparent';
   btnD.style.color = tab === 'ds19' ? 'var(--cyan)' : 'var(--ink2)';
   btnD.style.borderBottomColor = tab === 'ds19' ? 'var(--cyan)' : 'transparent';
+  btnK.style.color = tab === 'cortar' ? 'var(--cyan)' : 'var(--ink2)';
+  btnK.style.borderBottomColor = tab === 'cortar' ? 'var(--cyan)' : 'transparent';
 }
 
 // ── CONCILIACIÓN ENERGÉTICO ──────────────────────────────────
@@ -1229,6 +1253,84 @@ async function ds19GenerarWordLote(li) {
   } catch(e) {
     toast('Error al generar el formulario: ' + e.message, true);
   }
+}
+
+// ── RECORTE MASIVO DE ESCRITURAS (hasta las firmas) ──────────────
+let cortarJobId = null;
+
+function cortarLeerArchivoBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function cortarMostrarSeleccion() {
+  const input = document.getElementById('cortar-file-input');
+  const span = document.getElementById('cortar-archivos-elegidos');
+  const archivos = Array.from(input.files || []);
+  span.textContent = archivos.length
+    ? `${archivos.length} archivo(s): ${archivos.map(f=>f.name).join(', ')}`
+    : 'Ningún archivo seleccionado todavía';
+}
+
+async function cortarSubirLote() {
+  const input = document.getElementById('cortar-file-input');
+  const archivos = Array.from(input.files || []);
+  if (!archivos.length) { toast('Selecciona al menos un PDF', true); return; }
+
+  const progreso = document.getElementById('cortar-progreso');
+  document.getElementById('cortar-descarga').style.display = 'none';
+  progreso.innerHTML = `⏳ Subiendo ${archivos.length} archivo(s)…`;
+
+  try {
+    const archivosB64 = await Promise.all(archivos.map(async f => ({
+      nombre: f.name, base64: await cortarLeerArchivoBase64(f)
+    })));
+    const res = await fetch(`${API_BASE}/recorte-escrituras/procesar`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ archivos: archivosB64 })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error al subir');
+    cortarJobId = data.jobId;
+    progreso.innerHTML = `⏳ Procesando ${archivos.length} escritura(s) — el OCR puede tardar varios minutos…`;
+    cortarEsperarResultado();
+  } catch(e) {
+    progreso.innerHTML = `❌ Error: ${e.message}`;
+  }
+}
+
+async function cortarEsperarResultado() {
+  const progreso = document.getElementById('cortar-progreso');
+  const maxIntentos = 80; // ~20 minutos tope
+  for (let i = 0; i < maxIntentos; i++) {
+    await new Promise(r => setTimeout(r, 15000));
+    try {
+      const res = await fetch(`${API_BASE}/recorte-escrituras/estado/${cortarJobId}`);
+      const data = await res.json();
+      if (data.estado === 'listo') {
+        const lineas = data.resultado.map(r => r.error
+          ? `❌ ${r.archivo} — error: ${r.error}`
+          : `✅ ${r.archivo} — ${r.paginas_originales} → ${r.paginas_finales} páginas${r.encontrado ? '' : ' (no se encontraron firmas, se dejó completa)'}`
+        );
+        progreso.innerHTML = lineas.join('<br>');
+        document.getElementById('cortar-descarga').style.display = 'block';
+        return;
+      } else if (data.estado === 'error') {
+        progreso.innerHTML = `❌ Error: ${data.error}`;
+        return;
+      }
+    } catch(e) { /* sigue esperando */ }
+  }
+  progreso.innerHTML = `⚠ Está tardando más de lo normal, revisa la consola del servidor`;
+}
+
+function cortarDescargarZip() {
+  if (!cortarJobId) return;
+  window.location.href = `${API_BASE}/recorte-escrituras/descargar/${cortarJobId}`;
 }
 
 // ── INIT ──────────────────────────────────────────────────────
