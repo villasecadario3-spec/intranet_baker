@@ -490,14 +490,13 @@
   </div>
 
   <div class="ingreso-card" style="margin-bottom:16px;">
-    <div style="font-weight:700;font-size:13px;margin-bottom:6px;">💲 Costos de referencia por cargo</div>
+    <div style="font-weight:700;font-size:13px;margin-bottom:6px;">📋 Carga masiva de personal proyectado</div>
     <p style="font-size:12px;color:var(--muted,#777);margin-bottom:10px;">
-      Se usan cuando una persona no tiene un costo real registrado en el Excel — sirve como respaldo para proyectar. Sube un CSV con columnas <b>cc,role,amt</b> (una fila por cargo+centro) para reemplazar la tabla completa.
+      Para agregar varias personas proyectadas de una vez, en vez de una por una. Sube un CSV con las mismas columnas que "Dotación Activa": <b>nombre,rut,cargo,cc,fecha_desde,fecha_hasta,costo_empresa</b> (costo_empresa es opcional — vacío si quieres que se calcule solo).
     </p>
-    <input type="file" id="costos-csv-input" accept=".csv" style="margin-bottom:8px;">
-    <button class="btn btn-primary btn-sm" onclick="subirCostosCSV()">Subir y reemplazar tabla</button>
-    <button class="btn btn-secondary btn-sm" onclick="toggleCostosTabla()">Ver tabla actual</button>
-    <div id="costos-tabla-wrap" style="display:none;max-height:280px;overflow-y:auto;margin-top:10px;"></div>
+    <input type="file" id="proyectados-csv-input" accept=".csv" style="margin-bottom:8px;">
+    <button class="btn btn-primary btn-sm" onclick="previsualizarProyectadosCSV()">Revisar archivo</button>
+    <div id="proyectados-csv-preview" style="margin-top:12px;"></div>
   </div>
 </div>
 
@@ -619,6 +618,32 @@
       revisa y reemplaza si corresponde.
     </div>
     <div id="reemplazoProyectadoList"></div>
+  </div>
+
+  <div class="section-title">
+    Descuentos por inasistencia
+    <span class="n" id="descCount">0</span>
+  </div>
+  <div class="ingreso-card" style="margin-bottom:20px;">
+    <div style="font-size:12px;color:var(--steel);margin-bottom:10px;">
+      Descuento genérico: no se asocia a una persona. Resta del costo liquidación
+      proyectado del centro y mes indicados. No afecta los meses ya cerrados.
+    </div>
+    <div class="ingreso-grid" style="grid-template-columns:1.3fr 1.3fr 1fr 1fr 1.4fr auto;gap:12px;margin-bottom:12px;">
+      <div class="field"><label for="dRole">Cargo</label>
+        <select id="dRole"><option value="">Selecciona un cargo…</option></select></div>
+      <div class="field"><label for="dCC">Centro de gestión</label>
+        <select id="dCC"><option value="">Selecciona un centro…</option></select></div>
+      <div class="field"><label for="dMes">Periodo</label>
+        <select id="dMes"></select></div>
+      <div class="field"><label for="dMonto">Monto a descontar</label>
+        <input type="number" id="dMonto" min="0" step="1000" placeholder="0"></div>
+      <div class="field"><label for="dNota">Nota (opcional)</label>
+        <input type="text" id="dNota" placeholder="Motivo o referencia"></div>
+      <div class="field" style="align-self:end;">
+        <button class="btn btn-primary btn-sm" id="addDescBtn">+ Agregar descuento</button></div>
+    </div>
+    <div id="descList"></div>
   </div>
 
   <div class="section-title">Agregar personal proyectado</div>
@@ -1223,7 +1248,7 @@ async function guardarEnServidor(showToast) {
     const res = await fetch(`${API}/dotacion`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workers, meta, email: usuarioActual ? usuarioActual.username.toLowerCase() : '' }),
+      body: JSON.stringify({ workers, meta, descuentos, email: usuarioActual ? usuarioActual.username.toLowerCase() : '' }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     if (showToast) toast('Cambios guardados en el servidor');
@@ -1547,6 +1572,10 @@ function finiquitoDetalle(w){
 }
 
 let workers = [];
+// Descuentos genéricos por inasistencia: no se asocian a una persona, solo a
+// cargo + centro + periodo. Restan del costo liquidación proyectado. No
+// tocan dotación ni finiquito.
+let descuentos = []; // { id, cc, role, mes (idx 0-based), monto, nota }
 let meta = { ultimoMesReal: 7 }; // 1-12
 let activeCC = 'todos';
 let periodoFiltro = '';
@@ -1629,6 +1658,7 @@ async function loadState(){
   if(guardado && Array.isArray(guardado.workers) && guardado.workers.length){
     workers = guardado.workers;
     meta = guardado.meta || meta;
+    descuentos = Array.isArray(guardado.descuentos) ? guardado.descuentos : [];
   } else {
     // Primera vez que corre en el servidor — siembra con lo que traía este
     // archivo (ya filtrado a Mirador El Pino) y lo sube.
@@ -1643,7 +1673,7 @@ async function persist(showToast){
 }
 
 function downloadBackupJSON(){
-  const payload = JSON.stringify({ workers, meta, exportedAt: new Date().toISOString() }, null, 2);
+  const payload = JSON.stringify({ workers, meta, descuentos, exportedAt: new Date().toISOString() }, null, 2);
   const blob = new Blob([payload], { type:'application/json;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1670,6 +1700,7 @@ function handleBackupFile(e){
       if(!parsed || !Array.isArray(parsed.workers)) throw new Error('el archivo no tiene el formato esperado');
       workers = parsed.workers;
       meta = parsed.meta || meta;
+      descuentos = Array.isArray(parsed.descuentos) ? parsed.descuentos : [];
       renderMesRealSelect();
       renderAll();
       persist(false);
@@ -1696,7 +1727,7 @@ function renderMesRealSelect(){
   const sel = document.getElementById('mesReal');
   sel.innerHTML = PERIOD_LABELS.map((n,i)=>`<option value="${i+1}">${n}</option>`).join('');
   sel.value = meta.ultimoMesReal;
-  sel.onchange = () => { meta.ultimoMesReal = parseInt(sel.value,10); renderAll(); persist(false); };
+  sel.onchange = () => { meta.ultimoMesReal = parseInt(sel.value,10); renderDescuentoForm(); renderAll(); persist(false); };
 }
 
 function renderCCChips(){
@@ -1705,7 +1736,7 @@ function renderCCChips(){
   const all = ['todos', ...ccs];
   wrap.innerHTML = all.map(cc => `<div class="chip ${cc===activeCC?'active':''}" data-cc="${cc}">${cc==='todos'?'Todos':cc}</div>`).join('');
   wrap.querySelectorAll('.chip').forEach(chip=>{
-    chip.onclick = () => { activeCC = chip.dataset.cc; renderRoster(); renderCCChips(); };
+    chip.onclick = () => { activeCC = chip.dataset.cc; renderRoster(); renderCCChips(); renderDescuentos(); };
   });
 }
 
@@ -1781,7 +1812,7 @@ function renderObraFiltro(){
   const sel = document.getElementById('obraFiltro');
   if(!sel) return;
   sel.value = obraFiltro;
-  sel.onchange = () => { obraFiltro = sel.value; renderRoster(); };
+  sel.onchange = () => { obraFiltro = sel.value; renderRoster(); renderDescuentos(); };
 }
 
 function renderFechaSalidaFiltro(){
@@ -1929,6 +1960,20 @@ function computeMonthlyBreakdown(){
     }
   });
 
+  // Descuentos genéricos por inasistencia — restan del costo liquidación
+  // proyectado del centro+mes indicado. Solo aplica a meses aún proyectados
+  // (en los ya cerrados manda el agregado real), y solo a centros dentro del
+  // alcance actual (respeta el filtro de Obra, vía costoMensualByCC existente).
+  descuentos.forEach(d => {
+    const idx = Number(d.mes);
+    if(!costoMensualByCC[d.cc]) return;                             // centro inexistente o filtrado por Obra
+    if(!Number.isFinite(idx) || idx < 0 || idx >= HORIZON) return;  // fuera de rango
+    if((idx + 1) <= meta.ultimoMesReal) return;                     // mes cerrado: manda el real
+    const monto = Number(d.monto);
+    if(!Number.isFinite(monto) || monto <= 0) return;               // monto inválido
+    costoMensualByCC[d.cc][idx] -= monto;
+  });
+
   const totals = { costoMensual: new Array(HORIZON).fill(0), finiquitos: new Array(HORIZON).fill(0), dotacion: new Array(HORIZON).fill(0), vigentes: new Array(HORIZON).fill(0), proyectados: new Array(HORIZON).fill(0) };
   ccs.forEach(cc=>{
     for(let m=0;m<HORIZON;m++){
@@ -1941,6 +1986,103 @@ function computeMonthlyBreakdown(){
   });
 
   return { ccs, costoMensualByCC, finiquitosByCC, dotacionByCC, vigentesByCC, proyectadosByCC, totals };
+}
+
+// ── Descuentos por inasistencia: formulario, lista, alta y baja ─────
+function renderDescuentoForm(){
+  const rs = document.getElementById('dRole');
+  const cs = document.getElementById('dCC');
+  const ms = document.getElementById('dMes');
+  if(!rs || !cs || !ms) return;
+
+  rs.innerHTML = '<option value="">Selecciona un cargo…</option>' +
+    CARGOS_LIST.map(r=>`<option value="${r}">${r}</option>`).join('');
+
+  cs.innerHTML = '<option value="">Selecciona un centro…</option>' +
+    PP_LIST.slice().sort((a,b)=>a.cc.localeCompare(b.cc))
+      .map(p=>`<option value="${p.cc}">${p.cc} — ${p.cuenta}</option>`).join('');
+
+  // Solo meses proyectados: en los cerrados manda el agregado real
+  const opts = [];
+  for(let i=meta.ultimoMesReal; i<HORIZON; i++)
+    opts.push(`<option value="${i}">${PERIOD_LABELS[i]}</option>`);
+  ms.innerHTML = opts.join('');
+}
+
+// Respeta el filtro de Obra activo, igual que el resto de las tablas de resumen.
+function enObra(cc){
+  return obraFiltro==='' || cc.startsWith(obraFiltro);
+}
+
+function renderDescuentos(){
+  const cnt  = document.getElementById('descCount');
+  const list = document.getElementById('descList');
+  if(!cnt || !list) return;
+
+  const visibles = descuentos.filter(d => enObra(d.cc) && (activeCC === 'todos' || d.cc === activeCC));
+  cnt.textContent = visibles.length;
+
+  if(!visibles.length){
+    list.innerHTML = `<div class="empty">${descuentos.length
+      ? 'Sin descuentos en este centro — cambia el filtro para ver los demás.'
+      : 'Sin descuentos registrados.'}</div>`;
+    return;
+  }
+
+  const orden = visibles.slice().sort((a,b)=> a.mes - b.mes || a.cc.localeCompare(b.cc));
+  list.innerHTML = orden.map(d => `
+<div class="sugerencia-row" style="grid-template-columns:1.4fr 1.1fr 1fr 1.2fr 1.4fr 96px;">
+<div style="font-weight:600;">${d.role}</div>
+<div class="cc" style="font-size:12px;color:var(--steel);">${d.cc}</div>
+<div style="font-size:12px;">${PERIOD_LABELS[d.mes] || ''}</div>
+<div style="font-weight:600;color:var(--red);">− ${formatCLP(d.monto)}</div>
+<div style="font-size:11px;color:var(--steel);font-style:italic;">${d.nota || ''}</div>
+<div><button class="btn btn-ghost btn-sm" data-del-desc="${d.id}"
+             style="border-color:var(--red);color:var(--red);">Eliminar</button></div>
+</div>`).join('');
+
+  list.querySelectorAll('[data-del-desc]').forEach(btn=>{
+    btn.onclick = () => eliminarDescuento(btn.dataset.delDesc);
+  });
+}
+
+function addDescuento(){
+  const role  = document.getElementById('dRole').value;
+  const cc    = document.getElementById('dCC').value;
+  const mes   = document.getElementById('dMes').value;
+  const monto = Number(document.getElementById('dMonto').value);
+  const nota  = (document.getElementById('dNota').value || '').trim();
+
+  if(!role){ toast('Selecciona un cargo'); return; }
+  if(!cc){ toast('Selecciona un centro de gestión'); return; }
+  if(mes === '' || mes === null){ toast('Selecciona un periodo'); return; }
+  if(!Number.isFinite(monto) || monto <= 0){ toast('Ingresa un monto mayor que cero'); return; }
+
+  const idx = Number(mes);
+  if((idx + 1) <= meta.ultimoMesReal){
+    toast('Ese mes ya tiene costo real cargado — elige un mes proyectado');
+    return;
+  }
+
+  descuentos.push({
+    id: 'd' + Date.now() + Math.random().toString(36).slice(2,6),
+    cc, role, mes: idx, monto: Math.round(monto), nota
+  });
+
+  ['dMonto','dNota'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  renderAll();
+  persist(false);
+  toast(`Descuento de ${formatCLP(monto)} aplicado a ${cc} en ${PERIOD_LABELS[idx]}`);
+}
+
+function eliminarDescuento(id){
+  const d = descuentos.find(x => x.id === id);
+  if(!d) return;
+  if(!confirm(`¿Eliminar el descuento de ${formatCLP(d.monto)} en ${d.cc} · ${PERIOD_LABELS[d.mes]}?`)) return;
+  descuentos = descuentos.filter(x => x.id !== id);
+  renderAll();
+  persist(false);
+  toast('Descuento eliminado');
 }
 
 function renderMonthlyTable(title, ccs, dataByCC, totalsRow, formatter){
@@ -2199,7 +2341,9 @@ function renderResumenWidget(){
   const el = document.getElementById('resumenCard');
   if(!el) return;
   const b = computeMonthlyBreakdown();
-  const startIdx = meta.ultimoMesReal; // 0-indexed position of the month right after ultimoMesReal
+  // Si hay un filtro "Vigentes desde" activo, la tabla arranca ahí en vez de
+  // en el primer mes proyectado — nunca antes del mes que ya era el inicio.
+  const startIdx = periodoFiltro!=='' ? Math.max(meta.ultimoMesReal, parseInt(periodoFiltro,10)) : meta.ultimoMesReal;
   const dotacionTable = renderDotacionTable(b.ccs, b, startIdx);
   el.innerHTML = renderCostoProyectadoTable(b.ccs, b, startIdx) + dotacionTable;
   attachToggleSubListeners();
@@ -3013,6 +3157,7 @@ function downloadCSV(){
 
 function renderAll(){
   renderLegend();
+  renderDescuentos();
   renderCCChips();
   renderPeriodoFiltro();
   renderCargoFiltro();
@@ -3052,6 +3197,89 @@ function renderCostosTabla() {
       <thead><tr style="background:var(--gris-1,#f0f0f0);"><th style="padding:5px 8px;text-align:left;">Centro</th><th style="padding:5px 8px;text-align:left;">Cargo</th><th style="padding:5px 8px;text-align:right;">Monto</th></tr></thead>
       <tbody>${COSTOS.map(c => `<tr><td style="padding:4px 8px;border-top:1px solid #eee;">${c.cc}</td><td style="padding:4px 8px;border-top:1px solid #eee;">${c.role}</td><td style="padding:4px 8px;border-top:1px solid #eee;text-align:right;">${formatCLP(c.amt)}</td></tr>`).join('')}</tbody>
     </table>`;
+}
+
+// ── Carga masiva de personal proyectado ──────────────────────────
+function parseProyectadosCSV(texto) {
+  const lineas = texto.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (!lineas.length) return { filas: [], errores: [] };
+  const header = lineas[0].toLowerCase();
+  const empiezaEnHeader = header.includes('rut') && header.includes('nombre');
+  const dataLineas = empiezaEnHeader ? lineas.slice(1) : lineas;
+  const filas = [];
+  const errores = [];
+  const rutsEnEsteArchivo = new Set();
+
+  dataLineas.forEach((linea, i) => {
+    const numFila = i + (empiezaEnHeader ? 2 : 1);
+    const partes = linea.split(',').map(s => s.trim());
+    const [nombre, rut, cargo, cc, desde, hasta, costoTxt] = partes;
+
+    if (!nombre) { errores.push(`Fila ${numFila}: falta el nombre`); return; }
+    if (!rut || !isValidRutLimpio(rut)) { errores.push(`Fila ${numFila}: RUT inválido ("${rut||''}") — 8-9 dígitos sin puntos ni guión`); return; }
+    if (!cargo) { errores.push(`Fila ${numFila}: falta el cargo`); return; }
+    if (!cc) { errores.push(`Fila ${numFila}: falta el centro de gestión`); return; }
+    if (!desde || !/^\d{4}-\d{2}-\d{2}$/.test(desde)) { errores.push(`Fila ${numFila}: fecha_desde inválida ("${desde||''}") — formato AAAA-MM-DD`); return; }
+    if (!hasta || !/^\d{4}-\d{2}-\d{2}$/.test(hasta)) { errores.push(`Fila ${numFila}: fecha_hasta inválida ("${hasta||''}") — formato AAAA-MM-DD`); return; }
+    if (desde > hasta) { errores.push(`Fila ${numFila}: fecha_desde es posterior a fecha_hasta`); return; }
+
+    const rutlimpio = rut.toUpperCase();
+    const yaEnDotacion = workers.filter(w => w.rutlimpio === rutlimpio);
+    if (yaEnDotacion.length > 0) { errores.push(`Fila ${numFila}: el RUT ${rutlimpio} ya está en la dotación como ${yaEnDotacion.map(w=>w.role+' ('+w.cc+')').join(', ')}`); return; }
+    const claveFila = `${rutlimpio}#${cc}#${cargo}`;
+    if (rutsEnEsteArchivo.has(claveFila)) { errores.push(`Fila ${numFila}: RUT ${rutlimpio} repetido en el mismo archivo para ese cargo+centro`); return; }
+    rutsEnEsteArchivo.add(claveFila);
+
+    const costoManual = costoTxt && Number.isFinite(Number(costoTxt)) ? Math.round(Number(costoTxt)) : null;
+    filas.push({
+      id: claveFila, rutlimpio, cc, role: cargo, name: nombre, rut: rutlimpio,
+      fc: desde, status: 'finiquitado', fs: hasta, motivo: 'vencimiento_plazo', source: 'proyectado', costoManual
+    });
+  });
+
+  return { filas, errores };
+}
+
+let proyectadosCSVPendientes = [];
+
+async function previsualizarProyectadosCSV() {
+  const input = document.getElementById('proyectados-csv-input');
+  const archivo = input.files[0];
+  if (!archivo) { toast('Selecciona un archivo CSV primero'); return; }
+  const texto = await archivo.text();
+  const { filas, errores } = parseProyectadosCSV(texto);
+  proyectadosCSVPendientes = filas;
+  const cont = document.getElementById('proyectados-csv-preview');
+
+  let html = '';
+  if (errores.length) {
+    html += `<div style="background:#FFF4F4;border:1px solid var(--red,#c00);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;">
+      <b>${errores.length} fila(s) con problemas (no se van a cargar):</b>
+      <div style="margin-top:6px;max-height:160px;overflow-y:auto;">${errores.map(e=>`<div>${e}</div>`).join('')}</div>
+    </div>`;
+  }
+  if (filas.length) {
+    html += `<div style="font-size:12px;color:var(--steel);margin-bottom:8px;"><b>${filas.length} persona(s) listas para agregar:</b></div>
+      <table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:10px;">
+        <thead><tr style="background:var(--gris-1,#f0f0f0);"><th style="padding:4px 6px;text-align:left;">Nombre</th><th style="padding:4px 6px;text-align:left;">Cargo</th><th style="padding:4px 6px;text-align:left;">Centro</th><th style="padding:4px 6px;text-align:left;">Desde</th><th style="padding:4px 6px;text-align:left;">Hasta</th><th style="padding:4px 6px;text-align:right;">Costo</th></tr></thead>
+        <tbody>${filas.map(f => `<tr><td style="padding:3px 6px;border-top:1px solid #eee;">${f.name}</td><td style="padding:3px 6px;border-top:1px solid #eee;">${f.role}</td><td style="padding:3px 6px;border-top:1px solid #eee;">${f.cc}</td><td style="padding:3px 6px;border-top:1px solid #eee;">${f.fc}</td><td style="padding:3px 6px;border-top:1px solid #eee;">${f.fs}</td><td style="padding:3px 6px;border-top:1px solid #eee;text-align:right;">${f.costoManual!=null?formatCLP(f.costoManual):'(automático)'}</td></tr>`).join('')}</tbody>
+      </table>
+      <button class="btn btn-primary btn-sm" onclick="confirmarCargaProyectadosCSV()">Agregar estas ${filas.length} personas</button>`;
+  } else if (!errores.length) {
+    html += `<div style="font-size:12px;color:var(--muted,#777);">El archivo no tiene filas válidas.</div>`;
+  }
+  cont.innerHTML = html;
+}
+
+function confirmarCargaProyectadosCSV() {
+  if (!proyectadosCSVPendientes.length) return;
+  if (!confirm(`¿Agregar ${proyectadosCSVPendientes.length} persona(s) proyectada(s) a la dotación?`)) return;
+  proyectadosCSVPendientes.forEach(f => workers.push(f));
+  proyectadosCSVPendientes = [];
+  document.getElementById('proyectados-csv-preview').innerHTML = '';
+  document.getElementById('proyectados-csv-input').value = '';
+  renderCCChips(); renderCargoFiltro(); renderRoster(); renderReemplazoProyectado(); renderExportPreview();
+  toast('Personas agregadas — no olvides Guardar cambios');
 }
 
 function parseCostosCSV(texto) {
@@ -3121,10 +3349,12 @@ async function init(){
   await cargarCostosDotacion();
   await loadState();
   renderMesRealSelect();
+  renderDescuentoForm();
   populateProyectadoDropdowns();
   renderAll();
   document.getElementById('storageModeNote').textContent = storageModeLabel();
 
+  document.getElementById('addDescBtn').addEventListener('click', addDescuento);
   document.getElementById('searchBox').addEventListener('input', renderRoster);
   document.getElementById('saveBtn').addEventListener('click', () => persist(true));
   document.getElementById('exportBtn').addEventListener('click', downloadCSV);
