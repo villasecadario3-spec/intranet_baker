@@ -2446,10 +2446,11 @@ function renderRoster(){
       <div style="font-size:11px;color:var(--steel);display:flex;flex-direction:column;gap:3px;align-items:center;justify-content:center;text-align:center;height:100%;">
         ${hasEnd ? `<button class="btn btn-ghost" data-action="editar-salida" style="padding:1px 4px;font-size:9.5px;line-height:1.4;min-width:0;">Editar</button>` : '—'}
         ${(() => {
-          if(!departed) return '';
+          if(!departed && !projected) return '';
           const reemplazo = buscarReemplazoSugerido(w);
           if(!reemplazo) return '';
-          const msg = `Advertencia: ${w.name} se fue (${w.fs}). Recomendamos reemplazarla por ${reemplazo.name}, que marca asistencia en el mismo cargo (${w.role}) y centro (${w.cc}).`;
+          const situacion = departed ? `se fue (${w.fs})` : `tiene término de contrato proyectado para el ${w.fs}`;
+          const msg = `Advertencia: ${w.name} ${situacion}. Recomendamos reemplazarla por ${reemplazo.name}, que marca asistencia en el mismo cargo (${w.role}) y centro (${w.cc}).`;
           return `<button class="btn btn-ghost" style="color:#8a6508;border-color:#F0D98C;background:#FFF8E6;font-size:9.5px;padding:1px 4px;line-height:1.4;min-width:0;" title="${msg}" onclick="toast('${msg.replace(/'/g,"\\'")}')">⚠️</button>`;
         })()}
       </div>
