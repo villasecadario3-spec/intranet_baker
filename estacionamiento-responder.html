@@ -152,7 +152,7 @@
   .roster-inner{ min-width:1450px; }
   .roster-head{
     display:grid;
-    grid-template-columns: 1.2fr 0.8fr 0.65fr 95px 85px 110px 100px 130px 155px 70px minmax(220px, 1fr);
+    grid-template-columns: 1.2fr 0.8fr 0.6fr 90px 80px 105px 95px 125px 150px 115px minmax(200px, 1fr);
     gap:0;
     padding:0;
     background:var(--gray-soft);
@@ -173,7 +173,7 @@
   .roster-head > div:last-child{ border-right:none; }
   .row{
     display:grid;
-    grid-template-columns: 1.2fr 0.8fr 0.65fr 95px 85px 110px 100px 130px 155px 70px minmax(220px, 1fr);
+    grid-template-columns: 1.2fr 0.8fr 0.6fr 90px 80px 105px 95px 125px 150px 115px minmax(200px, 1fr);
     gap:0;
     padding:0;
     align-items:stretch;
@@ -2394,11 +2394,7 @@ function renderRoster(){
     const hasEnd = w.status === 'finiquitado';
     let detail = '—';
     if(departed){
-      const reemplazo = buscarReemplazoSugerido(w);
       detail = `<div style="font-size:11px;color:var(--red);margin-top:6px;">Salió ${w.fs} · ${motivoLabel(w.motivo)}</div>`;
-      if(reemplazo){
-        detail += `<div style="font-size:10.5px;color:#8a6508;background:#FFF8E6;border:1px solid #F0D98C;border-radius:5px;padding:4px 6px;margin-top:4px;">⚠️ Advertencia: esta persona se fue — recomendamos reemplazarla por <b>${reemplazo.name}</b>, que marca asistencia en el mismo cargo y centro.</div>`;
-      }
     } else if(projected){
       detail = `<div style="font-size:11px;color:var(--orange);margin-top:6px;">Término proyectado ${w.fs} · ${motivoLabel(w.motivo)}</div>`;
     }
@@ -2447,8 +2443,15 @@ function renderRoster(){
         </div>
         ${detail}
       </div>
-      <div style="font-size:12px;color:var(--steel);">
+      <div style="font-size:12px;color:var(--steel);display:flex;flex-direction:column;gap:4px;align-items:flex-start;">
         ${hasEnd ? `<button class="btn btn-ghost btn-sm" data-action="editar-salida">Editar</button>` : '—'}
+        ${(() => {
+          if(!departed) return '';
+          const reemplazo = buscarReemplazoSugerido(w);
+          if(!reemplazo) return '';
+          const msg = `Advertencia: ${w.name} se fue (${w.fs}). Recomendamos reemplazarla por ${reemplazo.name}, que marca asistencia en el mismo cargo (${w.role}) y centro (${w.cc}).`;
+          return `<button class="btn btn-ghost btn-sm" style="color:#8a6508;border-color:#F0D98C;background:#FFF8E6;font-size:10.5px;padding:2px 6px;" title="${msg}" onclick="toast('${msg.replace(/'/g,"\\'")}')">⚠️ Advertencia</button>`;
+        })()}
       </div>
       <div class="mini-wrap">
         <div class="mini">${bars}</div>
