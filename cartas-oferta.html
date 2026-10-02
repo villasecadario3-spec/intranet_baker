@@ -286,31 +286,48 @@ input[type=file] { display: none; }
 
   <div id="panelDS19" style="display:none;">
     <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:20px;">
-      <div style="font-weight:700;font-size:0.9rem;margin-bottom:10px;color:var(--ink);">Datos generales del proyecto</div>
+      <div style="font-weight:700;font-size:0.9rem;margin-bottom:10px;color:var(--ink);">Datos que no vienen en la Resolución</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <input type="date" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-fecha-ingreso" title="Fecha ingreso">
         <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-carpeta" placeholder="Nombre Carpeta de Solicitud">
         <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-vendedor" placeholder="Vendedor (Inmobiliaria/Constructora)">
-        <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-codigo" placeholder="Código Proyecto">
-        <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-nombreproyecto" placeholder="Nombre Proyecto">
-        <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-resoluciones" placeholder="N° Resolución(es) y Fecha(s)">
         <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-ano" placeholder="Año Beneficio">
       </div>
     </div>
 
-    <div style="font-weight:700;font-size:0.9rem;margin-bottom:8px;color:var(--ink);">Escrituras (hasta 10, una por comprador)</div>
+    <div style="font-weight:700;font-size:0.9rem;margin-bottom:8px;color:var(--ink);">Resolución Exenta (1 archivo — reemplaza las escrituras)</div>
     <div class="dropzone" id="ds19-dropzone" onclick="document.getElementById('ds19-file-input').click()">
-      <input type="file" id="ds19-file-input" accept=".pdf" multiple onchange="ds19MostrarSeleccion()">
+      <input type="file" id="ds19-file-input" accept=".pdf" onchange="ds19MostrarSeleccion()">
       <div class="dropzone-icon">📄</div>
-      <div class="dropzone-title">Haz clic para seleccionar hasta 10 PDFs de escritura</div>
+      <div class="dropzone-title">Haz clic para seleccionar el PDF de la Resolución Exenta</div>
       <div class="dropzone-sub" id="ds19-archivos-elegidos">Ningún archivo seleccionado todavía</div>
     </div>
-    <button class="btn btn-primary" onclick="ds19SubirEscrituras()" style="margin-bottom:20px;">Subir y procesar</button>
+    <button class="btn btn-primary" onclick="ds19SubirResolucion()" style="margin-bottom:20px;">Subir y procesar</button>
 
-    <div id="ds19-lista-procesando" style="color:var(--ink);"></div>
-    <div id="ds19-tabla-revision" style="color:var(--ink);"></div>
+    <div id="ds19-procesando" style="color:var(--ink);"></div>
 
-    <div style="margin-top:20px;display:none;" id="ds19-generar-wrap">
-      <button class="btn btn-primary" onclick="ds19GenerarFormulario()">📄 Generar formulario Word</button>
+    <div id="ds19-revision" style="display:none;">
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:16px;">
+        <div style="font-weight:700;font-size:0.9rem;margin-bottom:10px;color:var(--ink);">Datos detectados de la Resolución — revisa antes de generar</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-codigo" placeholder="Código Proyecto">
+          <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-nombreproyecto" placeholder="Nombre Proyecto">
+          <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);grid-column:1/3;" id="ds19-resoluciones" placeholder="N° Resolución(es) y Fecha(s)">
+          <select style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-programa">
+            <option value="DS19">DS19</option>
+            <option value="DS1">DS1</option>
+            <option value="DS49">DS49</option>
+          </select>
+        </div>
+      </div>
+      <div style="font-weight:700;font-size:0.9rem;margin-bottom:8px;color:var(--ink);">
+        Beneficiarios encontrados: <span id="ds19-total-beneficiarios">0</span>
+      </div>
+      <div id="ds19-tabla-beneficiarios" style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:16px;color:var(--ink);"></div>
+      <div style="font-size:0.78rem;color:var(--ink2);margin-bottom:14px;">
+        Las Tablas 3a/3b (cláusulas en escritura) quedan en blanco en cada Word — se completan a mano aparte, ya que esa información no está en la Resolución.
+      </div>
+      <button class="btn btn-primary" onclick="ds19GenerarLote()">📦 Generar todos los formularios (ZIP)</button>
     </div>
   </div><!-- /panelDS19 -->
 
@@ -958,17 +975,9 @@ async function enviarCorreosMasivo() {
   toast(fallidos.length ? `${enviados}/${n} enviados, ${fallidos.length} fallaron` : `${enviados} correo(s) enviados correctamente`, fallidos.length > 0);
 }
 
-// ── FORMULARIO DS19 ──────────────────────────────────────────
-const REQUISITOS_DS19 = [
-  'Permiso Edificación', 'Recepción Final', 'N° y fecha Resolución',
-  'Estacionamiento', 'Individualización vivienda', 'Precio compraventa',
-  'Seguro incendio y sismo', 'Seguro desgravamen e invalidez 2/3',
-  'Seguro desempleo e incapacidad temporal',
-  'Prohibiciones de enajenar, ceder uso y goce y habitar en favor de Serviu',
-  'Mandato cobro subsidio', 'Exención IVA o Contrato suma alzada',
-  'Nómina de Profesionales, articulo 18. Ley General de U.',
-];
-let ds19Compradores = []; // [{rut, nombre, requisitos:{...}, archivoNombre}]
+// ── FORMULARIO DS19 (desde Resolución Exenta) ───────────────────
+let ds19Proyecto = null;
+let ds19Beneficiarios = [];
 
 function ds19LeerArchivoBase64(file) {
   return new Promise((resolve, reject) => {
@@ -982,134 +991,110 @@ function ds19LeerArchivoBase64(file) {
 function ds19MostrarSeleccion() {
   const input = document.getElementById('ds19-file-input');
   const span = document.getElementById('ds19-archivos-elegidos');
-  const archivos = Array.from(input.files || []);
-  span.textContent = archivos.length
-    ? `${archivos.length} archivo(s) seleccionado(s): ${archivos.map(f=>f.name).join(', ')}`
-    : 'Ningún archivo seleccionado todavía';
+  const archivo = (input.files || [])[0];
+  span.textContent = archivo ? archivo.name : 'Ningún archivo seleccionado todavía';
 }
 
-async function ds19SubirEscrituras() {
+async function ds19SubirResolucion() {
   const input = document.getElementById('ds19-file-input');
-  const archivos = Array.from(input.files || []).slice(0, 10);
-  if (!archivos.length) { toast('Selecciona al menos un PDF', true); return; }
+  const archivo = (input.files || [])[0];
+  if (!archivo) { toast('Selecciona el PDF de la Resolución', true); return; }
 
-  const contProcesando = document.getElementById('ds19-lista-procesando');
-  contProcesando.innerHTML = archivos.map(f => `
-    <div id="ds19-job-${f.name.replace(/[^a-zA-Z0-9]/g,'_')}" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;font-size:0.82rem;">
-      ⏳ ${f.name} — subiendo y procesando (puede tardar varios minutos)…
-    </div>`).join('');
+  const cont = document.getElementById('ds19-procesando');
+  document.getElementById('ds19-revision').style.display = 'none';
+  cont.innerHTML = `⏳ ${archivo.name} — subiendo y procesando…`;
 
-  for (const file of archivos) {
-    try {
-      const base64 = await ds19LeerArchivoBase64(file);
-      const res = await fetch(`${API_BASE}/ds19/procesar-escritura`, {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ archivoBase64: base64, nombreArchivo: file.name })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al subir');
-      ds19EsperarResultado(data.jobId, file.name);
-    } catch(e) {
-      const divId = `ds19-job-${file.name.replace(/[^a-zA-Z0-9]/g,'_')}`;
-      const div = document.getElementById(divId);
-      if (div) div.innerHTML = `❌ ${file.name} — error: ${e.message}`;
-    }
+  try {
+    const base64 = await ds19LeerArchivoBase64(archivo);
+    const res = await fetch(`${API_BASE}/ds19-resolucion/procesar`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ archivoBase64: base64, nombreArchivo: archivo.name })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error al subir');
+    ds19EsperarResultado(data.jobId, archivo.name);
+  } catch(e) {
+    cont.innerHTML = `❌ ${archivo.name} — error: ${e.message}`;
   }
 }
 
 async function ds19EsperarResultado(jobId, nombreArchivo) {
-  const divId = `ds19-job-${nombreArchivo.replace(/[^a-zA-Z0-9]/g,'_')}`;
-  const div = document.getElementById(divId);
-  const maxIntentos = 60; // ~15 minutos tope (60 × 15s)
+  const cont = document.getElementById('ds19-procesando');
+  const maxIntentos = 40; // ~10 minutos tope (40 × 15s)
   for (let i = 0; i < maxIntentos; i++) {
     await new Promise(r => setTimeout(r, 15000));
     try {
-      const res = await fetch(`${API_BASE}/ds19/estado/${jobId}`);
+      const res = await fetch(`${API_BASE}/ds19-resolucion/estado/${jobId}`);
       const data = await res.json();
       if (data.estado === 'listo') {
-        if (div) div.innerHTML = `✅ ${nombreArchivo} — procesado`;
-        ds19AgregarComprador(data.resultado, nombreArchivo);
+        cont.innerHTML = `✅ ${nombreArchivo} — procesado`;
+        ds19MostrarResultado(data.resultado);
         return;
       } else if (data.estado === 'error') {
-        if (div) div.innerHTML = `❌ ${nombreArchivo} — error: ${data.error}`;
+        cont.innerHTML = `❌ ${nombreArchivo} — error: ${data.error}`;
         return;
       }
     } catch(e) { /* sigue esperando */ }
   }
-  if (div) div.innerHTML = `⚠ ${nombreArchivo} — está tardando más de lo normal, revisa la consola del servidor`;
+  cont.innerHTML = `⚠ ${nombreArchivo} — está tardando más de lo normal, revisa la consola del servidor`;
 }
 
-function ds19AgregarComprador(resultado, nombreArchivo) {
-  const candidato = (resultado.candidatos_comprador || [])[0] || {};
-  const requisitos = {};
-  REQUISITOS_DS19.forEach(nombre => {
-    const r = resultado.requisitos?.[nombre];
-    requisitos[nombre] = r ? String(r.clausula ?? '') : '';
-  });
-  const paginaResolucion = resultado.requisitos?.['N° y fecha Resolución']?.pagina;
-  ds19Compradores.push({
-    rut: candidato.rut || '',
-    nombre: candidato.nombre || '',
-    programa: resultado.programa_detectado || '',
-    resolucion: resultado.resolucion_subsidio_texto || '',
-    paginaResEx: paginaResolucion ? String(paginaResolucion) : '',
-    requisitos,
-    archivoNombre: nombreArchivo,
-  });
-  ds19RenderTablaRevision();
+function ds19MostrarResultado(resultado) {
+  ds19Proyecto = resultado.proyecto || {};
+  ds19Beneficiarios = resultado.beneficiarios || [];
+
+  document.getElementById('ds19-codigo').value = ds19Proyecto.codigo_proyecto || '';
+  document.getElementById('ds19-nombreproyecto').value = ds19Proyecto.nombre_proyecto || '';
+  document.getElementById('ds19-resoluciones').value = ds19Proyecto.resoluciones_texto || '';
+  document.getElementById('ds19-programa').value = ds19Proyecto.programa || 'DS19';
+
+  document.getElementById('ds19-total-beneficiarios').textContent = ds19Beneficiarios.length;
+  ds19RenderTablaBeneficiarios();
+  document.getElementById('ds19-revision').style.display = 'block';
 }
 
-function ds19RenderTablaRevision() {
-  const cont = document.getElementById('ds19-tabla-revision');
-  if (!ds19Compradores.length) { cont.innerHTML = ''; return; }
+function ds19RenderTablaBeneficiarios() {
+  const cont = document.getElementById('ds19-tabla-beneficiarios');
+  if (!ds19Beneficiarios.length) { cont.innerHTML = '<div style="padding:12px;">Ningún beneficiario encontrado en las tablas de la Resolución.</div>'; return; }
   cont.innerHTML = `
-    <div style="font-weight:700;font-size:0.9rem;margin:16px 0 8px;">Revisa y corrige antes de generar el formulario</div>
-    <div style="overflow-x:auto;">
-    <table style="border-collapse:collapse;width:100%;font-size:0.78rem;">
-      <thead><tr style="background:var(--bg2);">
-        <th style="padding:6px;border:1px solid var(--border);text-align:left;color:var(--ink);">Archivo</th>
+    <table style="border-collapse:collapse;width:100%;font-size:0.8rem;">
+      <thead style="position:sticky;top:0;"><tr style="background:var(--bg2);">
+        <th style="padding:6px;border:1px solid var(--border);color:var(--ink);">N° Res. Ex.</th>
+        <th style="padding:6px;border:1px solid var(--border);text-align:left;color:var(--ink);">Nombre</th>
         <th style="padding:6px;border:1px solid var(--border);color:var(--ink);">RUT</th>
-        <th style="padding:6px;border:1px solid var(--border);color:var(--ink);">Nombre</th>
-        <th style="padding:6px;border:1px solid var(--border);color:var(--ink);min-width:160px;">N° Resolución y Fecha</th>
-        <th style="padding:6px;border:1px solid var(--border);color:var(--ink);min-width:70px;">Página en Res. Ex.</th>
-        ${REQUISITOS_DS19.map(r => `<th style="padding:6px;border:1px solid var(--border);min-width:90px;color:var(--ink);">${r}</th>`).join('')}
+        <th style="padding:6px;border:1px solid var(--border);color:var(--ink);">Página</th>
       </tr></thead>
       <tbody>
-        ${ds19Compradores.map((c, i) => `
+        ${ds19Beneficiarios.map(b => `
         <tr>
-          <td style="padding:4px;border:1px solid var(--border);color:var(--ink);">${c.archivoNombre}</td>
-          <td style="padding:2px;border:1px solid var(--border);"><input style="width:90px;border:none;background:var(--bg2);color:var(--ink);" value="${c.rut}" onchange="ds19Compradores[${i}].rut=this.value"></td>
-          <td style="padding:2px;border:1px solid var(--border);"><input style="width:160px;border:none;background:var(--bg2);color:var(--ink);" value="${c.nombre}" onchange="ds19Compradores[${i}].nombre=this.value"></td>
-          <td style="padding:2px;border:1px solid var(--border);"><input style="width:150px;border:none;background:var(--bg2);color:var(--ink);" value="${c.resolucion || ''}" onchange="ds19Compradores[${i}].resolucion=this.value"></td>
-          <td style="padding:2px;border:1px solid var(--border);"><input style="width:60px;border:none;text-align:center;background:var(--bg2);color:var(--ink);" value="${c.paginaResEx || ''}" onchange="ds19Compradores[${i}].paginaResEx=this.value"></td>
-          ${REQUISITOS_DS19.map(r => `<td style="padding:2px;border:1px solid var(--border);"><input style="width:40px;border:none;text-align:center;background:var(--bg2);color:var(--ink);" value="${c.requisitos[r]}" onchange="ds19Compradores[${i}].requisitos['${r.replace(/'/g,"\\'")}']=this.value"></td>`).join('')}
+          <td style="padding:4px;border:1px solid var(--border);text-align:center;color:var(--ink);">${b.numero_tabla_res_ex}</td>
+          <td style="padding:4px;border:1px solid var(--border);color:var(--ink);">${b.nombre}</td>
+          <td style="padding:4px;border:1px solid var(--border);text-align:center;color:var(--ink);">${b.rut}</td>
+          <td style="padding:4px;border:1px solid var(--border);text-align:center;color:var(--ink);">${b.pagina_res_ex}</td>
         </tr>`).join('')}
       </tbody>
-    </table>
-    </div>`;
-  document.getElementById('ds19-generar-wrap').style.display = 'block';
+    </table>`;
 }
 
-async function ds19GenerarFormulario() {
-  const programaDetectado = ds19Compradores.find(c => c.programa)?.programa || '';
+async function ds19GenerarLote() {
+  if (!ds19Beneficiarios.length) { toast('No hay beneficiarios para generar', true); return; }
   const payload = {
     proyecto: {
-      fecha_ingreso: new Date().toLocaleDateString('es-CL'),
+      fecha_ingreso: document.getElementById('ds19-fecha-ingreso').value || new Date().toLocaleDateString('es-CL'),
       nombre_carpeta: document.getElementById('ds19-carpeta').value,
       vendedor: document.getElementById('ds19-vendedor').value,
       codigo_proyecto: document.getElementById('ds19-codigo').value,
       nombre_proyecto: document.getElementById('ds19-nombreproyecto').value,
       resoluciones_texto: document.getElementById('ds19-resoluciones').value,
-      programa: programaDetectado,
+      programa: document.getElementById('ds19-programa').value,
       ano_beneficio: document.getElementById('ds19-ano').value,
       tramo: '',
     },
-    compradores: ds19Compradores.map(c => ({
-      rut: c.rut, nombre: c.nombre, resolucion_texto: c.resolucion || '', pagina_res_ex: c.paginaResEx || '', requisitos: c.requisitos,
-    })),
+    beneficiarios: ds19Beneficiarios,
   };
+  toast(`Generando ${ds19Beneficiarios.length} formulario(s)… puede tardar un momento`);
   try {
-    const res = await fetch(`${API_BASE}/ds19/generar-formulario`, {
+    const res = await fetch(`${API_BASE}/ds19-resolucion/generar-lote`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify(payload)
     });
@@ -1117,16 +1102,18 @@ async function ds19GenerarFormulario() {
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'Formulario_DS19_completado.docx';
+    a.href = url; a.download = `Formularios_DS19_${payload.proyecto.nombre_proyecto||'lote'}.zip`;
     a.click();
     URL.revokeObjectURL(url);
-    toast('Formulario generado y descargado');
+    toast(`${ds19Beneficiarios.length} formulario(s) generados y descargados`);
   } catch(e) {
-    toast('Error al generar el formulario: ' + e.message, true);
+    toast('Error al generar los formularios: ' + e.message, true);
   }
 }
 
 // ── INIT ──────────────────────────────────────────────────────
+const elFechaIngresoDS19 = document.getElementById('ds19-fecha-ingreso');
+if (elFechaIngresoDS19) elFechaIngresoDS19.value = new Date().toISOString().slice(0,10);
 initAuth();
 </script>
 </body>
