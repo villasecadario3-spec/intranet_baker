@@ -2728,9 +2728,14 @@ function validateRutInput(){
   return false;
 }
 
+// Cruce por RUT + Cargo (sin importar el centro de gestión): si la persona
+// ya está en la dotación con ese mismo cargo, no aparece como pendiente —
+// agregarla igual crearía una fila duplicada de la misma persona. Solo
+// aparece si el cargo también es distinto (ahí sí puede ser un rol nuevo
+// de verdad, no un simple cruce de centro mal escrito).
 function pendingSugerencias(){
-  const existing = new Set(workers.map(w => `${w.rutlimpio}#${w.cc}#${(w.role||'').toLowerCase().trim()}`));
-  return ASISTENCIA_NUEVOS.filter(a => !existing.has(`${a.rutlimpio}#${a.cc}#${(a.role||'').toLowerCase().trim()}`));
+  const existing = new Set(workers.map(w => `${w.rutlimpio}#${(w.role||'').toLowerCase().trim()}`));
+  return ASISTENCIA_NUEVOS.filter(a => !existing.has(`${a.rutlimpio}#${(a.role||'').toLowerCase().trim()}`));
 }
 
 // Cruza los "proyectados" (agregados a mano, sin nombre real) contra las
