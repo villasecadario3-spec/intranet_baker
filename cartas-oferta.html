@@ -321,13 +321,12 @@ input[type=file] { display: none; }
         </div>
       </div>
       <div style="font-weight:700;font-size:0.9rem;margin-bottom:8px;color:var(--ink);">
-        Beneficiarios encontrados: <span id="ds19-total-beneficiarios">0</span>
+        Beneficiarios encontrados: <span id="ds19-total-beneficiarios">0</span> — agrupados en <span id="ds19-total-lotes">0</span> lote(s) de hasta 10
       </div>
-      <div id="ds19-tabla-beneficiarios" style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:16px;color:var(--ink);"></div>
-      <div style="font-size:0.78rem;color:var(--ink2);margin-bottom:14px;">
-        Las Tablas 3a/3b (cláusulas en escritura) quedan en blanco en cada Word — se completan a mano aparte, ya que esa información no está en la Resolución.
+      <div style="font-size:0.78rem;color:var(--ink2);margin-bottom:16px;">
+        Por cada lote puedes subir hasta 10 escrituras (una por persona) para completar las Tablas 3a/3b con el N° de cláusula — se calzan solas por RUT. Si no subes escrituras para alguien, esas columnas quedan en blanco en el Word de ese lote.
       </div>
-      <button class="btn btn-primary" onclick="ds19GenerarLote()">📦 Generar todos los formularios (ZIP)</button>
+      <div id="ds19-lotes"></div>
     </div>
   </div><!-- /panelDS19 -->
 
@@ -1039,6 +1038,19 @@ async function ds19EsperarResultado(jobId, nombreArchivo) {
   cont.innerHTML = `⚠ ${nombreArchivo} — está tardando más de lo normal, revisa la consola del servidor`;
 }
 
+const REQUISITOS_DS19 = [
+  'Permiso Edificación', 'Recepción Final', 'N° y fecha Resolución',
+  'Estacionamiento', 'Individualización vivienda', 'Precio compraventa',
+  'Seguro incendio y sismo', 'Seguro desgravamen e invalidez 2/3',
+  'Seguro desempleo e incapacidad temporal',
+  'Prohibiciones de enajenar, ceder uso y goce y habitar en favor de Serviu',
+  'Mandato cobro subsidio', 'Exención IVA o Contrato suma alzada',
+  'Nómina de Profesionales, articulo 18. Ley General de U.',
+];
+let ds19Lotes = []; // [{ beneficiarios:[...hasta 10], escrituras:{ rutLimpio: {requisitos, nombreArchivo, estado} } }]
+
+function limpiarRut(r) { return (r||'').replace(/[^0-9kK]/g,'').toUpperCase(); }
+
 function ds19MostrarResultado(resultado) {
   ds19Proyecto = resultado.proyecto || {};
   ds19Beneficiarios = resultado.beneficiarios || [];
@@ -1048,36 +1060,126 @@ function ds19MostrarResultado(resultado) {
   document.getElementById('ds19-resoluciones').value = ds19Proyecto.resoluciones_texto || '';
   document.getElementById('ds19-programa').value = ds19Proyecto.programa || 'DS19';
 
+  ds19Lotes = [];
+  for (let i = 0; i < ds19Beneficiarios.length; i += 10) {
+    ds19Lotes.push({ beneficiarios: ds19Beneficiarios.slice(i, i + 10), escrituras: {} });
+  }
+
   document.getElementById('ds19-total-beneficiarios').textContent = ds19Beneficiarios.length;
-  ds19RenderTablaBeneficiarios();
+  document.getElementById('ds19-total-lotes').textContent = ds19Lotes.length;
+  ds19RenderLotes();
   document.getElementById('ds19-revision').style.display = 'block';
 }
 
-function ds19RenderTablaBeneficiarios() {
-  const cont = document.getElementById('ds19-tabla-beneficiarios');
-  if (!ds19Beneficiarios.length) { cont.innerHTML = '<div style="padding:12px;">Ningún beneficiario encontrado en las tablas de la Resolución.</div>'; return; }
-  cont.innerHTML = `
-    <table style="border-collapse:collapse;width:100%;font-size:0.8rem;">
-      <thead style="position:sticky;top:0;"><tr style="background:var(--bg2);">
-        <th style="padding:6px;border:1px solid var(--border);color:var(--ink);">N° Res. Ex.</th>
-        <th style="padding:6px;border:1px solid var(--border);text-align:left;color:var(--ink);">Nombre</th>
-        <th style="padding:6px;border:1px solid var(--border);color:var(--ink);">RUT</th>
-        <th style="padding:6px;border:1px solid var(--border);color:var(--ink);">Página</th>
-      </tr></thead>
-      <tbody>
-        ${ds19Beneficiarios.map(b => `
-        <tr>
-          <td style="padding:4px;border:1px solid var(--border);text-align:center;color:var(--ink);">${b.numero_tabla_res_ex}</td>
-          <td style="padding:4px;border:1px solid var(--border);color:var(--ink);">${b.nombre}</td>
-          <td style="padding:4px;border:1px solid var(--border);text-align:center;color:var(--ink);">${b.rut}</td>
-          <td style="padding:4px;border:1px solid var(--border);text-align:center;color:var(--ink);">${b.pagina_res_ex}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table>`;
+function ds19RenderLotes() {
+  const cont = document.getElementById('ds19-lotes');
+  cont.innerHTML = ds19Lotes.map((lote, li) => {
+    const desde = lote.beneficiarios[0]?.numero_tabla_res_ex;
+    const hasta = lote.beneficiarios[lote.beneficiarios.length - 1]?.numero_tabla_res_ex;
+    return `
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px;">
+      <div style="font-weight:700;font-size:0.88rem;margin-bottom:8px;color:var(--ink);">Lote ${li+1} — Beneficiarios N° ${desde} al ${hasta}</div>
+      <table style="border-collapse:collapse;width:100%;font-size:0.78rem;margin-bottom:10px;">
+        <thead><tr style="background:var(--bg2);">
+          <th style="padding:4px;border:1px solid var(--border);color:var(--ink);">N°</th>
+          <th style="padding:4px;border:1px solid var(--border);text-align:left;color:var(--ink);">Nombre</th>
+          <th style="padding:4px;border:1px solid var(--border);color:var(--ink);">RUT</th>
+          <th style="padding:4px;border:1px solid var(--border);color:var(--ink);">Escritura / Cláusulas</th>
+        </tr></thead>
+        <tbody>
+          ${lote.beneficiarios.map(b => {
+            const esc = lote.escrituras[limpiarRut(b.rut)];
+            let estadoTxt = '— sin escritura (quedará en blanco)';
+            if (esc?.estado === 'procesando') estadoTxt = '⏳ procesando…';
+            else if (esc?.estado === 'listo') estadoTxt = `✅ ${esc.nombreArchivo}`;
+            else if (esc?.estado === 'error') estadoTxt = `❌ ${esc.error}`;
+            return `<tr>
+              <td style="padding:3px;border:1px solid var(--border);text-align:center;color:var(--ink);">${b.numero_tabla_res_ex}</td>
+              <td style="padding:3px;border:1px solid var(--border);color:var(--ink);">${b.nombre}</td>
+              <td style="padding:3px;border:1px solid var(--border);text-align:center;color:var(--ink);">${b.rut}</td>
+              <td style="padding:3px;border:1px solid var(--border);color:var(--ink);">${estadoTxt}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+      <input type="file" id="ds19-lote-file-${li}" accept=".pdf" multiple style="font-size:0.78rem;margin-bottom:8px;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-secondary" onclick="ds19SubirEscriturasLote(${li})">Subir y calzar escrituras de este lote</button>
+        <button class="btn btn-primary" onclick="ds19GenerarWordLote(${li})">📄 Generar Word de este lote</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
-async function ds19GenerarLote() {
-  if (!ds19Beneficiarios.length) { toast('No hay beneficiarios para generar', true); return; }
+async function ds19SubirEscriturasLote(li) {
+  const input = document.getElementById(`ds19-lote-file-${li}`);
+  const archivos = Array.from(input.files || []).slice(0, 10);
+  if (!archivos.length) { toast('Selecciona al menos un PDF de escritura', true); return; }
+  const lote = ds19Lotes[li];
+  const rutsDelLote = new Set(lote.beneficiarios.map(b => limpiarRut(b.rut)));
+
+  for (const file of archivos) {
+    // Se marca "procesando" en un RUT temporal (el nombre del archivo) hasta
+    // saber a quién calza, para que se vea feedback inmediato en pantalla.
+    lote.escrituras[`__pendiente_${file.name}`] = { estado: 'procesando', nombreArchivo: file.name };
+    ds19RenderLotes();
+    try {
+      const base64 = await ds19LeerArchivoBase64(file);
+      const res = await fetch(`${API_BASE}/ds19/procesar-escritura`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ archivoBase64: base64, nombreArchivo: file.name })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al subir');
+      await ds19EsperarYCalzarEscritura(li, data.jobId, file.name, rutsDelLote);
+    } catch(e) {
+      delete lote.escrituras[`__pendiente_${file.name}`];
+      toast(`${file.name}: ${e.message}`, true);
+      ds19RenderLotes();
+    }
+  }
+}
+
+async function ds19EsperarYCalzarEscritura(li, jobId, nombreArchivo, rutsDelLote) {
+  const lote = ds19Lotes[li];
+  const maxIntentos = 60; // ~15 minutos tope
+  for (let i = 0; i < maxIntentos; i++) {
+    await new Promise(r => setTimeout(r, 15000));
+    try {
+      const res = await fetch(`${API_BASE}/ds19/estado/${jobId}`);
+      const data = await res.json();
+      if (data.estado === 'listo') {
+        delete lote.escrituras[`__pendiente_${nombreArchivo}`];
+        const candidato = (data.resultado.candidatos_comprador || [])[0];
+        const rutCandidato = candidato ? limpiarRut(candidato.rut) : '';
+        if (!rutCandidato || !rutsDelLote.has(rutCandidato)) {
+          toast(`${nombreArchivo}: el RUT detectado (${candidato?.rut||'ninguno'}) no corresponde a nadie de este lote`, true);
+          ds19RenderLotes();
+          return;
+        }
+        const requisitos = {};
+        REQUISITOS_DS19.forEach(nombre => {
+          const r = data.resultado.requisitos?.[nombre];
+          requisitos[nombre] = r ? String(r.clausula ?? '') : '';
+        });
+        lote.escrituras[rutCandidato] = { estado: 'listo', nombreArchivo, requisitos };
+        ds19RenderLotes();
+        return;
+      } else if (data.estado === 'error') {
+        delete lote.escrituras[`__pendiente_${nombreArchivo}`];
+        toast(`${nombreArchivo}: ${data.error}`, true);
+        ds19RenderLotes();
+        return;
+      }
+    } catch(e) { /* sigue esperando */ }
+  }
+  delete lote.escrituras[`__pendiente_${nombreArchivo}`];
+  toast(`${nombreArchivo}: está tardando más de lo normal`, true);
+  ds19RenderLotes();
+}
+
+async function ds19GenerarWordLote(li) {
+  const lote = ds19Lotes[li];
   const payload = {
     proyecto: {
       fecha_ingreso: document.getElementById('ds19-fecha-ingreso').value || new Date().toLocaleDateString('es-CL'),
@@ -1090,11 +1192,18 @@ async function ds19GenerarLote() {
       ano_beneficio: document.getElementById('ds19-ano').value,
       tramo: '',
     },
-    beneficiarios: ds19Beneficiarios,
+    compradores: lote.beneficiarios.map(b => {
+      const esc = lote.escrituras[limpiarRut(b.rut)];
+      return {
+        rut: b.rut, nombre: b.nombre,
+        resolucion_texto: ds19Proyecto.resoluciones_texto || '',
+        pagina_res_ex: b.pagina_res_ex || '', numero_tabla_res_ex: b.numero_tabla_res_ex || '',
+        requisitos: esc?.requisitos || {},
+      };
+    }),
   };
-  toast(`Generando ${ds19Beneficiarios.length} formulario(s)… puede tardar un momento`);
   try {
-    const res = await fetch(`${API_BASE}/ds19-resolucion/generar-lote`, {
+    const res = await fetch(`${API_BASE}/ds19/generar-formulario`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify(payload)
     });
@@ -1102,12 +1211,12 @@ async function ds19GenerarLote() {
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `Formularios_DS19_${payload.proyecto.nombre_proyecto||'lote'}.zip`;
+    a.href = url; a.download = `Formulario_DS19_Lote${li+1}.docx`;
     a.click();
     URL.revokeObjectURL(url);
-    toast(`${ds19Beneficiarios.length} formulario(s) generados y descargados`);
+    toast(`Lote ${li+1} generado y descargado`);
   } catch(e) {
-    toast('Error al generar los formularios: ' + e.message, true);
+    toast('Error al generar el formulario: ' + e.message, true);
   }
 }
 
