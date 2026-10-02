@@ -2425,9 +2425,11 @@ function renderRoster(){
           : (w.fc||'-')
       }</div>
       <div style="font-size:12.5px;color:var(--ink);">
+        ${(w.source==='ingreso' || w.source==='proyectado') ? `
         <input type="number" data-action="editar-costo" value="${w.costoManual ?? costoMensual(w) ?? ''}" placeholder="Sin dato"
           style="width:110px;padding:3px 5px;border:1px solid ${w.costoManual!=null?'var(--orange)':'var(--line)'};border-radius:5px;font-size:12px;${w.costoManual!=null?'background:#FFF7ED;':''}">
         ${w.costoManual!=null ? `<button class="btn btn-ghost btn-sm" data-action="quitar-costo-manual" title="Volver al cálculo automático" style="font-size:10px;padding:1px 5px;">↺ auto</button>` : ''}
+        ` : formatCLP(costoMensual(w))}
       </div>
       <div style="font-size:12px;color:var(--steel);">${prev ? formatCLP(prevCosto) : '—'}</div>
       <div style="font-size:12.5px;color:var(--ink);">
