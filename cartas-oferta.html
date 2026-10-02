@@ -1102,13 +1102,24 @@ function ds19RenderLotes() {
           }).join('')}
         </tbody>
       </table>
-      <input type="file" id="ds19-lote-file-${li}" accept=".pdf" multiple style="font-size:0.78rem;margin-bottom:8px;">
+      <input type="file" id="ds19-lote-file-${li}" accept=".pdf" multiple onchange="ds19MostrarSeleccionLote(${li})">
+      <div style="font-size:0.78rem;color:var(--ink2);margin-bottom:8px;" id="ds19-lote-archivos-${li}">Ningún archivo seleccionado todavía</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-secondary" onclick="document.getElementById('ds19-lote-file-${li}').click()">📎 Elegir escrituras (hasta 10)</button>
         <button class="btn btn-secondary" onclick="ds19SubirEscriturasLote(${li})">Subir y calzar escrituras de este lote</button>
         <button class="btn btn-primary" onclick="ds19GenerarWordLote(${li})">📄 Generar Word de este lote</button>
       </div>
     </div>`;
   }).join('');
+}
+
+function ds19MostrarSeleccionLote(li) {
+  const input = document.getElementById(`ds19-lote-file-${li}`);
+  const span = document.getElementById(`ds19-lote-archivos-${li}`);
+  const archivos = Array.from(input.files || []);
+  span.textContent = archivos.length
+    ? `${archivos.length} archivo(s): ${archivos.map(f=>f.name).join(', ')}`
+    : 'Ningún archivo seleccionado todavía';
 }
 
 async function ds19SubirEscriturasLote(li) {
