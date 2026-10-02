@@ -42,7 +42,7 @@
     color:#fff;
     padding:22px 28px 20px;
   }
-  .topbar-inner{ max-width:1600px; margin:0 auto; }
+  .topbar-inner{ width:100%; margin:0; }
   .eyebrow{
     font-family:var(--font-mono);
     font-size:11px;
@@ -82,7 +82,7 @@
   .legend-swatch{ width:12px; height:12px; border-radius:3px; flex:none; }
 
   /* ---------- Layout ---------- */
-  .wrap{ max-width:1600px; margin:0 auto; padding:24px 28px 80px; }
+  .wrap{ width:100%; margin:0; padding:24px 20px 80px; box-sizing:border-box; }
   .toolbar{
     display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;
     background:var(--panel);
@@ -149,10 +149,10 @@
     border-radius:10px;
     overflow-x:auto;
   }
-  .roster-inner{ min-width:1650px; }
+  .roster-inner{ min-width:1550px; }
   .roster-head{
     display:grid;
-    grid-template-columns: 1.3fr 0.9fr 0.7fr 110px 90px 120px 120px 145px 165px 480px;
+    grid-template-columns: 1.3fr 1fr 0.9fr 110px 100px 130px 120px 160px 175px 85px minmax(200px, 1fr);
     gap:0;
     padding:0;
     background:var(--gray-soft);
@@ -173,7 +173,7 @@
   .roster-head > div:last-child{ border-right:none; }
   .row{
     display:grid;
-    grid-template-columns: 1.3fr 0.9fr 0.7fr 110px 90px 120px 120px 145px 165px 480px;
+    grid-template-columns: 1.3fr 1fr 0.9fr 110px 100px 130px 120px 160px 175px 85px minmax(200px, 1fr);
     gap:0;
     padding:0;
     align-items:stretch;
@@ -2443,8 +2443,16 @@ function renderRoster(){
         </div>
         ${detail}
       </div>
-      <div style="font-size:12px;color:var(--steel);">
-        ${hasEnd ? `<button class="btn btn-ghost btn-sm" data-action="editar-salida">Editar</button>` : '—'}
+      <div style="font-size:11px;color:var(--steel);display:flex;flex-direction:column;gap:3px;align-items:center;justify-content:center;text-align:center;height:100%;">
+        ${hasEnd ? `<button class="btn btn-ghost" data-action="editar-salida" style="padding:1px 4px;font-size:9.5px;line-height:1.4;min-width:0;">Editar</button>` : '—'}
+        ${(() => {
+          if(!departed && !projected) return '';
+          const reemplazo = buscarReemplazoSugerido(w);
+          if(!reemplazo) return '';
+          const situacion = departed ? `se fue (${w.fs})` : `tiene término de contrato proyectado para el ${w.fs}`;
+          const msg = `Advertencia: ${w.name} ${situacion}. Recomendamos reemplazarla por ${reemplazo.name}, que marca asistencia en el mismo cargo (${w.role}) y centro (${w.cc}).`;
+          return `<button class="btn btn-ghost" style="color:#8a6508;border-color:#F0D98C;background:#FFF8E6;font-size:9.5px;padding:1px 4px;line-height:1.4;min-width:0;" title="${msg}" onclick="toast('${msg.replace(/'/g,"\\'")}')">⚠️</button>`;
+        })()}
       </div>
       <div class="mini-wrap">
         <div class="mini">${bars}</div>
@@ -2735,6 +2743,15 @@ function validateRutInput(){
 // agregarla igual crearía una fila duplicada de la misma persona. Solo
 // aparece si el cargo también es distinto (ahí sí puede ser un rol nuevo
 // de verdad, no un simple cruce de centro mal escrito).
+// Para alguien que ya salió: busca si hay una persona marcando asistencia
+// real (y que todavía no está en la dotación) con el MISMO cargo y centro de
+// gestión — candidata natural para reemplazarla.
+function buscarReemplazoSugerido(w){
+  if(!w || w.cc == null || !w.role) return null;
+  const pendientes = pendingSugerencias();
+  return pendientes.find(a => a.cc === w.cc && (a.role||'').toLowerCase().trim() === (w.role||'').toLowerCase().trim()) || null;
+}
+
 function pendingSugerencias(){
   const existing = new Set(workers.map(w => `${w.rutlimpio}#${(w.role||'').toLowerCase().trim()}`));
   return ASISTENCIA_NUEVOS.filter(a => !existing.has(`${a.rutlimpio}#${(a.role||'').toLowerCase().trim()}`));
