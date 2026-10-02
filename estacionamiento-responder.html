@@ -149,10 +149,10 @@
     border-radius:10px;
     overflow-x:auto;
   }
-  .roster-inner{ min-width:1450px; }
+  .roster-inner{ min-width:1280px; }
   .roster-head{
     display:grid;
-    grid-template-columns: 1.2fr 0.8fr 0.6fr 90px 80px 105px 95px 125px 150px 115px minmax(200px, 1fr);
+    grid-template-columns: 1.1fr 0.75fr 0.55fr 85px 75px 100px 90px 120px 140px 78px minmax(170px, 1fr);
     gap:0;
     padding:0;
     background:var(--gray-soft);
@@ -173,7 +173,7 @@
   .roster-head > div:last-child{ border-right:none; }
   .row{
     display:grid;
-    grid-template-columns: 1.2fr 0.8fr 0.6fr 90px 80px 105px 95px 125px 150px 115px minmax(200px, 1fr);
+    grid-template-columns: 1.1fr 0.75fr 0.55fr 85px 75px 100px 90px 120px 140px 78px minmax(170px, 1fr);
     gap:0;
     padding:0;
     align-items:stretch;
@@ -2443,14 +2443,14 @@ function renderRoster(){
         </div>
         ${detail}
       </div>
-      <div style="font-size:12px;color:var(--steel);display:flex;flex-direction:column;gap:4px;align-items:flex-start;">
-        ${hasEnd ? `<button class="btn btn-ghost btn-sm" data-action="editar-salida">Editar</button>` : '—'}
+      <div style="font-size:11px;color:var(--steel);display:flex;flex-direction:column;gap:3px;align-items:flex-start;">
+        ${hasEnd ? `<button class="btn btn-ghost" data-action="editar-salida" style="padding:1px 6px;font-size:10.5px;line-height:1.5;">Editar</button>` : '—'}
         ${(() => {
           if(!departed) return '';
           const reemplazo = buscarReemplazoSugerido(w);
           if(!reemplazo) return '';
           const msg = `Advertencia: ${w.name} se fue (${w.fs}). Recomendamos reemplazarla por ${reemplazo.name}, que marca asistencia en el mismo cargo (${w.role}) y centro (${w.cc}).`;
-          return `<button class="btn btn-ghost btn-sm" style="color:#8a6508;border-color:#F0D98C;background:#FFF8E6;font-size:10.5px;padding:2px 6px;" title="${msg}" onclick="toast('${msg.replace(/'/g,"\\'")}')">⚠️ Advertencia</button>`;
+          return `<button class="btn btn-ghost" style="color:#8a6508;border-color:#F0D98C;background:#FFF8E6;font-size:9.5px;padding:1px 5px;line-height:1.4;" title="${msg}" onclick="toast('${msg.replace(/'/g,"\\'")}')">⚠️</button>`;
         })()}
       </div>
       <div class="mini-wrap">
