@@ -83,14 +83,26 @@
 
   /* ---------- Layout ---------- */
   .wrap{ width:100%; margin:0; padding:24px 20px 80px; box-sizing:border-box; }
+  /* Anclada: al bajar por la página, los filtros y botones quedan siempre a la vista,
+     justo debajo de la barra de navegación de la intranet (56px de alto). */
   .toolbar{
-    display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;
+    position:sticky; top:56px; z-index:40;
+    display:flex; gap:8px 12px; flex-wrap:wrap; align-items:flex-end;
     background:var(--panel);
     border:1px solid var(--line);
     border-radius:10px;
-    padding:16px 18px;
+    padding:10px 14px;
     margin-bottom:18px;
+    box-shadow:0 6px 16px rgba(22,38,58,.10);
+    max-height:calc(100vh - 56px - 90px);
+    overflow-y:auto;
   }
+  .toolbar .field{ gap:3px; }
+  .toolbar .field label{ font-size:10px; }
+  .toolbar select, .toolbar input[type=text], .toolbar input[type=date]{ padding:5px 8px; font-size:13px; }
+  .toolbar.compacta .sec{ display:none; }
+  #toggleFiltrosBtn .insignia{ background:var(--orange); color:#fff; border-radius:9px; padding:0 6px; font-size:10.5px; margin-left:4px; }
+  @media (max-width:760px){ .toolbar{ position:static; max-height:none; } }
   .field{ display:flex; flex-direction:column; gap:5px; }
   .field label{
     font-size:11px; text-transform:uppercase; letter-spacing:.08em;
@@ -501,7 +513,7 @@
 </div>
 
   <div class="toolbar">
-    <div class="field">
+    <div class="field sec">
       <label for="mesReal">Último mes con costo real cargado</label>
       <select id="mesReal"></select>
     </div>
@@ -509,15 +521,15 @@
       <label>Centro de gestión</label>
       <div class="chips" id="ccChips"></div>
     </div>
-    <div class="field">
+    <div class="field sec">
       <label for="periodoFiltro">Vigentes desde</label>
       <select id="periodoFiltro"><option value="">Todos los periodos</option></select>
     </div>
-    <div class="field">
+    <div class="field sec">
       <label for="cargoFiltro">Cargo</label>
       <select id="cargoFiltro"><option value="">Todos los cargos</option></select>
     </div>
-    <div class="field">
+    <div class="field sec">
       <label for="estadoOrigenFiltro">Vigente / Proyectado</label>
       <select id="estadoOrigenFiltro">
         <option value="">Todos</option>
@@ -533,7 +545,7 @@
         <option value="CG027">Mirador El Pino Urbanización</option>
       </select>
     </div>
-    <div class="field">
+    <div class="field sec">
       <label for="motivoFiltro">Motivo de salida</label>
       <select id="motivoFiltro">
         <option value="">Todos</option>
@@ -546,11 +558,11 @@
         <option value="otro">Otro</option>
       </select>
     </div>
-    <div class="field">
+    <div class="field sec">
       <label for="fechaSalidaDesde">Salida desde</label>
       <input type="date" id="fechaSalidaDesde">
     </div>
-    <div class="field">
+    <div class="field sec">
       <label for="fechaSalidaHasta">Salida hasta</label>
       <input type="date" id="fechaSalidaHasta">
     </div>
@@ -558,6 +570,7 @@
       <label for="searchBox">Buscar</label>
       <input type="text" id="searchBox" placeholder="Nombre, rut o cargo...">
     </div>
+    <button class="btn btn-ghost btn-sm" id="toggleFiltrosBtn" type="button"></button>
     <div class="spacer"></div>
     <button class="btn btn-primary btn-sm" id="syncBukBtn">Sincronizar con Excel BUK</button>
     <button class="btn btn-outline btn-sm" id="syncAsistenciaBtn">📋 Sincronizar asistencia</button>
@@ -1433,6 +1446,25 @@ function formatCLP(n){
   return '$' + Math.round(n).toLocaleString('es-CL');
 }
 
+// ── Privacidad ────────────────────────────────────────────────────────
+// El costo empresa del personal PROFESIONAL (cuentas "Personal Profesional") se
+// considera en TODOS los cálculos y totales, pero no se muestra en pantalla.
+// Lo que se descarga (Excel, CSV, JSON, respaldo) sigue llevando los valores reales.
+const OCULTO = '••••••';
+function esCCProfesional(cc){
+  const f = PP_LIST.find(p => p.cc === cc);
+  return !!f && /profesional/i.test(f.cuenta || '');
+}
+const esProfesional = w => !!w && esCCProfesional(w.cc);
+// Monto en pesos / número "-" para mostrar: oculto si el centro de costo es de profesionales.
+const clpDe = (cc, n) => esCCProfesional(cc) ? OCULTO : formatCLP(n);
+const numDe = (cc, n) => esCCProfesional(cc) ? OCULTO : formatNumOrDash(n);
+// Campo de costo de una fila: en profesionales muestra puntos y solo permite reemplazar el valor.
+function atributosCostoInput(w){
+  if(esProfesional(w)) return `type="text" inputmode="numeric" data-oculto="1" onfocus="this.select()" title="Costo oculto por privacidad. Escribe un valor nuevo para reemplazarlo." value="${OCULTO}"`;
+  return `type="number" value="${w.costoManual ?? costoMensual(w) ?? ''}"`;
+}
+
 // most recent REAL monthly cost recorded for this person+cost center (Base costo empresa BUK),
 // falling back to the average by cargo+centro if no real record exists.
 // Most recent real liquidation cost for this person+cc (used for finiquito base, mirrors column L in planilla)
@@ -2021,7 +2053,7 @@ function renderDescuentos(){
 <div style="font-weight:600;">${d.role}</div>
 <div class="cc" style="font-size:12px;color:var(--steel);">${d.cc}</div>
 <div style="font-size:12px;">${PERIOD_LABELS[d.mes] || ''}</div>
-<div style="font-weight:600;color:var(--red);">− ${formatCLP(d.monto)}</div>
+<div style="font-weight:600;color:var(--red);">− ${clpDe(d.cc, d.monto)}</div>
 <div style="font-size:11px;color:var(--steel);font-style:italic;">${d.nota || ''}</div>
 <div><button class="btn btn-ghost btn-sm" data-del-desc="${d.id}"
              style="border-color:var(--red);color:var(--red);">Eliminar</button></div>
@@ -2058,13 +2090,13 @@ function addDescuento(){
   ['dMonto','dNota'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
   renderAll();
   persist(false);
-  toast(`Descuento de ${formatCLP(monto)} aplicado a ${cc} en ${PERIOD_LABELS[idx]}`);
+  toast(`Descuento de ${clpDe(cc, monto)} aplicado a ${cc} en ${PERIOD_LABELS[idx]}`);
 }
 
 function eliminarDescuento(id){
   const d = descuentos.find(x => x.id === id);
   if(!d) return;
-  if(!confirm(`¿Eliminar el descuento de ${formatCLP(d.monto)} en ${d.cc} · ${PERIOD_LABELS[d.mes]}?`)) return;
+  if(!confirm(`¿Eliminar el descuento de ${clpDe(d.cc, d.monto)} en ${d.cc} · ${PERIOD_LABELS[d.mes]}?`)) return;
   descuentos = descuentos.filter(x => x.id !== id);
   renderAll();
   persist(false);
@@ -2136,29 +2168,31 @@ function renderCostoProyectadoTable(ccs, b, startIdx){
     const costoTotal = costoRow.reduce((s,v)=>s+v,0);
     const finTotal = finRow.reduce((s,v)=>s+v,0);
     const isOpen = expandedCC.has(cc);
+    const f = v => numDe(cc, v);   // oculto si es un centro de profesionales
     return `
     <tr class="cc-parent-row">
       <td class="cc-col">
         <button class="toggle-sub" data-cc="${cc}">${isOpen ? '−' : '+'}</button>
         ${cc}<span class="cuenta-name">${cuentaNombre(cc)}</span>
       </td>
-      ${subtotalRow.map(v=>`<td>${formatNumOrDash(v)}</td>`).join('')}
-      <td class="total-col">${formatNumOrDash(rowTotal)}</td>
+      ${subtotalRow.map(v=>`<td>${f(v)}</td>`).join('')}
+      <td class="total-col">${f(rowTotal)}</td>
     </tr>
     <tr class="sub-row cc-child-row" data-parent="${cc}" style="display:${isOpen?'table-row':'none'};">
       <td class="cc-col sub-indent">Costo Liquidación</td>
-      ${costoRow.map(v=>`<td>${formatNumOrDash(v)}</td>`).join('')}
-      <td class="total-col">${formatNumOrDash(costoTotal)}</td>
+      ${costoRow.map(v=>`<td>${f(v)}</td>`).join('')}
+      <td class="total-col">${f(costoTotal)}</td>
     </tr>
     <tr class="sub-row cc-child-row" data-parent="${cc}" style="display:${isOpen?'table-row':'none'};">
       <td class="cc-col sub-indent">Finiquito</td>
-      ${finRow.map(v=>`<td>${formatNumOrDash(v)}</td>`).join('')}
-      <td class="total-col">${formatNumOrDash(finTotal)}</td>
+      ${finRow.map(v=>`<td>${f(v)}</td>`).join('')}
+      <td class="total-col">${f(finTotal)}</td>
     </tr>`;
   }).join('');
 
   return `
     <div class="monthly-table-title">Costo Proyectado</div>
+    ${ccs.some(esCCProfesional) ? `<div style="padding:0 16px 8px;font-size:11.5px;color:var(--steel);">🔒 El costo de <strong>Personal Profesional</strong> está oculto por privacidad (${OCULTO}), pero sí está incluido en los totales.</div>` : ''}
     <div class="monthly-table-scroll">
       <table class="monthly-table">
         <thead><tr>
@@ -2419,14 +2453,14 @@ function renderRoster(){
       }</div>
       <div style="font-size:12.5px;color:var(--ink);">
         ${(w.source==='ingreso' || w.source==='proyectado') ? `
-        <input type="number" data-action="editar-costo" value="${w.costoManual ?? costoMensual(w) ?? ''}" placeholder="Sin dato"
+        <input ${atributosCostoInput(w)} data-action="editar-costo" placeholder="Sin dato"
           style="width:110px;padding:3px 5px;border:1px solid ${w.costoManual!=null?'var(--orange)':'var(--line)'};border-radius:5px;font-size:12px;${w.costoManual!=null?'background:#FFF7ED;':''}">
         ${w.costoManual!=null ? `<button class="btn btn-ghost btn-sm" data-action="quitar-costo-manual" title="Volver al cálculo automático" style="font-size:10px;padding:1px 5px;">↺ auto</button>` : ''}
-        ` : formatCLP(costoMensual(w))}
+        ` : clpDe(w.cc, costoMensual(w))}
       </div>
-      <div style="font-size:12px;color:var(--steel);">${prev ? formatCLP(prevCosto) : '—'}</div>
+      <div style="font-size:12px;color:var(--steel);">${prev ? clpDe(w.cc, prevCosto) : '—'}</div>
       <div style="font-size:12.5px;color:var(--ink);">
-        ${hasEnd ? formatCLP(montoFiniquito(w)) : '—'}
+        ${hasEnd ? clpDe(w.cc, montoFiniquito(w)) : '—'}
         ${hasEnd && finiquitoDetalle(w) ? `<div style="font-size:10.5px;color:var(--steel);margin-top:2px;">${finiquitoDetalle(w)}</div>` : ''}
       </div>
       <div>
@@ -2465,7 +2499,7 @@ function renderRoster(){
     const fcInput = row.querySelector('[data-action="editar-inicio"]');
     if(fcInput) fcInput.onchange = () => setFechaInicio(id, fcInput.value);
     const costoInput = row.querySelector('[data-action="editar-costo"]');
-    if(costoInput) costoInput.onchange = () => setCostoManual(id, costoInput.value);
+    if(costoInput) costoInput.onchange = () => setCostoManual(id, costoInput.value, costoInput.dataset.oculto === '1');
     const cubBtn = row.querySelector('[data-action="cubrir-proyectado"]');
     if(cubBtn) cubBtn.onclick = () => cubrirProyectado(id);
     const quitarCostoBtn = row.querySelector('[data-action="quitar-costo-manual"]');
@@ -2473,15 +2507,25 @@ function renderRoster(){
   });
 }
 
-function setCostoManual(id, value){
+function setCostoManual(id, value, oculto){
   const w = workers.find(x=>x.id===id);
   if(!w) return;
+  if(oculto){
+    // Campo con el costo oculto (profesionales): solo cambia si se escribe un valor nuevo completo.
+    const texto = String(value).trim();
+    if(texto.includes('•')){
+      if(texto !== OCULTO) toast('Escribe el costo completo, reemplazando los puntos');
+      renderRoster(); return;
+    }
+    value = texto.replace(/[^0-9]/g, '');
+    if(!value){ renderRoster(); return; }
+  }
   const n = Number(value);
   if(value === '' || !Number.isFinite(n)){ toast('Ingresa un costo empresa válido'); renderRoster(); return; }
   w.costoManual = Math.round(n);
   renderRoster();
   renderExportPreview();
-  toast(`Costo empresa de ${w.name} fijado a mano en ${formatCLP(w.costoManual)} — no olvides Guardar cambios`);
+  toast(`Costo empresa de ${w.name} fijado a mano en ${clpDe(w.cc, w.costoManual)} — no olvides Guardar cambios`);
 }
 
 function quitarCostoManual(id){
@@ -2646,12 +2690,23 @@ function validateProyectadoRut(){
   return true;
 }
 
+// El campo de costo se oculta (puntos) cuando el centro elegido es de profesionales.
+function actualizarPrivacidadFormProyectado(){
+  const inp = document.getElementById('pCosto');
+  if(!inp) return;
+  const prof = esCCProfesional(document.getElementById('pCC').value);
+  inp.type = prof ? 'password' : 'number';
+  inp.autocomplete = 'off';
+  inp.placeholder = prof ? 'Oculto — se usa el promedio del cargo' : 'Promedio del cargo';
+}
 function updateProyectadoCostPreview(){
+  actualizarPrivacidadFormProyectado();
   const el = document.getElementById('proyectadoCostPreview');
   if(!el) return;
   const role = document.getElementById('pRole').value;
   const cc = document.getElementById('pCC').value;
   if(!role || !cc){ el.textContent='Ingresa cargo y centro para ver el costo proyectado.'; return; }
+  if(esCCProfesional(cc)){ el.textContent = '🔒 Costo empresa oculto por privacidad: se usa en los cálculos (el promedio del cargo, o el valor que escribas).'; return; }
   const cost = costoMensual({rutlimpio:'', cc, role});
   if(cost === null){
     el.innerHTML=`Sin costo promedio registrado para <strong>${role}</strong> en <strong>${cc}</strong>.`;
@@ -2667,7 +2722,8 @@ function addProyectado(){
   const cc   = document.getElementById('pCC').value;
   const desde = document.getElementById('pDesde').value; // YYYY-MM-DD
   const hasta = document.getElementById('pHasta').value; // YYYY-MM-DD
-  const costoInput = document.getElementById('pCosto').value;
+  let costoInput = document.getElementById('pCosto').value;
+  if(esCCProfesional(cc)) costoInput = costoInput.replace(/[^0-9]/g, '');   // campo oculto: solo dígitos
   const costoManual = costoInput !== '' && Number.isFinite(Number(costoInput)) ? Math.round(Number(costoInput)) : null;
   if(!name){ toast('Ingresa el nombre'); return; }
   if(!isValidRutLimpio(rut)){ toast('RUT inválido — 8-9 dígitos sin puntos ni guión'); return; }
@@ -3171,6 +3227,7 @@ function renderAll(){
   renderMotivoFiltro();
   renderObraFiltro();
   renderFechaSalidaFiltro();
+  actualizarBotonFiltros();
   renderRoster();
   renderSugerencias();
  
@@ -3201,7 +3258,7 @@ function renderCostosTabla() {
   wrap.innerHTML = `
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
       <thead><tr style="background:var(--gris-1,#f0f0f0);"><th style="padding:5px 8px;text-align:left;">Centro</th><th style="padding:5px 8px;text-align:left;">Cargo</th><th style="padding:5px 8px;text-align:right;">Monto</th></tr></thead>
-      <tbody>${COSTOS.map(c => `<tr><td style="padding:4px 8px;border-top:1px solid #eee;">${c.cc}</td><td style="padding:4px 8px;border-top:1px solid #eee;">${c.role}</td><td style="padding:4px 8px;border-top:1px solid #eee;text-align:right;">${formatCLP(c.amt)}</td></tr>`).join('')}</tbody>
+      <tbody>${COSTOS.map(c => `<tr><td style="padding:4px 8px;border-top:1px solid #eee;">${c.cc}</td><td style="padding:4px 8px;border-top:1px solid #eee;">${c.role}</td><td style="padding:4px 8px;border-top:1px solid #eee;text-align:right;">${clpDe(c.cc, c.amt)}</td></tr>`).join('')}</tbody>
     </table>`;
 }
 
@@ -3268,7 +3325,7 @@ async function previsualizarProyectadosCSV() {
     html += `<div style="font-size:12px;color:var(--steel);margin-bottom:8px;"><b>${filas.length} persona(s) listas para agregar:</b></div>
       <table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:10px;">
         <thead><tr style="background:var(--gris-1,#f0f0f0);"><th style="padding:4px 6px;text-align:left;">Nombre</th><th style="padding:4px 6px;text-align:left;">Cargo</th><th style="padding:4px 6px;text-align:left;">Centro</th><th style="padding:4px 6px;text-align:left;">Desde</th><th style="padding:4px 6px;text-align:left;">Hasta</th><th style="padding:4px 6px;text-align:right;">Costo</th></tr></thead>
-        <tbody>${filas.map(f => `<tr><td style="padding:3px 6px;border-top:1px solid #eee;">${f.name}</td><td style="padding:3px 6px;border-top:1px solid #eee;">${f.role}</td><td style="padding:3px 6px;border-top:1px solid #eee;">${f.cc}</td><td style="padding:3px 6px;border-top:1px solid #eee;">${f.fc}</td><td style="padding:3px 6px;border-top:1px solid #eee;">${f.fs}</td><td style="padding:3px 6px;border-top:1px solid #eee;text-align:right;">${f.costoManual!=null?formatCLP(f.costoManual):'(automático)'}</td></tr>`).join('')}</tbody>
+        <tbody>${filas.map(f => `<tr><td style="padding:3px 6px;border-top:1px solid #eee;">${f.name}</td><td style="padding:3px 6px;border-top:1px solid #eee;">${f.role}</td><td style="padding:3px 6px;border-top:1px solid #eee;">${f.cc}</td><td style="padding:3px 6px;border-top:1px solid #eee;">${f.fc}</td><td style="padding:3px 6px;border-top:1px solid #eee;">${f.fs}</td><td style="padding:3px 6px;border-top:1px solid #eee;text-align:right;">${f.costoManual!=null?clpDe(f.cc, f.costoManual):'(automático)'}</td></tr>`).join('')}</tbody>
       </table>
       <button class="btn btn-primary btn-sm" onclick="confirmarCargaProyectadosCSV()">Agregar estas ${filas.length} personas</button>`;
   } else if (!errores.length) {
@@ -3341,13 +3398,23 @@ async function cargarHistorialDotacion() {
     wrap.innerHTML = `<div style="font-size:12px;color:var(--red,#c00);">Error al cargar: ${e.message}</div>`;
   }
 }
+// El historial guarda los cambios de costo con su monto. Para profesionales — o si no se
+// sabe de quién es el cambio — el monto se oculta (también en lo que ya estaba guardado).
+function ocultarMontosHistorial(linea){
+  const m = linea.match(/^✏️ Editado: (.+?) — (.*)$/);
+  if(!m || !/costoManual: /.test(m[2])) return linea;
+  const w = workers.find(x => x.name === m[1]);
+  if(w && !esProfesional(w)) return linea;
+  return linea.replace(/costoManual: "[^"]*" → "[^"]*"/g, `costoManual: "${OCULTO}" → "${OCULTO}"`);
+}
+
 function renderHistorialDotacion(historial) {
   const wrap = document.getElementById('historial-dotacion-wrap');
   if (!historial.length) { wrap.innerHTML = '<div style="font-size:12px;color:var(--muted,#777);">Todavía no hay cambios registrados.</div>'; return; }
   wrap.innerHTML = historial.map(h => `
     <div style="padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;">
       <div style="color:var(--muted,#777);margin-bottom:3px;">${new Date(h.fecha).toLocaleString('es-CL')} — ${h.email || 'sin identificar'}</div>
-      ${h.cambios.map(c => `<div>${c}</div>`).join('')}
+      ${h.cambios.map(c => `<div>${ocultarMontosHistorial(c)}</div>`).join('')}
     </div>`).join('');
 }
 
@@ -3388,6 +3455,45 @@ async function init(){
   // actualiza por detrás cuando termine.
   sincronizarConBUK(true);
 }
+
+// ── Barra de filtros anclada: compactar / expandir ────────────────────
+// Compacta deja a la vista el centro de gestión, la obra, la búsqueda y los botones; los
+// demás filtros se muestran con "Más filtros". La elección se recuerda. Si hay filtros
+// escondidos que están activos, el botón lo avisa para que no queden olvidados.
+const FILTROS_SECUNDARIOS = ['periodoFiltro','cargoFiltro','estadoOrigenFiltro','motivoFiltro','fechaSalidaDesde','fechaSalidaHasta'];
+function filtrosSecundariosActivos(){
+  return FILTROS_SECUNDARIOS.filter(id => { const el = document.getElementById(id); return el && el.value !== ''; }).length;
+}
+function actualizarBotonFiltros(){
+  const barra = document.querySelector('.toolbar'), btn = document.getElementById('toggleFiltrosBtn');
+  if(!barra || !btn) return;
+  const compacta = barra.classList.contains('compacta');
+  const n = filtrosSecundariosActivos();
+  btn.innerHTML = compacta
+    ? `▾ Más filtros${n ? `<span class="insignia" title="Filtros activos escondidos">${n}</span>` : ''}`
+    : '▴ Menos filtros';
+  btn.title = compacta
+    ? 'Mostrar los demás filtros (último mes real, vigentes desde, cargo, vigente/proyectado, motivo y fechas de salida)'
+    : 'Ocultar los demás filtros para ganar espacio al bajar por la página';
+}
+function ponerFiltrosCompactos(compacta, guardar){
+  const barra = document.querySelector('.toolbar');
+  if(!barra) return;
+  barra.classList.toggle('compacta', compacta);
+  actualizarBotonFiltros();
+  if(guardar){ try{ localStorage.setItem('dotacionFiltrosCompactos', compacta ? '1' : '0'); }catch(e){} }
+}
+(function initBarraAnclada(){
+  let pref = null; try{ pref = localStorage.getItem('dotacionFiltrosCompactos'); }catch(e){}
+  // Sin preferencia guardada: en pantallas bajas (notebooks) arranca compacta.
+  ponerFiltrosCompactos(pref === null ? window.innerHeight < 820 : pref === '1', false);
+  document.getElementById('toggleFiltrosBtn').addEventListener('click', () =>
+    ponerFiltrosCompactos(!document.querySelector('.toolbar').classList.contains('compacta'), true));
+  FILTROS_SECUNDARIOS.forEach(id => {
+    const el = document.getElementById(id);
+    if(el){ el.addEventListener('change', actualizarBotonFiltros); el.addEventListener('input', actualizarBotonFiltros); }
+  });
+})();
 
 initAuth();
 </script>
