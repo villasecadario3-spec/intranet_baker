@@ -281,8 +281,18 @@
         <div class="modal-titulo" id="modal-titulo">Subir documento</div>
         <div class="modal-form-group" id="grupo-carpeta">
             <label class="modal-label">Carpeta *</label>
-            <select class="modal-input" id="m-carpeta">
+            <select class="modal-input" id="m-carpeta" onchange="actualizarSubcarpetasModal()">
                 <option value="">Selecciona una carpeta…</option>
+            </select>
+        </div>
+        <div class="modal-form-group" id="grupo-subcarpeta" style="display:none;">
+            <label class="modal-label">Obra *</label>
+            <select class="modal-input" id="m-subcarpeta">
+                <option value="">Selecciona la obra…</option>
+            </select>
+            <label class="modal-label" style="margin-top:10px;">Categoría *</label>
+            <select class="modal-input" id="m-categoria" onchange="actualizarFlujoModal()">
+                <option value="">Selecciona la categoría…</option>
             </select>
         </div>
         <div class="modal-form-group" id="grupo-area" style="display:none;">
@@ -304,13 +314,22 @@
             <div id="m-obras-chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
         </div>
         <div class="modal-form-group" id="grupo-firma">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
+            <label id="m-requiere-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
                 <input type="checkbox" id="m-requiere-firma" onchange="toggleFirmantesUI()">
                 ¿Necesita firmantes?
             </label>
+            <div id="m-flujo-estandar" style="display:none;margin-bottom:12px;">
+                <label class="modal-label">Flujo de firmas (fijo, en este orden)</label>
+                <div id="m-flujo-lista" style="font-size:0.8rem;line-height:1.7;margin-bottom:10px;"></div>
+                <label class="modal-label">Correo del administrador de obra *</label>
+                <input class="modal-input" id="m-admin-email" type="email" placeholder="nombre@ibaker.cl" oninput="actualizarFlujoModal()">
+                <div style="font-size:0.72rem;color:var(--txt-dim,#999);margin-top:4px;">Firma al final. Lo ingresas al subir el documento y después no se puede cambiar.</div>
+            </div>
             <div id="grupo-firmantes" style="display:none;margin-top:10px;">
+                <div id="m-firmantes-manual">
                 <label class="modal-label">¿Quiénes deben firmar?</label>
                 <div id="m-firmantes-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;"></div>
+                </div>
                 <div id="m-firma-aviso-no-pdf" style="display:none;background:rgba(184,134,11,0.1);color:#8a6508;padding:8px 12px;border-radius:8px;font-size:0.76rem;margin-bottom:10px;">
                     ⚠ Este archivo no es PDF — la firma quedará registrada, pero no se va a estampar un sello visual dentro del documento.
                 </div>
@@ -367,14 +386,30 @@ const CARPETAS = [
     'Control de Gestión y TI', 'Proyectos', 'Estudios y Bodegas',
     'Adquisiciones', 'Entidades Patrocinantes', 'Personas', 'Obras'
 ];
+// Carpeta Obras: Obras → cada obra → las 4 categorías (mismas que en server.js).
+const CARPETA_OBRAS = 'Obras';
+const OBRAS_CONSTRUCCION = ['Mirador El Águila', 'Mirador El Pino', 'Portal Los Maitenes', 'Portal Oriente Melipilla', 'Portal El Abra'];
+const CATEGORIAS_OBRA = ['Procedimientos constructivos', 'Calidad y protocolos de inspección', 'Prevención de riesgos y seguridad', 'Subcontratos'];
+// Flujo estándar de firmas en Obras (lo hace cumplir el servidor, esto solo lo muestra).
+const NOMBRES_FIRMANTES_FIJOS = { 'mmatamala@ibaker.cl': 'Matias Matamala', 'jdiaz@ibaker.cl': 'Jorge Diaz' };
+function firmantesFijosObra(categoria) {
+    return categoria === 'Procedimientos constructivos' ? ['mmatamala@ibaker.cl', 'jdiaz@ibaker.cl'] : ['jdiaz@ibaker.cl'];
+}
+const DOMINIOS_EMPRESA = ['ibaker.cl', 'cmcromeral.cl', 'epbrotar.cl'];
+function correoAdminValido(e) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && DOMINIOS_EMPRESA.includes(e.split('@')[1]);
+}
 
 let emailActual = '';
 let nombreActual = '';
 let archivosSeleccionados = []; // [{file, base64, tipo}]
 let docsGithub = [];
 let carpetaActual = null; // null = viendo la grilla de carpetas
+let subcarpetaActual = null; // la obra, dentro de Obras (null = en la raíz de la carpeta)
+let categoriaActual = null;  // la categoría, dentro de una obra
+let flujoObrasForzado = false; // true mientras el formulario fuerza el flujo estándar de Obras
 let tipoSubidaActual = 'procedimiento'; // 'procedimiento' | 'comunicacion'
-const OBRAS_ACTIVAS_PROC = ['Los Molinos', 'Portal el Abra', 'Mirador El Águila', 'Portal Los Maitenes', 'Portal Oriente', 'Mirador El Pino'];
+const OBRAS_ACTIVAS_PROC = OBRAS_CONSTRUCCION.slice();
 const SUBIDORES_PROCEDIMIENTOS = ['dvillaseca@ibaker.cl', 'jcumplido@ibaker.cl', 'phenriquez@ibaker.cl'];
 const FIRMANTES_DISPONIBLES = ['dvillaseca@ibaker.cl','jcumplido@ibaker.cl','bsilva@ibaker.cl','alarrain@ibaker.cl','amolina@ibaker.cl','cgarces@ibaker.cl','pzuniga@ibaker.cl','pablo@cmcromeral.cl','crivera@ibaker.cl','jdiaz@ibaker.cl'];
 let firmantesSeleccionadosModal = new Set();
@@ -432,6 +467,44 @@ async function initAuth() {
     } catch(e) { window.location.href = 'index.html'; }
 }
 
+// Describe el flujo de firmas según la categoría y el correo escrito.
+function actualizarFlujoModal() {
+    const cat = document.getElementById('m-categoria').value;
+    const admin = (document.getElementById('m-admin-email').value || '').trim().toLowerCase();
+    const cont = document.getElementById('m-flujo-lista');
+    if (!cat) { cont.innerHTML = '<span style="color:var(--txt-dim,#999);">Elige la categoría para ver quiénes firman.</span>'; return; }
+    const pasos = firmantesFijosObra(cat).map(e => `${NOMBRES_FIRMANTES_FIJOS[e] || e} (${e})`)
+        .concat([`Administrador de obra (${admin || 'correo por ingresar'})`]);
+    cont.innerHTML = pasos.map((t, i) => `<div>${i + 1}. ${t}</div>`).join('');
+}
+
+// En la carpeta Obras se elige obra y categoría, y el flujo de firmas es fijo
+// (no se eligen firmantes a mano ni se etiquetan obras: la obra ya es la carpeta).
+function actualizarSubcarpetasModal() {
+    const esObras = tipoSubidaActual === 'procedimiento' && document.getElementById('m-carpeta').value === CARPETA_OBRAS;
+    const selObra = document.getElementById('m-subcarpeta'), selCat = document.getElementById('m-categoria');
+    document.getElementById('grupo-subcarpeta').style.display = esObras ? '' : 'none';
+    if (esObras) {
+        if (selObra.options.length <= 1) selObra.innerHTML = '<option value="">Selecciona la obra…</option>' + OBRAS_CONSTRUCCION.map(o => `<option value="${o}">${o}</option>`).join('');
+        if (selCat.options.length <= 1) selCat.innerHTML = '<option value="">Selecciona la categoría…</option>' + CATEGORIAS_OBRA.map(c => `<option value="${c}">${c}</option>`).join('');
+    } else {
+        selObra.innerHTML = '<option value="">Selecciona la obra…</option>';
+        selCat.innerHTML = '<option value="">Selecciona la categoría…</option>';
+        document.getElementById('m-admin-email').value = '';
+    }
+    document.getElementById('m-flujo-estandar').style.display = esObras ? '' : 'none';
+    document.getElementById('m-requiere-label').style.display = esObras ? 'none' : '';
+    document.getElementById('m-firmantes-manual').style.display = esObras ? 'none' : '';
+    const grupoObras = document.getElementById('grupo-obras');
+    if (grupoObras) grupoObras.style.display = (tipoSubidaActual === 'procedimiento' && !esObras) ? '' : 'none';
+    const chk = document.getElementById('m-requiere-firma');
+    if (esObras) chk.checked = true;
+    else if (flujoObrasForzado) chk.checked = false;
+    flujoObrasForzado = esObras;
+    toggleFirmantesUI();
+    actualizarFlujoModal();
+}
+
 function poblarSelectorCarpetas() {
     const sel = document.getElementById('m-carpeta');
     CARPETAS.forEach(c => {
@@ -470,21 +543,45 @@ function renderCarpetas() {
             if (!el) return;
             if (!res.ok) { el.textContent = '0 documentos'; return; }
             const files = await res.json();
-            const n = Array.isArray(files) ? files.length : 0;
+            const n = Array.isArray(files) ? contarDocumentos(files) : 0;
             el.textContent = n === 1 ? '1 documento' : `${n} documentos`;
         } catch(e) {}
     });
 }
 
-async function abrirCarpeta(nombre) {
-    carpetaActual = nombre;
+function escAttr(t) { return String(t).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+
+// Clave con la que se registra quién vio/descargó un documento. Incluye la
+// obra y la categoría para no mezclar archivos de igual nombre.
+function claveAcceso() {
+    return [carpetaActual, subcarpetaActual, categoriaActual].filter(Boolean).join(' - ');
+}
+
+function renderBreadcrumb() {
+    const bc = document.getElementById('breadcrumb');
+    bc.style.display = 'flex';
+    const niveles = [carpetaActual, subcarpetaActual, categoriaActual].filter(Boolean);
+    const partes = [`<a onclick="volverACarpetas()">Carpetas</a>`].concat(niveles.map((n, i) =>
+        i === niveles.length - 1 ? `<span class="actual">${n}</span>` : `<a onclick="irANivel(${i})">${n}</a>`));
+    bc.innerHTML = partes.join('<span class="sep">/</span>');
+    document.getElementById('search').placeholder = `Buscar en ${niveles[niveles.length - 1]}…`;
+}
+
+// 0 = raíz de la carpeta (ej. Obras), 1 = dentro de una obra
+function irANivel(i) {
+    if (i === 0) subcarpetaActual = null;
+    categoriaActual = null;
     document.getElementById('search').value = '';
-    document.getElementById('search').placeholder = `Buscar en ${nombre}…`;
-    document.getElementById('breadcrumb').style.display = 'flex';
-    document.getElementById('breadcrumb').innerHTML = `
-        <a onclick="volverACarpetas()">Carpetas</a>
-        <span class="sep">/</span>
-        <span class="actual">${nombre}</span>`;
+    renderBreadcrumb();
+    renderDocs();
+}
+
+async function abrirCarpeta(nombre, sub, cat) {
+    carpetaActual = nombre;
+    subcarpetaActual = sub || null;
+    categoriaActual = cat || null;
+    document.getElementById('search').value = '';
+    renderBreadcrumb();
 
     const lista = document.getElementById('doc-list');
     lista.innerHTML = `<div class="empty">Cargando documentos…</div>`;
@@ -499,11 +596,15 @@ async function abrirCarpeta(nombre) {
         docsAprobadosCache = await resAprobados.json().catch(() => []);
         docsGithub = (Array.isArray(files) ? files : [])
             .map(f => {
-                const meta = docsAprobadosCache.find(m => m.archivoGithub === f.nombre && m.carpeta === nombre);
+                const meta = docsAprobadosCache.find(m => m.archivoGithub === f.nombre && m.carpeta === nombre
+                    && (m.subcarpeta || '') === (f.subcarpeta || '') && (m.categoria || '') === (f.categoria || ''));
                 return {
                     nombre: f.nombre.replace(/\.[^.]+$/, ''),
-                    archivo: `docs/${nombre}/${f.nombre}`,
+                    archivoNombre: f.nombre,
+                    archivo: ['docs', nombre, f.subcarpeta, f.categoria, f.nombre].filter(Boolean).join('/'),
                     tipo:    f.nombre.split('.').pop().toUpperCase(),
+                    subcarpeta: f.subcarpeta || '',
+                    categoria: f.categoria || '',
                     fecha:   '',
                     githubUrl: f.url,
                     meta: meta || null,
@@ -517,8 +618,24 @@ async function abrirCarpeta(nombre) {
     renderDocs();
 }
 
+function abrirSubcarpeta(obra) {
+    subcarpetaActual = obra;
+    categoriaActual = null;
+    document.getElementById('search').value = '';
+    renderBreadcrumb();
+    renderDocs();
+}
+function abrirCategoria(cat) {
+    categoriaActual = cat;
+    document.getElementById('search').value = '';
+    renderBreadcrumb();
+    renderDocs();
+}
+
 function volverACarpetas() {
     carpetaActual = null;
+    subcarpetaActual = null;
+    categoriaActual = null;
     document.getElementById('search').value = '';
     renderCarpetas();
 }
@@ -538,64 +655,234 @@ function cambiarFiltroObra(valor) {
     renderDocs();
 }
 
-function renderDocs() {
-    const query = document.getElementById('search').value.toLowerCase();
-    let filtrados = query ? docsGithub.filter(d => d.nombre.toLowerCase().includes(query)) : docsGithub;
-    if (filtroObraPublicados) filtrados = filtrados.filter(d => (d.meta?.obras || []).includes(filtroObraPublicados));
+// ── Versiones ────────────────────────────────────────────────────
+// Un archivo nuevo con el mismo nombre en la misma carpeta (o subcarpeta)
+// es una versión nueva del documento: pasa a ser la vigente, y las
+// anteriores quedan visibles con su fecha pero sin poder abrirse ni
+// descargarse. El servidor ya agrega " (1)", " (2)"… al repetir un nombre.
+function extensionDe(archivoNombre) {
+    const m = archivoNombre.match(/\.([^.]+)$/);
+    return m ? m[1].toLowerCase() : '';
+}
+function baseSinVersion(archivoNombre) {
+    return archivoNombre.replace(/\.[^.]+$/, '').replace(/\s*\(\d+\)\s*$/, '').trim();
+}
+function numeroSufijo(archivoNombre) {
+    const m = archivoNombre.replace(/\.[^.]+$/, '').match(/\((\d+)\)\s*$/);
+    return m ? parseInt(m[1], 10) : 0;
+}
+function claveDocumento(d) {
+    return `${d.subcarpeta || ''}||${d.categoria || ''}||${baseSinVersion(d.archivoNombre).toLowerCase().replace(/\s+/g, ' ')}||${extensionDe(d.archivoNombre)}`;
+}
+function contarDocumentos(files) {
+    return new Set(files.map(f => claveDocumento({ archivoNombre: f.nombre, subcarpeta: f.subcarpeta, categoria: f.categoria }))).size;
+}
+function marcaTiempo(d) {
+    return d.meta && d.meta.fechaAprobacion ? Date.parse(d.meta.fechaAprobacion) : null;
+}
+// Orden ascendente: la versión más antigua primero.
+function compararVersiones(a, b) {
+    const ta = marcaTiempo(a), tb = marcaTiempo(b);
+    if (ta !== null && tb !== null && ta !== tb) return ta - tb;
+    const na = numeroSufijo(a.archivoNombre), nb = numeroSufijo(b.archivoNombre);
+    if (na !== nb) return na - nb;
+    return a.archivoNombre.localeCompare(b.archivoNombre);
+}
+// Una versión "cuenta" como vigente si no necesita firmas o ya las tiene todas.
+function versionValida(d) {
+    const m = d.meta;
+    return !m || !m.requiereFirma || m.estadoFirma === 'vigente';
+}
+function fechaCorta(iso) { return new Date(iso).toLocaleDateString('es-CL'); }
+// Desde cuándo rige una versión: la última firma si requería firmas; si no, su aprobación.
+function fechaVigencia(d) {
+    const m = d.meta;
+    if (!m) return null;
+    if (m.requiereFirma && Array.isArray(m.firmas) && m.firmas.length) return m.firmas[m.firmas.length - 1].fecha;
+    return m.fechaAprobacion || null;
+}
 
-    const lista = document.getElementById('doc-list');
-    if (filtrados.length === 0) {
-        lista.innerHTML = `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div>No hay documentos en esta carpeta todavía</div></div>`;
-        return;
+// Devuelve [{ nombreBase, actual, enFirma:[…], anteriores:[…], total }]
+//  - actual:    la versión más reciente que ya es válida (la única que se abre)
+//  - enFirma:   versiones más nuevas que todavía esperan firmas
+//  - anteriores: versiones reemplazadas (más nueva primero)
+function agruparVersiones(docs) {
+    const porClave = new Map();
+    docs.forEach(d => {
+        const k = claveDocumento(d);
+        if (!porClave.has(k)) porClave.set(k, []);
+        porClave.get(k).push(d);
+    });
+    const grupos = [...porClave.values()].map(lista => {
+        lista.sort(compararVersiones);
+        const nombreBase = baseSinVersion(lista[0].archivoNombre);
+        lista.forEach((d, i) => { d.version = i + 1; d.nombreMostrado = lista.length > 1 ? nombreBase : d.nombre; });
+        let idx = lista.length - 1;
+        for (let i = lista.length - 1; i >= 0; i--) { if (versionValida(lista[i])) { idx = i; break; } }
+        return {
+            nombreBase,
+            actual: lista[idx],
+            enFirma: lista.slice(idx + 1),
+            anteriores: lista.slice(0, idx).reverse(),
+            total: lista.length,
+        };
+    });
+    grupos.sort((a, b) => a.nombreBase.localeCompare(b.nombreBase));
+    return grupos;
+}
+
+const ICONO_DOC = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`;
+
+// Tarjeta de un documento que SÍ se puede abrir (la vigente o una en firma).
+function htmlTarjetaDoc(doc, etiquetaVersion) {
+    const url = doc.githubUrl || doc.archivo;
+    const esPdf = doc.tipo.toLowerCase() === 'pdf';
+    const meta = doc.meta;
+    const claveAcc = escAttr(claveAcceso());
+    const archivoClave = escAttr(doc.nombre + '.' + doc.tipo);
+    const obrasTxt = meta?.obras?.length ? `<div class="doc-meta">🏗 ${meta.obras.join(', ')}</div>` : '';
+    let firmaHtml = '';
+    if (meta?.requiereFirma) {
+        const ordenado = !!meta.ordenFirma;
+        const yaFirme = meta.firmas.some(f => f.email === emailActual);
+        const vigente = meta.estadoFirma === 'vigente';
+        // En un flujo en fila solo puede firmar quien sigue en la lista.
+        const esMiTurno = !ordenado || meta.firmantesRequeridos[meta.firmas.length] === emailActual;
+        const puedeFirmar = meta.firmantesRequeridos.includes(emailActual) && !yaFirme && esMiTurno;
+        const fechaFirma = f => new Date(f.fecha).toLocaleString('es-CL',{dateStyle:'short',timeStyle:'short'});
+        const lineasFirmas = ordenado
+            ? meta.firmantesRequeridos.map((email, i) => {
+                const f = meta.firmas[i];
+                if (f) return `<div style="color:var(--txt-dim,#999);">✔ ${f.nombre} — ${fechaFirma(f)}</div>`;
+                if (i === meta.firmas.length) return `<div style="color:#b8860b;">⏳ Turno de ${email}${email === emailActual ? ' (tú)' : ''}</div>`;
+                return `<div style="color:#bbb;">· En espera: ${email}</div>`;
+            }).join('')
+            : meta.firmas.map(f => `<div style="color:var(--txt-dim,#999);">✔ ${f.nombre} — ${fechaFirma(f)}</div>`).join('');
+        firmaHtml = `
+            <div style="margin-top:6px;font-size:0.72rem;">
+                <span style="font-weight:700;color:${vigente ? 'var(--verde,#1a7a4a)' : '#b8860b'};">
+                    ${vigente ? '✅ Vigente — todas las firmas completas' : `⏳ Faltan firmas (${meta.firmas.length}/${meta.firmantesRequeridos.length})`}
+                </span>
+                ${lineasFirmas}
+                ${puedeFirmar ? `<button class="btn-doc btn-dl" style="margin-top:4px;" onclick="firmarDocumento('${meta.id}')">✍️ Firmar</button>` : ''}
+            </div>`;
     }
-
-    lista.innerHTML = filtrados.map(doc => {
-        const url = doc.githubUrl || doc.archivo;
-        const esPdf = doc.tipo.toLowerCase() === 'pdf';
-        const meta = doc.meta;
-        const obrasTxt = meta?.obras?.length ? `<div class="doc-meta">🏗 ${meta.obras.join(', ')}</div>` : '';
-        let firmaHtml = '';
-        if (meta?.requiereFirma) {
-            const yaFirme = meta.firmas.some(f => f.email === emailActual);
-            const puedeFirmar = meta.firmantesRequeridos.includes(emailActual) && !yaFirme;
-            const vigente = meta.estadoFirma === 'vigente';
-            firmaHtml = `
-                <div style="margin-top:6px;font-size:0.72rem;">
-                    <span style="font-weight:700;color:${vigente ? 'var(--verde,#1a7a4a)' : '#b8860b'};">
-                        ${vigente ? '✅ Vigente — todas las firmas completas' : `⏳ Faltan firmas (${meta.firmas.length}/${meta.firmantesRequeridos.length})`}
-                    </span>
-                    ${meta.firmas.map(f => `<div style="color:var(--txt-dim,#999);">✔ ${f.nombre} — ${new Date(f.fecha).toLocaleString('es-CL',{dateStyle:'short',timeStyle:'short'})}</div>`).join('')}
-                    ${puedeFirmar ? `<button class="btn-doc btn-dl" style="margin-top:4px;" onclick="firmarDocumento('${meta.id}')">✍️ Firmar</button>` : ''}
-                </div>`;
-        }
-        return `
+    const etiqueta = etiquetaVersion ? `<div class="doc-meta" style="font-weight:600;color:var(--verde,#1a7a4a);">${etiquetaVersion}</div>` : '';
+    return `
         <div class="doc-card">
-            <div class="doc-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            </div>
+            <div class="doc-icon">${ICONO_DOC}</div>
             <div class="doc-info">
-                <div class="doc-nombre">${doc.nombre}</div>
+                <div class="doc-nombre">${doc.nombreMostrado || doc.nombre}</div>
                 <div class="doc-meta">${doc.tipo}${doc.fecha ? ' · ' + doc.fecha : ''}</div>
+                ${etiqueta}
                 ${obrasTxt}
                 ${firmaHtml}
             </div>
             <div class="doc-acciones">
                 ${esPdf ? `
-                <button class="btn-doc btn-ver" onclick="verDocumento('${url}', '${(doc.nombre+'.'+doc.tipo).replace(/'/g,"\\'")}', '${carpetaActual.replace(/'/g,"\\'")}')">
+                <button class="btn-doc btn-ver" onclick="verDocumento('${url}', '${archivoClave}', '${claveAcc}')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                     Ver
                 </button>` : ''}
-                <a class="btn-doc btn-dl" href="${url}" download onclick="registrarAcceso('${carpetaActual.replace(/'/g,"\\'")}', '${(doc.nombre+'.'+doc.tipo).replace(/'/g,"\\'")}', 'descargar')">
+                <a class="btn-doc btn-dl" href="${url}" download onclick="registrarAcceso('${claveAcc}', '${archivoClave}', 'descargar')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     Descargar
                 </a>
                 ${SUBIDORES_PROCEDIMIENTOS.includes(emailActual) ? `
-                <button class="btn-doc btn-dl" onclick="verHistorialAcceso('${carpetaActual.replace(/'/g,"\\'")}', '${(doc.nombre+'.'+doc.tipo).replace(/'/g,"\\'")}')" title="Ver quién lo vio o descargó">
+                <button class="btn-doc btn-dl" onclick="verHistorialAcceso('${claveAcc}', '${archivoClave}')" title="Ver quién lo vio o descargó">
                     📊
                 </button>` : ''}
             </div>
         </div>`;
-    }).join('');
+}
+
+// Versión reemplazada: visible y con fecha, pero sin botones y no seleccionable.
+function htmlVersionAnterior(d, reemplazadaEl) {
+    const subida = d.meta && d.meta.fechaAprobacion ? fechaCorta(d.meta.fechaAprobacion) : 'fecha no registrada';
+    const reemplazo = reemplazadaEl ? ` · Reemplazada el ${fechaCorta(reemplazadaEl)}` : '';
+    return `
+        <div class="doc-card doc-obsoleta" aria-disabled="true"
+             style="opacity:.55;background:#f3f3f3;pointer-events:none;user-select:none;-webkit-user-select:none;margin-left:28px;padding-top:8px;padding-bottom:8px;">
+            <div class="doc-icon" style="filter:grayscale(1);">${ICONO_DOC}</div>
+            <div class="doc-info">
+                <div class="doc-nombre" style="font-size:0.84rem;">${d.nombreMostrado || d.nombre}
+                    <span style="font-size:0.68rem;font-weight:600;color:#777;margin-left:6px;">Versión ${d.version} · no vigente</span>
+                </div>
+                <div class="doc-meta">Subida el ${subida}${reemplazo}</div>
+            </div>
+        </div>`;
+}
+
+function htmlGrupo(g) {
+    let html = '';
+    g.enFirma.forEach(d => {
+        html += htmlTarjetaDoc(d, `Versión ${d.version} — en proceso de firma (sigue rigiendo la versión ${g.actual.version})`);
+    });
+    let etiquetaActual = '';
+    if (g.total > 1) {
+        const desde = fechaVigencia(g.actual);
+        etiquetaActual = `Versión ${g.actual.version} · vigente${desde ? ' desde ' + fechaCorta(desde) : ''}`;
+    }
+    html += htmlTarjetaDoc(g.actual, etiquetaActual);
+    const fechaReemplazo = fechaVigencia(g.actual);
+    g.anteriores.forEach(d => { html += htmlVersionAnterior(d, fechaReemplazo); });
+    return `<div class="doc-grupo" style="margin-bottom:10px;">${html}</div>`;
+}
+
+// ── Niveles de la carpeta Obras: Obras → obra → categoría ──
+function hijosDelNivel() {
+    if (carpetaActual !== CARPETA_OBRAS) return { tipo: null, nombres: [] };
+    if (!subcarpetaActual) return { tipo: 'obra', nombres: OBRAS_CONSTRUCCION };
+    if (!categoriaActual) return { tipo: 'categoria', nombres: CATEGORIAS_OBRA };
+    return { tipo: null, nombres: [] };
+}
+// Documentos que viven directamente en el nivel actual. En la raíz de Obras
+// quedan también los antiguos que no pertenecen a ninguna obra.
+function docsDelNivel() {
+    if (carpetaActual !== CARPETA_OBRAS) return docsGithub;
+    if (!subcarpetaActual) return docsGithub.filter(d => !OBRAS_CONSTRUCCION.includes(d.subcarpeta));
+    if (!categoriaActual) return docsGithub.filter(d => d.subcarpeta === subcarpetaActual && !CATEGORIAS_OBRA.includes(d.categoria));
+    return docsGithub.filter(d => d.subcarpeta === subcarpetaActual && d.categoria === categoriaActual);
+}
+function docsDeHijo(nombre, tipo) {
+    return docsGithub.filter(d => tipo === 'obra' ? d.subcarpeta === nombre : (d.subcarpeta === subcarpetaActual && d.categoria === nombre));
+}
+
+function htmlTarjetasHijos(nombres, tipo) {
+    const abrir = tipo === 'obra' ? 'abrirSubcarpeta' : 'abrirCategoria';
+    return `<div class="carpetas-grid" style="margin-bottom:18px;">${nombres.map(n => {
+        const cant = agruparVersiones(docsDeHijo(n, tipo)).length;
+        return `
+        <div class="carpeta-card" onclick="${abrir}('${escAttr(n)}')">
+            <div class="carpeta-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+            </div>
+            <div class="carpeta-nombre">${n}</div>
+            <div class="carpeta-count">${cant === 1 ? '1 documento' : cant + ' documentos'}</div>
+        </div>`;
+    }).join('')}</div>`;
+}
+
+function renderDocs() {
+    const query = document.getElementById('search').value.toLowerCase();
+    const lista = document.getElementById('doc-list');
+    const { tipo, nombres } = hijosDelNivel();
+
+    // Tarjetas de las carpetas del nivel (obras o categorías) y, debajo, los
+    // documentos que hayan quedado sueltos en este nivel.
+    const hijosVisibles = nombres.filter(n => !query || n.toLowerCase().includes(query));
+    const htmlHijos = hijosVisibles.length ? htmlTarjetasHijos(hijosVisibles, tipo) : '';
+
+    let grupos = agruparVersiones(docsDelNivel());
+    if (query) grupos = grupos.filter(g => g.nombreBase.toLowerCase().includes(query));
+    if (filtroObraPublicados) grupos = grupos.filter(g => (g.actual.meta?.obras || []).includes(filtroObraPublicados));
+
+    if (!grupos.length) {
+        lista.innerHTML = htmlHijos || `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div>No hay documentos en esta carpeta todavía</div></div>`;
+        return;
+    }
+    const separador = htmlHijos ? `<div style="font-size:0.74rem;font-weight:700;color:var(--txt-dim,#999);text-transform:uppercase;letter-spacing:.04em;margin:4px 0 8px;">Documentos sueltos en ${subcarpetaActual || carpetaActual}</div>` : '';
+    lista.innerHTML = htmlHijos + separador + grupos.map(htmlGrupo).join('');
 }
 
 async function verDocumento(url, nombreArchivo, carpetaOArea) {
@@ -650,7 +937,8 @@ function renderPendientes(lista) {
             <div class="pend-header">
                 <div>
                     <div class="pend-nombre">${doc.nombre}</div>
-                    ${doc.tipoDoc === 'comunicacion' ? `<span class="carpeta-badge">📢 ${doc.area}</span>` : (doc.carpeta ? `<span class="carpeta-badge">${doc.carpeta}</span>` : '')}
+                    ${doc.tipoDoc === 'comunicacion' ? `<span class="carpeta-badge">📢 ${doc.area}</span>` : (doc.carpeta ? `<span class="carpeta-badge">${doc.carpeta}${doc.subcarpeta ? ' › ' + doc.subcarpeta : ''}${doc.categoria ? ' › ' + doc.categoria : ''}</span>` : '')}
+                    ${doc.adminObraEmail ? `<div class="doc-meta" style="margin-top:4px;">✍️ Firman en este orden: ${doc.firmantesRequeridos.join(' → ')}</div>` : ''}
                     <div class="pend-meta">
                         Subido por <strong>${doc.subidoPor}</strong> · 
                         ${new Date(doc.fecha).toLocaleDateString('es-CL', {day:'numeric', month:'long', year:'numeric'})}
@@ -708,7 +996,7 @@ async function aprobar(id) {
         await aprobarUno(id);
         mostrarToast('Documento publicado correctamente', 'ok');
         cargarPendientes();
-        if (carpetaActual) abrirCarpeta(carpetaActual); else renderCarpetas();
+        if (carpetaActual) abrirCarpeta(carpetaActual, subcarpetaActual, categoriaActual); else renderCarpetas();
     } catch(e) {
         mostrarToast('Error al aprobar: ' + e.message, 'err');
     }
@@ -762,7 +1050,7 @@ async function aprobarSeleccionados() {
     pendientesSeleccionados.clear();
     btn.innerHTML = '✓ Aprobar seleccionados';
     cargarPendientes();
-    if (carpetaActual) abrirCarpeta(carpetaActual); else renderCarpetas();
+    if (carpetaActual) abrirCarpeta(carpetaActual, subcarpetaActual, categoriaActual); else renderCarpetas();
 
     if (fallidos.length === 0) {
         mostrarToast(`${ok} documento${ok>1?'s':''} publicado${ok>1?'s':''} correctamente`, 'ok');
@@ -971,6 +1259,7 @@ function abrirModal(tipoDoc) {
     document.getElementById('grupo-area').style.display = tipoSubidaActual === 'comunicacion' ? '' : 'none';
     document.getElementById('grupo-obras').style.display = tipoSubidaActual === 'procedimiento' ? '' : 'none';
     document.getElementById('grupo-firma').style.display = tipoSubidaActual === 'procedimiento' ? '' : 'none';
+    actualizarSubcarpetasModal();
     obrasSeleccionadasModal = new Set();
     ultimoRenderFirmaKey = null;
     firmaXSeleccionado = null; firmaYSeleccionado = null;
@@ -1083,6 +1372,7 @@ function toggleFirmanteModal(email) {
 function cerrarModal() {
     document.getElementById('modal-overlay').classList.remove('visible');
     document.getElementById('m-carpeta').value = '';
+    actualizarSubcarpetasModal();
     document.getElementById('m-area').value = '';
     document.getElementById('m-nombre').value = '';
     document.getElementById('m-desc').value = '';
@@ -1163,6 +1453,13 @@ async function enviarDocumento() {
     const area = esComunicacion ? document.getElementById('m-area').value : '';
     if (esComunicacion && !area) { alert('Selecciona un área'); return; }
     if (!esComunicacion && !carpeta) { alert('Selecciona una carpeta'); return; }
+    const esObras = !esComunicacion && carpeta === CARPETA_OBRAS;
+    const subcarpeta = esObras ? document.getElementById('m-subcarpeta').value : '';
+    const categoria = esObras ? document.getElementById('m-categoria').value : '';
+    const adminObraEmail = esObras ? document.getElementById('m-admin-email').value.trim().toLowerCase() : '';
+    if (esObras && !subcarpeta) { alert('Selecciona la obra'); return; }
+    if (esObras && !categoria) { alert('Selecciona la categoría'); return; }
+    if (esObras && !correoAdminValido(adminObraEmail)) { alert('Ingresa el correo corporativo del administrador de obra'); return; }
     if (archivosSeleccionados.length === 0) { alert('Selecciona uno o más archivos'); return; }
 
     const esMasivo = archivosSeleccionados.length > 1;
@@ -1186,9 +1483,9 @@ async function enviarDocumento() {
                 : document.getElementById('m-nombre').value.trim();
             const desc = esMasivo ? '' : document.getElementById('m-desc').value.trim();
 
-            const requiereFirma = document.getElementById('m-requiere-firma').checked;
-            const firmantesRequeridos = requiereFirma ? [...firmantesSeleccionadosModal] : [];
-            if (requiereFirma && !firmantesRequeridos.length) { alert('Selecciona al menos un firmante'); btn.disabled = false; return; }
+            const requiereFirma = esObras ? true : document.getElementById('m-requiere-firma').checked;
+            const firmantesRequeridos = (requiereFirma && !esObras) ? [...firmantesSeleccionadosModal] : [];
+            if (requiereFirma && !esObras && !firmantesRequeridos.length) { alert('Selecciona al menos un firmante'); btn.disabled = false; return; }
             const firmaPagina = document.getElementById('m-firma-pagina').value;
             const res = await fetch(`${API}/docs/pendiente`, {
                 method: 'POST',
@@ -1201,8 +1498,11 @@ async function enviarDocumento() {
                     archivoNombreOriginal: a.nombreOriginal,
                     tipoDoc: tipoSubidaActual,
                     carpeta: esComunicacion ? undefined : carpeta,
+                    subcarpeta: subcarpeta || undefined,
+                    categoria: categoria || undefined,
+                    adminObraEmail: adminObraEmail || undefined,
                     area: esComunicacion ? area : undefined,
-                    obras: esComunicacion ? undefined : [...obrasSeleccionadasModal],
+                    obras: esComunicacion ? undefined : (esObras ? [subcarpeta] : [...obrasSeleccionadasModal]),
                     requiereFirma: esComunicacion ? false : requiereFirma,
                     firmantesRequeridos: esComunicacion ? [] : firmantesRequeridos,
                     firmaPagina: esComunicacion ? undefined : firmaPagina,
@@ -1227,6 +1527,7 @@ async function enviarDocumento() {
 }
 
 // ── TOAST ─────────────────────────────────────────────────────
+
 function registrarAcceso(carpetaOArea, archivoNombre, tipo) {
     fetch(`${API}/docs/registrar-acceso`, {
         method: 'POST',
@@ -1271,7 +1572,7 @@ async function firmarDocumento(id) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Error al firmar');
         mostrarToast(data.estadoFirma === 'vigente' ? 'Firmado — el documento ya quedó vigente' : 'Firma registrada', 'ok');
-        if (carpetaActual) abrirCarpeta(carpetaActual);
+        if (carpetaActual) abrirCarpeta(carpetaActual, subcarpetaActual, categoriaActual);
     } catch(e) { mostrarToast('Error: ' + e.message, 'err'); }
 }
 
