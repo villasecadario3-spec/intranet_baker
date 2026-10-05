@@ -111,27 +111,30 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
 .dot-otros{background:var(--txt-mid);}
 .dot-vacaciones{background:#2E5A8A;}
 
-/* Vista semanal de Estacionamientos (adaptada de Salas de Reuniones) */
-.estac-tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--gris-2);flex-wrap:wrap;}
-.estac-tab{padding:9px 16px;background:transparent;border:none;color:var(--txt-dim);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px;}
-.estac-tab.activo{color:var(--rojo);border-bottom-color:var(--rojo);}
-.semana-grid{display:grid;grid-template-columns:60px repeat(5,1fr);gap:1px;background:var(--gris-2);min-width:760px;border:1px solid var(--gris-2);border-radius:12px;overflow:hidden;}
-.sg-corner{background:var(--gris-1);}
-.sg-dia-header{background:var(--gris-1);padding:14px 8px;text-align:center;}
-.sg-dia-nombre{font-size:0.66rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--txt-dim);}
-.sg-dia-num{font-size:1.2rem;font-weight:700;line-height:1;margin-top:2px;}
-.sg-dia-header.hoy .sg-dia-num, .sg-dia-header.hoy .sg-dia-nombre{color:var(--rojo);}
-.sg-hora-cell{padding:0 10px;display:flex;align-items:flex-start;justify-content:flex-end;background:var(--gris-1);}
-.sg-hora-label{font-size:0.66rem;color:var(--txt-dim);transform:translateY(-8px);white-space:nowrap;}
-.sg-day-col{position:relative;background:#fff;}
-.sg-bloque{position:absolute;left:5px;right:5px;border-radius:7px;display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:2;font-size:0.72rem;font-weight:700;color:#fff;text-align:center;padding:3px 6px;box-shadow:0 1px 3px rgba(0,0,0,0.12);transition:transform 0.1s;}
-.sg-bloque-libre:hover, .sg-bloque-auto:hover{transform:scale(1.02);}
-.sg-bloque-ocupado{background:rgba(107,103,98,0.7);}
-.sg-bloque-libre{background:var(--verde);cursor:pointer;}
-.sg-bloque-libre:hover{background:#155f3b;}
-.sg-bloque-reservado{background:var(--rojo);}
-.sg-bloque-auto{background:rgba(26,122,74,0.55);border:1px dashed rgba(255,255,255,0.6);cursor:pointer;}
-.sg-linea-ahora{position:absolute;left:0;right:0;height:2px;background:var(--rojo);z-index:10;pointer-events:none;}
+/* Vista semanal de Estacionamientos por bloques (AM / PM) */
+.bq-ayuda{font-size:0.78rem;color:var(--txt-dim);margin-bottom:10px;}
+.bq-tabla{border-collapse:separate;border-spacing:0;min-width:980px;width:100%;font-size:0.76rem;background:#fff;}
+.bq-tabla th, .bq-tabla td{border-right:1px solid var(--gris-2);border-bottom:1px solid var(--gris-2);}
+.bq-tabla thead tr:first-child th{border-top:1px solid var(--gris-2);}
+.bq-esquina{background:var(--gris-1);padding:12px;text-align:left;position:sticky;left:0;z-index:3;min-width:170px;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--txt-dim);border-left:1px solid var(--gris-2);border-top-left-radius:12px;}
+.bq-dia{background:var(--gris-1);padding:8px 6px;text-align:center;font-size:0.66rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--txt-dim);border-left:2px solid var(--gris-3);}
+.bq-dia b{display:block;font-size:1.1rem;line-height:1.1;letter-spacing:0;color:var(--txt);}
+.bq-dia.hoy, .bq-dia.hoy b{color:var(--rojo);}
+.bq-bloque-h{background:var(--gris-1);padding:6px 4px;text-align:center;font-weight:700;font-size:0.74rem;color:var(--txt-mid);}
+.bq-bloque-h small{display:block;font-weight:500;font-size:0.62rem;color:var(--txt-dim);margin-top:1px;}
+.bq-spot{background:#fff;padding:10px 12px;text-align:left;position:sticky;left:0;z-index:2;font-size:0.86rem;font-weight:700;border-left:1px solid var(--gris-2);}
+.bq-spot small{display:block;font-weight:500;color:var(--txt-mid);font-size:0.74rem;margin-top:2px;}
+.bq-cell{height:60px;padding:5px 6px;vertical-align:middle;text-align:center;color:#fff;font-weight:700;line-height:1.2;}
+.bq-cell.bq-am{border-left:2px solid var(--gris-3);}
+.bq-cell .bq-p{font-size:0.74rem;}
+.bq-cell .bq-s{font-weight:500;font-size:0.64rem;opacity:0.95;max-width:104px;margin:2px auto 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bq-ocupado{background:rgba(107,103,98,0.7);}
+.bq-libre{background:var(--verde);}
+.bq-auto{background:rgba(26,122,74,0.55);}
+.bq-reservado{background:var(--rojo);}
+.bq-pasado{opacity:0.55;}
+.bq-clic{cursor:pointer;}
+.bq-clic:hover{filter:brightness(1.1);box-shadow:inset 0 0 0 2px rgba(0,0,0,0.28);}
 .estac-leyenda{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:0.76rem;color:var(--txt-dim);align-items:center;}
 .estac-leyenda .dot-cuad{width:11px;height:11px;border-radius:3px;display:inline-block;margin-right:4px;vertical-align:middle;}
 </style>
@@ -177,8 +180,8 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
                 <div style="font-weight:700;font-size:0.85rem;margin-bottom:10px;">⚙ Agregar / editar estacionamiento</div>
                 <div class="admin-row">
                     <input id="a-numero" placeholder="N° estacionamiento (ej. 5)">
-                    <input id="a-dueno-email" placeholder="correo del dueño">
-                    <input id="a-dueno-nombre" placeholder="nombre del dueño">
+                    <input id="a-dueno-email" placeholder="correo del usuario">
+                    <input id="a-dueno-nombre" placeholder="nombre del usuario">
                     <button class="btn btn-primary btn-sm" onclick="guardarSpot()">Guardar</button>
                 </div>
                 <div id="admin-lista" style="margin-top:14px;"></div>
@@ -200,15 +203,14 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
                 <button onclick="cambiarSemanaEstac(1)">Semana siguiente ›</button>
                 <button class="btn btn-outline btn-sm" style="margin-left:10px;" onclick="irHoyEstac()">Hoy</button>
             </div>
-            <div class="estac-tabs" id="estac-tabs"></div>
-            <div style="overflow-x:auto;">
-                <div class="semana-grid" id="estac-semana-grid"></div>
-            </div>
+            <div class="bq-ayuda" id="estac-ayuda"></div>
+            <div style="overflow-x:auto;" id="estac-bloques"></div>
             <div class="estac-leyenda">
                 <span><span class="dot-cuad" style="background:var(--gris-3);"></span>Ocupado</span>
                 <span><span class="dot-cuad" style="background:var(--verde);"></span>Liberado — disponible</span>
                 <span><span class="dot-cuad" style="background:rgba(26,122,74,0.55);border:1px dashed #fff;"></span>Automático (por su ruta)</span>
                 <span><span class="dot-cuad" style="background:var(--rojo);"></span>Reservado</span>
+                <span style="margin-left:auto;">AM: 08:00 a 14:00 · PM: 15:00 a 19:00</span>
             </div>
         </div>
     </div>
@@ -361,20 +363,25 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
     </div>
 </div>
 
-<div class="modal-overlay" id="modal-reservar-dia">
+<div class="modal-overlay" id="modal-agendar">
     <div class="modal">
-        <h3>Reservar para ese día</h3>
-        <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;" id="reservar-dia-info"></p>
+        <h3>Agendar estacionamiento</h3>
+        <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:12px;" id="ag-info"></p>
         <div class="form-group">
-            <label class="form-label">Horario (opcional — vacío = todo el día)</label>
-            <div style="display:flex;gap:8px;">
-                <input class="form-input" type="time" id="reservar-dia-hora-desde">
-                <input class="form-input" type="time" id="reservar-dia-hora-hasta">
+            <label class="form-label">Bloque(s)</label>
+            <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:0.85rem;">
+                <label id="ag-lab-AM" style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="ag-AM"> AM (08:00 a 14:00)</label>
+                <label id="ag-lab-PM" style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="ag-PM"> PM (15:00 a 19:00)</label>
             </div>
+            <div id="ag-aviso" style="font-size:0.72rem;color:var(--txt-dim);margin-top:4px;"></div>
         </div>
+        <div class="form-group"><label class="form-label">Correo de la persona</label><input class="form-input" id="ag-email" list="ag-personas" placeholder="correo@ibaker.cl" oninput="autocompletarNombre('ag-email','ag-nombre')"></div>
+        <datalist id="ag-personas"></datalist>
+        <div class="form-group"><label class="form-label">Nombre de la persona</label><input class="form-input" id="ag-nombre" placeholder="Nombre completo"></div>
+        <div class="form-group"><label class="form-label">Justificativo (lo verán los demás)</label><input class="form-input" id="ag-motivo" maxlength="200" placeholder="Ej.: visita de cliente, reunión en oficina"></div>
         <div class="modal-btns">
-            <button class="btn btn-outline btn-sm" onclick="cerrarModal('modal-reservar-dia')">Cancelar</button>
-            <button class="btn btn-primary btn-sm" onclick="confirmarReservarDia()">Confirmar reserva</button>
+            <button class="btn btn-outline btn-sm" onclick="cerrarModal('modal-agendar')">Cancelar</button>
+            <button class="btn btn-primary btn-sm" onclick="confirmarAgendar()">Agendar</button>
         </div>
     </div>
 </div>
@@ -384,7 +391,7 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
         <h3>Asignar este estacionamiento a alguien</h3>
         <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Para cuando alguien llama pidiendo el spot ya mismo — queda asignado al instante, sin importar si estaba ocupado o no.</p>
         <div class="form-group"><label class="form-label">Nombre de la persona</label><input class="form-input" id="asig-nombre" placeholder="Nombre completo"></div>
-        <div class="form-group"><label class="form-label">Correo de la persona</label><input class="form-input" id="asig-email" placeholder="correo@ibaker.cl"></div>
+        <div class="form-group"><label class="form-label">Correo de la persona</label><input class="form-input" id="asig-email" list="ag-personas" placeholder="correo@ibaker.cl" oninput="autocompletarNombre('asig-email','asig-nombre')"></div>
         <div class="form-group"><label class="form-label">Desde</label><input class="form-input" type="date" id="asig-desde"></div>
         <div class="form-group"><label class="form-label">Hasta</label><input class="form-input" type="date" id="asig-hasta"></div>
         <div class="form-group">
@@ -394,6 +401,7 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
                 <input class="form-input" type="time" id="asig-hora-hasta">
             </div>
         </div>
+        <div class="form-group"><label class="form-label">Justificativo (lo verán los demás)</label><input class="form-input" id="asig-motivo" maxlength="200" placeholder="Ej.: visita de cliente"></div>
         <div class="modal-btns">
             <button class="btn btn-outline btn-sm" onclick="cerrarModal('modal-asignar')">Cancelar</button>
             <button class="btn btn-primary btn-sm" onclick="confirmarAsignar()">Asignar ahora</button>
@@ -538,7 +546,7 @@ async function getTokenCorreo() {
 }
 async function avisarDuenoPorCorreo(duenoEmail, duenoNombre, spotNumero, fecha, horaTxt, solicitudId) {
     const token = await getTokenCorreo();
-    if (!token) { toast('Solicitud enviada, pero no se pudo avisar por correo al dueño'); return; }
+    if (!token) { toast('Solicitud enviada, pero no se pudo avisar por correo al usuario'); return; }
     try {
         const base = window.location.origin + '/';
         const linkAprobar  = `${base}estacionamiento-responder.html?id=${encodeURIComponent(solicitudId)}&decision=aprobar`;
@@ -685,33 +693,9 @@ async function bloquearHoy(spotId) {
     } catch(e) { toast('Error: ' + e.message); }
 }
 
-let reservarDiaSpotId = null, reservarDiaFecha = null;
-function abrirReservarDia(spotId, fechaStr) {
-    reservarDiaSpotId = spotId;
-    reservarDiaFecha = fechaStr;
-    document.getElementById('reservar-dia-info').textContent = `Para el ${fmt(fechaStr)}`;
-    document.getElementById('reservar-dia-hora-desde').value = '';
-    document.getElementById('reservar-dia-hora-hasta').value = '';
-    document.getElementById('modal-reservar-dia').classList.add('visible');
-}
-async function confirmarReservarDia() {
-    const horaInicio = document.getElementById('reservar-dia-hora-desde').value || null;
-    const horaFin = document.getElementById('reservar-dia-hora-hasta').value || null;
-    try {
-        const res = await fetch(`${API}/estacionamientos/solicitar`, {
-            method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ estacionamientoId: reservarDiaSpotId, email: emailActual, nombre: nombreActual, fecha: reservarDiaFecha, horaInicio, horaFin })
-        });
-        if (!res.ok) throw new Error((await res.json()).error || 'Error');
-        cerrarModal('modal-reservar-dia');
-        toast('Estacionamiento reservado para ese día');
-        cargarTodo();
-    } catch(e) { toast('Error: ' + e.message); }
-}
-
 async function cancelarReservaDesdeGrid(id, label) {
     if (!confirm(`¿Cancelar la reserva de ${label}?`)) return;
-    await cancelarReserva(id);
+    await cancelarReserva(id, true);
 }
 
 async function reservarAuto(spotId, fechaStr) {
@@ -759,7 +743,7 @@ function render() {
                 <button class="btn btn-outline btn-sm" onclick="responderSolicitud('${pendiente.id}', false)">✕ Rechazar</button>`;
         } else if (pendiente) {
             badge = `<span class="spot-badge badge-ocupado">Solicitud en revisión</span>`;
-            info = `Esperando que el dueño apruebe (${horarioTexto(pendiente)})`;
+            info = `Esperando que el usuario apruebe (${horarioTexto(pendiente)})`;
         } else if (!lib) {
             badge = `<span class="spot-badge badge-ocupado">Ocupado</span>`;
             info = '';
@@ -767,11 +751,11 @@ function render() {
                 <button class="btn btn-primary btn-sm" onclick="liberarHoy('${s.id}')">✅ Queda libre hoy</button>
                 <button class="btn btn-outline btn-sm" onclick="abrirLiberar('${s.id}')">Liberar otro período</button>`;
             else if (ADMINISTRADORES.includes(emailActual)) acciones = `
-                <button class="btn btn-outline btn-sm" onclick="abrirLiberar('${s.id}')">Liberar por el dueño</button>`;
+                <button class="btn btn-outline btn-sm" onclick="abrirLiberar('${s.id}')">Liberar por el usuario</button>`;
         } else if (lib.reservadoPor) {
             const soyYo = lib.reservadoPor === emailActual;
             badge = `<span class="spot-badge badge-reservado">Reservado${soyYo?' por ti':''}</span>`;
-            info = `Por ${lib.reservadoPorNombre || lib.reservadoPor}, del ${fmt(lib.fechaInicio)} al ${fmt(lib.fechaFin)} (${horarioTexto(lib)})`;
+            info = `Por ${lib.reservadoPorNombre || lib.reservadoPor}, del ${fmt(lib.fechaInicio)} al ${fmt(lib.fechaFin)} (${horarioTexto(lib)})${lib.motivo ? ' — Motivo: ' + escHtml(lib.motivo) : ''}`;
             if (soyYo || esMio || ADMINISTRADORES.includes(emailActual)) {
                 acciones = lib.esAuto ? '' : `<button class="btn btn-outline btn-sm" onclick="cancelarReserva('${lib.id}')">Cancelar</button>`;
             }
@@ -799,7 +783,7 @@ function render() {
                 <div class="spot-num">N° ${s.numero}</div>
                 ${badge}
             </div>
-            <div class="spot-dueno">Dueño: ${s.duenoNombre || s.duenoEmail}</div>
+            <div class="spot-dueno">Usuario: ${s.duenoNombre || s.duenoEmail}</div>
             ${info ? `<div class="spot-info">${info}</div>` : ''}
             <div class="spot-acciones">${acciones}</div>
         </div>`;
@@ -855,6 +839,8 @@ function abrirAsignar(spotId) {
     document.getElementById('asig-hasta').value = hoyISO();
     document.getElementById('asig-hora-desde').value = '';
     document.getElementById('asig-hora-hasta').value = '';
+    document.getElementById('asig-motivo').value = '';
+    poblarPersonasConocidas();
     document.getElementById('modal-asignar').classList.add('visible');
 }
 async function confirmarAsignar() {
@@ -864,11 +850,13 @@ async function confirmarAsignar() {
     const fechaFin = document.getElementById('asig-hasta').value;
     const horaInicio = document.getElementById('asig-hora-desde').value || null;
     const horaFin = document.getElementById('asig-hora-hasta').value || null;
+    const motivo = document.getElementById('asig-motivo').value.trim();
     if (!personaNombre || !personaEmail || !fechaInicio || !fechaFin) { alert('Completa nombre, correo y fechas'); return; }
+    if (motivo.length < 3) { alert('Escribe el justificativo: lo verán los demás'); return; }
     try {
         const res = await fetch(`${API}/estacionamientos/asignar`, {
             method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ estacionamientoId: asignarSpotId, fechaInicio, fechaFin, horaInicio, horaFin, personaEmail, personaNombre, email: emailActual })
+            body: JSON.stringify({ estacionamientoId: asignarSpotId, fechaInicio, fechaFin, horaInicio, horaFin, personaEmail, personaNombre, motivo, email: emailActual })
         });
         if (!res.ok) throw new Error((await res.json()).error || 'Error');
         cerrarModal('modal-asignar');
@@ -895,8 +883,8 @@ async function confirmarReservar() {
     } catch(e) { toast('Error: ' + e.message); }
 }
 
-async function cancelarReserva(id) {
-    if (!confirm('¿Cancelar esto?')) return;
+async function cancelarReserva(id, yaConfirmado) {
+    if (!yaConfirmado && !confirm('¿Cancelar esto?')) return;
     try {
         const res = await fetch(`${API}/estacionamientos/reservas/${id}?email=${encodeURIComponent(emailActual)}`, { method: 'DELETE' });
         if (!res.ok) throw new Error((await res.json()).error || 'Error');
@@ -921,7 +909,7 @@ async function guardarSpot() {
     const numero = document.getElementById('a-numero').value.trim();
     const duenoEmail = document.getElementById('a-dueno-email').value.trim();
     const duenoNombre = document.getElementById('a-dueno-nombre').value.trim();
-    if (!numero || !duenoEmail) { alert('Completa número y correo del dueño'); return; }
+    if (!numero || !duenoEmail) { alert('Completa número y correo del usuario'); return; }
     try {
         const res = await fetch(`${API}/estacionamientos`, {
             method: 'POST', headers: {'Content-Type':'application/json'},
@@ -936,9 +924,15 @@ async function guardarSpot() {
     } catch(e) { toast('Error: ' + e.message); }
 }
 
-// ══════════════════ VISTA SEMANAL (estilo Salas de Reuniones) ══════════════════
-const HORA_INI_ESTAC = 8, HORA_FIN_ESTAC = 20, SLOT_H_ESTAC = 50;
-let spotActivo = 0, vistaEstacActiva = false;
+// ══════════════════ VISTA SEMANAL POR BLOQUES ══════════════════
+// Todos los estacionamientos juntos, y cada día en dos bloques: AM (08:00 a
+// 14:00) y PM (15:00 a 19:00). Solo los administradores agendan por bloque, con
+// un justificativo que los demás ven al pasar el mouse sobre el bloque.
+const BLOQUES_ESTAC = [
+    { clave: 'AM', desde: '08:00', hasta: '14:00' },
+    { clave: 'PM', desde: '15:00', hasta: '19:00' },
+];
+let vistaEstacActiva = false;
 
 function alternarVistaEstac() {
     vistaEstacActiva = !vistaEstacActiva;
@@ -967,110 +961,187 @@ function irHoyEstac() {
     renderVistaSemanalEstac();
 }
 
+function escHtml(t) {
+    return String(t == null ? '' : t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+// Minutos desde las 00:00; una reserva sin hora ocupa todo el día.
+function aMinutos(h) { const [H, M] = String(h).split(':'); return parseInt(H,10) * 60 + (parseInt(M,10) || 0); }
+function rangoReserva(r) { return [r.horaInicio ? aMinutos(r.horaInicio) : 0, r.horaFin ? aMinutos(r.horaFin) : 1440]; }
+function reservaSolapaBloque(r, b) { const [ri, rf] = rangoReserva(r); return ri < aMinutos(b.hasta) && rf > aMinutos(b.desde); }
+function reservaCubreBloque(r, b) { const [ri, rf] = rangoReserva(r); return ri <= aMinutos(b.desde) && rf >= aMinutos(b.hasta); }
+function esReservaVigente(r) {
+    return (r.tipo === 'solicitud' && r.estado === 'aprobada') || (r.tipo === 'liberado' && !!r.reservadoPor);
+}
+function nombreReserva(r) {
+    return r.tipo === 'solicitud' ? (r.solicitanteNombre || r.solicitanteEmail) : (r.reservadoPorNombre || r.reservadoPor);
+}
+function emailReserva(r) { return r.tipo === 'solicitud' ? r.solicitanteEmail : r.reservadoPor; }
+function usuarioDe(spot) { return spot.duenoNombre || spot.duenoEmail; }
+function diaSemanaDe(fechaStr) {
+    return ['domingo','lunes','martes','miercoles','jueves','viernes','sabado'][new Date(fechaStr + 'T00:00:00').getDay()];
+}
+
+// Estado de un estacionamiento en un día y bloque:
+//   reservado → hay una reserva que toca el bloque
+//   libre     → el usuario lo liberó y nadie lo tomó
+//   auto      → su ruta (teletrabajo, obra, vacaciones…) lo deja libre
+//   ocupado   → lo usa su usuario
+function estadoBloque(spot, fechaStr, bloque) {
+    const delDia = reservas.filter(r => r.estacionamientoId === spot.id && r.fechaInicio <= fechaStr && r.fechaFin >= fechaStr && reservaSolapaBloque(r, bloque));
+    const tomadas = delDia.filter(esReservaVigente);
+    if (tomadas.length) return { estado: 'reservado', reservas: tomadas };
+    if (delDia.some(r => r.tipo === 'liberado' && !r.reservadoPor)) return { estado: 'libre' };
+    const dia = diaSemanaDe(fechaStr);
+    if (fechaStr >= hoyISO() && DIAS.includes(dia)) {
+        const { estado: estRuta } = estadoEnFecha(spot.duenoEmail, fechaStr, dia);
+        if (estRuta !== 'presencial') return { estado: 'auto', motivoAuto: estRuta };
+    }
+    return { estado: 'ocupado' };
+}
+
+function puedeCancelarReserva(r, spot) {
+    return emailReserva(r) === emailActual || spot.duenoEmail === emailActual || ADMINISTRADORES.includes(emailActual);
+}
+// Qué hace un clic en el bloque: anular una reserva (quien corresponda) o agendar (solo administradores).
+function accionBloque(spot, fechaStr, bloque) {
+    const est = estadoBloque(spot, fechaStr, bloque);
+    if (est.estado === 'reservado') return est.reservas.some(r => puedeCancelarReserva(r, spot)) ? 'cancelar' : null;
+    if (ADMINISTRADORES.includes(emailActual) && fechaStr >= hoyISO()) return 'agendar';
+    return null;
+}
+
+function celdaBloque(spot, fechaStr, bloque) {
+    const est = estadoBloque(spot, fechaStr, bloque);
+    const accion = accionBloque(spot, fechaStr, bloque);
+    let principal, secundario = '', titulo;
+    if (est.estado === 'reservado') {
+        const r0 = est.reservas[0];
+        principal = nombreReserva(r0) + (est.reservas.length > 1 ? ` +${est.reservas.length - 1}` : '');
+        const partes = [];
+        if (!reservaCubreBloque(r0, bloque)) partes.push(`${r0.horaInicio || '00:00'}–${r0.horaFin || '24:00'}`);
+        if (r0.motivo) partes.push(r0.motivo);
+        secundario = partes.join(' · ');
+        titulo = est.reservas.map(r => `${nombreReserva(r)} (${horarioTexto(r)})${r.motivo ? '\nMotivo: ' + r.motivo : ''}`).join('\n\n');
+    } else if (est.estado === 'libre') {
+        principal = 'Disponible'; titulo = `Liberado por ${usuarioDe(spot)} — disponible`;
+    } else if (est.estado === 'auto') {
+        principal = 'Automático'; secundario = MOTIVO_AUTO_LABEL[est.motivoAuto] || '';
+        titulo = `Libre por la ruta de ${usuarioDe(spot)}${secundario ? ' (' + secundario + ')' : ''}`;
+    } else {
+        principal = 'Ocupado'; titulo = `En uso por ${usuarioDe(spot)}`;
+    }
+    if (accion === 'agendar') titulo += '\n\nClic para agendar este bloque';
+    if (accion === 'cancelar') titulo += '\n\nClic para anular la reserva';
+    return `<td class="bq-cell bq-${est.estado} ${bloque.clave === 'AM' ? 'bq-am' : ''} ${fechaStr < hoyISO() ? 'bq-pasado' : ''} ${accion ? 'bq-clic' : ''}"
+        data-spot="${escHtml(spot.id)}" data-fecha="${fechaStr}" data-bloque="${bloque.clave}" title="${escHtml(titulo)}"
+        ${accion ? 'onclick="clickBloque(this)"' : ''}>
+        <div class="bq-p">${escHtml(principal)}</div>${secundario ? `<div class="bq-s">${escHtml(secundario)}</div>` : ''}</td>`;
+}
+
 function renderVistaSemanalEstac() {
+    const cont = document.getElementById('estac-bloques');
+    document.getElementById('estac-ayuda').textContent = ADMINISTRADORES.includes(emailActual)
+        ? 'Haz clic en un bloque para agendarlo a nombre de alguien (con su justificativo) o para anular una reserva.'
+        : 'Vista de consulta. Pasa el mouse sobre un bloque reservado para ver el justificativo.';
     if (!spots.length) {
-        document.getElementById('estac-tabs').innerHTML = '';
-        document.getElementById('estac-semana-grid').innerHTML = '<div class="empty">Todavía no hay estacionamientos cargados.</div>';
+        cont.innerHTML = '<div class="empty">Todavía no hay estacionamientos cargados.</div>';
         return;
     }
-    const lunesLabel = lunesDeEstaSemana();
-    const viernesLabel = new Date(lunesLabel); viernesLabel.setDate(lunesLabel.getDate()+4);
-    document.getElementById('estac-week-label').textContent = `${fmt(lunesLabel.toISOString().slice(0,10))} — ${fmt(viernesLabel.toISOString().slice(0,10))}`;
-    if (spotActivo >= spots.length) spotActivo = 0;
-    document.getElementById('estac-tabs').innerHTML = spots.map((s,i) => `
-        <button class="estac-tab ${i===spotActivo?'activo':''}" onclick="setSpotActivo(${i})">N° ${s.numero} — ${s.duenoNombre || s.duenoEmail}</button>
-    `).join('');
-    buildGridEstacionamiento();
-}
-function setSpotActivo(i) { spotActivo = i; renderVistaSemanalEstac(); }
-
-function buildGridEstacionamiento() {
-    const grid = document.getElementById('estac-semana-grid');
-    const spot = spots[spotActivo];
-    if (!spot) return;
     const lunes = lunesDeEstaSemana();
+    const viernes = new Date(lunes); viernes.setDate(lunes.getDate() + 4);
+    document.getElementById('estac-week-label').textContent = `${fmt(lunes.toISOString().slice(0,10))} — ${fmt(viernes.toISOString().slice(0,10))}`;
+
     const diasLabel = ['Lun','Mar','Mié','Jue','Vie'];
-    const totalHoras = HORA_FIN_ESTAC - HORA_INI_ESTAC;
-
-    let html = `<div class="sg-corner" style="height:48px"></div>`;
-    const fechasSemana = [];
-    for (let d=0; d<5; d++) {
-        const dia = new Date(lunes); dia.setDate(lunes.getDate()+d);
-        fechasSemana.push(dia.toISOString().slice(0,10));
-        const esHoy = dia.toISOString().slice(0,10) === hoyISO();
-        html += `<div class="sg-dia-header ${esHoy?'hoy':''}"><div class="sg-dia-nombre">${diasLabel[d]}</div><div class="sg-dia-num">${dia.getDate()}</div></div>`;
-    }
-    for (let h=HORA_INI_ESTAC; h<=HORA_FIN_ESTAC; h++) {
-        const label = h<HORA_FIN_ESTAC ? `${String(h).padStart(2,'0')}:00` : '';
-        html += `<div class="sg-hora-cell" style="height:${SLOT_H_ESTAC}px"><span class="sg-hora-label">${label}</span></div>`;
-        if (h<HORA_FIN_ESTAC) for (let d=0; d<5; d++) html += `<div class="sg-day-col" id="ecol-${d}-${h}" style="height:${SLOT_H_ESTAC}px"></div>`;
-    }
-    grid.style.gridTemplateRows = `48px repeat(${totalHoras},${SLOT_H_ESTAC}px)`;
-    grid.innerHTML = html;
-
-    fechasSemana.forEach((fechaStr, d) => {
-        const diaSemanaTxt = ['domingo','lunes','martes','miercoles','jueves','viernes','sabado'][new Date(fechaStr+'T00:00:00').getDay()];
-        let estado = 'ocupado', label = 'Ocupado', horaIni = HORA_INI_ESTAC, horaFin = HORA_FIN_ESTAC, accion = null;
-
-        const aprobada = reservas.find(r => r.estacionamientoId===spot.id && r.tipo==='solicitud' && r.estado==='aprobada' && r.fechaInicio<=fechaStr && r.fechaFin>=fechaStr);
-        const explicita = reservas.find(r => r.estacionamientoId===spot.id && r.tipo==='liberado' && r.fechaInicio<=fechaStr && r.fechaFin>=fechaStr);
-
-        if (aprobada) {
-            estado = 'reservado'; label = aprobada.solicitanteNombre || aprobada.solicitanteEmail;
-            if (aprobada.horaInicio) horaIni = parseInt(aprobada.horaInicio,10);
-            if (aprobada.horaFin) horaFin = parseInt(aprobada.horaFin,10)+1;
-            if (aprobada.solicitanteEmail === emailActual || spot.duenoEmail === emailActual || ADMINISTRADORES.includes(emailActual)) {
-                accion = () => cancelarReservaDesdeGrid(aprobada.id, label);
-            }
-        } else if (explicita) {
-            if (explicita.reservadoPor) {
-                estado = 'reservado'; label = explicita.reservadoPorNombre || explicita.reservadoPor;
-                if (explicita.reservadoPor === emailActual || spot.duenoEmail === emailActual || ADMINISTRADORES.includes(emailActual)) {
-                    accion = () => cancelarReservaDesdeGrid(explicita.id, label);
-                }
-            } else {
-                estado = 'libre'; label = 'Disponible'; accion = () => abrirReservarDia(spot.id, fechaStr);
-            }
-            if (explicita.horaInicio) horaIni = parseInt(explicita.horaInicio,10);
-            if (explicita.horaFin) horaFin = parseInt(explicita.horaFin,10)+1;
-        } else if (fechaStr >= hoyISO() && DIAS.includes(diaSemanaTxt)) {
-            const { estado: estRuta } = estadoEnFecha(spot.duenoEmail, fechaStr, diaSemanaTxt);
-            if (estRuta !== 'presencial') {
-                estado = 'auto'; label = 'Automático'; accion = () => reservarAuto(spot.id, fechaStr);
-            }
-        }
-
-        horaIni = Math.max(horaIni, HORA_INI_ESTAC);
-        horaFin = Math.min(horaFin, HORA_FIN_ESTAC);
-        const colEl = document.getElementById(`ecol-${d}-${horaIni}`);
-        if (!colEl) return;
-        const alto = (horaFin - horaIni) * SLOT_H_ESTAC - 4;
-        const bloque = document.createElement('div');
-        bloque.className = `sg-bloque sg-bloque-${estado}`;
-        bloque.style.cssText = `top:2px;height:${alto}px;`;
-        bloque.textContent = label;
-        bloque.title = label;
-        if (accion) bloque.onclick = accion;
-        colEl.style.position = 'relative';
-        colEl.appendChild(bloque);
-
-        if (fechaStr === hoyISO()) {
-            const ahora = new Date();
-            const min = (ahora.getHours()-HORA_INI_ESTAC)*60 + ahora.getMinutes();
-            if (min>=0 && min<=totalHorasEstac()*60) {
-                const col = document.getElementById(`ecol-${d}-${HORA_INI_ESTAC}`);
-                if (col) {
-                    const l = document.createElement('div');
-                    l.className = 'sg-linea-ahora';
-                    l.style.top = `${(min/60)*SLOT_H_ESTAC}px`;
-                    col.style.position = 'relative';
-                    col.appendChild(l);
-                }
-            }
-        }
-    });
+    const fechas = [0,1,2,3,4].map(d => { const f = new Date(lunes); f.setDate(lunes.getDate() + d); return f; });
+    const cab1 = fechas.map((f, d) => `<th class="bq-dia ${f.toISOString().slice(0,10) === hoyISO() ? 'hoy' : ''}" colspan="2">${diasLabel[d]}<b>${f.getDate()}</b></th>`).join('');
+    const cab2 = fechas.map(() => BLOQUES_ESTAC.map(b => `<th class="bq-bloque-h ${b.clave === 'AM' ? 'bq-am' : ''}">${b.clave}<small>${b.desde}–${b.hasta}</small></th>`).join('')).join('');
+    const ordenados = spots.slice().sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0) || String(a.numero).localeCompare(String(b.numero)));
+    const filas = ordenados.map(spot => `
+        <tr><th class="bq-spot">N° ${escHtml(spot.numero)}<small>${escHtml(usuarioDe(spot))}</small></th>
+        ${fechas.map(f => BLOQUES_ESTAC.map(b => celdaBloque(spot, f.toISOString().slice(0,10), b)).join('')).join('')}</tr>`).join('');
+    cont.innerHTML = `<table class="bq-tabla"><thead>
+        <tr><th class="bq-esquina" rowspan="2">Estacionamiento</th>${cab1}</tr><tr>${cab2}</tr></thead><tbody>${filas}</tbody></table>`;
 }
-function totalHorasEstac() { return HORA_FIN_ESTAC - HORA_INI_ESTAC; }
+
+function clickBloque(el) {
+    const spot = spots.find(s => s.id === el.dataset.spot);
+    const bloque = BLOQUES_ESTAC.find(b => b.clave === el.dataset.bloque);
+    if (!spot || !bloque) return;
+    const accion = accionBloque(spot, el.dataset.fecha, bloque);
+    if (accion === 'agendar') abrirAgendarBloque(spot.id, el.dataset.fecha, bloque.clave);
+    else if (accion === 'cancelar') cancelarDesdeBloque(spot, el.dataset.fecha, bloque);
+}
+
+async function cancelarDesdeBloque(spot, fechaStr, bloque) {
+    const lista = estadoBloque(spot, fechaStr, bloque).reservas.filter(r => puedeCancelarReserva(r, spot));
+    if (!lista.length) return;
+    let elegida = lista[0];
+    if (lista.length > 1) {
+        const opciones = lista.map((r, i) => `${i + 1}. ${nombreReserva(r)} (${horarioTexto(r)})${r.motivo ? ' — ' + r.motivo : ''}`).join('\n');
+        const resp = prompt(`Hay varias reservas en este bloque. ¿Cuál anulas?\n\n${opciones}\n\nEscribe el número:`);
+        if (!resp) return;
+        elegida = lista[parseInt(resp, 10) - 1];
+        if (!elegida) { toast('Opción no válida'); return; }
+    }
+    await cancelarReservaDesdeGrid(elegida.id, nombreReserva(elegida));
+}
+
+// ── Agendar por bloque (administradores) ──
+let agendaCtx = null;
+function poblarPersonasConocidas() {
+    const dl = document.getElementById('ag-personas');
+    if (dl && !dl.options.length) {
+        dl.innerHTML = Object.entries(NOMBRES_RESPALDO).sort((a, b) => a[1].localeCompare(b[1]))
+            .map(([email, nombre]) => `<option value="${escHtml(email)}">${escHtml(nombre)}</option>`).join('');
+    }
+}
+// Al escribir un correo conocido, completa el nombre si está vacío.
+function autocompletarNombre(idEmail, idNombre) {
+    const nombre = NOMBRES_RESPALDO[document.getElementById(idEmail).value.trim().toLowerCase()];
+    const campo = document.getElementById(idNombre);
+    if (nombre && !campo.value.trim()) campo.value = nombre;
+}
+function abrirAgendarBloque(spotId, fechaStr, claveBloque) {
+    const spot = spots.find(s => s.id === spotId);
+    if (!spot) return;
+    agendaCtx = { spotId, fechaStr };
+    poblarPersonasConocidas();
+    const nombreDia = diaSemanaDe(fechaStr);
+    document.getElementById('ag-info').textContent = `N° ${spot.numero} — ${usuarioDe(spot)} · ${DIAS_LABEL[nombreDia] || nombreDia} ${fmt(fechaStr)}`;
+    BLOQUES_ESTAC.forEach(b => {
+        const tomado = estadoBloque(spot, fechaStr, b).estado === 'reservado';
+        const cb = document.getElementById('ag-' + b.clave);
+        cb.disabled = tomado;
+        cb.checked = !tomado && b.clave === claveBloque;
+        document.getElementById('ag-lab-' + b.clave).style.opacity = tomado ? '0.45' : '1';
+    });
+    document.getElementById('ag-aviso').textContent = BLOQUES_ESTAC.some(b => document.getElementById('ag-' + b.clave).disabled)
+        ? 'El bloque en gris ya está reservado: para cambiarlo, anula primero esa reserva.' : '';
+    ['ag-email', 'ag-nombre', 'ag-motivo'].forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('modal-agendar').classList.add('visible');
+}
+async function confirmarAgendar() {
+    const bloques = BLOQUES_ESTAC.filter(b => document.getElementById('ag-' + b.clave).checked);
+    const personaEmail = document.getElementById('ag-email').value.trim();
+    const personaNombre = document.getElementById('ag-nombre').value.trim();
+    const motivo = document.getElementById('ag-motivo').value.trim();
+    if (!bloques.length) { alert('Elige al menos un bloque (AM o PM)'); return; }
+    if (!personaNombre || !personaEmail) { alert('Completa el nombre y el correo de la persona'); return; }
+    if (motivo.length < 3) { alert('Escribe el justificativo: lo verán los demás'); return; }
+    try {
+        for (const b of bloques) {
+            const res = await fetch(`${API}/estacionamientos/asignar`, {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ estacionamientoId: agendaCtx.spotId, fechaInicio: agendaCtx.fechaStr, fechaFin: agendaCtx.fechaStr,
+                    horaInicio: b.desde, horaFin: b.hasta, personaEmail, personaNombre, motivo, email: emailActual })
+            });
+            if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        }
+        cerrarModal('modal-agendar');
+        toast(`Agendado para ${personaNombre} (${bloques.map(b => b.clave).join(' + ')})`);
+        cargarTodo();
+    } catch(e) { toast('Error: ' + e.message); cargarTodo(); }
+}
 
 // ══════════════════ TELETRABAJO / RUTAS ══════════════════
 let dataTeletrabajo = { patrones: {}, excepciones: [] };
