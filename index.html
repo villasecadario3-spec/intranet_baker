@@ -983,6 +983,18 @@ async function aplicarAccesos(email) {
         const lista = await fetch('https://api.ibaker.cl/acceso-beta/rutas-estacionamientos').then(r => r.json());
         ACCESOS_MODULOS['rutas-estacionamientos.html'] = lista;
     } catch(e) { console.warn('No se pudo cargar la lista de acceso beta:', e.message); }
+    // Control de Dotación: la tarjeta aparece si la persona tiene acceso a al menos una obra
+    // (lo decide el servidor), en vez de una lista fija de correos. Si el servidor no responde,
+    // queda la lista fija de abajo.
+    try {
+        const headers = {};
+        try {
+            const t = await msalInstance.acquireTokenSilent({ scopes: ['User.Read'], account: msalInstance.getAllAccounts()[0] });
+            headers.Authorization = 'Bearer ' + t.accessToken;
+        } catch(e) {}
+        const r = await fetch('https://api.ibaker.cl/dotacion/obras?email=' + encodeURIComponent(correo), { headers });
+        if (r.ok) ACCESOS_MODULOS['dotacion.html'] = (await r.json()).length ? [correo] : [];
+    } catch(e) { console.warn('No se pudo consultar el acceso a Control de Dotación:', e.message); }
     document.querySelectorAll('[data-modulo]').forEach(card => {
         const modulo = card.getAttribute('data-modulo');
         const lista  = ACCESOS_MODULOS[modulo];
