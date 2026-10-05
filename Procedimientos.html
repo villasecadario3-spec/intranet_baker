@@ -286,14 +286,20 @@
             </select>
         </div>
         <div class="modal-form-group" id="grupo-subcarpeta" style="display:none;">
-            <label class="modal-label">Obra *</label>
+            <label class="modal-label">Carpeta dentro de Obras *</label>
             <select class="modal-input" id="m-subcarpeta">
-                <option value="">Selecciona la obra…</option>
+                <option value="">Selecciona la carpeta…</option>
             </select>
-            <label class="modal-label" style="margin-top:10px;">Categoría *</label>
-            <select class="modal-input" id="m-categoria" onchange="actualizarFlujoModal()">
-                <option value="">Selecciona la categoría…</option>
-            </select>
+            <label class="modal-label" style="margin-top:10px;">¿Aplica a obras específicas? *</label>
+            <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:0.85rem;">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="radio" name="m-aplica" value="no" onchange="cambiarAplicaObras()"> No, es general (todas las obras)</label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="radio" name="m-aplica" value="si" onchange="cambiarAplicaObras()"> Sí, para obras específicas</label>
+            </div>
+            <div id="m-obras-aplica" style="display:none;margin-top:10px;">
+                <label class="modal-label">¿Para qué obras? *</label>
+                <div id="m-obras-aplica-chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+                <div id="m-admins-obras" style="margin-top:12px;"></div>
+            </div>
         </div>
         <div class="modal-form-group" id="grupo-area" style="display:none;">
             <label class="modal-label">Área *</label>
@@ -319,11 +325,8 @@
                 ¿Necesita firmantes?
             </label>
             <div id="m-flujo-estandar" style="display:none;margin-bottom:12px;">
-                <label class="modal-label">Flujo de firmas (fijo, en este orden)</label>
-                <div id="m-flujo-lista" style="font-size:0.8rem;line-height:1.7;margin-bottom:10px;"></div>
-                <label class="modal-label">Correo del administrador de obra *</label>
-                <input class="modal-input" id="m-admin-email" type="email" placeholder="nombre@ibaker.cl" oninput="actualizarFlujoModal()">
-                <div style="font-size:0.72rem;color:var(--txt-dim,#999);margin-top:4px;">Firma al final. Lo ingresas al subir el documento y después no se puede cambiar.</div>
+                <label class="modal-label">Flujo de firmas (fijo)</label>
+                <div id="m-flujo-lista" style="font-size:0.8rem;line-height:1.7;"></div>
             </div>
             <div id="grupo-firmantes" style="display:none;margin-top:10px;">
                 <div id="m-firmantes-manual">
@@ -386,19 +389,20 @@ const CARPETAS = [
     'Control de Gestión y TI', 'Proyectos', 'Estudios y Bodegas',
     'Adquisiciones', 'Entidades Patrocinantes', 'Personas', 'Obras'
 ];
-// Carpeta Obras: Obras → cada obra → las 4 categorías (mismas que en server.js).
+// Carpeta Obras: Obras → [Planos / Detalles Constructivos | Procedimientos] (mismas que en server.js).
+// Dentro de cada una, un documento es GENERAL (queda suelto) o aplica a una o más obras.
 const CARPETA_OBRAS = 'Obras';
 const OBRAS_CONSTRUCCION = ['Mirador El Águila', 'Mirador El Pino', 'Portal Los Maitenes', 'Portal Oriente Melipilla', 'Portal El Abra'];
-const CATEGORIAS_OBRA = ['Procedimientos constructivos', 'Calidad y protocolos de inspección', 'Prevención de riesgos y seguridad', 'Subcontratos'];
-// Flujo estándar de firmas en Obras (lo hace cumplir el servidor, esto solo lo muestra).
-const NOMBRES_FIRMANTES_FIJOS = { 'mmatamala@ibaker.cl': 'Matias Matamala', 'jdiaz@ibaker.cl': 'Jorge Diaz' };
-function firmantesFijosObra(categoria) {
-    return categoria === 'Procedimientos constructivos' ? ['mmatamala@ibaker.cl', 'jdiaz@ibaker.cl'] : ['jdiaz@ibaker.cl'];
-}
+const SUBCARPETAS_OBRAS = ['Planos / Detalles Constructivos', 'Procedimientos'];
+// Flujo fijo de firmas en Obras (lo hace cumplir el servidor, esto solo lo muestra).
+const FIRMANTE_REVISOR = 'jdiaz@ibaker.cl';
+const NOMBRE_REVISOR = 'Jorge Diaz';
 const DOMINIOS_EMPRESA = ['ibaker.cl', 'cmcromeral.cl', 'epbrotar.cl'];
 function correoAdminValido(e) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && DOMINIOS_EMPRESA.includes(e.split('@')[1]);
 }
+// Las obras de un documento, leídas de la carpeta donde está guardado ("A + B").
+function obrasDeDoc(d) { return d.grupoObras ? d.grupoObras.split(' + ') : []; }
 
 let emailActual = '';
 let nombreActual = '';
@@ -406,7 +410,9 @@ let archivosSeleccionados = []; // [{file, base64, tipo}]
 let docsGithub = [];
 let carpetaActual = null; // null = viendo la grilla de carpetas
 let subcarpetaActual = null; // la obra, dentro de Obras (null = en la raíz de la carpeta)
-let categoriaActual = null;  // la categoría, dentro de una obra
+let obraActual = null;       // obra abierta dentro de Planos/Procedimientos (es una vista, no una carpeta real)
+let obrasAplicaModal = new Set(); // obras elegidas en el formulario de subida
+let adminsObraModal = {};    // obra -> correo de su administrador (formulario de subida)
 let flujoObrasForzado = false; // true mientras el formulario fuerza el flujo estándar de Obras
 let tipoSubidaActual = 'procedimiento'; // 'procedimiento' | 'comunicacion'
 const OBRAS_ACTIVAS_PROC = OBRAS_CONSTRUCCION.slice();
@@ -467,30 +473,64 @@ async function initAuth() {
     } catch(e) { window.location.href = 'index.html'; }
 }
 
-// Describe el flujo de firmas según la categoría y el correo escrito.
-function actualizarFlujoModal() {
-    const cat = document.getElementById('m-categoria').value;
-    const admin = (document.getElementById('m-admin-email').value || '').trim().toLowerCase();
-    const cont = document.getElementById('m-flujo-lista');
-    if (!cat) { cont.innerHTML = '<span style="color:var(--txt-dim,#999);">Elige la categoría para ver quiénes firman.</span>'; return; }
-    const pasos = firmantesFijosObra(cat).map(e => `${NOMBRES_FIRMANTES_FIJOS[e] || e} (${e})`)
-        .concat([`Administrador de obra (${admin || 'correo por ingresar'})`]);
-    cont.innerHTML = pasos.map((t, i) => `<div>${i + 1}. ${t}</div>`).join('');
+// ── Subida a la carpeta Obras: general u obras específicas ──────────────
+function aplicaObrasModal() {
+    const r = document.querySelector('input[name="m-aplica"]:checked');
+    return r ? r.value === 'si' : null;   // null = todavía sin elegir
+}
+function cambiarAplicaObras() {
+    document.getElementById('m-obras-aplica').style.display = aplicaObrasModal() === true ? '' : 'none';
+    renderObrasAplicaModal();
+    actualizarFlujoModal();
+}
+function toggleObraAplica(o) {
+    if (obrasAplicaModal.has(o)) obrasAplicaModal.delete(o); else obrasAplicaModal.add(o);
+    renderObrasAplicaModal();
+    actualizarFlujoModal();
+}
+function cambiarAdminObra(o, v) { adminsObraModal[o] = v; actualizarFlujoModal(); }
+
+function renderObrasAplicaModal() {
+    document.getElementById('m-obras-aplica-chips').innerHTML = OBRAS_CONSTRUCCION.map(o => `
+        <div class="dia-chip" style="padding:6px 12px;font-size:0.76rem;border:1px solid var(--gris-2,#ddd);border-radius:100px;cursor:pointer;${obrasAplicaModal.has(o) ? 'background:var(--negro,#111);color:#fff;border-color:var(--negro,#111);' : ''}"
+             onclick="toggleObraAplica('${escAttr(o)}')">${o}</div>`).join('');
+    const sel = OBRAS_CONSTRUCCION.filter(o => obrasAplicaModal.has(o));
+    document.getElementById('m-admins-obras').innerHTML = sel.length ? `
+        <label class="modal-label">Administrador de cada obra *</label>
+        ${sel.map(o => `<div style="margin-bottom:6px;"><input class="modal-input" type="email" placeholder="Correo del administrador de ${o}" value="${attrHtml(adminsObraModal[o] || '')}" oninput="cambiarAdminObra('${escAttr(o)}', this.value)"></div>`).join('')}
+        <div style="font-size:0.72rem;color:var(--txt-dim,#999);">Firman después de jdiaz. Los ingresas al subir el documento y después no se pueden cambiar.</div>` : '';
 }
 
-// En la carpeta Obras se elige obra y categoría, y el flujo de firmas es fijo
-// (no se eligen firmantes a mano ni se etiquetan obras: la obra ya es la carpeta).
+// Describe el flujo de firmas según lo elegido.
+function actualizarFlujoModal() {
+    const cont = document.getElementById('m-flujo-lista');
+    const aplica = aplicaObrasModal();
+    const primero = `<div>1. ${NOMBRE_REVISOR} (${FIRMANTE_REVISOR})</div>`;
+    const gris = t => `<div style="color:var(--txt-dim,#999);">${t}</div>`;
+    if (aplica === null) { cont.innerHTML = gris('Indica si aplica a obras específicas para ver quiénes firman.'); return; }
+    if (!aplica) { cont.innerHTML = primero + gris('Es general: no firma nadie más.'); return; }
+    const sel = OBRAS_CONSTRUCCION.filter(o => obrasAplicaModal.has(o));
+    if (!sel.length) { cont.innerHTML = primero + gris('2. Elige las obras para ver a sus administradores.'); return; }
+    cont.innerHTML = primero + `<div>2. Administrador de cada obra (en cualquier orden entre ellos):</div>` +
+        sel.map(o => `<div style="padding-left:16px;">· ${o}: ${(adminsObraModal[o] || '').trim() || 'correo por ingresar'}</div>`).join('');
+}
+
+// En la carpeta Obras se elige la carpeta (Planos / Procedimientos) y si aplica a
+// obras; el flujo de firmas es fijo (no se eligen firmantes a mano ni se etiquetan
+// obras aparte: las obras elegidas ya son la etiqueta).
 function actualizarSubcarpetasModal() {
     const esObras = tipoSubidaActual === 'procedimiento' && document.getElementById('m-carpeta').value === CARPETA_OBRAS;
-    const selObra = document.getElementById('m-subcarpeta'), selCat = document.getElementById('m-categoria');
+    const selCarpeta = document.getElementById('m-subcarpeta');
     document.getElementById('grupo-subcarpeta').style.display = esObras ? '' : 'none';
     if (esObras) {
-        if (selObra.options.length <= 1) selObra.innerHTML = '<option value="">Selecciona la obra…</option>' + OBRAS_CONSTRUCCION.map(o => `<option value="${o}">${o}</option>`).join('');
-        if (selCat.options.length <= 1) selCat.innerHTML = '<option value="">Selecciona la categoría…</option>' + CATEGORIAS_OBRA.map(c => `<option value="${c}">${c}</option>`).join('');
+        if (selCarpeta.options.length <= 1) selCarpeta.innerHTML = '<option value="">Selecciona la carpeta…</option>' + SUBCARPETAS_OBRAS.map(c => `<option value="${c}">${c}</option>`).join('');
     } else {
-        selObra.innerHTML = '<option value="">Selecciona la obra…</option>';
-        selCat.innerHTML = '<option value="">Selecciona la categoría…</option>';
-        document.getElementById('m-admin-email').value = '';
+        selCarpeta.innerHTML = '<option value="">Selecciona la carpeta…</option>';
+        document.querySelectorAll('input[name="m-aplica"]').forEach(r => { r.checked = false; });
+        obrasAplicaModal = new Set();
+        adminsObraModal = {};
+        document.getElementById('m-obras-aplica').style.display = 'none';
+        renderObrasAplicaModal();
     }
     document.getElementById('m-flujo-estandar').style.display = esObras ? '' : 'none';
     document.getElementById('m-requiere-label').style.display = esObras ? 'none' : '';
@@ -550,36 +590,37 @@ function renderCarpetas() {
 }
 
 function escAttr(t) { return String(t).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+function attrHtml(t) { return String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
 
-// Clave con la que se registra quién vio/descargó un documento. Incluye la
-// obra y la categoría para no mezclar archivos de igual nombre.
-function claveAcceso() {
-    return [carpetaActual, subcarpetaActual, categoriaActual].filter(Boolean).join(' - ');
+// Clave con la que se registra quién vio/descargó un documento: su ubicación
+// real (carpeta + obra o grupo de obras), sin barras para poder ir en la URL.
+function claveAccesoDe(doc) {
+    return [carpetaActual, doc.subcarpeta, doc.grupoObras].filter(Boolean).join(' - ').replace(/\s*\/\s*/g, ' - ');
 }
 
 function renderBreadcrumb() {
     const bc = document.getElementById('breadcrumb');
     bc.style.display = 'flex';
-    const niveles = [carpetaActual, subcarpetaActual, categoriaActual].filter(Boolean);
+    const niveles = [carpetaActual, subcarpetaActual, obraActual].filter(Boolean);
     const partes = [`<a onclick="volverACarpetas()">Carpetas</a>`].concat(niveles.map((n, i) =>
         i === niveles.length - 1 ? `<span class="actual">${n}</span>` : `<a onclick="irANivel(${i})">${n}</a>`));
     bc.innerHTML = partes.join('<span class="sep">/</span>');
     document.getElementById('search').placeholder = `Buscar en ${niveles[niveles.length - 1]}…`;
 }
 
-// 0 = raíz de la carpeta (ej. Obras), 1 = dentro de una obra
+// 0 = raíz de la carpeta (ej. Obras), 1 = dentro de Planos o Procedimientos
 function irANivel(i) {
     if (i === 0) subcarpetaActual = null;
-    categoriaActual = null;
+    obraActual = null;
     document.getElementById('search').value = '';
     renderBreadcrumb();
     renderDocs();
 }
 
-async function abrirCarpeta(nombre, sub, cat) {
+async function abrirCarpeta(nombre, sub, obra) {
     carpetaActual = nombre;
     subcarpetaActual = sub || null;
-    categoriaActual = cat || null;
+    obraActual = obra || null;
     document.getElementById('search').value = '';
     renderBreadcrumb();
 
@@ -597,14 +638,14 @@ async function abrirCarpeta(nombre, sub, cat) {
         docsGithub = (Array.isArray(files) ? files : [])
             .map(f => {
                 const meta = docsAprobadosCache.find(m => m.archivoGithub === f.nombre && m.carpeta === nombre
-                    && (m.subcarpeta || '') === (f.subcarpeta || '') && (m.categoria || '') === (f.categoria || ''));
+                    && (m.subcarpeta || '') === (f.subcarpeta || '') && (m.grupoObras || '') === (f.grupoObras || ''));
                 return {
                     nombre: f.nombre.replace(/\.[^.]+$/, ''),
                     archivoNombre: f.nombre,
-                    archivo: ['docs', nombre, f.subcarpeta, f.categoria, f.nombre].filter(Boolean).join('/'),
+                    archivo: ['docs', nombre, f.subcarpeta, f.grupoObras, f.nombre].filter(Boolean).join('/'),
                     tipo:    f.nombre.split('.').pop().toUpperCase(),
                     subcarpeta: f.subcarpeta || '',
-                    categoria: f.categoria || '',
+                    grupoObras: f.grupoObras || '',
                     fecha:   '',
                     githubUrl: f.url,
                     meta: meta || null,
@@ -618,15 +659,15 @@ async function abrirCarpeta(nombre, sub, cat) {
     renderDocs();
 }
 
-function abrirSubcarpeta(obra) {
-    subcarpetaActual = obra;
-    categoriaActual = null;
+function abrirSubcarpeta(carpeta) {
+    subcarpetaActual = carpeta;
+    obraActual = null;
     document.getElementById('search').value = '';
     renderBreadcrumb();
     renderDocs();
 }
-function abrirCategoria(cat) {
-    categoriaActual = cat;
+function abrirObra(obra) {
+    obraActual = obra;
     document.getElementById('search').value = '';
     renderBreadcrumb();
     renderDocs();
@@ -635,7 +676,7 @@ function abrirCategoria(cat) {
 function volverACarpetas() {
     carpetaActual = null;
     subcarpetaActual = null;
-    categoriaActual = null;
+    obraActual = null;
     document.getElementById('search').value = '';
     renderCarpetas();
 }
@@ -672,10 +713,10 @@ function numeroSufijo(archivoNombre) {
     return m ? parseInt(m[1], 10) : 0;
 }
 function claveDocumento(d) {
-    return `${d.subcarpeta || ''}||${d.categoria || ''}||${baseSinVersion(d.archivoNombre).toLowerCase().replace(/\s+/g, ' ')}||${extensionDe(d.archivoNombre)}`;
+    return `${d.subcarpeta || ''}||${d.grupoObras || ''}||${baseSinVersion(d.archivoNombre).toLowerCase().replace(/\s+/g, ' ')}||${extensionDe(d.archivoNombre)}`;
 }
 function contarDocumentos(files) {
-    return new Set(files.map(f => claveDocumento({ archivoNombre: f.nombre, subcarpeta: f.subcarpeta, categoria: f.categoria }))).size;
+    return new Set(files.map(f => claveDocumento({ archivoNombre: f.nombre, subcarpeta: f.subcarpeta, grupoObras: f.grupoObras }))).size;
 }
 function marcaTiempo(d) {
     return d.meta && d.meta.fechaAprobacion ? Date.parse(d.meta.fechaAprobacion) : null;
@@ -692,6 +733,21 @@ function compararVersiones(a, b) {
 function versionValida(d) {
     const m = d.meta;
     return !m || !m.requiereFirma || m.estadoFirma === 'vigente';
+}
+// Quiénes pueden firmar AHORA: los que faltan de la primera etapa incompleta
+// (igual que en el servidor). Sin etapas, cada firmante es una etapa.
+function firmantesDelTurno(meta) {
+    const etapas = meta.etapasFirma || (meta.firmantesRequeridos || []).map(e => [e]);
+    for (const etapa of etapas) {
+        const faltan = etapa.filter(e => !(meta.firmas || []).some(f => f.email === e));
+        if (faltan.length) return faltan;
+    }
+    return [];
+}
+// "correo (admin de Obra A, Obra B)" cuando ese correo es administrador de obras.
+function etiquetaFirmante(email, meta) {
+    const obras = Object.entries(meta.adminsObra || {}).filter(([, e]) => e === email).map(([o]) => o);
+    return obras.length ? `${email} (admin de ${obras.join(', ')})` : email;
 }
 function fechaCorta(iso) { return new Date(iso).toLocaleDateString('es-CL'); }
 // Desde cuándo rige una versión: la última firma si requería firmas; si no, su aprobación.
@@ -738,7 +794,7 @@ function htmlTarjetaDoc(doc, etiquetaVersion) {
     const url = doc.githubUrl || doc.archivo;
     const esPdf = doc.tipo.toLowerCase() === 'pdf';
     const meta = doc.meta;
-    const claveAcc = escAttr(claveAcceso());
+    const claveAcc = escAttr(claveAccesoDe(doc));
     const archivoClave = escAttr(doc.nombre + '.' + doc.tipo);
     const obrasTxt = meta?.obras?.length ? `<div class="doc-meta">🏗 ${meta.obras.join(', ')}</div>` : '';
     let firmaHtml = '';
@@ -746,17 +802,20 @@ function htmlTarjetaDoc(doc, etiquetaVersion) {
         const ordenado = !!meta.ordenFirma;
         const yaFirme = meta.firmas.some(f => f.email === emailActual);
         const vigente = meta.estadoFirma === 'vigente';
-        // En un flujo en fila solo puede firmar quien sigue en la lista.
-        const esMiTurno = !ordenado || meta.firmantesRequeridos[meta.firmas.length] === emailActual;
+        // En un flujo por etapas solo puede firmar quien está en el turno actual.
+        const turno = ordenado ? firmantesDelTurno(meta) : [];
+        const esMiTurno = !ordenado || turno.includes(emailActual);
         const puedeFirmar = meta.firmantesRequeridos.includes(emailActual) && !yaFirme && esMiTurno;
         const fechaFirma = f => new Date(f.fecha).toLocaleString('es-CL',{dateStyle:'short',timeStyle:'short'});
+        const lineaDe = email => {
+            const f = meta.firmas.find(x => x.email === email);
+            if (f) return `<div style="color:var(--txt-dim,#999);">✔ ${f.nombre} — ${fechaFirma(f)}</div>`;
+            if (turno.includes(email)) return `<div style="color:#b8860b;">⏳ Turno de ${etiquetaFirmante(email, meta)}${email === emailActual ? ' (tú)' : ''}</div>`;
+            return `<div style="color:#bbb;">· En espera: ${etiquetaFirmante(email, meta)}</div>`;
+        };
+        const etapas = meta.etapasFirma || meta.firmantesRequeridos.map(e => [e]);
         const lineasFirmas = ordenado
-            ? meta.firmantesRequeridos.map((email, i) => {
-                const f = meta.firmas[i];
-                if (f) return `<div style="color:var(--txt-dim,#999);">✔ ${f.nombre} — ${fechaFirma(f)}</div>`;
-                if (i === meta.firmas.length) return `<div style="color:#b8860b;">⏳ Turno de ${email}${email === emailActual ? ' (tú)' : ''}</div>`;
-                return `<div style="color:#bbb;">· En espera: ${email}</div>`;
-            }).join('')
+            ? etapas.map(etapa => etapa.map(lineaDe).join('')).join('')
             : meta.firmas.map(f => `<div style="color:var(--txt-dim,#999);">✔ ${f.nombre} — ${fechaFirma(f)}</div>`).join('');
         firmaHtml = `
             <div style="margin-top:6px;font-size:0.72rem;">
@@ -829,27 +888,33 @@ function htmlGrupo(g) {
     return `<div class="doc-grupo" style="margin-bottom:10px;">${html}</div>`;
 }
 
-// ── Niveles de la carpeta Obras: Obras → obra → categoría ──
+// ── Niveles de la carpeta Obras: Obras → Planos / Procedimientos → obra ──
+// La obra es una VISTA: un documento que aplica a varias obras se guarda una
+// sola vez y aparece dentro de cada una de ellas.
 function hijosDelNivel() {
     if (carpetaActual !== CARPETA_OBRAS) return { tipo: null, nombres: [] };
-    if (!subcarpetaActual) return { tipo: 'obra', nombres: OBRAS_CONSTRUCCION };
-    if (!categoriaActual) return { tipo: 'categoria', nombres: CATEGORIAS_OBRA };
+    if (!subcarpetaActual) return { tipo: 'carpeta', nombres: SUBCARPETAS_OBRAS };
+    if (!obraActual) {
+        // Una obra solo aparece cuando ya tiene documentos en esta carpeta.
+        const conDocs = OBRAS_CONSTRUCCION.filter(o => docsGithub.some(d => d.subcarpeta === subcarpetaActual && obrasDeDoc(d).includes(o)));
+        return { tipo: 'obra', nombres: conDocs };
+    }
     return { tipo: null, nombres: [] };
 }
-// Documentos que viven directamente en el nivel actual. En la raíz de Obras
-// quedan también los antiguos que no pertenecen a ninguna obra.
+// Documentos que se muestran directamente en el nivel actual. En la raíz de
+// Obras quedan también los antiguos que no pertenecen a ninguna carpeta nueva.
 function docsDelNivel() {
     if (carpetaActual !== CARPETA_OBRAS) return docsGithub;
-    if (!subcarpetaActual) return docsGithub.filter(d => !OBRAS_CONSTRUCCION.includes(d.subcarpeta));
-    if (!categoriaActual) return docsGithub.filter(d => d.subcarpeta === subcarpetaActual && !CATEGORIAS_OBRA.includes(d.categoria));
-    return docsGithub.filter(d => d.subcarpeta === subcarpetaActual && d.categoria === categoriaActual);
+    if (!subcarpetaActual) return docsGithub.filter(d => !SUBCARPETAS_OBRAS.includes(d.subcarpeta));
+    if (!obraActual) return docsGithub.filter(d => d.subcarpeta === subcarpetaActual && !d.grupoObras);   // generales
+    return docsGithub.filter(d => d.subcarpeta === subcarpetaActual && obrasDeDoc(d).includes(obraActual));
 }
 function docsDeHijo(nombre, tipo) {
-    return docsGithub.filter(d => tipo === 'obra' ? d.subcarpeta === nombre : (d.subcarpeta === subcarpetaActual && d.categoria === nombre));
+    return docsGithub.filter(d => tipo === 'carpeta' ? d.subcarpeta === nombre : (d.subcarpeta === subcarpetaActual && obrasDeDoc(d).includes(nombre)));
 }
 
 function htmlTarjetasHijos(nombres, tipo) {
-    const abrir = tipo === 'obra' ? 'abrirSubcarpeta' : 'abrirCategoria';
+    const abrir = tipo === 'carpeta' ? 'abrirSubcarpeta' : 'abrirObra';
     return `<div class="carpetas-grid" style="margin-bottom:18px;">${nombres.map(n => {
         const cant = agruparVersiones(docsDeHijo(n, tipo)).length;
         return `
@@ -868,8 +933,8 @@ function renderDocs() {
     const lista = document.getElementById('doc-list');
     const { tipo, nombres } = hijosDelNivel();
 
-    // Tarjetas de las carpetas del nivel (obras o categorías) y, debajo, los
-    // documentos que hayan quedado sueltos en este nivel.
+    // Tarjetas de las carpetas del nivel (Planos/Procedimientos u obras) y,
+    // debajo, los documentos que viven directamente en este nivel.
     const hijosVisibles = nombres.filter(n => !query || n.toLowerCase().includes(query));
     const htmlHijos = hijosVisibles.length ? htmlTarjetasHijos(hijosVisibles, tipo) : '';
 
@@ -881,7 +946,9 @@ function renderDocs() {
         lista.innerHTML = htmlHijos || `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div>No hay documentos en esta carpeta todavía</div></div>`;
         return;
     }
-    const separador = htmlHijos ? `<div style="font-size:0.74rem;font-weight:700;color:var(--txt-dim,#999);text-transform:uppercase;letter-spacing:.04em;margin:4px 0 8px;">Documentos sueltos en ${subcarpetaActual || carpetaActual}</div>` : '';
+    const rotulo = (carpetaActual === CARPETA_OBRAS && subcarpetaActual && !obraActual)
+        ? 'Generales — aplican a todas las obras' : `Documentos sueltos en ${subcarpetaActual || carpetaActual}`;
+    const separador = htmlHijos ? `<div style="font-size:0.74rem;font-weight:700;color:var(--txt-dim,#999);text-transform:uppercase;letter-spacing:.04em;margin:4px 0 8px;">${rotulo}</div>` : '';
     lista.innerHTML = htmlHijos + separador + grupos.map(htmlGrupo).join('');
 }
 
@@ -937,8 +1004,8 @@ function renderPendientes(lista) {
             <div class="pend-header">
                 <div>
                     <div class="pend-nombre">${doc.nombre}</div>
-                    ${doc.tipoDoc === 'comunicacion' ? `<span class="carpeta-badge">📢 ${doc.area}</span>` : (doc.carpeta ? `<span class="carpeta-badge">${doc.carpeta}${doc.subcarpeta ? ' › ' + doc.subcarpeta : ''}${doc.categoria ? ' › ' + doc.categoria : ''}</span>` : '')}
-                    ${doc.adminObraEmail ? `<div class="doc-meta" style="margin-top:4px;">✍️ Firman en este orden: ${doc.firmantesRequeridos.join(' → ')}</div>` : ''}
+                    ${doc.tipoDoc === 'comunicacion' ? `<span class="carpeta-badge">📢 ${doc.area}</span>` : (doc.carpeta ? `<span class="carpeta-badge">${doc.carpeta}${doc.subcarpeta ? ' › ' + doc.subcarpeta : ''}${doc.grupoObras ? ' › ' + doc.grupoObras : ''}</span>` : '')}
+                    ${doc.etapasFirma ? `<div class="doc-meta" style="margin-top:4px;">✍️ Firman: ${doc.etapasFirma.map(e => e.join(' / ')).join(' → ')}</div>` : ''}
                     <div class="pend-meta">
                         Subido por <strong>${doc.subidoPor}</strong> · 
                         ${new Date(doc.fecha).toLocaleDateString('es-CL', {day:'numeric', month:'long', year:'numeric'})}
@@ -996,7 +1063,7 @@ async function aprobar(id) {
         await aprobarUno(id);
         mostrarToast('Documento publicado correctamente', 'ok');
         cargarPendientes();
-        if (carpetaActual) abrirCarpeta(carpetaActual, subcarpetaActual, categoriaActual); else renderCarpetas();
+        if (carpetaActual) abrirCarpeta(carpetaActual, subcarpetaActual, obraActual); else renderCarpetas();
     } catch(e) {
         mostrarToast('Error al aprobar: ' + e.message, 'err');
     }
@@ -1050,7 +1117,7 @@ async function aprobarSeleccionados() {
     pendientesSeleccionados.clear();
     btn.innerHTML = '✓ Aprobar seleccionados';
     cargarPendientes();
-    if (carpetaActual) abrirCarpeta(carpetaActual, subcarpetaActual, categoriaActual); else renderCarpetas();
+    if (carpetaActual) abrirCarpeta(carpetaActual, subcarpetaActual, obraActual); else renderCarpetas();
 
     if (fallidos.length === 0) {
         mostrarToast(`${ok} documento${ok>1?'s':''} publicado${ok>1?'s':''} correctamente`, 'ok');
@@ -1455,11 +1522,17 @@ async function enviarDocumento() {
     if (!esComunicacion && !carpeta) { alert('Selecciona una carpeta'); return; }
     const esObras = !esComunicacion && carpeta === CARPETA_OBRAS;
     const subcarpeta = esObras ? document.getElementById('m-subcarpeta').value : '';
-    const categoria = esObras ? document.getElementById('m-categoria').value : '';
-    const adminObraEmail = esObras ? document.getElementById('m-admin-email').value.trim().toLowerCase() : '';
-    if (esObras && !subcarpeta) { alert('Selecciona la obra'); return; }
-    if (esObras && !categoria) { alert('Selecciona la categoría'); return; }
-    if (esObras && !correoAdminValido(adminObraEmail)) { alert('Ingresa el correo corporativo del administrador de obra'); return; }
+    const aplica = esObras ? aplicaObrasModal() : null;
+    const obrasDoc = (esObras && aplica) ? OBRAS_CONSTRUCCION.filter(o => obrasAplicaModal.has(o)) : [];
+    const adminsObra = {};
+    if (esObras && !subcarpeta) { alert('Selecciona la carpeta dentro de Obras'); return; }
+    if (esObras && aplica === null) { alert('Indica si el documento aplica a obras específicas'); return; }
+    if (esObras && aplica && !obrasDoc.length) { alert('Selecciona para qué obras aplica el documento'); return; }
+    for (const o of obrasDoc) {
+        const e = (adminsObraModal[o] || '').trim().toLowerCase();
+        if (!correoAdminValido(e)) { alert(`Ingresa el correo corporativo del administrador de ${o}`); return; }
+        adminsObra[o] = e;
+    }
     if (archivosSeleccionados.length === 0) { alert('Selecciona uno o más archivos'); return; }
 
     const esMasivo = archivosSeleccionados.length > 1;
@@ -1499,10 +1572,10 @@ async function enviarDocumento() {
                     tipoDoc: tipoSubidaActual,
                     carpeta: esComunicacion ? undefined : carpeta,
                     subcarpeta: subcarpeta || undefined,
-                    categoria: categoria || undefined,
-                    adminObraEmail: adminObraEmail || undefined,
+                    aplicaObras: esObras ? aplica : undefined,
+                    adminsObra: (esObras && aplica) ? adminsObra : undefined,
                     area: esComunicacion ? area : undefined,
-                    obras: esComunicacion ? undefined : (esObras ? [subcarpeta] : [...obrasSeleccionadasModal]),
+                    obras: esComunicacion ? undefined : (esObras ? obrasDoc : [...obrasSeleccionadasModal]),
                     requiereFirma: esComunicacion ? false : requiereFirma,
                     firmantesRequeridos: esComunicacion ? [] : firmantesRequeridos,
                     firmaPagina: esComunicacion ? undefined : firmaPagina,
@@ -1572,7 +1645,7 @@ async function firmarDocumento(id) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Error al firmar');
         mostrarToast(data.estadoFirma === 'vigente' ? 'Firmado — el documento ya quedó vigente' : 'Firma registrada', 'ok');
-        if (carpetaActual) abrirCarpeta(carpetaActual, subcarpetaActual, categoriaActual);
+        if (carpetaActual) abrirCarpeta(carpetaActual, subcarpetaActual, obraActual);
     } catch(e) { mostrarToast('Error: ' + e.message, 'err'); }
 }
 
