@@ -111,25 +111,23 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
 .dot-otros{background:var(--txt-mid);}
 .dot-vacaciones{background:#2E5A8A;}
 
-/* Vista semanal de Estacionamientos por bloques (AM / PM a la izquierda) */
+/* Vista semanal de Estacionamientos por bloques (AM / PM) */
 .bq-ayuda{font-size:0.78rem;color:var(--txt-dim);margin-bottom:10px;}
-.bq-tabla{border-collapse:separate;border-spacing:0;min-width:760px;width:100%;font-size:0.76rem;background:#fff;}
+.bq-tabla{border-collapse:separate;border-spacing:0;min-width:980px;width:100%;font-size:0.76rem;background:#fff;}
 .bq-tabla th, .bq-tabla td{border-right:1px solid var(--gris-2);border-bottom:1px solid var(--gris-2);}
 .bq-tabla thead tr:first-child th{border-top:1px solid var(--gris-2);}
-.bq-esquina{background:var(--gris-1);padding:12px;text-align:left;position:sticky;z-index:3;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--txt-dim);}
-.bq-esq-bloque{left:0;width:86px;min-width:86px;text-align:center;border-left:1px solid var(--gris-2);border-top-left-radius:12px;}
-.bq-esq-spot{left:86px;min-width:170px;}
-.bq-dia{background:var(--gris-1);padding:10px 6px;text-align:center;font-size:0.66rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--txt-dim);}
-.bq-dia b{display:block;font-size:1.15rem;line-height:1.1;letter-spacing:0;color:var(--txt);}
+.bq-esquina{background:var(--gris-1);padding:12px;text-align:left;position:sticky;left:0;z-index:3;min-width:170px;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--txt-dim);border-left:1px solid var(--gris-2);border-top-left-radius:12px;}
+.bq-dia{background:var(--gris-1);padding:8px 6px;text-align:center;font-size:0.66rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--txt-dim);border-left:2px solid var(--gris-3);}
+.bq-dia b{display:block;font-size:1.1rem;line-height:1.1;letter-spacing:0;color:var(--txt);}
 .bq-dia.hoy, .bq-dia.hoy b{color:var(--rojo);}
-.bq-lado{background:var(--gris-1);width:86px;min-width:86px;text-align:center;vertical-align:middle;font-weight:700;font-size:1.15rem;color:var(--txt-mid);position:sticky;left:0;z-index:2;border-left:1px solid var(--gris-2);}
-.bq-lado small{display:block;font-weight:500;font-size:0.64rem;color:var(--txt-dim);margin-top:3px;}
-.bq-spot{background:#fff;padding:10px 12px;text-align:left;position:sticky;left:86px;z-index:2;font-size:0.86rem;font-weight:700;min-width:170px;}
+.bq-bloque-h{background:var(--gris-1);padding:6px 4px;text-align:center;font-weight:700;font-size:0.74rem;color:var(--txt-mid);}
+.bq-bloque-h small{display:block;font-weight:500;font-size:0.62rem;color:var(--txt-dim);margin-top:1px;}
+.bq-spot{background:#fff;padding:10px 12px;text-align:left;position:sticky;left:0;z-index:2;font-size:0.86rem;font-weight:700;border-left:1px solid var(--gris-2);}
 .bq-spot small{display:block;font-weight:500;color:var(--txt-mid);font-size:0.74rem;margin-top:2px;}
-.bq-corte > *{border-top:2px solid var(--gris-3);}
 .bq-cell{height:60px;padding:5px 6px;vertical-align:middle;text-align:center;color:#fff;font-weight:700;line-height:1.2;}
-.bq-cell .bq-p{font-size:0.76rem;}
-.bq-cell .bq-s{font-weight:500;font-size:0.66rem;opacity:0.95;max-width:150px;margin:2px auto 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bq-cell.bq-am{border-left:2px solid var(--gris-3);}
+.bq-cell .bq-p{font-size:0.74rem;}
+.bq-cell .bq-s{font-weight:500;font-size:0.64rem;opacity:0.95;max-width:104px;margin:2px auto 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .bq-ocupado{background:rgba(107,103,98,0.7);}
 .bq-libre{background:var(--verde);}
 .bq-auto{background:rgba(26,122,74,0.55);}
@@ -1034,7 +1032,7 @@ function celdaBloque(spot, fechaStr, bloque) {
     }
     if (accion === 'agendar') titulo += '\n\nClic para agendar este bloque';
     if (accion === 'cancelar') titulo += '\n\nClic para anular la reserva';
-    return `<td class="bq-cell bq-${est.estado} ${fechaStr < hoyISO() ? 'bq-pasado' : ''} ${accion ? 'bq-clic' : ''}"
+    return `<td class="bq-cell bq-${est.estado} ${bloque.clave === 'AM' ? 'bq-am' : ''} ${fechaStr < hoyISO() ? 'bq-pasado' : ''} ${accion ? 'bq-clic' : ''}"
         data-spot="${escHtml(spot.id)}" data-fecha="${fechaStr}" data-bloque="${bloque.clave}" title="${escHtml(titulo)}"
         ${accion ? 'onclick="clickBloque(this)"' : ''}>
         <div class="bq-p">${escHtml(principal)}</div>${secundario ? `<div class="bq-s">${escHtml(secundario)}</div>` : ''}</td>`;
@@ -1053,20 +1051,16 @@ function renderVistaSemanalEstac() {
     const viernes = new Date(lunes); viernes.setDate(lunes.getDate() + 4);
     document.getElementById('estac-week-label').textContent = `${fmt(lunes.toISOString().slice(0,10))} — ${fmt(viernes.toISOString().slice(0,10))}`;
 
-    // Días arriba; a la izquierda, los bloques: primero la franja AM con todos
-    // los estacionamientos y debajo la franja PM.
     const diasLabel = ['Lun','Mar','Mié','Jue','Vie'];
     const fechas = [0,1,2,3,4].map(d => { const f = new Date(lunes); f.setDate(lunes.getDate() + d); return f; });
-    const cabecera = fechas.map((f, d) => `<th class="bq-dia ${f.toISOString().slice(0,10) === hoyISO() ? 'hoy' : ''}">${diasLabel[d]}<b>${f.getDate()}</b></th>`).join('');
+    const cab1 = fechas.map((f, d) => `<th class="bq-dia ${f.toISOString().slice(0,10) === hoyISO() ? 'hoy' : ''}" colspan="2">${diasLabel[d]}<b>${f.getDate()}</b></th>`).join('');
+    const cab2 = fechas.map(() => BLOQUES_ESTAC.map(b => `<th class="bq-bloque-h ${b.clave === 'AM' ? 'bq-am' : ''}">${b.clave}<small>${b.desde}–${b.hasta}</small></th>`).join('')).join('');
     const ordenados = spots.slice().sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0) || String(a.numero).localeCompare(String(b.numero)));
-    const franjas = BLOQUES_ESTAC.map((bloque, i) => ordenados.map((spot, j) => `
-        <tr class="${j === 0 && i > 0 ? 'bq-corte' : ''}">
-            ${j === 0 ? `<th class="bq-lado" rowspan="${ordenados.length}">${bloque.clave}<small>${bloque.desde}–${bloque.hasta}</small></th>` : ''}
-            <th class="bq-spot">N° ${escHtml(spot.numero)}<small>${escHtml(usuarioDe(spot))}</small></th>
-            ${fechas.map(f => celdaBloque(spot, f.toISOString().slice(0,10), bloque)).join('')}
-        </tr>`).join('')).join('');
+    const filas = ordenados.map(spot => `
+        <tr><th class="bq-spot">N° ${escHtml(spot.numero)}<small>${escHtml(usuarioDe(spot))}</small></th>
+        ${fechas.map(f => BLOQUES_ESTAC.map(b => celdaBloque(spot, f.toISOString().slice(0,10), b)).join('')).join('')}</tr>`).join('');
     cont.innerHTML = `<table class="bq-tabla"><thead>
-        <tr><th class="bq-esquina bq-esq-bloque">Bloque</th><th class="bq-esquina bq-esq-spot">Estacionamiento</th>${cabecera}</tr></thead><tbody>${franjas}</tbody></table>`;
+        <tr><th class="bq-esquina" rowspan="2">Estacionamiento</th>${cab1}</tr><tr>${cab2}</tr></thead><tbody>${filas}</tbody></table>`;
 }
 
 function clickBloque(el) {
