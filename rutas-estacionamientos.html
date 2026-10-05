@@ -185,10 +185,9 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
             </div>
         </div>
         <div class="toolbar">
-            <div style="font-size:0.82rem;color:var(--txt-dim);">Hoy: <b id="fecha-hoy"></b></div>
+            <div style="font-size:0.82rem;color:var(--txt-dim);">Hoy: <b id="fecha-hoy"></b> &nbsp;·&nbsp; Reservas fuera de ruta: pídeselas a Karollihn Yépez (kyepez@ibaker.cl)</div>
             <div style="display:flex;gap:8px;">
                 <button class="btn btn-outline btn-sm" id="btn-vista-toggle" onclick="alternarVistaEstac()">📅 Ver vista semanal</button>
-                <button class="btn btn-primary btn-sm" onclick="abrirSolicitar()">🙋 Solicitar estacionamiento</button>
                 <button class="btn btn-outline btn-sm" onclick="cargarTodo()">↻ Actualizar</button>
             </div>
         </div>
@@ -402,28 +401,6 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
     </div>
 </div>
 
-<div class="modal-overlay" id="modal-solicitar">
-    <div class="modal">
-        <h3>Solicitar un estacionamiento</h3>
-        <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Elige un estacionamiento, fecha y hora — queda tomado al instante, sin necesitar aprobación de nadie.</p>
-        <div class="form-group">
-            <label class="form-label">Estacionamiento</label>
-            <select class="form-input" id="sol-spot"></select>
-        </div>
-        <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" type="date" id="sol-fecha"></div>
-        <div class="form-group">
-            <label class="form-label">Horario (opcional — vacío = todo el día)</label>
-            <div style="display:flex;gap:8px;">
-                <input class="form-input" type="time" id="sol-hora-desde">
-                <input class="form-input" type="time" id="sol-hora-hasta">
-            </div>
-        </div>
-        <div class="modal-btns">
-            <button class="btn btn-outline btn-sm" onclick="cerrarModal('modal-solicitar')">Cancelar</button>
-            <button class="btn btn-primary btn-sm" onclick="confirmarSolicitar()">Confirmar</button>
-        </div>
-    </div>
-</div>
 
 <div class="toast" id="toast"></div>
 
@@ -924,34 +901,6 @@ async function cancelarReserva(id) {
         const res = await fetch(`${API}/estacionamientos/reservas/${id}?email=${encodeURIComponent(emailActual)}`, { method: 'DELETE' });
         if (!res.ok) throw new Error((await res.json()).error || 'Error');
         toast('Cancelado');
-        cargarTodo();
-    } catch(e) { toast('Error: ' + e.message); }
-}
-
-function abrirSolicitar() {
-    const sel = document.getElementById('sol-spot');
-    sel.innerHTML = spots.map(s => `<option value="${s.id}">N° ${s.numero} — ${s.duenoNombre || s.duenoEmail}</option>`).join('');
-    document.getElementById('sol-fecha').value = hoyISO();
-    document.getElementById('sol-hora-desde').value = '';
-    document.getElementById('sol-hora-hasta').value = '';
-    document.getElementById('modal-solicitar').classList.add('visible');
-}
-
-async function confirmarSolicitar() {
-    const estacionamientoId = document.getElementById('sol-spot').value;
-    const fecha = document.getElementById('sol-fecha').value;
-    const horaInicio = document.getElementById('sol-hora-desde').value || null;
-    const horaFin = document.getElementById('sol-hora-hasta').value || null;
-    if (!estacionamientoId || !fecha) { alert('Completa estacionamiento y fecha'); return; }
-    try {
-        const res = await fetch(`${API}/estacionamientos/solicitar`, {
-            method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ estacionamientoId, email: emailActual, nombre: nombreActual, fecha, horaInicio, horaFin })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Error');
-        cerrarModal('modal-solicitar');
-        toast('Estacionamiento tomado');
         cargarTodo();
     } catch(e) { toast('Error: ' + e.message); }
 }
