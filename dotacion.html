@@ -465,6 +465,7 @@
   <div style="width:1px;height:18px;background:#333;"></div>
   <div style="font-family:monospace;font-size:0.72rem;color:#B5B0AA;letter-spacing:0.08em;text-transform:uppercase;" id="navObra">Control de Dotación</div>
   <a id="navTodasObras" href="dotacion.html" style="display:none;color:#B5B0AA;text-decoration:none;font-size:0.78rem;border:1px solid #333;border-radius:6px;padding:4px 10px;">▦ Todas las obras</a>
+  <a id="navAccesos" href="?panel=accesos" style="display:none;color:#B5B0AA;text-decoration:none;font-size:0.78rem;border:1px solid #333;border-radius:6px;padding:4px 10px;">⚙ Accesos</a>
   <div style="flex:1;"></div>
   <div id="auth-area"></div>
 </nav>
@@ -481,6 +482,31 @@
   <div id="menu-obras-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;"></div>
 </div>
 
+<div id="panel-accesos" style="display:none;max-width:1100px;margin:40px auto 80px;padding:0 24px;">
+  <a href="dotacion.html" style="color:var(--steel);text-decoration:none;font-size:13px;">← Volver a las obras</a>
+  <h1 class="h1" style="color:var(--ink);margin:10px 0 8px;">Accesos a las <span>obras</span></h1>
+  <p style="color:var(--steel);font-size:14px;margin:0 0 4px;">Marca en qué obras puede entrar cada persona. Cada una ve solo las obras que tenga marcadas, y a quien tenga al menos una le aparece la tarjeta «Control de Dotación» en el inicio de la intranet.</p>
+  <p id="panel-accesos-admins" style="color:var(--steel);font-size:12.5px;margin:0 0 18px;"></p>
+
+  <div class="ingreso-card" style="margin-bottom:16px;">
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px;">➕ Dar acceso a una persona</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+      <input id="panel-alta-email" type="text" placeholder="correo@ibaker.cl" style="flex:1;min-width:220px;padding:8px 10px;border:1px solid var(--line,#ccc);border-radius:7px;font-size:13px;">
+      <div id="panel-alta-obras" style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;"></div>
+      <button class="btn btn-primary btn-sm" id="panel-alta-btn" onclick="agregarPersonaPanel()">Dar acceso</button>
+    </div>
+  </div>
+
+  <div class="ingreso-card" style="padding:0;overflow-x:auto;margin-bottom:16px;">
+    <table id="panel-accesos-tabla" style="width:100%;border-collapse:collapse;font-size:13px;"></table>
+  </div>
+
+  <div class="ingreso-card">
+    <div style="font-weight:700;font-size:13px;margin-bottom:8px;">📜 Últimos cambios de acceso</div>
+    <div id="panel-accesos-historial" style="font-size:12.5px;"></div>
+  </div>
+</div>
+
 <div id="main-wrap" style="display:none;">
 <div class="topbar">
   <div class="topbar-inner">
@@ -494,15 +520,6 @@
 <div class="wrap">
 
 <div id="admin-acceso-dotacion-wrap" style="display:none;">
-  <div class="ingreso-card" style="margin-bottom:16px;">
-    <div style="font-weight:700;font-size:13px;margin-bottom:10px;">👥 Acceso a esta obra: <span id="accesoObraNombre"></span></div>
-    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-      <input id="acceso-dotacion-nuevo" placeholder="correo@ibaker.cl" style="flex:1;min-width:180px;padding:7px 10px;border:1px solid var(--line,#ccc);border-radius:7px;font-size:0.82rem;">
-      <button class="btn btn-primary btn-sm" onclick="agregarAccesoDotacion()">Agregar acceso</button>
-    </div>
-    <div id="acceso-dotacion-lista"></div>
-  </div>
-
   <div class="ingreso-card" style="margin-bottom:16px;">
     <div style="font-weight:700;font-size:13px;margin-bottom:6px;">📜 Historial de cambios</div>
     <button class="btn btn-secondary btn-sm" onclick="toggleHistorialDotacion()" style="margin-bottom:10px;">Ver / ocultar historial</button>
@@ -784,7 +801,6 @@ async function dotFetch(ruta, opciones = {}, sinObra){
 }
 // Quiénes pueden administrar el acceso al módulo (agregar/quitar personas).
 const ADMINISTRADORES_DOTACION = ['dvillaseca@ibaker.cl', 'jcumplido@ibaker.cl', 'tsanmartin@ibaker.cl'];
-let accesoDotacionLista = [];
 
 let irA = url => location.replace(url);
 // ¿Es administrador del módulo? (lo decide el servidor; esta lista solo es el respaldo)
@@ -807,6 +823,16 @@ function mostrarMenuObras(obras){
         <div style="font-size:12px;color:var(--steel);">${o.rol === 'admin' ? 'Administrador' : 'Con acceso'} · Entrar →</div>
       </div>
     </a>`).join('');
+  if (esAdminModulo) {
+    document.getElementById('menu-obras-grid').insertAdjacentHTML('beforeend', `
+    <a href="?panel=accesos" style="text-decoration:none;color:inherit;">
+      <div style="background:transparent;border:1.5px dashed var(--steel);border-radius:12px;padding:20px 22px;height:100%;box-sizing:border-box;">
+        <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--steel);margin-bottom:6px;">Administración</div>
+        <div style="font-size:18px;font-weight:700;color:var(--ink);margin-bottom:10px;">⚙ Administrar accesos</div>
+        <div style="font-size:12px;color:var(--steel);">Elige quién puede ver cada obra →</div>
+      </div>
+    </a>`);
+  }
   document.getElementById('menu-obras').style.display = 'block';
 }
 
@@ -818,8 +844,8 @@ function aplicarConfigObra(cfg, obras){
   document.title = `Control de Dotación — ${OBRA.nombre}`;
   document.getElementById('navObra').textContent = `Control de Dotación — ${OBRA.nombre}`;
   document.getElementById('h1Titulo').innerHTML = `Control de <span>Dotación</span> · ${escHtml(OBRA.nombre)}`;
-  const acc = document.getElementById('accesoObraNombre'); if(acc) acc.textContent = OBRA.nombre;
   document.getElementById('navTodasObras').style.display = obras.length > 1 ? '' : 'none';
+  document.getElementById('navAccesos').style.display = esAdminModulo ? '' : 'none';
 }
 
 async function initAuth() {
@@ -835,6 +861,11 @@ async function initAuth() {
     try { const r = await dotFetch('/dotacion/obras', {}, true); if (r.ok) obras = await r.json(); } catch(e) {}
     esAdminModulo = obras.some(o => o.rol === 'admin') || ADMINISTRADORES_DOTACION.includes(emailUsuario());
 
+    if (new URLSearchParams(location.search).get('panel') === 'accesos') {
+      if (!esAdminModulo) { mostrarAccesoDenegado(); return; }
+      await mostrarPanelAccesos();
+      return;
+    }
     const pedida = new URLSearchParams(location.search).get('obra');
     if (!pedida) {
       if (!obras.length) { mostrarAccesoDenegado(); return; }
@@ -851,7 +882,7 @@ async function initAuth() {
     document.getElementById('main-wrap').style.display = 'block';
     if (esAdminModulo) {
       const wrap = document.getElementById('admin-acceso-dotacion-wrap');
-      if (wrap) { wrap.style.display = 'block'; await cargarAccesoObra(); }
+      if (wrap) wrap.style.display = 'block';
     }
     await init();
   } catch(e) {
@@ -860,52 +891,102 @@ async function initAuth() {
   }
 }
 
-async function cargarAccesoObra() {
+// ── Panel de accesos (administradores del módulo) ───────────────────────
+// Una matriz persona × obra: se marca en qué obras puede entrar cada persona. Cada cambio se
+// guarda al instante. Quien tenga al menos una obra ve la tarjeta de Dotación en el inicio.
+let panelAccesos = { obras: [], accesos: {}, admins: [], historial: [] };
+const personasDeLaSesion = new Set(); // personas tocadas en esta pantalla: la fila no desaparece al quedar sin acceso
+
+async function mostrarPanelAccesos() {
+  document.getElementById('main-wrap').style.display = 'none';
+  document.getElementById('menu-obras').style.display = 'none';
+  document.getElementById('panel-accesos').style.display = 'block';
+  document.getElementById('navObra').textContent = 'Control de Dotación — Accesos';
+  document.title = 'Control de Dotación — Accesos';
+  document.getElementById('navTodasObras').style.display = '';
+  await cargarPanelAccesos();
+}
+async function cargarPanelAccesos() {
   try {
-    const r = await dotFetch(`/dotacion/obras/${encodeURIComponent(OBRA.id)}/acceso`, {}, true);
-    const d = await r.json();
-    accesoDotacionLista = Array.isArray(d.lista) ? d.lista : [];
-  } catch(e) { accesoDotacionLista = ADMINISTRADORES_DOTACION; }
-  renderAccesoDotacionLista();
+    const r = await dotFetch('/dotacion/accesos', {}, true);
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
+    panelAccesos = await r.json();
+  } catch(e) { toast('No se pudieron cargar los accesos: ' + e.message); return; }
+  renderPanelAccesos();
+}
+const nombreObraPanel = id => (panelAccesos.obras.find(o => o.id === id) || { nombre: id }).nombre;
+
+function renderPanelAccesos() {
+  const { obras, accesos, admins, historial } = panelAccesos;
+  document.getElementById('panel-accesos-admins').textContent =
+    `Administran los accesos y ven todas las obras: ${admins.join(', ')}.`;
+  document.getElementById('panel-alta-obras').innerHTML = obras.map(o =>
+    `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" value="${escHtml(o.id)}"> ${escHtml(o.nombre)}</label>`).join('');
+
+  const celda = 'padding:9px 12px;border-top:1px solid var(--line,#e5e5e5);';
+  const personas = [...new Set([...Object.values(accesos).flat(), ...personasDeLaSesion])].sort((a, b) => a.localeCompare(b));
+  const cabecera = `<tr style="background:var(--gris-1,#f3f1ec);"><th style="${celda}text-align:left;">Persona</th>${obras.map(o => `<th style="${celda}text-align:center;">${escHtml(o.nombre)}</th>`).join('')}</tr>`;
+  const filasAdmin = admins.map(e => `<tr data-admin="1"><td style="${celda}">${escHtml(e)} <span style="font-size:10.5px;color:#999;margin-left:6px;">Administrador · ve todas</span></td>${
+    obras.map(() => `<td style="${celda}text-align:center;"><input type="checkbox" checked disabled></td>`).join('')}</tr>`).join('');
+  const filas = personas.map(e => {
+    const marcadas = obras.filter(o => (accesos[o.id] || []).includes(e));
+    return `<tr data-email="${escHtml(e)}"><td style="${celda}">${escHtml(e)}${marcadas.length ? '' : ' <span style="font-size:10.5px;color:var(--red,#c0392b);margin-left:6px;">Sin acceso a ninguna obra</span>'}</td>${
+      obras.map(o => `<td style="${celda}text-align:center;"><input type="checkbox" data-obra="${escHtml(o.id)}" ${marcadas.some(m => m.id === o.id) ? 'checked' : ''} onchange="cambiarAccesoPanel(this)"></td>`).join('')}</tr>`;
+  }).join('');
+  document.getElementById('panel-accesos-tabla').innerHTML = cabecera + filasAdmin + filas +
+    (personas.length ? '' : `<tr><td colspan="${obras.length + 1}" style="${celda}color:var(--steel);">Todavía no hay personas con acceso además de los administradores.</td></tr>`);
+  renderHistorialAccesos(historial);
+}
+function renderHistorialAccesos(historial) {
+  const nombres = ids => ids.length ? ids.map(nombreObraPanel).join(' y ') : 'ninguna';
+  document.getElementById('panel-accesos-historial').innerHTML = historial.length
+    ? historial.map(h => `<div style="padding:5px 0;border-top:1px solid var(--line,#eee);"><span style="color:var(--steel);">${new Date(h.fecha).toLocaleString('es-CL')}</span> — ${escHtml(h.por)} dejó a <b>${escHtml(h.persona)}</b> con: ${escHtml(nombres(h.despues))} <span style="color:#999;">(antes: ${escHtml(nombres(h.antes))})</span></div>`).join('')
+    : '<div style="color:var(--steel);">Todavía no hay cambios registrados.</div>';
+}
+// Guarda las obras de una persona y refresca el registro (sin redibujar la tabla).
+async function guardarObrasPersona(email, obras) {
+  const r = await dotFetch('/dotacion/accesos/persona', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, obras })
+  }, true);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+  panelAccesos.accesos = d.accesos;
+  try {
+    const h = await dotFetch('/dotacion/accesos', {}, true);
+    if (h.ok) { panelAccesos.historial = (await h.json()).historial || []; renderHistorialAccesos(panelAccesos.historial); }
+  } catch(e) {}
+}
+async function cambiarAccesoPanel(chk) {
+  const fila = chk.closest('tr'), email = fila.dataset.email;
+  const obras = [...fila.querySelectorAll('input[data-obra]')].filter(i => i.checked).map(i => i.dataset.obra);
+  chk.disabled = true;
+  try {
+    await guardarObrasPersona(email, obras);
+    personasDeLaSesion.add(email);
+    toast(obras.length ? `${email}: ahora ve ${obras.map(nombreObraPanel).join(' y ')}` : `${email}: sin acceso a ninguna obra`);
+    renderPanelAccesos();
+  } catch(e) {
+    chk.checked = !chk.checked; // se devuelve la marca: no quedó guardado
+    toast('Error: ' + e.message);
+  } finally { chk.disabled = false; }
+}
+async function agregarPersonaPanel() {
+  const input = document.getElementById('panel-alta-email');
+  const email = input.value.trim().toLowerCase();
+  const obras = [...document.querySelectorAll('#panel-alta-obras input:checked')].map(i => i.value);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast('Escribe un correo válido'); return; }
+  if (!obras.length) { toast('Marca al menos una obra'); return; }
+  // Si la persona ya tenía otras obras, se conservan: se suman a las nuevas.
+  const previas = panelAccesos.obras.filter(o => (panelAccesos.accesos[o.id] || []).includes(email)).map(o => o.id);
+  try {
+    await guardarObrasPersona(email, [...new Set([...previas, ...obras])]);
+    personasDeLaSesion.add(email);
+    input.value = '';
+    renderPanelAccesos();
+    toast(`${email}: ahora ve ${panelAccesos.obras.filter(o => (panelAccesos.accesos[o.id] || []).includes(email)).map(o => o.nombre).join(' y ')}`);
+  } catch(e) { toast('Error: ' + e.message); }
 }
 
-function renderAccesoDotacionLista() {
-  const cont = document.getElementById('acceso-dotacion-lista');
-  if (!cont) return;
-  cont.innerHTML = accesoDotacionLista.map(email => `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;border:1px solid var(--line,#ddd);border-radius:7px;margin-bottom:6px;font-size:0.8rem;">
-      <span>${email}</span>
-      ${ADMINISTRADORES_DOTACION.includes(email) ? '<span style="font-size:0.68rem;color:#999;">Admin fijo</span>' : `<button class="btn btn-outline btn-sm" onclick="quitarAccesoDotacion('${email}')">Quitar</button>`}
-    </div>`).join('');
-}
-async function agregarAccesoDotacion() {
-  const input = document.getElementById('acceso-dotacion-nuevo');
-  const email = input.value.trim().toLowerCase();
-  if (!email) return;
-  try {
-    const res = await dotFetch(`/dotacion/obras/${encodeURIComponent(OBRA.id)}/acceso`, {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ nuevoEmail: email })
-    }, true);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Error');
-    input.value = '';
-    accesoDotacionLista = data.lista;
-    renderAccesoDotacionLista();
-    toast(`Acceso agregado a ${OBRA.nombre}`);
-  } catch(e) { toast('Error: ' + e.message); }
-}
-async function quitarAccesoDotacion(email) {
-  if (!confirm(`¿Quitar el acceso de ${email} a ${OBRA.nombre}?`)) return;
-  try {
-    const res = await dotFetch(`/dotacion/obras/${encodeURIComponent(OBRA.id)}/acceso/${encodeURIComponent(email)}`, { method: 'DELETE' }, true);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Error');
-    accesoDotacionLista = data.lista;
-    renderAccesoDotacionLista();
-    toast('Acceso quitado');
-  } catch(e) { toast('Error: ' + e.message); }
-}
 function renderUserChip() {
   if (!usuarioActual) return;
   const nombre = usuarioActual.name || usuarioActual.username;
