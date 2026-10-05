@@ -128,7 +128,7 @@ async function procesar() {
             return;
         }
         if (!spot || spot.duenoEmail !== emailActual) {
-            mostrar('🚫', 'Sin permiso', 'Solo el dueño del estacionamiento puede aprobar o rechazar esta solicitud.');
+            mostrar('🚫', 'Sin permiso', 'Solo el usuario del estacionamiento puede aprobar o rechazar esta solicitud.');
             return;
         }
 
