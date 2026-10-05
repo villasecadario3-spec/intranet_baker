@@ -97,6 +97,7 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
 .tag-visita_obra{background:rgba(184,134,11,0.1);color:#8a6508;}
 .tag-presencial{background:rgba(192,57,43,0.08);color:var(--rojo);}
 .tag-otros{background:rgba(107,103,98,0.1);color:var(--txt-mid);}
+.tag-vacaciones{background:rgba(46,90,138,0.1);color:#2E5A8A;}
 .week-nav{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
 .week-nav button{background:white;border:1px solid var(--gris-2);border-radius:8px;padding:7px 12px;cursor:pointer;}
 .week-label{font-weight:600;font-size:0.9rem;}
@@ -108,6 +109,7 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
 .dot-visita_obra{background:#B8860B;}
 .dot-presencial{background:var(--gris-3);}
 .dot-otros{background:var(--txt-mid);}
+.dot-vacaciones{background:#2E5A8A;}
 
 /* Vista semanal de Estacionamientos (adaptada de Salas de Reuniones) */
 .estac-tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--gris-2);flex-wrap:wrap;}
@@ -258,6 +260,7 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
                             <option value="remoto">Remoto</option>
                             <option value="visita_obra">Visita a Obra</option>
                             <option value="presencial">Presencial</option>
+                            <option value="vacaciones">Vacaciones</option>
                             <option value="otros">Otros motivos</option>
                         </select>
                     </div>
@@ -322,7 +325,7 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
                 <tbody id="semana-body"></tbody>
             </table>
             <div style="margin-top:14px;font-size:0.78rem;color:var(--txt-dim);">
-                <span class="dot dot-remoto"></span> Remoto &nbsp;&nbsp; <span class="dot dot-visita_obra"></span> Visita a Obra &nbsp;&nbsp; <span class="dot dot-presencial"></span> Presencial &nbsp;&nbsp; <span class="dot dot-otros"></span> Otros
+                <span class="dot dot-remoto"></span> Remoto &nbsp;&nbsp; <span class="dot dot-visita_obra"></span> Visita a Obra &nbsp;&nbsp; <span class="dot dot-presencial"></span> Presencial &nbsp;&nbsp; <span class="dot dot-vacaciones"></span> Vacaciones &nbsp;&nbsp; <span class="dot dot-otros"></span> Otros
             </div>
         </div>
     </div>
@@ -746,7 +749,7 @@ async function reservarAuto(spotId, fechaStr) {
     } catch(e) { toast('Error: ' + e.message); }
 }
 
-const MOTIVO_AUTO_LABEL = { remoto: 'teletrabajo', visita_obra: 'visita a obra', otros: 'otros motivos' };
+const MOTIVO_AUTO_LABEL = { remoto: 'teletrabajo', visita_obra: 'visita a obra', vacaciones: 'vacaciones', otros: 'otros motivos' };
 
 function render() {
     const grid = document.getElementById('grid-spots');
@@ -799,7 +802,9 @@ function render() {
             // Liberación automática por la ruta del día — nadie la ha tomado
             // todavía y el dueño no la ha bloqueado.
             badge = `<span class="spot-badge badge-libre">Disponible (automático)</span>`;
-            info = `Libre hoy — ${s.duenoNombre || s.duenoEmail} tiene ${MOTIVO_AUTO_LABEL[lib.motivoAuto] || 'otro motivo'} registrado en su ruta.`;
+            info = lib.motivoAuto === 'vacaciones'
+                ? `Libre hoy — ${s.duenoNombre || s.duenoEmail} está de vacaciones.`
+                : `Libre hoy — ${s.duenoNombre || s.duenoEmail} tiene ${MOTIVO_AUTO_LABEL[lib.motivoAuto] || 'otro motivo'} registrado en su ruta.`;
             if (!esMio) acciones = `<button class="btn btn-primary btn-sm" onclick="reservarAuto('${s.id}')">Reservar</button>`;
             if (esMio || ADMINISTRADORES.includes(emailActual)) acciones += ` <button class="btn btn-outline btn-sm" onclick="bloquearHoy('${s.id}')">🚗 Lo necesito hoy de todas formas</button>`;
             if (ADMINISTRADORES.includes(emailActual)) acciones += ` <button class="btn btn-outline btn-sm" onclick="abrirLiberar('${s.id}')">Ajustar a medio día</button>`;
@@ -1128,6 +1133,55 @@ const DIAS_OBRA = ['lunes','martes','miercoles','jueves','viernes'];
 let semanaOffset = 0;
 const DIAS = ['lunes','martes','miercoles','jueves','viernes'];
 const DIAS_LABEL = {lunes:'Lunes',martes:'Martes',miercoles:'Miércoles',jueves:'Jueves',viernes:'Viernes'};
+// Respaldo de nombres para rutas aprobadas ANTES de que empezáramos a
+// guardar el nombre junto al patrón — para esas, no hay otra forma de saber
+// el nombre real. Las rutas nuevas ya guardan el nombre solas.
+const NOMBRES_RESPALDO = {
+    'amolina@ibaker.cl': 'Andrea Molina',
+    'jcumplido@ibaker.cl': 'Javier Cumplido',
+    'alarrain@ibaker.cl': 'Andrés Larrain',
+    'bsilva@ibaker.cl': 'Benjamin Silva',
+    'jdiaz@ibaker.cl': 'Jorge Diaz',
+    'pablo@cmcromeral.cl': 'Pablo Abufom',
+    'cgarces@ibaker.cl': 'Carlos Garcés',
+    'tsanmartin@ibaker.cl': 'Tamara San Martin',
+    'ebruna@ibaker.cl': 'Elisa Bruna',
+    'porellana@ibaker.cl': 'Paula Orellana',
+    'jzamora@ibaker.cl': 'Josefina Zamora',
+    'adquisiones2@ibaker.cl': 'Antony Rojas',
+    'adquisiciones@ibaker.cl': 'Marisol Oropeza',
+    'jessica@cmcromeral.cl': 'Jessica Lopez',
+    'francisco@cmcromeral.cl': 'Francisco Donoso',
+    'dparedes@ibaker.cl': 'Dangela Paredes',
+    'dponce@ibaker.cl': 'Daniela Ponce',
+    'nromero@ibaker.cl': 'Nicolas Romero',
+    'phenriquez@ibaker.cl': 'Pilar Henriquez',
+    'crivera@ibaker.cl': 'Carola Rivera',
+    'ccampos@ibaker.cl': 'Claudia Campos',
+    'scarreno@ibaker.cl': 'Sandra Carreño',
+    'mbello@ibaker.cl': 'Moises Bello',
+    'mmatamala@ibaker.cl': 'Matias Matamala',
+    'rsanchez@ibaker.cl': 'Raysa Sanchez',
+    'pguajardo@ibaker.cl': 'Pablo Guajardo',
+    'jjara@ibaker.cl': 'Jose Jara',
+    'dcatalan@ibaker.cl': 'Demis Catalán',
+    'pmorales@ibaker.cl': 'Patricia Morales',
+    'mramos@ibaker.cl': 'Manuel Ramos',
+    'kalarcon@ibaker.cl': 'Katherine Alarcon',
+    'cquezada@ibaker.cl': 'Cristina Quezada',
+    'ebustamante@ibaker.cl': 'Evelyn Bustamante',
+    'cramos@ibaker.cl': 'Carol Ramos',
+    'avasquez@ibaker.cl': 'Abel Vasquez',
+    'cmadrid@ibaker.cl': 'Camila Madrid',
+    'ggalvez@ibaker.cl': 'Grace Galvez',
+    'jlara@ibaker.cl': 'Jacqueline Lara',
+    'cgomez@ibaker.cl': 'Constanza Gomez',
+    'bjara@ibaker.cl': 'Belgica Jara',
+    'cespina@ibaker.cl': 'Carolina Espina',
+    'bmorales@ibaker.cl': 'Barbara Morales',
+    'parteaga@ibaker.cl': 'Pedro Arteaga',
+};
+
 // Jefatura que aprueba las rutas semanales propuestas (Fase 5).
 // Jefatura que aprueba las rutas semanales propuestas ahora se define por
 // grupo (ver gruposRuta / aprobadoresDeCliente), no como lista fija.
@@ -1516,6 +1570,7 @@ function renderExcepciones() {
     cont.innerHTML = mias.map(e => {
         const etiqueta = e.tipo === 'visita_obra' ? (e.obras && e.obras.length ? e.obras.join(', ') : 'Visita a Obra')
             : e.tipo === 'otros' ? (e.detalle ? `Otros — ${e.detalle}` : 'Otros motivos')
+            : e.tipo === 'vacaciones' ? 'Vacaciones'
             : e.tipo;
         return `
         <div class="excepcion-item">
@@ -1580,6 +1635,7 @@ function renderSemana() {
         const guardado = (dataTeletrabajo.patrones[email] || {}).nombre;
         if (guardado) return guardado;
         if (email === emailActual) return nombreActual;
+        if (NOMBRES_RESPALDO[email]) return NOMBRES_RESPALDO[email];
         return email;
     }
     personas.sort((a,b) => nombreDe(a).localeCompare(nombreDe(b)));
@@ -1590,6 +1646,7 @@ function renderSemana() {
             const label = estado === 'remoto' ? 'Remoto'
                 : estado === 'visita_obra' ? (obras.length ? obras.join(', ') : 'Visita a Obra')
                 : estado === 'otros' ? (detalle ? `Otros — ${detalle}` : 'Otros motivos')
+                : estado === 'vacaciones' ? 'Vacaciones'
                 : 'Presencial';
             return `<td><span class="dot dot-${estado}"></span> ${label}</td>`;
         }).join('');
