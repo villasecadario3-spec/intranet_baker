@@ -342,14 +342,28 @@ input[type=file] { display: none; }
 
   <div id="panelCortar" style="display:none;">
     <div style="font-size:0.84rem;color:var(--ink2);margin-bottom:14px;">
-      Sube varias escrituras de una vez — a cada una se le detecta automáticamente dónde terminan las firmas de todos los otorgantes, y se corta ahí (descartando reversos en blanco, timbres, etc. que SERVIU no necesita).
+      Sube varias escrituras de una vez — a cada una se le detecta automáticamente dónde terminan las firmas de todos los otorgantes, y se corta ahí (descartando reversos en blanco, timbres, etc. que SERVIU no necesita). Si hace falta, también puedes pegarles al final otro documento y dejar cada archivo con el nombre y RUT del comprador.
     </div>
-    <div class="dropzone" id="cortar-dropzone" onclick="document.getElementById('cortar-file-input').click()">
+        <div class="dropzone" id="cortar-dropzone" onclick="document.getElementById('cortar-file-input').click()">
       <input type="file" id="cortar-file-input" accept=".pdf" multiple onchange="cortarMostrarSeleccion()">
       <div class="dropzone-icon">✂️</div>
       <div class="dropzone-title">Haz clic para seleccionar varias escrituras en PDF</div>
       <div class="dropzone-sub" id="cortar-archivos-elegidos">Ningún archivo seleccionado todavía</div>
     </div>
+
+    <div style="font-weight:700;font-size:0.9rem;margin:18px 0 6px;color:var(--ink);">Documento(s) para pegar al final de cada escritura <span style="font-weight:400;color:var(--ink2);">(opcional)</span></div>
+    <div class="dropzone" id="cortar-adj-dropzone" onclick="document.getElementById('cortar-adjuntos-input').click()" style="padding:18px;">
+      <input type="file" id="cortar-adjuntos-input" accept=".pdf" multiple onchange="cortarMostrarAdjuntos()">
+      <div class="dropzone-icon" style="font-size:1.8rem;margin-bottom:6px;">📎</div>
+      <div class="dropzone-title" style="font-size:0.92rem;">Haz clic para seleccionar el o los documentos a pegar</div>
+      <div class="dropzone-sub" id="cortar-adjuntos-elegidos">Ninguno seleccionado</div>
+    </div>
+    <div id="cortar-adjuntos-modo" style="display:none;margin:12px 0 4px;font-size:0.84rem;color:var(--ink);">
+      <div style="font-weight:600;margin-bottom:6px;">¿A cuáles escrituras se pega?</div>
+      <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-bottom:4px;"><input type="radio" name="cortar-modo" value="todas"> <span>El mismo documento a <b>todas</b> las escrituras</span></label>
+      <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;"><input type="radio" name="cortar-modo" value="persona"> <span>Cada documento a la escritura de <b>su persona</b> <span style="color:var(--ink2);">(se asocia por el RUT que trae el documento, en su nombre de archivo o dentro de él)</span></span></label>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:0.84rem;margin:14px 0 16px;cursor:pointer;color:var(--ink);"><input type="checkbox" id="cortar-nombrar" checked> <span>Nombrar cada archivo como «NOMBRE - RUT» del comprador <span style="color:var(--ink2);">(lee las primeras páginas: unos 15 segundos más por escritura)</span></span></label>
     <button class="btn btn-primary" onclick="cortarSubirLote()" style="margin-bottom:20px;">Subir y cortar</button>
 
     <div id="cortar-progreso" style="color:var(--ink);"></div>
@@ -1298,6 +1312,7 @@ function cortarLeerArchivoBase64(file) {
     reader.readAsDataURL(file);
   });
 }
+const cortarEsc = t => String(t == null ? '' : t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 function cortarMostrarSeleccion() {
   const input = document.getElementById('cortar-file-input');
@@ -1306,6 +1321,23 @@ function cortarMostrarSeleccion() {
   span.textContent = archivos.length
     ? `${archivos.length} archivo(s): ${archivos.map(f=>f.name).join(', ')}`
     : 'Ningún archivo seleccionado todavía';
+}
+
+// Documentos a pegar al final: con uno solo se propone pegarlo a todas las
+// escrituras; con varios, cada uno a su persona (por RUT).
+function cortarMostrarAdjuntos() {
+  const input = document.getElementById('cortar-adjuntos-input');
+  const adjuntos = Array.from(input.files || []);
+  document.getElementById('cortar-adjuntos-elegidos').textContent = adjuntos.length
+    ? `${adjuntos.length} documento(s): ${adjuntos.map(f=>f.name).join(', ')}`
+    : 'Ninguno seleccionado';
+  document.getElementById('cortar-adjuntos-modo').style.display = adjuntos.length ? 'block' : 'none';
+  const porDefecto = adjuntos.length > 1 ? 'persona' : 'todas';
+  document.querySelectorAll('input[name="cortar-modo"]').forEach(r => { r.checked = r.value === porDefecto; });
+}
+function cortarModoElegido() {
+  const r = document.querySelector('input[name="cortar-modo"]:checked');
+  return r ? r.value : 'todas';
 }
 
 // Lee la respuesta del servidor aunque no sea JSON (un error 413 llega como HTML).
@@ -1318,15 +1350,32 @@ async function cortarLeerRespuesta(res) {
 }
 
 // Sube las escrituras DE A UNA (cada una en su propio envío), así no hay tope por
-// cantidad; recién al final se inicia el corte de todas juntas.
+// cantidad; luego los documentos a pegar, y recién al final se inicia el proceso.
 async function cortarSubirLote() {
   const input = document.getElementById('cortar-file-input');
   const archivos = Array.from(input.files || []);
-  if (!archivos.length) { toast('Selecciona al menos un PDF', true); return; }
+  const adjuntos = Array.from((document.getElementById('cortar-adjuntos-input').files) || []);
+  if (!archivos.length) { toast('Selecciona al menos una escritura en PDF', true); return; }
 
   const progreso = document.getElementById('cortar-progreso');
   document.getElementById('cortar-descarga').style.display = 'none';
   const omitidos = [];
+
+  // Sube un archivo a su ruta; devuelve true si quedó subido.
+  const subir = async (f, ruta, etiqueta) => {
+    if (f.size > CORTAR_MAX_MB * 1048576) {
+      omitidos.push(`${f.name} — pesa ${(f.size / 1048576).toFixed(1)} MB y el máximo es ${CORTAR_MAX_MB} MB`);
+      return false;
+    }
+    try {
+      const base64 = await cortarLeerArchivoBase64(f);
+      await cortarLeerRespuesta(await fetch(`${API_BASE}/recorte-escrituras/lote/${cortarJobId}/${ruta}`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ nombre: f.name, base64 })
+      }));
+      return true;
+    } catch(e) { omitidos.push(`${f.name} — ${e.message}`); return false; }
+  };
 
   try {
     progreso.innerHTML = '⏳ Preparando el lote…';
@@ -1335,55 +1384,64 @@ async function cortarSubirLote() {
 
     let subidos = 0;
     for (let i = 0; i < archivos.length; i++) {
-      const f = archivos[i];
-      progreso.innerHTML = `⏳ Subiendo ${i + 1} de ${archivos.length}: ${f.name}…`;
-      if (f.size > CORTAR_MAX_MB * 1048576) {
-        omitidos.push(`${f.name} — pesa ${(f.size / 1048576).toFixed(1)} MB y el máximo es ${CORTAR_MAX_MB} MB`);
-        continue;
-      }
-      try {
-        const base64 = await cortarLeerArchivoBase64(f);
-        await cortarLeerRespuesta(await fetch(`${API_BASE}/recorte-escrituras/lote/${cortarJobId}/archivo`, {
-          method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ nombre: f.name, base64 })
-        }));
-        subidos++;
-      } catch(e) { omitidos.push(`${f.name} — ${e.message}`); }
+      progreso.innerHTML = `⏳ Subiendo escritura ${i + 1} de ${archivos.length}: ${cortarEsc(archivos[i].name)}…`;
+      if (await subir(archivos[i], 'archivo')) subidos++;
     }
     if (!subidos) {
-      progreso.innerHTML = `❌ No se pudo subir ningún archivo<br>${omitidos.map(o => `⚠ ${o}`).join('<br>')}`;
+      progreso.innerHTML = `❌ No se pudo subir ninguna escritura<br>${omitidos.map(o => `⚠ ${cortarEsc(o)}`).join('<br>')}`;
       return;
     }
-    await cortarLeerRespuesta(await fetch(`${API_BASE}/recorte-escrituras/lote/${cortarJobId}/iniciar`, { method: 'POST' }));
+    let adjSubidos = 0;
+    for (let j = 0; j < adjuntos.length; j++) {
+      progreso.innerHTML = `⏳ Subiendo documento ${j + 1} de ${adjuntos.length}: ${cortarEsc(adjuntos[j].name)}…`;
+      if (await subir(adjuntos[j], 'adjunto')) adjSubidos++;
+    }
+    const opciones = { nombrar: document.getElementById('cortar-nombrar').checked };
+    if (adjSubidos) opciones.modoAdjuntos = cortarModoElegido();
+    await cortarLeerRespuesta(await fetch(`${API_BASE}/recorte-escrituras/lote/${cortarJobId}/iniciar`, {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(opciones)
+    }));
     progreso.innerHTML = `⏳ Procesando ${subidos} escritura(s) con OCR…`;
-    cortarEsperarResultado(subidos, omitidos);
+    cortarEsperarResultado(subidos, omitidos, adjSubidos);
   } catch(e) {
-    progreso.innerHTML = `❌ Error: ${e.message}`;
+    progreso.innerHTML = `❌ Error: ${cortarEsc(e.message)}`;
   }
 }
 
-async function cortarEsperarResultado(total, omitidos) {
+async function cortarEsperarResultado(total, omitidos, nAdjuntos) {
   const progreso = document.getElementById('cortar-progreso');
-  // El tiempo de espera crece con la cantidad de escrituras (~90 s de margen cada una).
-  const limiteMs = Math.max(20 * 60 * 1000, total * 90 * 1000);
+  // El tiempo de espera crece con la cantidad de archivos (leer al comprador y los
+  // documentos agrega tiempo por escritura y por documento).
+  const limiteMs = Math.max(20 * 60 * 1000, (total * 120 + (nAdjuntos || 0) * 40) * 1000);
   const inicio = Date.now();
   while (Date.now() - inicio < limiteMs) {
     await new Promise(r => setTimeout(r, 10000));
     try {
       const data = await cortarLeerRespuesta(await fetch(`${API_BASE}/recorte-escrituras/estado/${cortarJobId}`));
       if (data.estado === 'listo') {
-        const lineas = data.resultado.map(r => r.error
-          ? `❌ ${r.archivo} — error: ${r.error}`
-          : `✅ ${r.archivo} — ${r.paginas_originales} → ${r.paginas_finales} páginas${r.encontrado ? '' : ' (no se encontraron firmas, se dejó completa)'}`
-        ).concat((omitidos || []).map(o => `⚠ No se subió: ${o}`));
-        progreso.innerHTML = lineas.join('<br>');
+        const lineas = [], avisos = [];
+        data.resultado.forEach(r => {
+          if (r.error) { lineas.push(`❌ ${cortarEsc(r.archivo)} — error: ${cortarEsc(r.error)}`); return; }
+          const nombre = r.salida || r.archivo;
+          const deOrigen = r.salida && r.salida !== r.archivo ? ` <span style="color:var(--ink2);">(de ${cortarEsc(r.archivo)})</span>` : '';
+          const pegados = r.adjuntos && r.adjuntos.length ? ` + ${r.adjuntos.length} documento(s) pegado(s) (${r.paginas_adjuntos} pág.)` : '';
+          lineas.push(`✅ ${cortarEsc(nombre)}${deOrigen} — escritura ${r.paginas_originales} → ${r.paginas_finales} páginas${r.encontrado ? '' : ' (no se encontraron firmas, se dejó completa)'}${pegados}`);
+          (r.avisos || []).forEach(a => avisos.push(`⚠ ${cortarEsc(nombre)}: ${cortarEsc(a)}`));
+        });
+        (data.adjuntosSinEscritura || []).forEach(a => avisos.push(`⚠ Documento sin escritura (no calzó con ninguna): ${cortarEsc(a)}`));
+        (data.avisosAdjuntos || []).forEach(a => avisos.push(`⚠ ${cortarEsc(a)}`));
+        (omitidos || []).forEach(o => avisos.push(`⚠ No se subió: ${cortarEsc(o)}`));
+        progreso.innerHTML = lineas.concat(avisos).join('<br>');
         document.getElementById('cortar-descarga').style.display = 'block';
         return;
       } else if (data.estado === 'error') {
-        progreso.innerHTML = `❌ Error: ${data.error}`;
+        progreso.innerHTML = `❌ Error: ${cortarEsc(data.error)}`;
         return;
       } else if (data.progreso) {
-        progreso.innerHTML = `⏳ Procesando ${Math.min(data.progreso.hechos + 1, total)} de ${total}: ${data.progreso.actual}…`;
+        const p = data.progreso;
+        progreso.innerHTML = p.fase === 'adjuntos'
+          ? `⏳ Leyendo los documentos a pegar (${Math.min(p.hechos + 1, p.total)} de ${p.total}): ${cortarEsc(p.actual)}…`
+          : `⏳ Procesando ${Math.min(p.hechos + 1, total)} de ${total}: ${cortarEsc(p.actual)}…`;
       }
     } catch(e) { /* sigue esperando */ }
   }
