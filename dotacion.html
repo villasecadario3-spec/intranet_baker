@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Control de Dotación — Mirador El Pino</title>
+<title>Control de Dotación</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -463,7 +463,8 @@
     Volver a la intranet
   </a>
   <div style="width:1px;height:18px;background:#333;"></div>
-  <div style="font-family:monospace;font-size:0.72rem;color:#B5B0AA;letter-spacing:0.08em;text-transform:uppercase;">Control de Dotación — Mirador El Pino</div>
+  <div style="font-family:monospace;font-size:0.72rem;color:#B5B0AA;letter-spacing:0.08em;text-transform:uppercase;" id="navObra">Control de Dotación</div>
+  <a id="navTodasObras" href="dotacion.html" style="display:none;color:#B5B0AA;text-decoration:none;font-size:0.78rem;border:1px solid #333;border-radius:6px;padding:4px 10px;">▦ Todas las obras</a>
   <div style="flex:1;"></div>
   <div id="auth-area"></div>
 </nav>
@@ -473,11 +474,18 @@
   <p style="color:var(--steel);">Este módulo está disponible solo para el equipo autorizado.</p>
 </div>
 
+<div id="menu-obras" style="display:none;max-width:1000px;margin:56px auto;padding:0 24px;">
+  <p class="eyebrow" style="color:var(--steel);">iBaker · Control de Gestión</p>
+  <h1 class="h1" style="color:var(--ink);margin:6px 0 8px;">Control de <span>Dotación</span></h1>
+  <p style="color:var(--steel);font-size:14px;margin:0 0 22px;">Elige la obra con la que quieres trabajar.</p>
+  <div id="menu-obras-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;"></div>
+</div>
+
 <div id="main-wrap" style="display:none;">
 <div class="topbar">
   <div class="topbar-inner">
     <p class="eyebrow">iBaker · Control de Gestión</p>
-    <h1 class="h1">Control de <span>Dotación</span> · Mirador El Pino</h1>
+    <h1 class="h1" id="h1Titulo">Control de <span>Dotación</span></h1>
     <p class="sub">Confirma mensualmente quién sigue en obra, registra salidas y agrega ingresos. Esto alimenta la proyección de MO de <strong>Base Proyeccion</strong>.</p>
     <div class="legend-strip" id="legendStrip"></div>
   </div>
@@ -487,7 +495,7 @@
 
 <div id="admin-acceso-dotacion-wrap" style="display:none;">
   <div class="ingreso-card" style="margin-bottom:16px;">
-    <div style="font-weight:700;font-size:13px;margin-bottom:10px;">👥 Acceso al módulo (mientras está en pruebas)</div>
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px;">👥 Acceso a esta obra: <span id="accesoObraNombre"></span></div>
     <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <input id="acceso-dotacion-nuevo" placeholder="correo@ibaker.cl" style="flex:1;min-width:180px;padding:7px 10px;border:1px solid var(--line,#ccc);border-radius:7px;font-size:0.82rem;">
       <button class="btn btn-primary btn-sm" onclick="agregarAccesoDotacion()">Agregar acceso</button>
@@ -537,12 +545,10 @@
         <option value="proyectado">Proyectados</option>
       </select>
     </div>
-    <div class="field">
+    <div class="field" id="obraFiltroField">
       <label for="obraFiltro">Obra</label>
       <select id="obraFiltro">
         <option value="">Todas</option>
-        <option value="CG019">Mirador El Pino</option>
-        <option value="CG027">Mirador El Pino Urbanización</option>
       </select>
     </div>
     <div class="field sec">
@@ -759,37 +765,108 @@ const msalConfig = {
 };
 const msalInstance = new msal.PublicClientApplication(msalConfig);
 let usuarioActual = null;
+const emailUsuario = () => usuarioActual ? usuarioActual.username.toLowerCase() : '';
+// Token de Microsoft para que el servidor compruebe quién consulta (si no hay, igual manda el correo).
+async function tokenParaApi(){
+  try { const r = await msalInstance.acquireTokenSilent({ scopes: ['User.Read'], account: usuarioActual }); return r.accessToken; }
+  catch(e) { return null; }
+}
+// Todas las consultas del módulo llevan la obra y la identidad de quien consulta.
+async function dotFetch(ruta, opciones = {}, sinObra){
+  const params = [];
+  if(!sinObra && OBRA.id) params.push('obra=' + encodeURIComponent(OBRA.id));
+  params.push('email=' + encodeURIComponent(emailUsuario()));
+  const url = `${API}${ruta}${ruta.includes('?') ? '&' : '?'}${params.join('&')}`;
+  const headers = Object.assign({}, opciones.headers);
+  const token = await tokenParaApi();
+  if(token) headers['Authorization'] = 'Bearer ' + token;
+  return fetch(url, Object.assign({}, opciones, { headers }));
+}
 // Quiénes pueden administrar el acceso al módulo (agregar/quitar personas).
 const ADMINISTRADORES_DOTACION = ['dvillaseca@ibaker.cl', 'jcumplido@ibaker.cl', 'tsanmartin@ibaker.cl'];
 let accesoDotacionLista = [];
+
+let irA = url => location.replace(url);
+// ¿Es administrador del módulo? (lo decide el servidor; esta lista solo es el respaldo)
+let esAdminModulo = false;
+
+function mostrarAccesoDenegado(){
+  document.getElementById('menu-obras').style.display = 'none';
+  document.getElementById('main-wrap').style.display = 'none';
+  document.getElementById('acceso-denegado').style.display = 'block';
+}
+
+// Menú de obras: una tarjeta por cada obra a la que la persona tiene acceso.
+function mostrarMenuObras(obras){
+  document.getElementById('main-wrap').style.display = 'none';
+  document.getElementById('menu-obras-grid').innerHTML = obras.map(o => `
+    <a href="?obra=${encodeURIComponent(o.id)}" style="text-decoration:none;color:inherit;">
+      <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px;">
+        <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--steel);margin-bottom:6px;">Obra</div>
+        <div style="font-size:18px;font-weight:700;color:var(--ink);margin-bottom:10px;">${escHtml(o.nombre)}</div>
+        <div style="font-size:12px;color:var(--steel);">${o.rol === 'admin' ? 'Administrador' : 'Con acceso'} · Entrar →</div>
+      </div>
+    </a>`).join('');
+  document.getElementById('menu-obras').style.display = 'block';
+}
+
+// Configura toda la pantalla con la ficha de la obra elegida.
+function aplicarConfigObra(cfg, obras){
+  OBRA = { prefijos: [], ccs: [], grupos: [], cuentas: [], areaExcel: '', ...cfg };
+  PP_LIST = OBRA.cuentas;
+  obraFiltro = '';
+  document.title = `Control de Dotación — ${OBRA.nombre}`;
+  document.getElementById('navObra').textContent = `Control de Dotación — ${OBRA.nombre}`;
+  document.getElementById('h1Titulo').innerHTML = `Control de <span>Dotación</span> · ${escHtml(OBRA.nombre)}`;
+  const acc = document.getElementById('accesoObraNombre'); if(acc) acc.textContent = OBRA.nombre;
+  document.getElementById('navTodasObras').style.display = obras.length > 1 ? '' : 'none';
+}
 
 async function initAuth() {
   try {
     await msalInstance.initialize();
     const accounts = msalInstance.getAllAccounts();
-    if (accounts.length > 0) {
-      usuarioActual = accounts[0];
-      const email = usuarioActual.username.toLowerCase();
-      try { accesoDotacionLista = await fetch(`${API}/acceso-beta/dotacion`).then(r => r.json()); }
-      catch(e) { accesoDotacionLista = ADMINISTRADORES_DOTACION; }
-      if (!accesoDotacionLista.includes(email)) {
-        document.getElementById('acceso-denegado').style.display = 'block';
-        return;
-      }
-      renderUserChip();
-      document.getElementById('main-wrap').style.display = 'block';
-      if (ADMINISTRADORES_DOTACION.includes(email)) {
-        const wrap = document.getElementById('admin-acceso-dotacion-wrap');
-        if (wrap) { wrap.style.display = 'block'; renderAccesoDotacionLista(); }
-      }
-      await init();
-    } else {
-      await msalInstance.loginRedirect({ scopes: ['User.Read'] });
+    if (accounts.length === 0) { await msalInstance.loginRedirect({ scopes: ['User.Read'] }); return; }
+    usuarioActual = accounts[0];
+    renderUserChip();
+
+    // Obras a las que puede entrar esta persona (lo decide el servidor)
+    let obras = [];
+    try { const r = await dotFetch('/dotacion/obras', {}, true); if (r.ok) obras = await r.json(); } catch(e) {}
+    esAdminModulo = obras.some(o => o.rol === 'admin') || ADMINISTRADORES_DOTACION.includes(emailUsuario());
+
+    const pedida = new URLSearchParams(location.search).get('obra');
+    if (!pedida) {
+      if (!obras.length) { mostrarAccesoDenegado(); return; }
+      // Con una sola obra (y sin ser administrador) no hay nada que elegir: entra directo.
+      if (obras.length === 1 && !esAdminModulo) { irA(`${location.pathname}?obra=${encodeURIComponent(obras[0].id)}`); return; }
+      mostrarMenuObras(obras);
+      return;
     }
+    if (!obras.some(o => o.id === pedida)) { mostrarAccesoDenegado(); return; }
+    const rc = await dotFetch(`/dotacion/obras/${encodeURIComponent(pedida)}`, {}, true);
+    if (!rc.ok) { mostrarAccesoDenegado(); return; }
+    aplicarConfigObra(await rc.json(), obras);
+
+    document.getElementById('main-wrap').style.display = 'block';
+    if (esAdminModulo) {
+      const wrap = document.getElementById('admin-acceso-dotacion-wrap');
+      if (wrap) { wrap.style.display = 'block'; await cargarAccesoObra(); }
+    }
+    await init();
   } catch(e) {
     console.error('Error de autenticación:', e);
     document.getElementById('acceso-denegado').style.display = 'block';
   }
+}
+
+async function cargarAccesoObra() {
+  try {
+    const r = await dotFetch(`/dotacion/obras/${encodeURIComponent(OBRA.id)}/acceso`, {}, true);
+    const d = await r.json();
+    accesoDotacionLista = Array.isArray(d.lista) ? d.lista : [];
+  } catch(e) { accesoDotacionLista = ADMINISTRADORES_DOTACION; }
+  renderAccesoDotacionLista();
 }
 
 function renderAccesoDotacionLista() {
@@ -806,23 +883,22 @@ async function agregarAccesoDotacion() {
   const email = input.value.trim().toLowerCase();
   if (!email) return;
   try {
-    const res = await fetch(`${API}/acceso-beta/dotacion`, {
+    const res = await dotFetch(`/dotacion/obras/${encodeURIComponent(OBRA.id)}/acceso`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ email, emailQuienPide: usuarioActual.username.toLowerCase() })
-    });
+      body: JSON.stringify({ nuevoEmail: email })
+    }, true);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Error');
     input.value = '';
     accesoDotacionLista = data.lista;
     renderAccesoDotacionLista();
-    toast('Acceso agregado');
+    toast(`Acceso agregado a ${OBRA.nombre}`);
   } catch(e) { toast('Error: ' + e.message); }
 }
 async function quitarAccesoDotacion(email) {
-  if (!confirm(`¿Quitar el acceso a ${email}?`)) return;
+  if (!confirm(`¿Quitar el acceso de ${email} a ${OBRA.nombre}?`)) return;
   try {
-    const emailQuienPide = usuarioActual.username.toLowerCase();
-    const res = await fetch(`${API}/acceso-beta/dotacion/${encodeURIComponent(email)}?emailQuienPide=${encodeURIComponent(emailQuienPide)}`, { method: 'DELETE' });
+    const res = await dotFetch(`/dotacion/obras/${encodeURIComponent(OBRA.id)}/acceso/${encodeURIComponent(email)}`, { method: 'DELETE' }, true);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Error');
     accesoDotacionLista = data.lista;
@@ -879,8 +955,17 @@ async function resolverExcelItem() {
   }
 }
 
-// Obras identificadas por prefijo de Centro de Costo — CG019 = Mirador El Pino.
-const PREFIJOS_OBRA = ['CG019', 'CG027'];
+// La obra abierta. Su ficha viene del servidor (aplicarConfigObra) y define qué centros de
+// costo del Excel son de la obra, sus cuentas, los grupos del filtro "Obra" y cómo se llama en
+// el Excel de BUK ("Trabajo - Nombre Área"). La lógica del módulo es la misma para todas.
+let OBRA = { id: '', nombre: '', prefijos: [], ccs: [], grupos: [], cuentas: [], areaExcel: '' };
+const normTxt = t => String(t == null ? '' : t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+const escHtml = t => String(t == null ? '' : t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+// ¿Este centro de costo es de la obra? (por prefijo o por lista exacta)
+function ccDeObra(cc){
+  cc = String(cc || '').trim();
+  return OBRA.prefijos.some(p => cc.startsWith(p)) || OBRA.ccs.includes(cc);
+}
 
 function parseFechaExcelBUK(val) {
   if (!val) return null;
@@ -900,6 +985,7 @@ const COL_NOMBRE_BUK = 'Colaborador(a) - Nombre Completo';
 const COL_RUT_BUK    = 'Colaborador(a) - Número de Documento';
 const COL_CARGO_BUK  = 'Trabajo - Cargo';
 const COL_CC_BUK     = 'Trabajo - Centro de Costo';
+const COL_AREA_BUK   = 'Trabajo - Nombre Área';
 const COL_GASTO_BUK  = 'Liquidación - Gasto Empresa';
 const COL_FING_BUK   = 'Trabajo - Fecha Ingreso Compañía';
 const COL_FTERM_BUK  = 'Trabajo - Fecha Término Trabajo';
@@ -912,7 +998,6 @@ const COL_PERIODO_BUK= 'Liquidación - Período';
 const COL_ASIS_OBRA   = 'OBRA';
 const COL_ASIS_RUT    = 'Asistencia[data.rut_trabajador]';
 const COL_ASIS_FECHA  = 'Asistencia[data.dia_entrada]';
-const OBRA_ASISTENCIA = 'Mirador El Pino';
 const DIAS_SIN_ASISTENCIA_ALERTA = 10; // más de esto sin marcar y activo → aviso
 
 let asistenciaPorRut = {}; // rutlimpio -> { ultima: 'YYYY-MM-DD', total: N, ultimos14: N }
@@ -956,12 +1041,12 @@ async function sincronizarAsistenciaManual() {
   btn.disabled = true;
   btn.textContent = 'Sincronizando asistencia…';
   try {
-    await fetch(`${API}/dotacion/asistencia-directa/refrescar`, { method: 'POST' });
+    await dotFetch(`/dotacion/asistencia-directa/refrescar`, { method: 'POST' });
     toast('Actualización de asistencia iniciada — puede tardar varios minutos');
     const maxIntentos = 40; // ~10 minutos como tope (40 × 15s)
     for (let i = 0; i < maxIntentos; i++) {
       await new Promise(r => setTimeout(r, 15000));
-      const res = await fetch(`${API}/dotacion/asistencia-directa`);
+      const res = await dotFetch(`/dotacion/asistencia-directa`);
       const data = await res.json();
       if (data.actualizadoEn && data.actualizadoEn !== actualizadoAntes && !data.actualizando) {
         await cargarAsistenciaBUK();
@@ -985,20 +1070,23 @@ async function cargarAsistenciaBUK() {
   // Conexión directa a la API de Asistencia de BUK — el servidor mantiene
   // estos datos ya calculados en memoria (se renuevan solos cada 15 minutos)
   // y responde al instante, así que esta llamada nunca debería demorar.
-  const res = await fetch(`${API}/dotacion/asistencia-directa`);
+  const res = await dotFetch(`/dotacion/asistencia-directa`);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     console.warn('[Asistencia Directa] Error:', err.error || res.status);
     return;
   }
-  const { datos, actualizadoEn, actualizando, error } = await res.json();
+  const { datos, actualizadoEn, actualizando, error, recintosEsperados, recintosSimilares } = await res.json();
   ultimaActualizacionAsistencia = actualizadoEn || ultimaActualizacionAsistencia;
   if (error) console.warn('[Asistencia Directa] Aviso del servidor:', error);
   if (actualizando && (!datos || !datos.length)) {
     console.log('[Asistencia Directa] El servidor está preparando los datos por primera vez — esto puede tardar unos minutos tras reiniciar. Vuelve a entrar en un rato.');
   }
   if (actualizadoEn) console.log('[Asistencia Directa] Datos actualizados por última vez:', new Date(actualizadoEn).toLocaleString('es-CL'));
-  if (!datos || !datos.length) { console.warn('[Asistencia Directa] Sin registros para Mirador El Pino'); return; }
+  if ((!datos || !datos.length) && recintosSimilares && recintosSimilares.length && esAdminModulo) {
+    toast(`Asistencia: no hay registros para «${(recintosEsperados || []).join(' / ')}». En BUK aparecen: ${recintosSimilares.map(r => `«${r.nombre}» (${r.registros})`).join(', ')} — ajusta "recintos" en la ficha de la obra.`);
+  }
+  if (!datos || !datos.length) { console.warn(`[Asistencia Directa] Sin registros para ${OBRA.nombre}`); return; }
 
   const hoy = new Date();
   const registros = {}; // rutlimpio -> Set de fechas
@@ -1042,7 +1130,7 @@ async function cargarAsistenciaBUK() {
     };
   });
 
-  console.log('[Asistencia Directa] Personas con registro en Mirador El Pino:', Object.keys(resumen).length);
+  console.log(`[Asistencia Directa] Personas con registro en ${OBRA.nombre}:`, Object.keys(resumen).length);
 }
 
 // Etiqueta corta de asistencia para mostrar junto a cada persona activa.
@@ -1095,6 +1183,26 @@ function cerrarHistorialAsistencia() {
 // deriva TODAS las tablas de costo (GASTO_MES, PRIMER_PERIODO, ULTIMO_COSTO,
 // ULTIMO_COSTO_MAX, COSTOS promedio, REAL_MONTHLY) directamente de los datos
 // reales, en vez de usar los valores fijos que traía este archivo antes.
+// Verificación cruzada: si en el Excel hay gente cuya área ("Trabajo - Nombre Área") dice que es
+// de esta obra pero con un centro de costo que NO está en su ficha, se avisa (probablemente falta
+// agregarlo a la ficha). Se avisa una sola vez por sesión.
+// ¿El área del Excel nombra a esta obra? Se compara como frase completa (sin importar mayúsculas ni
+// tildes), para que "Maitenes I" no se confunda con "Maitenes II".
+function coincideArea(texto, buscado){
+  const b = normTxt(buscado).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return !!b && new RegExp('(^|[^a-z0-9])' + b + '($|[^a-z0-9])').test(normTxt(texto));
+}
+let avisoAreaMostrado = false;
+function verificarAreaExcel(filas){
+  if(!OBRA.areaExcel || avisoAreaMostrado) return;
+  const sueltas = filas.filter(r => coincideArea(r[COL_AREA_BUK], OBRA.areaExcel) && !ccDeObra(r[COL_CC_BUK]));
+  if(!sueltas.length) return;
+  avisoAreaMostrado = true;
+  const ccs = [...new Set(sueltas.map(r => String(r[COL_CC_BUK] || '').trim() || '(sin centro de costo)'))];
+  const personas = new Set(sueltas.map(r => String(r[COL_RUT_BUK] || '').trim())).size;
+  console.warn(`[BUK] ${sueltas.length} filas de «${OBRA.areaExcel}» tienen un centro de costo que no está en la ficha de la obra:`, ccs);
+  toast(`⚠ ${personas} persona(s) de «${OBRA.areaExcel}» tienen centros de costo que no están en la ficha de la obra: ${ccs.join(', ')}`);
+}
 async function cargarDesdeBUK() {
   const ok = await resolverExcelItem();
   if (!ok) throw new Error('No se pudo acceder al Excel de SharePoint');
@@ -1115,8 +1223,9 @@ async function cargarDesdeBUK() {
     return obj;
   });
 
-  const deObra = filas.filter(r => PREFIJOS_OBRA.some(p => String(r[COL_CC_BUK] || '').trim().startsWith(p)));
-  console.log(`[BUK] Filas de ${PREFIJOS_OBRA.join('/')}* (Mirador El Pino):`, deObra.length, 'de', filas.length, 'totales');
+  const deObra = filas.filter(r => ccDeObra(r[COL_CC_BUK]));
+  console.log(`[BUK] Filas de ${OBRA.nombre}:`, deObra.length, 'de', filas.length, 'totales');
+  verificarAreaExcel(filas);
 
   const gastoMes = {};       // id -> {mes: gasto}
   const porPersonaCC = {};   // rutlimpio#cc -> [{mes, gasto}]
@@ -1234,7 +1343,7 @@ async function cargarDesdeBUK() {
 // ── Guardado en servidor (compartido entre todo el equipo) ─────
 async function cargarDesdeServidor() {
   try {
-    const res = await fetch(`${API}/dotacion`);
+    const res = await dotFetch(`/dotacion`);
     if (!res.ok) return null;
     return await res.json();
   } catch(e) {
@@ -1244,7 +1353,7 @@ async function cargarDesdeServidor() {
 }
 async function guardarEnServidor(showToast) {
   try {
-    const res = await fetch(`${API}/dotacion`, {
+    const res = await dotFetch(`/dotacion`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ workers, meta, descuentos, email: usuarioActual ? usuarioActual.username.toLowerCase() : '' }),
@@ -1286,7 +1395,7 @@ async function sincronizarConBUK(silencioso) {
     await guardarEnServidor(false);
     renderMesRealSelect();
     renderAll();
-    if (!silencioso) toast(`Sincronizado — ${nuevos} nuevos, ${actualizados} actualizados, ${desdeExcel.length} personas de Mirador El Pino en el Excel`);
+    if (!silencioso) toast(`Sincronizado — ${nuevos} nuevos, ${actualizados} actualizados, ${desdeExcel.length} personas de ${OBRA.nombre} en el Excel`);
     else if (nuevos || actualizados) toast(`Actualizado automáticamente desde el Excel — ${nuevos} nuevos, ${actualizados} actualizados`);
   } catch(e) {
     console.error('Error sincronizando con BUK:', e);
@@ -1314,7 +1423,7 @@ let COSTOS = []; // se carga dinámicamente desde el servidor en init() — ver 
 let ULTIMO_COSTO = []; // se llena al sincronizar con el Excel BUK
 let MAX_CE_RUT = {}; // costo más alto por RUT solo (cualquier centro/cargo) — se llena al sincronizar
 let ULTIMO_COSTO_MAX = []; // se llena al sincronizar con el Excel BUK
-const PP_LIST = [{"pp":6071,"cc":"CG0196071","cuenta":"IMIV"},{"pp":8131,"cc":"CG0198131","cuenta":"Personal Profesional"},{"pp":8141,"cc":"CG0198141","cuenta":"PERSONAL TECNICO"},{"pp":8191,"cc":"CG0198191","cuenta":"PERSONAL DE APOYO RIGGERS SENALEROS Y OTROS"},{"pp":8201,"cc":"CG0198201","cuenta":"MO DIRECTA EDIFICACION"},{"pp":6301,"cc":"CG0276301","cuenta":"MO DIRECTA URBANIZACION"},{"pp":8131,"cc":"CG0278131","cuenta":"Personal Profesional"},{"pp":8141,"cc":"CG0278141","cuenta":"PERSONAL TECNICO"}];
+let PP_LIST = []; // las cuentas de la obra: vienen de su ficha (aplicarConfigObra)
 // Primer mes de liquidacion real en la obra, por persona+centro (Base costo empresa BUK)
 // Gasto empresa real por persona: rut#centro#cargo -> { mes: monto } (archivo MO)
 let GASTO_MES = {}; // se llena al sincronizar con el Excel BUK
@@ -1680,8 +1789,15 @@ async function loadState(){
   } else {
     // Primera vez que corre en el servidor — siembra con lo que traía este
     // archivo (ya filtrado a Mirador El Pino) y lo sube.
-    workers = SEED_WORKERS.map(w => ({...w}));
-    meta = { ultimoMesReal: 7 };
+    if(OBRA.id === 'mirador-el-pino'){
+      workers = SEED_WORKERS.map(w => ({...w}));
+      meta = { ultimoMesReal: 7 };
+    } else {
+      // Una obra nueva NO se siembra con la gente de otra: parte vacía y se llena con el Excel de BUK.
+      workers = [];
+      meta = { ultimoMesReal: Math.min(12, Math.max(1, new Date().getMonth())) }; // el mes anterior al actual
+    }
+    descuentos = [];
     await guardarEnServidor(false);
   }
 }
@@ -1691,12 +1807,12 @@ async function persist(showToast){
 }
 
 function downloadBackupJSON(){
-  const payload = JSON.stringify({ workers, meta, descuentos, exportedAt: new Date().toISOString() }, null, 2);
+  const payload = JSON.stringify({ obra: OBRA.id, workers, meta, descuentos, exportedAt: new Date().toISOString() }, null, 2);
   const blob = new Blob([payload], { type:'application/json;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `dotacion_respaldo_${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `dotacion_respaldo_${OBRA.id}_${new Date().toISOString().slice(0,10)}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -1716,6 +1832,9 @@ function handleBackupFile(e){
     try{
       const parsed = JSON.parse(reader.result);
       if(!parsed || !Array.isArray(parsed.workers)) throw new Error('el archivo no tiene el formato esperado');
+      // Un respaldo de otra obra no se puede cargar acá (los respaldos antiguos, sin obra, son de Mirador El Pino).
+      const deObra = parsed.obra || 'mirador-el-pino';
+      if(deObra !== OBRA.id){ toast(`Ese respaldo es de otra obra (${deObra}): no se puede cargar en ${OBRA.nombre}`); return; }
       workers = parsed.workers;
       meta = parsed.meta || meta;
       descuentos = Array.isArray(parsed.descuentos) ? parsed.descuentos : [];
@@ -1829,6 +1948,10 @@ function renderMotivoFiltro(){
 function renderObraFiltro(){
   const sel = document.getElementById('obraFiltro');
   if(!sel) return;
+  // El filtro "Obra" solo aparece si la obra tiene más de una parte (ej. edificación y urbanización).
+  const campo = document.getElementById('obraFiltroField');
+  if(campo) campo.style.display = OBRA.grupos.length > 1 ? '' : 'none';
+  sel.innerHTML = '<option value="">Todas</option>' + OBRA.grupos.map(g => `<option value="${escHtml(g.id)}">${escHtml(g.nombre)}</option>`).join('');
   sel.value = obraFiltro;
   sel.onchange = () => { obraFiltro = sel.value; renderRoster(); renderDescuentos(); };
 }
@@ -2028,8 +2151,13 @@ function renderDescuentoForm(){
 }
 
 // Respeta el filtro de Obra activo, igual que el resto de las tablas de resumen.
+function enGrupo(cc, g){
+  return (g.prefijos || []).some(p => cc.startsWith(p)) || (g.ccs || []).includes(cc);
+}
 function enObra(cc){
-  return obraFiltro==='' || cc.startsWith(obraFiltro);
+  if(obraFiltro === '') return true;
+  const g = OBRA.grupos.find(x => x.id === obraFiltro);
+  return g ? enGrupo(cc, g) : true;
 }
 
 function renderDescuentos(){
@@ -3238,7 +3366,7 @@ function renderAll(){
 // ── Costos de referencia (carga masiva) ─────────────────────────
 async function cargarCostosDotacion() {
   try {
-    const res = await fetch(`${API}/dotacion/costos`);
+    const res = await dotFetch(`/dotacion/costos`);
     COSTOS = await res.json();
   } catch(e) {
     console.warn('No se pudo cargar la tabla de costos de referencia:', e.message);
@@ -3366,7 +3494,7 @@ async function subirCostosCSV() {
     const filas = parseCostosCSV(texto);
     if (!filas.length) { toast('No se encontraron filas válidas en el CSV (columnas: cc,role,amt)'); return; }
     if (!confirm(`Esto va a REEMPLAZAR toda la tabla de costos actual por las ${filas.length} filas del archivo. ¿Continuar?`)) return;
-    const res = await fetch(`${API}/dotacion/costos`, {
+    const res = await dotFetch(`/dotacion/costos`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ costos: filas, email: usuarioActual ? usuarioActual.username.toLowerCase() : '' })
     });
@@ -3391,7 +3519,7 @@ async function cargarHistorialDotacion() {
   const wrap = document.getElementById('historial-dotacion-wrap');
   wrap.innerHTML = '<div style="font-size:12px;color:var(--muted,#777);">Cargando…</div>';
   try {
-    const res = await fetch(`${API}/dotacion/historial`);
+    const res = await dotFetch(`/dotacion/historial`);
     const historial = await res.json();
     renderHistorialDotacion(historial);
   } catch(e) {
