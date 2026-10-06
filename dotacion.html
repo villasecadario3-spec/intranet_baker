@@ -1274,6 +1274,59 @@ function coincideArea(texto, buscado){
   return !!b && new RegExp('(^|[^a-z0-9])' + b + '($|[^a-z0-9])').test(normTxt(texto));
 }
 let avisoAreaMostrado = false;
+
+// ── Combinar lo guardado con lo que dice el Excel ──────────────────────
+// Lo hecho a mano nunca se pisa: finiquitos confirmados (con motivo), costos escritos a mano y
+// personas marcadas "Sigue" pese a una fecha de término.
+const tieneMotivo = x => x.motivo !== null && x.motivo !== undefined;
+const tieneTrabajoManual = x => tieneMotivo(x) || (x.costoManual !== null && x.costoManual !== undefined) || !!x.sigueDescartaFs;
+
+// El estado de término sigue al Excel: si BUK trae fecha de término la persona queda con finiquito
+// (sin motivo, porque BUK no lo informa); si BUK la quita, vuelve a quedar activa.
+function refrescarDesdeExcel(x, w){
+  if (x.source !== 'excel' || tieneMotivo(x)) return x;
+  const n = { ...x, fc: w.fc || x.fc };
+  if (w.fs && x.sigueDescartaFs !== w.fs) {
+    n.status = 'finiquitado'; n.fs = w.fs; n.motivo = null; delete n.sigueDescartaFs;
+  } else if (w.fs) {            // la marcaron "Sigue" para esa misma fecha de término: se respeta
+    n.status = 'activo'; n.fs = null;
+  } else {                      // el Excel ya no trae término
+    n.status = 'activo'; n.fs = null; delete n.sigueDescartaFs;
+  }
+  const igual = n.fc === x.fc && n.fs === x.fs && n.status === x.status && n.motivo === x.motivo && n.sigueDescartaFs === x.sigueDescartaFs;
+  return igual ? x : n;
+}
+function combinarConExcel(actuales, desdeExcel){
+  let lista = actuales.slice();
+  const r = { nuevos: 0, actualizados: 0, finiquitosAuto: 0, unificados: 0, duplicadasConservadas: 0 };
+  desdeExcel.forEach(w => {
+    const delRut = lista.filter(x => x.source === 'excel' && x.rutlimpio === w.rutlimpio);
+    let destino = delRut.find(x => x.id === w.id);
+    const otros = delRut.filter(x => x.id !== w.id);
+    // La persona cambió de centro de costo o de cargo: su fila pasa al último centro/cargo del Excel.
+    if (!destino && otros.length) {
+      const base = otros.find(tieneTrabajoManual) || otros[0];
+      destino = { ...base, id: w.id, cc: w.cc, role: w.role, name: w.name, rut: w.rut };
+      lista[lista.indexOf(base)] = destino;
+      otros.splice(otros.indexOf(base), 1);
+      r.unificados++;
+    }
+    // Las demás filas viejas de esa persona se quitan, salvo que tengan algo hecho a mano.
+    otros.forEach(x => {
+      if (tieneTrabajoManual(x)) { r.duplicadasConservadas++; return; }
+      lista = lista.filter(y => y !== x);
+      r.unificados++;
+    });
+    if (!destino) { lista.push(w); r.nuevos++; return; }
+    const nuevo = refrescarDesdeExcel(destino, w);
+    if (nuevo !== destino) {
+      lista[lista.indexOf(destino)] = nuevo;
+      r.actualizados++;
+      if (nuevo.status === 'finiquitado' && destino.status !== 'finiquitado') r.finiquitosAuto++;
+    }
+  });
+  return { lista, ...r };
+}
 function verificarAreaExcel(filas){
   if(!OBRA.areaExcel || avisoAreaMostrado) return;
   const sueltas = filas.filter(r => coincideArea(r[COL_AREA_BUK], OBRA.areaExcel) && !ccDeObra(r[COL_CC_BUK]));
@@ -1308,20 +1361,23 @@ async function cargarDesdeBUK() {
   console.log(`[BUK] Filas de ${OBRA.nombre}:`, deObra.length, 'de', filas.length, 'totales');
   verificarAreaExcel(filas);
 
+  // Si en el Excel aparece una cuenta de la obra que no está en su ficha, se agrega sola.
+  asegurarCuentas([...new Set(deObra.map(r => String(r[COL_CC_BUK] || '').trim()).filter(Boolean))]);
+
   const gastoMes = {};       // id -> {mes: gasto}
   const porPersonaCC = {};   // rutlimpio#cc -> [{mes, gasto}]
   const porCCRole = {};      // cc#role -> [gasto]
   const porCCMes = {};       // cc#mes -> {total, personas:Set}
-  const nuevosWorkers = new Map(); // id -> worker
 
-  deObra.forEach(r => {
+  // 1) Cada fila del Excel (una por persona y mes), ya leída.
+  const registros = [];
+  deObra.forEach((r, orden) => {
     const rut = String(r[COL_RUT_BUK] || '').trim();
     const rutlimpio = rut.replace(/[^0-9kK]/g,'').toUpperCase().replace(/^0+(?=\d)/, '');
     const cc = String(r[COL_CC_BUK] || '').trim();
     const role = String(r[COL_CARGO_BUK] || '').trim();
     const name = String(r[COL_NOMBRE_BUK] || '').trim();
     if (!rutlimpio || !cc || !name) return;
-    const id = `${rutlimpio}#${cc}#${role}`;
     const periodoStr = parseFechaExcelBUK(r[COL_PERIODO_BUK]);
     const mes = periodoStr ? Number(periodoStr.slice(5,7)) : null;
     // El Excel trae esta columna a veces como número real, a veces como
@@ -1331,39 +1387,60 @@ async function cargarDesdeBUK() {
     // realmente tienen registrado.
     const gastoRaw = r[COL_GASTO_BUK];
     const gasto = typeof gastoRaw === 'number' ? gastoRaw : Number(String(gastoRaw ?? '').trim().replace(/\./g, '').replace(/\s/g, ''));
-    const fc = parseFechaExcelBUK(r[COL_FING_BUK]);
-    const fs = parseFechaExcelBUK(r[COL_FTERM_BUK]);
-
     if (mes && gastoRaw !== undefined && gastoRaw !== null && gastoRaw !== '' && !Number.isFinite(gasto)) {
-      console.warn(`[BUK] No se pudo leer "Gasto Empresa" para ${name} (${id}), mes ${mes} — valor crudo:`, gastoRaw);
+      console.warn(`[BUK] No se pudo leer "Gasto Empresa" para ${name} (${rutlimpio}#${cc}#${role}), mes ${mes} — valor crudo:`, gastoRaw);
     }
-    if (mes && Number.isFinite(gasto)) {
-      gastoMes[id] = gastoMes[id] || {};
-      gastoMes[id][mes] = Math.round(gasto);
-      const keyPC = `${rutlimpio}#${cc}`;
-      porPersonaCC[keyPC] = porPersonaCC[keyPC] || [];
-      porPersonaCC[keyPC].push({ mes, gasto: Math.round(gasto) });
-      const keyCM = `${cc}#${mes}`;
-      porCCMes[keyCM] = porCCMes[keyCM] || { total: 0, personas: new Set() };
-      porCCMes[keyCM].total += Math.round(gasto);
-      porCCMes[keyCM].personas.add(rutlimpio);
-    }
-    if (Number.isFinite(gasto)) {
-      const keyCR = `${cc}#${role}`;
-      porCCRole[keyCR] = porCCRole[keyCR] || [];
-      porCCRole[keyCR].push(Math.round(gasto));
-    }
+    registros.push({ orden, rut, rutlimpio, cc, role, name, periodoStr, mes, gastoRaw, gasto,
+      fc: parseFechaExcelBUK(r[COL_FING_BUK]), fs: parseFechaExcelBUK(r[COL_FTERM_BUK]) });
+  });
 
-    const existente = nuevosWorkers.get(id);
-    if (!existente || (fc && (!existente.fc || fc < existente.fc))) {
-      nuevosWorkers.set(id, {
-        id, rutlimpio, cc, role, name, rut,
-        fc: (existente && existente.fc && (!fc || existente.fc < fc)) ? existente.fc : (fc || (existente && existente.fc) || null),
-        status: fs ? 'finiquitado' : 'activo',
-        fs: fs || null,
-        motivo: null,
-        source: 'excel',
-      });
+  // 2) Una fila por PERSONA (RUT). Su centro de costo, cargo y fecha de término son los de su fila
+  // más reciente (igual que el costo empresa, que toma el del último mes): así quien cambió de
+  // cuenta aparece una sola vez, y la fecha de término no depende de en qué orden vengan las filas.
+  const porRut = new Map();
+  registros.forEach(x => { if (!porRut.has(x.rutlimpio)) porRut.set(x.rutlimpio, []); porRut.get(x.rutlimpio).push(x); });
+  const nuevosWorkers = new Map(); // id -> worker
+  porRut.forEach((filasP, rutlimpio) => {
+    const clave = x => `${x.periodoStr || ''}|${x.fc || ''}`; // mismo mes: gana el trabajo que empezó después
+    const ultima = filasP.reduce((a, b) => clave(b) >= clave(a) ? b : a);
+    const { cc, role, name, rut } = ultima;
+    const id = `${rutlimpio}#${cc}#${role}`;
+    const ingresos = filasP.map(x => x.fc).filter(Boolean).sort();
+    // Costo por mes de la persona: se juntan todos sus meses aunque haya pasado por otro centro o cargo.
+    // (Si una misma fila viene repetida vale la última; en un mismo mes con dos centros distintos se suman.)
+    const porSub = {};
+    filasP.forEach(x => {
+      if (x.mes && Number.isFinite(x.gasto)) { const k = `${x.cc}#${x.role}`; (porSub[k] = porSub[k] || {})[x.mes] = Math.round(x.gasto); }
+    });
+    const meses = {};
+    Object.values(porSub).forEach(m => Object.entries(m).forEach(([mes, g]) => { meses[mes] = (meses[mes] || 0) + g; }));
+    if (Object.keys(meses).length) {
+      gastoMes[id] = meses;
+      porPersonaCC[`${rutlimpio}#${cc}`] = Object.entries(meses).map(([mes, gasto]) => ({ mes: Number(mes), gasto }));
+    }
+    nuevosWorkers.set(id, {
+      id, rutlimpio, cc, role, name, rut,
+      fc: ingresos[0] || null,
+      status: ultima.fs ? 'finiquitado' : 'activo',
+      fs: ultima.fs || null,
+      motivo: null,
+      source: 'excel',
+    });
+  });
+
+  // 3) Totales por centro y mes, y promedios por centro+cargo: se mantienen por fila, para que la
+  // historia real de cada centro de costo quede tal como se pagó.
+  registros.forEach(x => {
+    if (x.mes && Number.isFinite(x.gasto)) {
+      const keyCM = `${x.cc}#${x.mes}`;
+      porCCMes[keyCM] = porCCMes[keyCM] || { total: 0, personas: new Set() };
+      porCCMes[keyCM].total += Math.round(x.gasto);
+      porCCMes[keyCM].personas.add(x.rutlimpio);
+    }
+    if (Number.isFinite(x.gasto)) {
+      const keyCR = `${x.cc}#${x.role}`;
+      porCCRole[keyCR] = porCCRole[keyCR] || [];
+      porCCRole[keyCR].push(Math.round(x.gasto));
     }
   });
 
@@ -1458,26 +1535,20 @@ async function sincronizarConBUK(silencioso) {
     // Las dos pestañas (MO y ASISTENCIA BUK) son grandes — se piden en
     // paralelo en vez de una después de la otra, para no sumar sus tiempos.
     const [desdeExcel] = await Promise.all([cargarDesdeBUK(), cargarAsistenciaBUK()]);
-    const porId = new Map(workers.map(w => [w.id, w]));
-    let nuevos = 0, actualizados = 0;
-    desdeExcel.forEach(w => {
-      const existente = porId.get(w.id);
-      if (!existente) {
-        porId.set(w.id, w);
-        nuevos++;
-      } else if (existente.source === 'excel' && existente.motivo === null && existente.status === 'activo') {
-        // Solo se refresca si la persona sigue activa y sin una salida
-        // confirmada a mano — así nunca se pisa un finiquito ya registrado.
-        porId.set(w.id, { ...existente, fc: w.fc, fs: w.fs, status: w.fs ? existente.status : w.status });
-        actualizados++;
-      }
-    });
-    workers = [...porId.values()];
+    const r = combinarConExcel(workers, desdeExcel);
+    workers = r.lista;
+    asegurarCuentas(workers.map(w => w.cc));
     await guardarEnServidor(false);
     renderMesRealSelect();
     renderAll();
-    if (!silencioso) toast(`Sincronizado — ${nuevos} nuevos, ${actualizados} actualizados, ${desdeExcel.length} personas de ${OBRA.nombre} en el Excel`);
-    else if (nuevos || actualizados) toast(`Actualizado automáticamente desde el Excel — ${nuevos} nuevos, ${actualizados} actualizados`);
+    const detalle = [
+      `${r.nuevos} nuevos`, `${r.actualizados} actualizados`,
+      r.finiquitosAuto ? `${r.finiquitosAuto} con término según el Excel` : '',
+      r.unificados ? `${r.unificados} fila(s) unificadas por cambio de cuenta` : '',
+    ].filter(Boolean).join(', ');
+    const aviso = r.duplicadasConservadas ? ` ⚠ ${r.duplicadasConservadas} fila(s) por cambio de cuenta tienen datos hechos a mano: revísalas` : '';
+    if (!silencioso) toast(`Sincronizado — ${detalle}, ${desdeExcel.length} personas de ${OBRA.nombre} en el Excel${aviso}`);
+    else if (r.nuevos || r.actualizados || r.unificados || aviso) toast(`Actualizado automáticamente desde el Excel — ${detalle}${aviso}`);
   } catch(e) {
     console.error('Error sincronizando con BUK:', e);
     if (!silencioso) toast('Error al sincronizar: ' + e.message);
@@ -1505,6 +1576,24 @@ let ULTIMO_COSTO = []; // se llena al sincronizar con el Excel BUK
 let MAX_CE_RUT = {}; // costo más alto por RUT solo (cualquier centro/cargo) — se llena al sincronizar
 let ULTIMO_COSTO_MAX = []; // se llena al sincronizar con el Excel BUK
 let PP_LIST = []; // las cuentas de la obra: vienen de su ficha (aplicarConfigObra)
+// Nombre de cada cuenta de mano de obra según sus 4 últimos dígitos (plan de cuentas del grupo).
+// Sirve cuando en el Excel aparece una cuenta de la obra que no está en su ficha.
+const NOMBRE_CUENTA = { 6071: 'IMIV', 6301: 'MO DIRECTA URBANIZACION', 8131: 'Personal Profesional', 8141: 'PERSONAL TECNICO', 8191: 'PERSONAL DE APOYO RIGGERS SENALEROS Y OTROS', 8201: 'MO DIRECTA EDIFICACION' };
+// Los cálculos recorren las cuentas de PP_LIST: toda cuenta con personas tiene que estar ahí, o la
+// pantalla falla. Si falta alguna (la obra se reconoce por "CG015…", no por una lista de cuentas),
+// se agrega sola con su nombre del plan de cuentas.
+function asegurarCuentas(ccs){
+  const nuevas = [];
+  (ccs || []).forEach(cc => {
+    cc = String(cc || '').trim();
+    if(!cc || PP_LIST.some(p => p.cc === cc)) return;
+    const pp = Number(cc.slice(-4));
+    PP_LIST.push({ pp, cc, cuenta: NOMBRE_CUENTA[pp] || `Cuenta ${cc.slice(-4)}` });
+    nuevas.push(cc);
+  });
+  if(nuevas.length) console.warn('[Dotación] Cuentas que no estaban en la ficha de la obra (se agregaron solas):', nuevas);
+  return nuevas;
+}
 // Primer mes de liquidacion real en la obra, por persona+centro (Base costo empresa BUK)
 // Gasto empresa real por persona: rut#centro#cargo -> { mes: monto } (archivo MO)
 let GASTO_MES = {}; // se llena al sincronizar con el Excel BUK
@@ -1867,6 +1956,7 @@ async function loadState(){
     workers = guardado.workers;
     meta = guardado.meta || meta;
     descuentos = Array.isArray(guardado.descuentos) ? guardado.descuentos : [];
+    asegurarCuentas(workers.map(w => w.cc));
   } else {
     // Primera vez que corre en el servidor — siembra con lo que traía este
     // archivo (ya filtrado a Mirador El Pino) y lo sube.
@@ -2084,7 +2174,7 @@ function pasaFiltrosDotacion(w){
     && (periodoFiltro==='' || vigenteDesdeMes(w, parseInt(periodoFiltro,10)))
     && (estadoOrigenFiltro==='' || (estadoOrigenFiltro==='vigente' ? esVigente(w) : esProyectado(w)))
     && (motivoFiltro==='' || w.motivo===motivoFiltro)
-    && (obraFiltro==='' || w.cc.startsWith(obraFiltro))
+    && enObra(w.cc)
     && (fechaSalidaDesdeFiltro==='' || (w.fs && w.fs>=fechaSalidaDesdeFiltro))
     && (fechaSalidaHastaFiltro==='' || (w.fs && w.fs<=fechaSalidaHastaFiltro));
 }
@@ -2097,7 +2187,7 @@ function hayFiltrosPersonaActivos(){
 
 function computeMonthlyBreakdown(){
   const ccs = PP_LIST.slice().sort((a,b)=>a.cc.localeCompare(b.cc)).map(p=>p.cc)
-    .filter(cc => obraFiltro==='' || cc.startsWith(obraFiltro));
+    .filter(cc => enObra(cc));
   const costoMensualByCC = {};
   const finiquitosByCC = {};
   const dotacionByCC = {};
@@ -2769,6 +2859,9 @@ function setFechaInicio(id, value){
 function setSigue(id){
   const w = workers.find(x=>x.id===id);
   if(!w) return;
+  // Si el término vino del Excel y se decide que sigue, se recuerda esa fecha para que la próxima
+  // sincronización no la vuelva a poner (solo volvería si BUK cambia la fecha).
+  if(w.source === 'excel' && w.status === 'finiquitado' && w.fs && !tieneMotivo(w)) w.sigueDescartaFs = w.fs;
   w.status = 'activo';
   w.fs = null;
   w.motivo = null;
@@ -2798,6 +2891,7 @@ function confirmExit(){
   w.status = 'finiquitado';
   w.fs = date;
   w.motivo = document.getElementById('exitMotivo').value;
+  delete w.sigueDescartaFs;
   closeExitModal();
   renderRoster();
   renderExportPreview();
@@ -3427,6 +3521,7 @@ function downloadCSV(){
 }
 
 function renderAll(){
+  asegurarCuentas(workers.map(w => w.cc));
   renderLegend();
   renderDescuentos();
   renderCCChips();
