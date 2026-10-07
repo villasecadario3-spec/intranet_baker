@@ -333,6 +333,7 @@ input[type=file] { display: none; }
       <div style="font-weight:700;font-size:0.9rem;margin-bottom:8px;color:var(--ink);">
         Beneficiarios encontrados: <span id="ds19-total-beneficiarios">0</span> — agrupados en <span id="ds19-total-lotes">0</span> lote(s) de hasta 10
       </div>
+      <div id="ds19-aviso-lectura" style="display:none;background:rgba(246,173,85,0.12);border:1px solid #f6ad55;border-radius:var(--radius);padding:10px 14px;font-size:0.8rem;color:var(--ink);margin-bottom:14px;line-height:1.5;"></div>
       <div style="font-size:0.78rem;color:var(--ink2);margin-bottom:16px;">
         Por cada lote puedes subir hasta 10 escrituras (una por persona) para completar las Tablas 3a/3b con el N° de cláusula — se calzan solas por RUT. Si no subes escrituras para alguien, esas columnas quedan en blanco en el Word de ese lote.
       </div>
@@ -1119,9 +1120,17 @@ function ds19DesbloquearProyecto() {
   document.getElementById('ds19-fijos-nota').textContent = '✏️ Editando código y nombre — lo que escribas vale para todos los formularios.';
 }
 
+const ds19Esc = t => String(t == null ? '' : t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
 function ds19MostrarResultado(resultado) {
   ds19Proyecto = resultado.proyecto || {};
   ds19Beneficiarios = resultado.beneficiarios || [];
+
+  // Avisos de lectura (por ejemplo: "la resolución indica 261 beneficiarios y se leyeron 259").
+  const avisos = Array.isArray(resultado.advertencias) ? resultado.advertencias : [];
+  const cajaAviso = document.getElementById('ds19-aviso-lectura');
+  cajaAviso.innerHTML = avisos.map(a => '⚠ ' + ds19Esc(a)).join('<br>');
+  cajaAviso.style.display = avisos.length ? 'block' : 'none';
 
   document.getElementById('ds19-codigo').value = ds19Proyecto.codigo_proyecto || '';
   document.getElementById('ds19-nombreproyecto').value = ds19Proyecto.nombre_proyecto || '';
@@ -1143,8 +1152,11 @@ function ds19MostrarResultado(resultado) {
 function ds19RenderLotes() {
   const cont = document.getElementById('ds19-lotes');
   cont.innerHTML = ds19Lotes.map((lote, li) => {
-    const desde = lote.beneficiarios[0]?.numero_tabla_res_ex;
-    const hasta = lote.beneficiarios[lote.beneficiarios.length - 1]?.numero_tabla_res_ex;
+    const bDesde = lote.beneficiarios[0], bHasta = lote.beneficiarios[lote.beneficiarios.length - 1];
+    // Si la Resolución viene por sectores, la numeración reinicia en cada uno: se indica el sector.
+    const etiqueta = b => b && b.sector ? ` (${ds19Esc(b.sector)})` : '';
+    const desde = bDesde?.numero_tabla_res_ex + (bDesde?.sector === bHasta?.sector ? '' : etiqueta(bDesde));
+    const hasta = bHasta?.numero_tabla_res_ex + etiqueta(bHasta);
     return `
     <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px;">
       <div style="font-weight:700;font-size:0.88rem;margin-bottom:8px;color:var(--ink);">Lote ${li+1} — Beneficiarios N° ${desde} al ${hasta}</div>
@@ -1163,7 +1175,7 @@ function ds19RenderLotes() {
             else if (esc?.estado === 'listo') estadoTxt = `✅ ${esc.nombreArchivo}`;
             else if (esc?.estado === 'error') estadoTxt = `❌ ${esc.error}`;
             return `<tr>
-              <td style="padding:3px;border:1px solid var(--border);text-align:center;color:var(--ink);">${b.numero_tabla_res_ex}</td>
+              <td style="padding:3px;border:1px solid var(--border);text-align:center;color:var(--ink);">${b.numero_tabla_res_ex}${b.sector ? `<div style="font-size:0.62rem;color:var(--ink3);">${ds19Esc(b.sector)}</div>` : ''}</td>
               <td style="padding:3px;border:1px solid var(--border);color:var(--ink);">${b.nombre}</td>
               <td style="padding:3px;border:1px solid var(--border);text-align:center;color:var(--ink);">${b.rut}</td>
               <td style="padding:3px;border:1px solid var(--border);color:var(--ink);">${estadoTxt}</td>
