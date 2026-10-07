@@ -1047,41 +1047,55 @@ async function ds19SubirResolucion() {
 
   const cont = document.getElementById('ds19-procesando');
   document.getElementById('ds19-revision').style.display = 'none';
-  cont.innerHTML = `⏳ ${archivo.name} — subiendo y procesando…`;
+  cont.innerHTML = `⏳ ${ds19Esc(archivo.name)} — subiendo…`;
 
   try {
     const base64 = await ds19LeerArchivoBase64(archivo);
-    const res = await fetch(`${API_BASE}/ds19-resolucion/procesar`, {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ archivoBase64: base64, nombreArchivo: archivo.name })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Error al subir');
-    ds19EsperarResultado(data.jobId, archivo.name);
+    let res;
+    try {
+      res = await fetch(`${API_BASE}/ds19-resolucion/procesar`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ archivoBase64: base64, nombreArchivo: archivo.name })
+      });
+    } catch (e) { throw new Error('No hay conexión con el servidor. Revisa tu conexión e intenta de nuevo.'); }
+    const data = await ds19JsonSeguro(res);
+    if (!res.ok) throw new Error(data.error || ds19MensajeHttp(res.status, archivo.size));
+    await ds19EsperarResultado(data.jobId, archivo.name);
   } catch(e) {
-    cont.innerHTML = `❌ ${archivo.name} — error: ${e.message}`;
+    cont.innerHTML = `❌ ${ds19Esc(archivo.name)} — ${ds19Esc(e.message)}`;
   }
 }
 
+// Espera a que el servidor termine de leer la Resolución (normalmente segundos). Muestra el tiempo que lleva y
+// cualquier fallo queda escrito en pantalla: nada se traga en silencio.
 async function ds19EsperarResultado(jobId, nombreArchivo) {
   const cont = document.getElementById('ds19-procesando');
-  const maxIntentos = 40; // ~10 minutos tope (40 × 15s)
-  for (let i = 0; i < maxIntentos; i++) {
-    await new Promise(r => setTimeout(r, 15000));
+  const nombre = ds19Esc(nombreArchivo);
+  const t0 = Date.now(), tope = 5 * 60 * 1000;
+  let fallosRed = 0, primera = true;
+  while (Date.now() - t0 < tope) {
+    await ds19Pausa(primera ? 2000 : 3000); primera = false;
+    const seg = Math.round((Date.now() - t0) / 1000);
+    let data;
     try {
       const res = await fetch(`${API_BASE}/ds19-resolucion/estado/${jobId}`);
-      const data = await res.json();
-      if (data.estado === 'listo') {
-        cont.innerHTML = `✅ ${nombreArchivo} — procesado`;
-        ds19MostrarResultado(data.resultado);
-        return;
-      } else if (data.estado === 'error') {
-        cont.innerHTML = `❌ ${nombreArchivo} — error: ${data.error}`;
-        return;
-      }
-    } catch(e) { /* sigue esperando */ }
+      if (res.status === 404) throw Object.assign(new Error('El servidor ya no tiene este trabajo (se reinició mientras se leía). Vuelve a subir la Resolución.'), { fatal: true });
+      data = await ds19JsonSeguro(res); fallosRed = 0;
+    } catch (e) {
+      if (e.fatal) throw e;
+      if (++fallosRed >= 5) throw new Error('Se perdió la conexión con el servidor. Revisa tu conexión e intenta de nuevo.');
+      continue;
+    }
+    if (data.estado === 'listo') {
+      try { ds19MostrarResultado(data.resultado); }
+      catch (e) { throw new Error('La Resolución se leyó, pero no se pudo mostrar en pantalla: ' + e.message); }
+      cont.innerHTML = `✅ ${nombre} — procesado en ${ds19Mmss(seg)}`;
+      return;
+    }
+    if (data.estado === 'error') throw new Error(data.error || 'No se pudo leer la Resolución.');
+    cont.innerHTML = `⏳ ${nombre} — leyendo la Resolución… ${ds19Mmss(seg)}` + (seg > 60 ? ' (normalmente toma segundos; si pasa de 2 minutos, avisa a TI)' : '');
   }
-  cont.innerHTML = `⚠ ${nombreArchivo} — está tardando más de lo normal, revisa la consola del servidor`;
+  throw new Error('Está tardando más de 5 minutos y normalmente toma segundos. Avisa a TI: puede haber un problema en el servidor.');
 }
 
 const REQUISITOS_DS19 = [
@@ -1323,7 +1337,7 @@ async function ds19Concurrencia(items, maximo, fn) {
   });
   await Promise.all(trabajadores);
 }
-async function ds19EsperarResultado(jobId, it) {
+async function ds19EsperarLecturaEscritura(jobId, it) {
   const t0 = Date.now(), tope = 20 * 60 * 1000;
   while (Date.now() - t0 < tope) {
     await ds19Pausa(5000);
@@ -1351,7 +1365,7 @@ async function ds19ProcesarArchivo(it) {
     catch (e) { throw new Error('No hay conexión con el servidor. Revisa tu conexión e intenta de nuevo.'); }
     const data = await ds19JsonSeguro(res);
     if (!res.ok) throw new Error(data.error || ds19MensajeHttp(res.status, it.tamano));
-    const resultado = await ds19EsperarResultado(data.jobId, it);
+    const resultado = await ds19EsperarLecturaEscritura(data.jobId, it);
     ds19Calzar(it, resultado);
   } catch (e) {
     it.estado = 'error'; it.mensaje = e.message || 'No se pudo procesar el archivo.';
