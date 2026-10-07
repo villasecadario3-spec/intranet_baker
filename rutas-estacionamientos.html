@@ -110,6 +110,17 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
 .dot-presencial{background:var(--gris-3);}
 .dot-otros{background:var(--txt-mid);}
 .dot-vacaciones{background:#2E5A8A;}
+.dot-sin_ruta{background:transparent;border:1.5px dashed var(--gris-3);box-sizing:border-box;}
+.seg-resumen{display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;margin-bottom:20px;}
+.seg-caja{background:white;border:1px solid var(--gris-2);border-radius:10px;padding:12px 18px;min-width:130px;}
+.seg-caja b{display:block;font-size:1.5rem;line-height:1.2;}
+.seg-caja span{font-size:0.74rem;color:var(--txt-dim);}
+.seg-caja.seg-alerta b{color:var(--rojo);}
+.seg-total{align-self:center;font-size:0.78rem;color:var(--txt-dim);}
+.seg-titulo{font-weight:700;font-size:0.88rem;margin:6px 0 10px;}
+.seg-fila{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;padding:9px 12px;border-bottom:1px solid var(--gris-1);font-size:0.82rem;background:white;}
+.seg-fila .seg-sub{color:var(--txt-dim);font-size:0.76rem;}
+.seg-tag{font-size:0.68rem;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--gris-1);color:var(--txt-mid);}
 
 /* Vista semanal de Estacionamientos por bloques (AM / PM) */
 .bq-ayuda{font-size:0.78rem;color:var(--txt-dim);margin-bottom:10px;}
@@ -168,13 +179,13 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
         </div>
     </div>
 
-    <div class="tabs tabs-principal" id="tabs-principal">
-        <div class="tab activo" data-tab-principal="estacionamientos" onclick="cambiarTabPrincipal('estacionamientos')">🚗 Estacionamientos</div>
-        <div class="tab" data-tab-principal="teletrabajo" onclick="cambiarTabPrincipal('teletrabajo')">🗺️ Teletrabajo / Rutas</div>
+    <div class="tabs tabs-principal" id="tabs-principal" style="display:none;">
+        <div class="tab" data-tab-principal="estacionamientos" onclick="cambiarTabPrincipal('estacionamientos')">🚗 Estacionamientos</div>
+        <div class="tab activo" data-tab-principal="teletrabajo" onclick="cambiarTabPrincipal('teletrabajo')">🗺️ Teletrabajo / Rutas</div>
     </div>
 
     <!-- ═══════════ PANEL: ESTACIONAMIENTOS ═══════════ -->
-    <div class="panel activo" id="panel-principal-estacionamientos">
+    <div class="panel" id="panel-principal-estacionamientos">
         <div id="admin-wrap" style="display:none;">
             <div class="admin-box">
                 <div style="font-weight:700;font-size:0.85rem;margin-bottom:10px;">⚙ Agregar / editar estacionamiento</div>
@@ -216,10 +227,11 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
     </div>
 
     <!-- ═══════════ PANEL: TELETRABAJO / RUTAS ═══════════ -->
-    <div class="panel" id="panel-principal-teletrabajo">
+    <div class="panel activo" id="panel-principal-teletrabajo">
         <div class="tabs" id="tabs-teletrabajo">
-            <div class="tab activo" onclick="cambiarTab('mio')">Mi ruta</div>
-            <div class="tab" onclick="cambiarTab('equipo')">Ver equipo por semana</div>
+            <div class="tab activo" data-tab="mio" onclick="cambiarTab('mio')">Mi ruta</div>
+            <div class="tab" data-tab="equipo" onclick="cambiarTab('equipo')">Ver equipo por semana</div>
+            <div class="tab" data-tab="seguimiento" id="tab-seguimiento" style="display:none;" onclick="cambiarTab('seguimiento')">👥 Seguimiento</div>
         </div>
 
         <div class="panel activo" id="panel-mio">
@@ -321,13 +333,22 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
                 <div class="week-label" id="week-label"></div>
                 <button onclick="cambiarSemana(1)">Semana siguiente ›</button>
             </div>
+            <div id="aviso-sin-ruta" style="display:none;margin:0 0 12px;padding:10px 14px;background:var(--gris-1);border-radius:8px;font-size:0.8rem;color:var(--txt-mid);"></div>
             <table class="tabla-semana">
                 <thead><tr id="semana-head"></tr></thead>
                 <tbody id="semana-body"></tbody>
             </table>
             <div style="margin-top:14px;font-size:0.78rem;color:var(--txt-dim);">
-                <span class="dot dot-remoto"></span> Remoto &nbsp;&nbsp; <span class="dot dot-visita_obra"></span> Visita a Obra &nbsp;&nbsp; <span class="dot dot-presencial"></span> Presencial &nbsp;&nbsp; <span class="dot dot-vacaciones"></span> Vacaciones &nbsp;&nbsp; <span class="dot dot-otros"></span> Otros
+                <span class="dot dot-remoto"></span> Remoto &nbsp;&nbsp; <span class="dot dot-visita_obra"></span> Visita a Obra &nbsp;&nbsp; <span class="dot dot-sin_ruta"></span> Sin ruta &nbsp;&nbsp; <span class="dot dot-presencial"></span> Presencial &nbsp;&nbsp; <span class="dot dot-vacaciones"></span> Vacaciones &nbsp;&nbsp; <span class="dot dot-otros"></span> Otros
             </div>
+        </div>
+
+        <div class="panel" id="panel-seguimiento">
+            <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">
+                Quién ya tiene su ruta aprobada, quién está esperando que se la aprueben y quién todavía no la ha enviado,
+                entre las personas con acceso al módulo.
+            </p>
+            <div id="seguimiento-contenido"></div>
         </div>
     </div>
 
@@ -417,6 +438,12 @@ const API = 'https://api.ibaker.cl';
 // Administradores del módulo combinado — se mantienen los que ya
 // administraban Estacionamientos/Teletrabajo, más Karollihn Yépez.
 const ADMINISTRADORES = ['dvillaseca@ibaker.cl', 'jcumplido@ibaker.cl', 'kyepez@ibaker.cl'];
+// Quién ve la pestaña de Estacionamientos: las personas que tienen un estacionamiento asignado, y estas.
+// (El resto solo ve Teletrabajo / Rutas.)
+const VEN_ESTACIONAMIENTOS = ['kyepez@ibaker.cl'];
+// Quién ve la pestaña de Seguimiento (quién ya envió su ruta y quién no).
+const VEN_SEGUIMIENTO = ['kyepez@ibaker.cl'];
+let personasConAcceso = []; // correos con acceso al módulo: el "universo" del seguimiento
 let emailActual = '', nombreActual = '';
 
 const msalConfig = {
@@ -442,6 +469,7 @@ async function initAuth() {
                 window.location.href = 'index.html';
                 return;
             }
+            personasConAcceso = listaAcceso.map(e => String(e).toLowerCase());
             nombreActual = u.name || u.username;
             const iniciales = nombreActual.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
             document.getElementById('auth-area').innerHTML = `<div class="user-chip"><div class="user-av">${iniciales}</div><span class="user-nm">${nombreActual.split(' ').slice(0,2).join(' ')}</span></div>`;
@@ -465,7 +493,12 @@ async function initAuth() {
             renderFilasObra();
 
             await cargarDatos(); // Teletrabajo — primero, porque estacionamientos ahora depende de su patrón
-            cargarTodo();       // Estacionamientos
+            await cargarTodo();  // Estacionamientos (hace falta saber quién tiene uno para decidir qué pestañas se ven)
+            aplicarVisibilidadEstacionamientos(true);
+            if (VEN_SEGUIMIENTO.includes(emailActual)) {
+                document.getElementById('tab-seguimiento').style.display = '';
+                renderSeguimiento();
+            }
         } else {
             window.location.href = 'index.html';
         }
@@ -515,6 +548,18 @@ function toast(msg) {
 }
 function fmt(iso) { const [y,m,d] = iso.split('-'); return `${d}-${m}-${y}`; }
 
+// Solo ven los estacionamientos quienes tienen uno asignado (son su "usuario") y las personas de VEN_ESTACIONAMIENTOS.
+// A los demás no se les muestra la pestaña ni nada de eso: solo Teletrabajo / Rutas.
+function puedeVerEstacionamientos() {
+    return VEN_ESTACIONAMIENTOS.includes(emailActual) || spots.some(s => String(s.duenoEmail || '').toLowerCase() === emailActual);
+}
+function aplicarVisibilidadEstacionamientos(primeraVez) {
+    const ver = puedeVerEstacionamientos();
+    document.getElementById('tabs-principal').style.display = ver ? '' : 'none';
+    const enEstac = document.getElementById('panel-principal-estacionamientos').classList.contains('activo');
+    if (!ver && enEstac) cambiarTabPrincipal('teletrabajo');
+    else if (ver && primeraVez) cambiarTabPrincipal('estacionamientos');
+}
 function cambiarTabPrincipal(tab) {
     document.querySelectorAll('#tabs-principal .tab').forEach(t => t.classList.toggle('activo', t.dataset.tabPrincipal === tab));
     document.getElementById('panel-principal-estacionamientos').classList.toggle('activo', tab === 'estacionamientos');
@@ -593,6 +638,7 @@ async function cargarTodo() {
         reservas = await reservasRes.json();
         render();
         if (ADMINISTRADORES.includes(emailActual)) renderAdminLista();
+        aplicarVisibilidadEstacionamientos(false);
     } catch(e) {
         toast('Error al cargar: ' + e.message);
     }
@@ -1484,10 +1530,10 @@ async function avisarAprobadoresNuevaPropuesta(resumen, propuestaId) {
 }
 
 function cambiarTab(tab) {
-    document.querySelectorAll('#tabs-teletrabajo .tab').forEach((t,i) => t.classList.toggle('activo', (i===0 && tab==='mio') || (i===1 && tab==='equipo')));
-    document.getElementById('panel-mio').classList.toggle('activo', tab==='mio');
-    document.getElementById('panel-equipo').classList.toggle('activo', tab==='equipo');
+    document.querySelectorAll('#tabs-teletrabajo .tab').forEach(t => t.classList.toggle('activo', t.dataset.tab === tab));
+    ['mio', 'equipo', 'seguimiento'].forEach(n => { const pn = document.getElementById('panel-' + n); if (pn) pn.classList.toggle('activo', n === tab); });
     if (tab === 'equipo') renderSemana();
+    if (tab === 'seguimiento') renderSeguimiento();
 }
 
 async function guardarPatron() {
@@ -1615,17 +1661,44 @@ function cambiarSemana(delta) {
     renderSemana();
 }
 
+// Qué ruta tenía una persona en una fecha. La ruta vigente rige desde el día en que se aprobó (vigenteDesde);
+// antes de eso rige la que tenía antes (historial), o ninguna. Las rutas guardadas antes de este cambio no
+// tienen fecha y rigen para todas las fechas, como siempre. Así, aprobar una ruta nueva NO cambia las semanas pasadas.
+function patronEnFecha(email, fechaISO) {
+    const p = dataTeletrabajo.patrones[email];
+    if (!p) return null;
+    if (!p.vigenteDesde || fechaISO >= p.vigenteDesde) return p;
+    const rigieron = (p.historial || []).filter(h => (!h.desde || h.desde <= fechaISO) && fechaISO < h.hasta);
+    return rigieron.length ? rigieron[rigieron.length - 1] : null;
+}
+
 // Estado efectivo de una persona en una fecha: excepción propia si existe, si no su patrón fijo según el día de la semana.
+// (Sin ruta aprobada ese día se supone presencial: es lo que usan los estacionamientos.)
 function estadoEnFecha(email, fechaISO, diaSemana) {
     const exc = dataTeletrabajo.excepciones.find(e => e.email === email && e.fecha === fechaISO);
     if (exc) return { estado: exc.tipo, obras: exc.obras || [], detalle: exc.detalle || '' };
-    const patron = dataTeletrabajo.patrones[email] || { teletrabajoDia: null, visitaObra: [], otros: [] };
+    const patron = patronEnFecha(email, fechaISO) || { teletrabajoDia: null, visitaObra: [], otros: [] };
     if (patron.teletrabajoDia === diaSemana) return { estado: 'remoto', obras: [], detalle: '' };
     const item = (patron.visitaObra || []).find(v => v.dia === diaSemana);
     if (item) return { estado: 'visita_obra', obras: item.obras || [], detalle: '' };
     const itemOtros = (patron.otros || []).find(v => v.dia === diaSemana);
     if (itemOtros) return { estado: 'otros', obras: [], detalle: itemOtros.detalle || '' };
     return { estado: 'presencial', obras: [], detalle: '' };
+}
+// Para la vista del equipo: si ese día no había ruta aprobada ni excepción, se dice "Sin ruta" en vez de suponer presencial.
+function estadoVistaEquipo(email, fechaISO, diaSemana) {
+    const hayExc = dataTeletrabajo.excepciones.some(e => e.email === email && e.fecha === fechaISO);
+    if (!hayExc && !patronEnFecha(email, fechaISO)) return { estado: 'sin_ruta', obras: [], detalle: '' };
+    return estadoEnFecha(email, fechaISO, diaSemana);
+}
+
+// Nombre a mostrar: el guardado junto a la ruta, o el propio nombre de quien ve la pantalla si es su fila, o el correo.
+function nombrePersona(email) {
+    const guardado = (dataTeletrabajo.patrones[email] || {}).nombre;
+    if (guardado) return guardado;
+    if (email === emailActual) return nombreActual;
+    if (NOMBRES_RESPALDO[email]) return NOMBRES_RESPALDO[email];
+    return email;
 }
 
 function renderSemana() {
@@ -1640,38 +1713,79 @@ function renderSemana() {
     document.getElementById('semana-head').innerHTML =
         '<th>Persona</th>' + DIAS.map((d,i) => `<th>${DIAS_LABEL[d]}<br><span style="font-weight:400;">${fmt(fechas[i])}</span></th>`).join('');
 
+    // Solo aparecen quienes ya tienen una ruta APROBADA. Una propuesta pendiente no aparece hasta que se apruebe.
     const personas = Object.keys(dataTeletrabajo.patrones);
-    // Asegura que la propia persona aparezca aunque aún no tenga patrón guardado.
-    if (!personas.includes(emailActual)) personas.push(emailActual);
+    const aviso = document.getElementById('aviso-sin-ruta');
+    if (aviso) {
+        if (dataTeletrabajo.patrones[emailActual]) aviso.style.display = 'none';
+        else {
+            const pend = (dataTeletrabajo.propuestas || []).find(p => p.email === emailActual && p.estado === 'pendiente');
+            aviso.textContent = pend
+                ? 'Tu ruta todavía no aparece en esta lista: está pendiente de aprobación.'
+                : 'Tu ruta todavía no aparece en esta lista: aún no la has enviado (hazlo en "Mi ruta").';
+            aviso.style.display = 'block';
+        }
+    }
 
     if (!personas.length) {
-        document.getElementById('semana-body').innerHTML = `<tr><td colspan="6" class="empty">Todavía nadie configuró su patrón de teletrabajo.</td></tr>`;
+        document.getElementById('semana-body').innerHTML = `<tr><td colspan="6" class="empty">Todavía no hay rutas aprobadas.</td></tr>`;
         return;
     }
-
-    // Nombre a mostrar: el guardado junto al patrón, o el propio nombre de
-    // quien ve la pantalla si es su propia fila, o el correo como último recurso.
-    function nombreDe(email) {
-        const guardado = (dataTeletrabajo.patrones[email] || {}).nombre;
-        if (guardado) return guardado;
-        if (email === emailActual) return nombreActual;
-        if (NOMBRES_RESPALDO[email]) return NOMBRES_RESPALDO[email];
-        return email;
-    }
-    personas.sort((a,b) => nombreDe(a).localeCompare(nombreDe(b)));
+    personas.sort((a,b) => nombrePersona(a).localeCompare(nombrePersona(b)));
 
     document.getElementById('semana-body').innerHTML = personas.map(email => {
         const celdas = DIAS.map((dia,i) => {
-            const { estado, obras, detalle } = estadoEnFecha(email, fechas[i], dia);
+            const { estado, obras, detalle } = estadoVistaEquipo(email, fechas[i], dia);
             const label = estado === 'remoto' ? 'Remoto'
                 : estado === 'visita_obra' ? (obras.length ? obras.join(', ') : 'Visita a Obra')
                 : estado === 'otros' ? (detalle ? `Otros — ${detalle}` : 'Otros motivos')
                 : estado === 'vacaciones' ? 'Vacaciones'
+                : estado === 'sin_ruta' ? 'Sin ruta'
                 : 'Presencial';
             return `<td><span class="dot dot-${estado}"></span> ${label}</td>`;
         }).join('');
-        return `<tr><td>${nombreDe(email)}${email===emailActual?' (tú)':''}</td>${celdas}</tr>`;
+        return `<tr><td>${escHtml(nombrePersona(email))}${email===emailActual?' (tú)':''}</td>${celdas}</tr>`;
     }).join('');
+}
+
+// ── Seguimiento (solo VEN_SEGUIMIENTO): quién usa el módulo y quién no ──
+const diasDesde = iso => Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
+function renderSeguimiento() {
+    const cont = document.getElementById('seguimiento-contenido');
+    if (!cont) return;
+    const propuestas = dataTeletrabajo.propuestas || [];
+    const conRuta = new Set(Object.keys(dataTeletrabajo.patrones));
+    const pendientes = propuestas.filter(p => p.estado === 'pendiente').sort((a, b) => String(a.creadoEn).localeCompare(String(b.creadoEn)));
+    const conPendiente = new Set(pendientes.map(p => p.email));
+    const universo = [...new Set([...personasConAcceso, ...conRuta, ...conPendiente])];
+    const sinRuta = universo.filter(e => !conRuta.has(e) && !conPendiente.has(e)).sort((a, b) => nombrePersona(a).localeCompare(nombrePersona(b)));
+    const primeraPendiente = pendientes.filter(p => !conRuta.has(p.email)).length;
+
+    const filaPendiente = p => {
+        const nombre = p.nombre || nombrePersona(p.email);
+        const aprobadores = aprobadoresDeCliente(p.email).map(e => nombrePersona(e)).join(', ') || 'sin aprobador asignado';
+        const dias = diasDesde(p.creadoEn);
+        return `<div class="seg-fila"><b>${escHtml(nombre)}</b> <span class="seg-sub">${escHtml(p.email)}</span>
+            <span class="seg-tag">${conRuta.has(p.email) ? 'Cambio de ruta' : 'Primera ruta'}</span>
+            <span class="seg-sub">enviada el ${new Date(p.creadoEn).toLocaleDateString('es-CL')} (${dias === 0 ? 'hoy' : `hace ${dias} día${dias === 1 ? '' : 's'}`}) · la aprueba: ${escHtml(aprobadores)}</span></div>`;
+    };
+    const filaSinRuta = e => {
+        const rechazo = propuestas.filter(p => p.email === e && p.estado === 'rechazada').sort((a, b) => String(a.respondidoEn || a.creadoEn).localeCompare(String(b.respondidoEn || b.creadoEn))).pop();
+        const nombre = nombrePersona(e) !== e ? nombrePersona(e) : ((rechazo && rechazo.nombre) || e);
+        return `<div class="seg-fila"><b>${escHtml(nombre)}</b> <span class="seg-sub">${escHtml(e)}</span>
+            ${rechazo ? `<span class="seg-sub">su propuesta fue rechazada el ${new Date(rechazo.respondidoEn || rechazo.creadoEn).toLocaleDateString('es-CL')}</span>` : ''}</div>`;
+    };
+    cont.innerHTML = `
+        <div class="seg-resumen">
+            <div class="seg-caja"><b>${conRuta.size}</b><span>Con ruta aprobada</span></div>
+            <div class="seg-caja"><b>${primeraPendiente}</b><span>Primera ruta pendiente</span></div>
+            <div class="seg-caja seg-alerta"><b>${sinRuta.length}</b><span>Sin ruta</span></div>
+            <div class="seg-total">de ${universo.length} personas</div>
+        </div>
+        <div class="seg-titulo">⏳ Esperando aprobación (${pendientes.length})</div>
+        <div style="margin-bottom:22px;">${pendientes.length ? pendientes.map(filaPendiente).join('') : '<div class="empty" style="padding:18px;">No hay rutas pendientes.</div>'}</div>
+        <div class="seg-titulo">🚫 Todavía no han enviado su ruta (${sinRuta.length})</div>
+        <div>${sinRuta.length ? sinRuta.map(filaSinRuta).join('') : '<div class="empty" style="padding:18px;">Todas las personas con acceso ya enviaron su ruta.</div>'}</div>`;
 }
 
 initAuth();
