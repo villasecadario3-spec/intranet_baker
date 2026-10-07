@@ -300,7 +300,7 @@ input[type=file] { display: none; }
           <option value="INMOBILIARIA BAKER CUATRO SPA">INMOBILIARIA BAKER CUATRO SPA</option>
           <option value="INMOBILIARIA BAKER DOS SPA">INMOBILIARIA BAKER DOS SPA</option>
         </select>
-        <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-ano" placeholder="Año Beneficio">
+        <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-ano" type="number" min="2000" max="2100" step="1" inputmode="numeric" title="Año del beneficio: por defecto el año en curso; con las flechas o escribiendo se puede cambiar a años anteriores o siguientes" placeholder="Año Beneficio">
       </div>
     </div>
 
@@ -335,7 +335,20 @@ input[type=file] { display: none; }
       </div>
       <div id="ds19-aviso-lectura" style="display:none;background:rgba(246,173,85,0.12);border:1px solid #f6ad55;border-radius:var(--radius);padding:10px 14px;font-size:0.8rem;color:var(--ink);margin-bottom:14px;line-height:1.5;"></div>
       <div style="font-size:0.78rem;color:var(--ink2);margin-bottom:16px;">
-        Por cada lote puedes subir hasta 10 escrituras (una por persona) para completar las Tablas 3a/3b con el N° de cláusula — se calzan solas por RUT. Si no subes escrituras para alguien, esas columnas quedan en blanco en el Word de ese lote.
+        Las escrituras sirven para completar las Tablas 3a/3b con el N° de cláusula. Si no subes la escritura de alguien, esas columnas quedan en blanco en el Word de su lote.
+      </div>
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;">
+        <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--ink);">📥 Subir escrituras — todas juntas, en cualquier orden</div>
+        <div style="font-size:0.78rem;color:var(--ink2);margin-bottom:10px;line-height:1.5;">
+          Sube todas las que tengas sin pensar en el lote: cada una se asigna sola a su comprador (por el RUT que se lee dentro del PDF) y queda cargada en el lote que le corresponde. Leer una escritura escaneada puede tardar varios minutos; puedes dejar la página abierta.
+        </div>
+        <input type="file" id="ds19-global-file" accept=".pdf" multiple onchange="ds19MostrarSeleccionGlobal()">
+        <div style="font-size:0.78rem;color:var(--ink2);margin-bottom:8px;" id="ds19-global-archivos">Ningún archivo seleccionado todavía</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-secondary" onclick="document.getElementById('ds19-global-file').click()">📎 Elegir escrituras</button>
+          <button class="btn btn-primary" onclick="ds19SubirEscriturasGlobal()">Subir y asignar a su lote</button>
+        </div>
+        <div id="ds19-estado-global" style="margin-top:12px;"></div>
       </div>
       <div id="ds19-lotes"></div>
     </div>
@@ -1153,26 +1166,29 @@ function ds19MostrarResultado(resultado) {
   document.getElementById('ds19-programa').value = ds19Proyecto.programa || 'DS19';
 
   ds19Lotes = [];
+  ds19Escrituras = []; // las escrituras de una Resolución anterior no valen para esta
   for (let i = 0; i < ds19Beneficiarios.length; i += 10) {
-    ds19Lotes.push({ beneficiarios: ds19Beneficiarios.slice(i, i + 10), escrituras: {}, archivos: [] });
+    ds19Lotes.push({ beneficiarios: ds19Beneficiarios.slice(i, i + 10), escrituras: {} });
   }
 
   document.getElementById('ds19-total-beneficiarios').textContent = ds19Beneficiarios.length;
   document.getElementById('ds19-total-lotes').textContent = ds19Lotes.length;
   ds19RenderLotes();
+  ds19RefrescarGlobal();
   document.getElementById('ds19-revision').style.display = 'block';
 }
 
-// ── Escrituras de cada lote ──────────────────────────────────────────────
-// Cada escritura se asigna a su comprador por el RUT que se lee DENTRO del PDF (no por el nombre del
-// archivo). Se pueden subir de 1 a 10 por vez: las personas sin escritura quedan en blanco en el Word.
-// Leer una escritura escaneada (OCR) tarda minutos, así que cada archivo muestra su avance en una lista
-// que no se borra, y los errores quedan escritos ahí (no solo en un aviso que desaparece).
+// ── Escrituras: un solo apartado para todas ──────────────────────────────
+// Se suben todas juntas, en cualquier orden. Cada una se asigna a su comprador por el RUT que se lee DENTRO del
+// PDF (no por el nombre del archivo) y queda cargada en el lote donde está esa persona. Las personas sin
+// escritura quedan en blanco en el Word de su lote. Leer una escritura escaneada (OCR) tarda minutos, así que
+// cada archivo muestra su avance en una lista que no se borra, y los errores quedan escritos ahí.
 const ds19Pausa = ms => new Promise(r => setTimeout(r, ms));
 const ds19Mmss = seg => `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`;
 const ds19Mb = bytes => (bytes / 1048576 >= 10 ? Math.round(bytes / 1048576) : (bytes / 1048576).toFixed(1)) + ' MB';
 const ds19Norm = t => String(t == null ? '' : t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9ñ ]/g, ' ').replace(/\s+/g, ' ').trim();
 let ds19ArchivoSeq = 0;
+let ds19Escrituras = []; // todas las escrituras enviadas (de cualquier lote): { id, file, nombre, tamano, estado, mensaje }
 
 function ds19TablaLoteHtml(li) {
   const lote = ds19Lotes[li];
@@ -1188,7 +1204,6 @@ function ds19TablaLoteHtml(li) {
             const esc = lote.escrituras[limpiarRut(b.rut)];
             let estadoTxt = '— sin escritura (quedará en blanco)';
             if (esc?.estado === 'listo') estadoTxt = `✅ ${ds19Esc(esc.nombreArchivo)}` + (esc.calzadoPor && esc.calzadoPor !== 'RUT leído en la escritura' ? ` <span style="font-size:0.68rem;color:var(--ink3);">(calzada por ${ds19Esc(esc.calzadoPor)})</span>` : '');
-            else if (esc?.estado === 'error') estadoTxt = `❌ ${ds19Esc(esc.error)}`;
             return `<tr>
               <td style="padding:3px;border:1px solid var(--border);text-align:center;color:var(--ink);">${b.numero_tabla_res_ex}${b.sector ? `<div style="font-size:0.62rem;color:var(--ink3);">${ds19Esc(b.sector)}</div>` : ''}</td>
               <td style="padding:3px;border:1px solid var(--border);color:var(--ink);">${b.nombre}</td>
@@ -1200,18 +1215,33 @@ function ds19TablaLoteHtml(li) {
       </table>`;
 }
 
-function ds19EstadoHtml(li) {
-  const arch = ds19Lotes[li].archivos || [];
-  if (!arch.length) return '';
+// Cuántos beneficiarios de un lote ya tienen su escritura cargada.
+function ds19ConEscritura(li) {
+  const l = ds19Lotes[li];
+  return l.beneficiarios.filter(b => l.escrituras[limpiarRut(b.rut)]?.estado === 'listo').length;
+}
+function ds19ResumenLoteHtml(li) {
+  const c = ds19ConEscritura(li), n = ds19Lotes[li].beneficiarios.length;
+  return c ? `<span style="color:#68d391;font-weight:600;"> · ${c} de ${n} con escritura</span>`
+           : `<span style="color:var(--ink3);font-weight:400;"> · sin escrituras todavía</span>`;
+}
+
+function ds19EstadoHtml() {
+  const arch = ds19Escrituras;
+  const total = ds19Lotes.reduce((s, l) => s + l.beneficiarios.length, 0);
+  const conEsc = ds19Lotes.reduce((s, _, li) => s + ds19ConEscritura(li), 0);
+  const lotesCon = ds19Lotes.filter((_, li) => ds19ConEscritura(li) > 0).length;
+  if (!arch.length && !conEsc) return '';
   const listos = arch.filter(a => a.estado === 'listo').length;
   const errores = arch.filter(a => a.estado === 'error').length;
   const activos = arch.length - listos - errores;
   const icono = { 'en cola': '🕐', subiendo: '⬆️', procesando: '⏳', listo: '✅', error: '❌' };
   const color = e => e === 'listo' ? '#68d391' : e === 'error' ? '#fc8181' : 'var(--ink2)';
-  return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:10px;font-size:0.78rem;">
-      <div style="font-weight:700;color:var(--ink);margin-bottom:6px;">Escrituras enviadas: ${listos} de ${arch.length} listas${activos ? ` · ${activos} en proceso` : ''}${errores ? ` · ${errores} con problema` : ''}</div>
+  return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;font-size:0.78rem;">
+      <div style="font-weight:700;color:var(--ink);margin-bottom:2px;">Beneficiarios con escritura: ${conEsc} de ${total}${lotesCon ? ` · en ${lotesCon} lote${lotesCon === 1 ? '' : 's'}` : ''}</div>
+      ${arch.length ? `<div style="color:var(--ink2);margin-bottom:6px;">Escrituras enviadas: ${listos} de ${arch.length} listas${activos ? ` · ${activos} en proceso` : ''}${errores ? ` · ${errores} con problema` : ''}</div>` : ''}
       ${arch.map(a => `<div style="padding:3px 0;color:${color(a.estado)};">${icono[a.estado] || '•'} <b>${ds19Esc(a.nombre)}</b> <span style="color:var(--ink3);">(${ds19Mb(a.tamano)})</span><br><span style="margin-left:22px;">${ds19Esc(a.mensaje || '')}</span></div>`).join('')}
-      ${activos ? '' : `<a href="#" onclick="ds19LimpiarEstado(${li});return false;" style="color:var(--ink3);font-size:0.72rem;">Quitar esta lista</a>`}
+      ${arch.length && !activos ? `<a href="#" onclick="ds19LimpiarEstado();return false;" style="color:var(--ink3);font-size:0.72rem;">Quitar esta lista</a>` : ''}
     </div>`;
 }
 
@@ -1224,53 +1254,52 @@ function ds19RenderLotes() {
     const desde = bDesde?.numero_tabla_res_ex + (bDesde?.sector === bHasta?.sector ? '' : etiqueta(bDesde));
     const hasta = bHasta?.numero_tabla_res_ex + etiqueta(bHasta);
     return `
-    <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px;">
-      <div style="font-weight:700;font-size:0.88rem;margin-bottom:8px;color:var(--ink);">Lote ${li+1} — Beneficiarios N° ${desde} al ${hasta}</div>
+    <div id="ds19-lote-${li}" style="background:var(--panel);border:1px solid ${ds19ConEscritura(li) ? '#68d391' : 'var(--border)'};border-radius:var(--radius);padding:16px;margin-bottom:14px;">
+      <div style="font-weight:700;font-size:0.88rem;margin-bottom:8px;color:var(--ink);">Lote ${li+1} — Beneficiarios N° ${desde} al ${hasta}<span id="ds19-resumen-lote-${li}">${ds19ResumenLoteHtml(li)}</span></div>
       <div id="ds19-tabla-${li}">${ds19TablaLoteHtml(li)}</div>
-      <div id="ds19-estado-${li}">${ds19EstadoHtml(li)}</div>
-      <input type="file" id="ds19-lote-file-${li}" accept=".pdf" multiple onchange="ds19MostrarSeleccionLote(${li})">
-      <div style="font-size:0.78rem;color:var(--ink2);margin-bottom:8px;" id="ds19-lote-archivos-${li}">Ningún archivo seleccionado todavía</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn btn-secondary" onclick="document.getElementById('ds19-lote-file-${li}').click()">📎 Elegir escrituras (hasta 10)</button>
-        <button class="btn btn-secondary" onclick="ds19SubirEscriturasLote(${li})">Subir y calzar escrituras de este lote</button>
         <button class="btn btn-primary" onclick="ds19GenerarWordLote(${li})">📄 Generar Word de este lote</button>
       </div>
     </div>`;
   }).join('');
 }
 
-// Actualiza solo la tabla y la lista de estado de un lote (sin tocar el selector de archivos de nadie).
+// Actualiza solo la tabla, el resumen y el borde de un lote.
 function ds19RefrescarLote(li) {
-  const t = document.getElementById(`ds19-tabla-${li}`), e = document.getElementById(`ds19-estado-${li}`);
+  const t = document.getElementById(`ds19-tabla-${li}`), r = document.getElementById(`ds19-resumen-lote-${li}`), c = document.getElementById(`ds19-lote-${li}`);
   if (t) t.innerHTML = ds19TablaLoteHtml(li);
-  if (e) e.innerHTML = ds19EstadoHtml(li);
+  if (r) r.innerHTML = ds19ResumenLoteHtml(li);
+  if (c) c.style.borderColor = ds19ConEscritura(li) ? '#68d391' : '';
 }
-function ds19LimpiarEstado(li) {
-  ds19Lotes[li].archivos = (ds19Lotes[li].archivos || []).filter(a => !['listo', 'error'].includes(a.estado));
-  ds19RefrescarLote(li);
+function ds19RefrescarGlobal() {
+  const e = document.getElementById('ds19-estado-global');
+  if (e) e.innerHTML = ds19EstadoHtml();
+}
+function ds19LimpiarEstado() {
+  ds19Escrituras = ds19Escrituras.filter(a => !['listo', 'error'].includes(a.estado));
+  ds19RefrescarGlobal();
 }
 
-function ds19MostrarSeleccionLote(li) {
-  const input = document.getElementById(`ds19-lote-file-${li}`);
-  const span = document.getElementById(`ds19-lote-archivos-${li}`);
+function ds19MostrarSeleccionGlobal() {
+  const input = document.getElementById('ds19-global-file');
+  const span = document.getElementById('ds19-global-archivos');
   const archivos = Array.from(input.files || []);
   span.textContent = archivos.length
-    ? `${archivos.length} archivo(s): ${archivos.map(f=>f.name).join(', ')}`
+    ? `${archivos.length} archivo(s): ${archivos.slice(0, 5).map(f => f.name).join(', ')}${archivos.length > 5 ? ` y ${archivos.length - 5} más` : ''}`
     : 'Ningún archivo seleccionado todavía';
 }
 
-// ── Asignar cada escritura a su comprador ──
+// ── Asignar cada escritura a su comprador (en cualquier lote) ──
 // Orden: 1) cualquiera de los RUT de comprador que se leen en la escritura; 2) un RUT escrito en el nombre del
 // archivo (ej. "PEREZ JUAN - 12.345.678-5.pdf"); 3) el nombre de la persona en el nombre del archivo, si calza con
-// una sola. Se busca en este lote y, si no está, en los demás lotes de la Resolución.
+// una sola.
 function ds19RutEnTexto(t) {
   const m = String(t || '').match(/(?:^|[^0-9])(\d{1,2})\.?(\d{3})\.?(\d{3})\s*-\s*([0-9kK])(?![0-9])/);
   return m ? limpiarRut(m[1] + m[2] + m[3] + m[4]) : '';
 }
-function ds19BuscarPorRut(rut, preferido) {
+function ds19BuscarPorRut(rut) {
   if (!rut) return null;
-  const orden = [preferido, ...ds19Lotes.map((_, i) => i).filter(i => i !== preferido)];
-  for (const i of orden) {
+  for (let i = 0; i < ds19Lotes.length; i++) {
     const b = ds19Lotes[i].beneficiarios.find(x => limpiarRut(x.rut) === rut);
     if (b) return { li: i, b };
   }
@@ -1291,11 +1320,11 @@ function ds19Calzar(it, resultado) {
   const candidatos = resultado.candidatos_comprador || [];
   let hallado = null, via = '';
   for (const c of candidatos) {
-    const h = ds19BuscarPorRut(limpiarRut(c.rut), it.li);
+    const h = ds19BuscarPorRut(limpiarRut(c.rut));
     if (h) { hallado = h; via = 'RUT leído en la escritura'; break; }
   }
   if (!hallado) {
-    const h = ds19BuscarPorRut(ds19RutEnTexto(it.nombre), it.li);
+    const h = ds19BuscarPorRut(ds19RutEnTexto(it.nombre));
     if (h) { hallado = h; via = 'RUT del nombre del archivo'; }
   }
   if (!hallado) {
@@ -1315,12 +1344,14 @@ function ds19Calzar(it, resultado) {
     requisitos[nombre] = r ? String(r.clausula ?? '') : '';
   });
   const destino = ds19Lotes[hallado.li];
-  destino.escrituras[limpiarRut(hallado.b.rut)] = { estado: 'listo', nombreArchivo: it.nombre, requisitos, calzadoPor: via };
+  const rut = limpiarRut(hallado.b.rut);
+  const previa = destino.escrituras[rut];
+  destino.escrituras[rut] = { estado: 'listo', nombreArchivo: it.nombre, requisitos, calzadoPor: via };
   it.estado = 'listo';
-  it.mensaje = `Calzada con ${hallado.b.nombre} (${hallado.b.rut})`
-    + (hallado.li !== it.li ? ` — esta persona está en el Lote ${hallado.li + 1}, y ahí quedó cargada` : '')
+  it.mensaje = `Calzada con ${hallado.b.nombre} (${hallado.b.rut}) → Lote ${hallado.li + 1}`
+    + (previa && previa.estado === 'listo' && previa.nombreArchivo !== it.nombre ? ` — reemplazó a «${previa.nombreArchivo}», que ya estaba cargada` : '')
     + (via === 'nombre del archivo' ? ' — se asignó por el nombre del archivo: verifica que sea la persona correcta' : '');
-  if (hallado.li !== it.li) ds19RefrescarLote(hallado.li);
+  ds19RefrescarLote(hallado.li);
 }
 
 // ── Subir, esperar y calzar ──
@@ -1352,13 +1383,13 @@ async function ds19EsperarLecturaEscritura(jobId, it) {
     const seg = Math.round((Date.now() - t0) / 1000);
     it.estado = 'procesando';
     it.mensaje = data.estado === 'en_cola' ? `En la cola del servidor… ${ds19Mmss(seg)}` : `Leyendo la escritura (OCR)… ${ds19Mmss(seg)} — puede tardar varios minutos`;
-    ds19RefrescarLote(it.li);
+    ds19RefrescarGlobal();
   }
   throw new Error('Está tardando más de 20 minutos. Intenta de nuevo; si se repite, avisa a TI.');
 }
 async function ds19ProcesarArchivo(it) {
   try {
-    it.estado = 'subiendo'; it.mensaje = `Subiendo (${ds19Mb(it.tamano)})…`; ds19RefrescarLote(it.li);
+    it.estado = 'subiendo'; it.mensaje = `Subiendo (${ds19Mb(it.tamano)})…`; ds19RefrescarGlobal();
     const fd = new FormData(); fd.append('archivo', it.file, it.file.name);
     let res;
     try { res = await fetch(`${API_BASE}/ds19/procesar-escritura-archivo`, { method: 'POST', body: fd }); }
@@ -1371,27 +1402,34 @@ async function ds19ProcesarArchivo(it) {
     it.estado = 'error'; it.mensaje = e.message || 'No se pudo procesar el archivo.';
   }
   it.file = null; // libera la memoria del PDF
-  ds19RefrescarLote(it.li);
+  ds19RefrescarGlobal();
 }
-async function ds19SubirEscriturasLote(li) {
-  const input = document.getElementById(`ds19-lote-file-${li}`);
+async function ds19SubirEscriturasGlobal() {
+  const input = document.getElementById('ds19-global-file');
   const elegidos = Array.from(input.files || []);
   if (!elegidos.length) { toast('Selecciona al menos un PDF de escritura', true); return; }
-  const archivos = elegidos.slice(0, 10);
-  if (elegidos.length > 10) toast(`Se toman los primeros 10; los otros ${elegidos.length - 10} súbelos en una segunda vuelta`, true);
-  const lote = ds19Lotes[li];
   // Los intentos anteriores con problema se reemplazan por este nuevo envío.
-  lote.archivos = (lote.archivos || []).filter(a => a.estado !== 'error');
-  const items = archivos.map(file => {
-    const it = { id: ++ds19ArchivoSeq, li, file, nombre: file.name, tamano: file.size, estado: 'en cola', mensaje: 'Esperando turno…' };
-    lote.archivos.push(it);
+  ds19Escrituras = ds19Escrituras.filter(a => a.estado !== 'error');
+  const items = elegidos.map(file => {
+    const it = { id: ++ds19ArchivoSeq, file, nombre: file.name, tamano: file.size, estado: 'en cola', mensaje: 'Esperando turno…' };
+    ds19Escrituras.push(it);
     return it;
   });
-  // Los archivos pasan a la lista de estado de arriba; la selección se limpia a propósito.
+  // Los archivos pasan a la lista de estado de abajo; la selección se limpia a propósito.
   input.value = '';
-  document.getElementById(`ds19-lote-archivos-${li}`).textContent = `Se enviaron ${items.length} archivo(s): mira su estado en la lista de arriba.`;
-  ds19RefrescarLote(li);
+  document.getElementById('ds19-global-archivos').textContent = `Se enviaron ${items.length} archivo(s): mira su estado en la lista de abajo.`;
+  ds19RefrescarGlobal();
   await ds19Concurrencia(items, 3, ds19ProcesarArchivo);
+}
+
+// ── Año del beneficio: por defecto el año en curso, editable hacia atrás o adelante ──
+(function () { const a = document.getElementById('ds19-ano'); if (a && !a.value) a.value = new Date().getFullYear(); })();
+function ds19AnoBeneficio() {
+  const campo = document.getElementById('ds19-ano');
+  const v = String(campo.value || '').trim();
+  if (/^\d{4}$/.test(v)) return v;
+  campo.value = new Date().getFullYear(); // vacío o inválido: vuelve al año en curso
+  return String(campo.value);
 }
 
 async function ds19GenerarWordLote(li) {
@@ -1405,7 +1443,7 @@ async function ds19GenerarWordLote(li) {
       nombre_proyecto: document.getElementById('ds19-nombreproyecto').value,
       resoluciones_texto: document.getElementById('ds19-resoluciones').value,
       programa: document.getElementById('ds19-programa').value,
-      ano_beneficio: document.getElementById('ds19-ano').value,
+      ano_beneficio: ds19AnoBeneficio(),
       tramo: '',
     },
     compradores: lote.beneficiarios.map(b => {
