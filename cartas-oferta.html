@@ -1140,13 +1140,65 @@ function ds19MostrarResultado(resultado) {
 
   ds19Lotes = [];
   for (let i = 0; i < ds19Beneficiarios.length; i += 10) {
-    ds19Lotes.push({ beneficiarios: ds19Beneficiarios.slice(i, i + 10), escrituras: {} });
+    ds19Lotes.push({ beneficiarios: ds19Beneficiarios.slice(i, i + 10), escrituras: {}, archivos: [] });
   }
 
   document.getElementById('ds19-total-beneficiarios').textContent = ds19Beneficiarios.length;
   document.getElementById('ds19-total-lotes').textContent = ds19Lotes.length;
   ds19RenderLotes();
   document.getElementById('ds19-revision').style.display = 'block';
+}
+
+// ── Escrituras de cada lote ──────────────────────────────────────────────
+// Cada escritura se asigna a su comprador por el RUT que se lee DENTRO del PDF (no por el nombre del
+// archivo). Se pueden subir de 1 a 10 por vez: las personas sin escritura quedan en blanco en el Word.
+// Leer una escritura escaneada (OCR) tarda minutos, así que cada archivo muestra su avance en una lista
+// que no se borra, y los errores quedan escritos ahí (no solo en un aviso que desaparece).
+const ds19Pausa = ms => new Promise(r => setTimeout(r, ms));
+const ds19Mmss = seg => `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`;
+const ds19Mb = bytes => (bytes / 1048576 >= 10 ? Math.round(bytes / 1048576) : (bytes / 1048576).toFixed(1)) + ' MB';
+const ds19Norm = t => String(t == null ? '' : t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9ñ ]/g, ' ').replace(/\s+/g, ' ').trim();
+let ds19ArchivoSeq = 0;
+
+function ds19TablaLoteHtml(li) {
+  const lote = ds19Lotes[li];
+  return `<table style="border-collapse:collapse;width:100%;font-size:0.78rem;margin-bottom:10px;">
+        <thead><tr style="background:var(--bg2);">
+          <th style="padding:4px;border:1px solid var(--border);color:var(--ink);">N°</th>
+          <th style="padding:4px;border:1px solid var(--border);text-align:left;color:var(--ink);">Nombre</th>
+          <th style="padding:4px;border:1px solid var(--border);color:var(--ink);">RUT</th>
+          <th style="padding:4px;border:1px solid var(--border);color:var(--ink);">Escritura / Cláusulas</th>
+        </tr></thead>
+        <tbody>
+          ${lote.beneficiarios.map(b => {
+            const esc = lote.escrituras[limpiarRut(b.rut)];
+            let estadoTxt = '— sin escritura (quedará en blanco)';
+            if (esc?.estado === 'listo') estadoTxt = `✅ ${ds19Esc(esc.nombreArchivo)}` + (esc.calzadoPor && esc.calzadoPor !== 'RUT leído en la escritura' ? ` <span style="font-size:0.68rem;color:var(--ink3);">(calzada por ${ds19Esc(esc.calzadoPor)})</span>` : '');
+            else if (esc?.estado === 'error') estadoTxt = `❌ ${ds19Esc(esc.error)}`;
+            return `<tr>
+              <td style="padding:3px;border:1px solid var(--border);text-align:center;color:var(--ink);">${b.numero_tabla_res_ex}${b.sector ? `<div style="font-size:0.62rem;color:var(--ink3);">${ds19Esc(b.sector)}</div>` : ''}</td>
+              <td style="padding:3px;border:1px solid var(--border);color:var(--ink);">${b.nombre}</td>
+              <td style="padding:3px;border:1px solid var(--border);text-align:center;color:var(--ink);">${b.rut}</td>
+              <td style="padding:3px;border:1px solid var(--border);color:var(--ink);">${estadoTxt}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>`;
+}
+
+function ds19EstadoHtml(li) {
+  const arch = ds19Lotes[li].archivos || [];
+  if (!arch.length) return '';
+  const listos = arch.filter(a => a.estado === 'listo').length;
+  const errores = arch.filter(a => a.estado === 'error').length;
+  const activos = arch.length - listos - errores;
+  const icono = { 'en cola': '🕐', subiendo: '⬆️', procesando: '⏳', listo: '✅', error: '❌' };
+  const color = e => e === 'listo' ? '#68d391' : e === 'error' ? '#fc8181' : 'var(--ink2)';
+  return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:10px;font-size:0.78rem;">
+      <div style="font-weight:700;color:var(--ink);margin-bottom:6px;">Escrituras enviadas: ${listos} de ${arch.length} listas${activos ? ` · ${activos} en proceso` : ''}${errores ? ` · ${errores} con problema` : ''}</div>
+      ${arch.map(a => `<div style="padding:3px 0;color:${color(a.estado)};">${icono[a.estado] || '•'} <b>${ds19Esc(a.nombre)}</b> <span style="color:var(--ink3);">(${ds19Mb(a.tamano)})</span><br><span style="margin-left:22px;">${ds19Esc(a.mensaje || '')}</span></div>`).join('')}
+      ${activos ? '' : `<a href="#" onclick="ds19LimpiarEstado(${li});return false;" style="color:var(--ink3);font-size:0.72rem;">Quitar esta lista</a>`}
+    </div>`;
 }
 
 function ds19RenderLotes() {
@@ -1160,29 +1212,8 @@ function ds19RenderLotes() {
     return `
     <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px;">
       <div style="font-weight:700;font-size:0.88rem;margin-bottom:8px;color:var(--ink);">Lote ${li+1} — Beneficiarios N° ${desde} al ${hasta}</div>
-      <table style="border-collapse:collapse;width:100%;font-size:0.78rem;margin-bottom:10px;">
-        <thead><tr style="background:var(--bg2);">
-          <th style="padding:4px;border:1px solid var(--border);color:var(--ink);">N°</th>
-          <th style="padding:4px;border:1px solid var(--border);text-align:left;color:var(--ink);">Nombre</th>
-          <th style="padding:4px;border:1px solid var(--border);color:var(--ink);">RUT</th>
-          <th style="padding:4px;border:1px solid var(--border);color:var(--ink);">Escritura / Cláusulas</th>
-        </tr></thead>
-        <tbody>
-          ${lote.beneficiarios.map(b => {
-            const esc = lote.escrituras[limpiarRut(b.rut)];
-            let estadoTxt = '— sin escritura (quedará en blanco)';
-            if (esc?.estado === 'procesando') estadoTxt = '⏳ procesando…';
-            else if (esc?.estado === 'listo') estadoTxt = `✅ ${esc.nombreArchivo}`;
-            else if (esc?.estado === 'error') estadoTxt = `❌ ${esc.error}`;
-            return `<tr>
-              <td style="padding:3px;border:1px solid var(--border);text-align:center;color:var(--ink);">${b.numero_tabla_res_ex}${b.sector ? `<div style="font-size:0.62rem;color:var(--ink3);">${ds19Esc(b.sector)}</div>` : ''}</td>
-              <td style="padding:3px;border:1px solid var(--border);color:var(--ink);">${b.nombre}</td>
-              <td style="padding:3px;border:1px solid var(--border);text-align:center;color:var(--ink);">${b.rut}</td>
-              <td style="padding:3px;border:1px solid var(--border);color:var(--ink);">${estadoTxt}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
+      <div id="ds19-tabla-${li}">${ds19TablaLoteHtml(li)}</div>
+      <div id="ds19-estado-${li}">${ds19EstadoHtml(li)}</div>
       <input type="file" id="ds19-lote-file-${li}" accept=".pdf" multiple onchange="ds19MostrarSeleccionLote(${li})">
       <div style="font-size:0.78rem;color:var(--ink2);margin-bottom:8px;" id="ds19-lote-archivos-${li}">Ningún archivo seleccionado todavía</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -1194,6 +1225,17 @@ function ds19RenderLotes() {
   }).join('');
 }
 
+// Actualiza solo la tabla y la lista de estado de un lote (sin tocar el selector de archivos de nadie).
+function ds19RefrescarLote(li) {
+  const t = document.getElementById(`ds19-tabla-${li}`), e = document.getElementById(`ds19-estado-${li}`);
+  if (t) t.innerHTML = ds19TablaLoteHtml(li);
+  if (e) e.innerHTML = ds19EstadoHtml(li);
+}
+function ds19LimpiarEstado(li) {
+  ds19Lotes[li].archivos = (ds19Lotes[li].archivos || []).filter(a => !['listo', 'error'].includes(a.estado));
+  ds19RefrescarLote(li);
+}
+
 function ds19MostrarSeleccionLote(li) {
   const input = document.getElementById(`ds19-lote-file-${li}`);
   const span = document.getElementById(`ds19-lote-archivos-${li}`);
@@ -1203,71 +1245,139 @@ function ds19MostrarSeleccionLote(li) {
     : 'Ningún archivo seleccionado todavía';
 }
 
-async function ds19SubirEscriturasLote(li) {
-  const input = document.getElementById(`ds19-lote-file-${li}`);
-  const archivos = Array.from(input.files || []).slice(0, 10);
-  if (!archivos.length) { toast('Selecciona al menos un PDF de escritura', true); return; }
-  const lote = ds19Lotes[li];
-  const rutsDelLote = new Set(lote.beneficiarios.map(b => limpiarRut(b.rut)));
-
-  for (const file of archivos) {
-    // Se marca "procesando" en un RUT temporal (el nombre del archivo) hasta
-    // saber a quién calza, para que se vea feedback inmediato en pantalla.
-    lote.escrituras[`__pendiente_${file.name}`] = { estado: 'procesando', nombreArchivo: file.name };
-    ds19RenderLotes();
-    try {
-      const base64 = await ds19LeerArchivoBase64(file);
-      const res = await fetch(`${API_BASE}/ds19/procesar-escritura`, {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ archivoBase64: base64, nombreArchivo: file.name })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al subir');
-      await ds19EsperarYCalzarEscritura(li, data.jobId, file.name, rutsDelLote);
-    } catch(e) {
-      delete lote.escrituras[`__pendiente_${file.name}`];
-      toast(`${file.name}: ${e.message}`, true);
-      ds19RenderLotes();
-    }
+// ── Asignar cada escritura a su comprador ──
+// Orden: 1) cualquiera de los RUT de comprador que se leen en la escritura; 2) un RUT escrito en el nombre del
+// archivo (ej. "PEREZ JUAN - 12.345.678-5.pdf"); 3) el nombre de la persona en el nombre del archivo, si calza con
+// una sola. Se busca en este lote y, si no está, en los demás lotes de la Resolución.
+function ds19RutEnTexto(t) {
+  const m = String(t || '').match(/(?:^|[^0-9])(\d{1,2})\.?(\d{3})\.?(\d{3})\s*-\s*([0-9kK])(?![0-9])/);
+  return m ? limpiarRut(m[1] + m[2] + m[3] + m[4]) : '';
+}
+function ds19BuscarPorRut(rut, preferido) {
+  if (!rut) return null;
+  const orden = [preferido, ...ds19Lotes.map((_, i) => i).filter(i => i !== preferido)];
+  for (const i of orden) {
+    const b = ds19Lotes[i].beneficiarios.find(x => limpiarRut(x.rut) === rut);
+    if (b) return { li: i, b };
   }
+  return null;
+}
+function ds19BuscarPorNombre(nombreArchivo) {
+  const palabras = ds19Norm(String(nombreArchivo).replace(/\.pdf$/i, '')).split(' ')
+    .filter(t => t.length >= 2 && !/^(escritura|escrituras|compraventa|copia|final|rut|firmada|firmado|v\d*|\d+)$/.test(t));
+  if (palabras.length < 2) return null;
+  const hallados = [];
+  ds19Lotes.forEach((lote, li) => lote.beneficiarios.forEach(b => {
+    const tokens = new Set(ds19Norm(b.nombre).split(' '));
+    if (palabras.every(t => tokens.has(t))) hallados.push({ li, b });
+  }));
+  return hallados.length === 1 ? hallados[0] : null;
+}
+function ds19Calzar(it, resultado) {
+  const candidatos = resultado.candidatos_comprador || [];
+  let hallado = null, via = '';
+  for (const c of candidatos) {
+    const h = ds19BuscarPorRut(limpiarRut(c.rut), it.li);
+    if (h) { hallado = h; via = 'RUT leído en la escritura'; break; }
+  }
+  if (!hallado) {
+    const h = ds19BuscarPorRut(ds19RutEnTexto(it.nombre), it.li);
+    if (h) { hallado = h; via = 'RUT del nombre del archivo'; }
+  }
+  if (!hallado) {
+    const h = ds19BuscarPorNombre(it.nombre);
+    if (h) { hallado = h; via = 'nombre del archivo'; }
+  }
+  if (!hallado) {
+    it.estado = 'error';
+    it.mensaje = candidatos.length
+      ? `Se leyó el RUT ${candidatos[0].rut}${candidatos[0].nombre ? ' (' + candidatos[0].nombre + ')' : ''}, pero no está en esta Resolución. ¿Es la escritura de otro proyecto?`
+      : 'No se pudo leer el RUT del comprador en la escritura (pasa con escaneos poco legibles). Solución: pon el RUT en el nombre del archivo, por ejemplo «PEREZ JUAN - 12.345.678-5.pdf», y vuelve a subirlo.';
+    return;
+  }
+  const requisitos = {};
+  REQUISITOS_DS19.forEach(nombre => {
+    const r = resultado.requisitos?.[nombre];
+    requisitos[nombre] = r ? String(r.clausula ?? '') : '';
+  });
+  const destino = ds19Lotes[hallado.li];
+  destino.escrituras[limpiarRut(hallado.b.rut)] = { estado: 'listo', nombreArchivo: it.nombre, requisitos, calzadoPor: via };
+  it.estado = 'listo';
+  it.mensaje = `Calzada con ${hallado.b.nombre} (${hallado.b.rut})`
+    + (hallado.li !== it.li ? ` — esta persona está en el Lote ${hallado.li + 1}, y ahí quedó cargada` : '')
+    + (via === 'nombre del archivo' ? ' — se asignó por el nombre del archivo: verifica que sea la persona correcta' : '');
+  if (hallado.li !== it.li) ds19RefrescarLote(hallado.li);
 }
 
-async function ds19EsperarYCalzarEscritura(li, jobId, nombreArchivo, rutsDelLote) {
-  const lote = ds19Lotes[li];
-  const maxIntentos = 60; // ~15 minutos tope
-  for (let i = 0; i < maxIntentos; i++) {
-    await new Promise(r => setTimeout(r, 15000));
+// ── Subir, esperar y calzar ──
+async function ds19JsonSeguro(res) { try { return await res.json(); } catch (e) { return {}; } }
+function ds19MensajeHttp(status, tamano) {
+  if (status === 413) return `El servidor rechazó el archivo por su tamaño (${ds19Mb(tamano)}).`;
+  if (status === 502 || status === 503 || status === 504) return 'El servidor no respondió. Intenta de nuevo en unos minutos.';
+  return `El servidor respondió con un error (${status}).`;
+}
+async function ds19Concurrencia(items, maximo, fn) {
+  let i = 0;
+  const trabajadores = Array.from({ length: Math.min(maximo, items.length) }, async () => {
+    while (i < items.length) { const it = items[i++]; await fn(it); }
+  });
+  await Promise.all(trabajadores);
+}
+async function ds19EsperarResultado(jobId, it) {
+  const t0 = Date.now(), tope = 20 * 60 * 1000;
+  while (Date.now() - t0 < tope) {
+    await ds19Pausa(5000);
+    let data;
     try {
       const res = await fetch(`${API_BASE}/ds19/estado/${jobId}`);
-      const data = await res.json();
-      if (data.estado === 'listo') {
-        delete lote.escrituras[`__pendiente_${nombreArchivo}`];
-        const candidato = (data.resultado.candidatos_comprador || [])[0];
-        const rutCandidato = candidato ? limpiarRut(candidato.rut) : '';
-        if (!rutCandidato || !rutsDelLote.has(rutCandidato)) {
-          toast(`${nombreArchivo}: el RUT detectado (${candidato?.rut||'ninguno'}) no corresponde a nadie de este lote`, true);
-          ds19RenderLotes();
-          return;
-        }
-        const requisitos = {};
-        REQUISITOS_DS19.forEach(nombre => {
-          const r = data.resultado.requisitos?.[nombre];
-          requisitos[nombre] = r ? String(r.clausula ?? '') : '';
-        });
-        lote.escrituras[rutCandidato] = { estado: 'listo', nombreArchivo, requisitos };
-        ds19RenderLotes();
-        return;
-      } else if (data.estado === 'error') {
-        delete lote.escrituras[`__pendiente_${nombreArchivo}`];
-        toast(`${nombreArchivo}: ${data.error}`, true);
-        ds19RenderLotes();
-        return;
-      }
-    } catch(e) { /* sigue esperando */ }
+      if (res.status === 404) throw Object.assign(new Error('El servidor ya no tiene este trabajo (se reinició). Vuelve a subir el archivo.'), { fatal: true });
+      data = await ds19JsonSeguro(res);
+    } catch (e) { if (e.fatal) throw e; continue; } // un fallo de red momentáneo: se sigue esperando
+    if (data.estado === 'listo') return data.resultado || {};
+    if (data.estado === 'error') throw new Error(data.error || 'No se pudo leer la escritura.');
+    const seg = Math.round((Date.now() - t0) / 1000);
+    it.estado = 'procesando';
+    it.mensaje = data.estado === 'en_cola' ? `En la cola del servidor… ${ds19Mmss(seg)}` : `Leyendo la escritura (OCR)… ${ds19Mmss(seg)} — puede tardar varios minutos`;
+    ds19RefrescarLote(it.li);
   }
-  delete lote.escrituras[`__pendiente_${nombreArchivo}`];
-  toast(`${nombreArchivo}: está tardando más de lo normal`, true);
-  ds19RenderLotes();
+  throw new Error('Está tardando más de 20 minutos. Intenta de nuevo; si se repite, avisa a TI.');
+}
+async function ds19ProcesarArchivo(it) {
+  try {
+    it.estado = 'subiendo'; it.mensaje = `Subiendo (${ds19Mb(it.tamano)})…`; ds19RefrescarLote(it.li);
+    const fd = new FormData(); fd.append('archivo', it.file, it.file.name);
+    let res;
+    try { res = await fetch(`${API_BASE}/ds19/procesar-escritura-archivo`, { method: 'POST', body: fd }); }
+    catch (e) { throw new Error('No hay conexión con el servidor. Revisa tu conexión e intenta de nuevo.'); }
+    const data = await ds19JsonSeguro(res);
+    if (!res.ok) throw new Error(data.error || ds19MensajeHttp(res.status, it.tamano));
+    const resultado = await ds19EsperarResultado(data.jobId, it);
+    ds19Calzar(it, resultado);
+  } catch (e) {
+    it.estado = 'error'; it.mensaje = e.message || 'No se pudo procesar el archivo.';
+  }
+  it.file = null; // libera la memoria del PDF
+  ds19RefrescarLote(it.li);
+}
+async function ds19SubirEscriturasLote(li) {
+  const input = document.getElementById(`ds19-lote-file-${li}`);
+  const elegidos = Array.from(input.files || []);
+  if (!elegidos.length) { toast('Selecciona al menos un PDF de escritura', true); return; }
+  const archivos = elegidos.slice(0, 10);
+  if (elegidos.length > 10) toast(`Se toman los primeros 10; los otros ${elegidos.length - 10} súbelos en una segunda vuelta`, true);
+  const lote = ds19Lotes[li];
+  // Los intentos anteriores con problema se reemplazan por este nuevo envío.
+  lote.archivos = (lote.archivos || []).filter(a => a.estado !== 'error');
+  const items = archivos.map(file => {
+    const it = { id: ++ds19ArchivoSeq, li, file, nombre: file.name, tamano: file.size, estado: 'en cola', mensaje: 'Esperando turno…' };
+    lote.archivos.push(it);
+    return it;
+  });
+  // Los archivos pasan a la lista de estado de arriba; la selección se limpia a propósito.
+  input.value = '';
+  document.getElementById(`ds19-lote-archivos-${li}`).textContent = `Se enviaron ${items.length} archivo(s): mira su estado en la lista de arriba.`;
+  ds19RefrescarLote(li);
+  await ds19Concurrencia(items, 3, ds19ProcesarArchivo);
 }
 
 async function ds19GenerarWordLote(li) {
