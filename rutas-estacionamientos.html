@@ -438,11 +438,14 @@ const API = 'https://api.ibaker.cl';
 // Administradores del módulo combinado — se mantienen los que ya
 // administraban Estacionamientos/Teletrabajo, más Karollihn Yépez.
 const ADMINISTRADORES = ['dvillaseca@ibaker.cl', 'jcumplido@ibaker.cl', 'kyepez@ibaker.cl'];
+// Personas con los mismos permisos que Karollihn: ven siempre los estacionamientos y el seguimiento.
+// Para sumar a alguien con los mismos permisos, se agrega aquí (un solo lugar).
+const MISMOS_PERMISOS_QUE_KYEPEZ = ['kyepez@ibaker.cl', 'dvillaseca@ibaker.cl'];
 // Quién ve la pestaña de Estacionamientos: las personas que tienen un estacionamiento asignado, y estas.
 // (El resto solo ve Teletrabajo / Rutas.)
-const VEN_ESTACIONAMIENTOS = ['kyepez@ibaker.cl'];
+const VEN_ESTACIONAMIENTOS = MISMOS_PERMISOS_QUE_KYEPEZ;
 // Quién ve la pestaña de Seguimiento (quién ya envió su ruta y quién no).
-const VEN_SEGUIMIENTO = ['kyepez@ibaker.cl'];
+const VEN_SEGUIMIENTO = MISMOS_PERMISOS_QUE_KYEPEZ;
 let personasConAcceso = []; // correos con acceso al módulo: el "universo" del seguimiento
 let emailActual = '', nombreActual = '';
 
