@@ -144,6 +144,9 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
 .bq-auto{background:rgba(26,122,74,0.55);}
 .bq-reservado{background:var(--rojo);}
 .bq-pasado{opacity:0.55;}
+.bq-feriado{background:var(--gris-1,#eee);color:var(--txt-dim,#888);font-style:italic;}
+.tabla-semana th.th-feriado,.tabla-semana td.td-feriado{background:var(--gris-1,#eee);color:var(--txt-dim,#888);}
+.aviso-feriado{margin:0 0 12px;padding:10px 14px;background:#FFF4E0;border:1px solid #F0D9A8;border-radius:8px;font-size:0.8rem;color:#7A5A12;}
 .bq-clic{cursor:pointer;}
 .bq-clic:hover{filter:brightness(1.1);box-shadow:inset 0 0 0 2px rgba(0,0,0,0.28);}
 .estac-leyenda{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:0.76rem;color:var(--txt-dim);align-items:center;}
@@ -238,6 +241,7 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
             <div class="card">
                 <h3>Día de Teletrabajo</h3>
                 <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Elige como máximo un día fijo, entre martes, miércoles o jueves.</p>
+                <div id="aviso-feriado-patron" class="aviso-feriado" style="display:none;"></div>
                 <div class="dias-grid" id="dias-teletrabajo">
                     <div class="dia-chip" data-dia="martes">Martes</div>
                     <div class="dia-chip" data-dia="miercoles">Miércoles</div>
@@ -265,8 +269,9 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
             <div class="card">
                 <h3>Excepción para un día puntual</h3>
                 <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Para cambiar un día específico sin tocar tu patrón fijo (ej. esta semana trabajas remoto un día distinto al habitual).</p>
+                <div id="aviso-feriado-exc" class="aviso-feriado" style="display:none;"></div>
                 <div class="form-row">
-                    <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" type="date" id="exc-fecha"></div>
+                    <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" type="date" id="exc-fecha" onchange="actualizarAvisoFeriadoExc()"></div>
                     <div class="form-group">
                         <label class="form-label">Ese día voy a estar</label>
                         <select class="form-select" id="exc-tipo" onchange="toggleObraExcepcion()">
@@ -333,13 +338,14 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
                 <div class="week-label" id="week-label"></div>
                 <button onclick="cambiarSemana(1)">Semana siguiente ›</button>
             </div>
+            <div id="aviso-feriado-semana" class="aviso-feriado" style="display:none;"></div>
             <div id="aviso-sin-ruta" style="display:none;margin:0 0 12px;padding:10px 14px;background:var(--gris-1);border-radius:8px;font-size:0.8rem;color:var(--txt-mid);"></div>
             <table class="tabla-semana">
                 <thead><tr id="semana-head"></tr></thead>
                 <tbody id="semana-body"></tbody>
             </table>
             <div style="margin-top:14px;font-size:0.78rem;color:var(--txt-dim);">
-                <span class="dot dot-remoto"></span> Remoto &nbsp;&nbsp; <span class="dot dot-visita_obra"></span> Visita a Obra &nbsp;&nbsp; <span class="dot dot-sin_ruta"></span> Sin ruta &nbsp;&nbsp; <span class="dot dot-presencial"></span> Presencial &nbsp;&nbsp; <span class="dot dot-vacaciones"></span> Vacaciones &nbsp;&nbsp; <span class="dot dot-otros"></span> Otros
+                <span class="dot dot-remoto"></span> Remoto &nbsp;&nbsp; <span class="dot dot-visita_obra"></span> Visita a Obra &nbsp;&nbsp; <span class="dot dot-sin_ruta"></span> Sin ruta &nbsp;&nbsp; <span class="dot dot-presencial"></span> Presencial &nbsp;&nbsp; <span class="dot dot-vacaciones"></span> Vacaciones &nbsp;&nbsp; <span class="dot dot-otros"></span> Otros &nbsp;&nbsp; <span class="dot" style="background:#bbb;"></span> Feriado
             </div>
         </div>
 
@@ -722,7 +728,8 @@ function liberacionAutoPorRuta(spot) {
     const diaHoy = diaSemanaDeHoy();
     if (!DIAS.includes(diaHoy)) return null; // fin de semana, no aplica
     const { estado } = estadoEnFecha(spot.duenoEmail, hoyISO(), diaHoy);
-    if (estado === 'presencial') return null;
+    if (estado === 'presencial' || estado === 'feriado') return null; // feriado: nadie va a la oficina, no se ofrece
+
     return {
         id: null, estacionamientoId: spot.id, fechaInicio: hoyISO(), fechaFin: hoyISO(),
         horaInicio: null, horaFin: null, reservadoPor: null, reservadoPorNombre: null,
@@ -1041,6 +1048,7 @@ function estadoBloque(spot, fechaStr, bloque) {
     if (tomadas.length) return { estado: 'reservado', reservas: tomadas };
     if (delDia.some(r => r.tipo === 'liberado' && !r.reservadoPor)) return { estado: 'libre' };
     const dia = diaSemanaDe(fechaStr);
+    if (esFeriado(fechaStr)) return { estado: 'feriado' };
     if (fechaStr >= hoyISO() && DIAS.includes(dia)) {
         const { estado: estRuta } = estadoEnFecha(spot.duenoEmail, fechaStr, dia);
         if (estRuta !== 'presencial') return { estado: 'auto', motivoAuto: estRuta };
@@ -1055,6 +1063,7 @@ function puedeCancelarReserva(r, spot) {
 function accionBloque(spot, fechaStr, bloque) {
     const est = estadoBloque(spot, fechaStr, bloque);
     if (est.estado === 'reservado') return est.reservas.some(r => puedeCancelarReserva(r, spot)) ? 'cancelar' : null;
+    if (esFeriado(fechaStr)) return null;
     if (ADMINISTRADORES.includes(emailActual) && fechaStr >= hoyISO()) return 'agendar';
     return null;
 }
@@ -1073,6 +1082,8 @@ function celdaBloque(spot, fechaStr, bloque) {
         titulo = est.reservas.map(r => `${nombreReserva(r)} (${horarioTexto(r)})${r.motivo ? '\nMotivo: ' + r.motivo : ''}`).join('\n\n');
     } else if (est.estado === 'libre') {
         principal = 'Disponible'; titulo = `Liberado por ${usuarioDe(spot)} — disponible`;
+    } else if (est.estado === 'feriado') {
+        principal = 'Feriado'; titulo = nombreFeriado(fechaStr);
     } else if (est.estado === 'auto') {
         principal = 'Automático'; secundario = MOTIVO_AUTO_LABEL[est.motivoAuto] || '';
         titulo = `Libre por la ruta de ${usuarioDe(spot)}${secundario ? ' (' + secundario + ')' : ''}`;
@@ -1192,6 +1203,44 @@ async function confirmarAgendar() {
     } catch(e) { toast('Error: ' + e.message); cargarTodo(); }
 }
 
+// ══════════════════ FERIADOS ══════════════════
+// Feriados legales de Chile (lunes a viernes son los que importan acá). Hay que agregar los del año siguiente
+// cuando se publiquen. En una semana con feriado NO hay día remoto: todos van presencial toda la semana;
+// solo se respetan las visitas a obra, "otros motivos" y vacaciones (patrón o excepción).
+const FERIADOS_CL = {
+    '2026-01-01': 'Año Nuevo',
+    '2026-04-03': 'Viernes Santo',
+    '2026-05-01': 'Día del Trabajo',
+    '2026-05-21': 'Glorias Navales',
+    '2026-06-29': 'San Pedro y San Pablo',
+    '2026-07-16': 'Virgen del Carmen',
+    '2026-09-18': 'Independencia Nacional',
+    '2026-10-12': 'Encuentro de Dos Mundos',
+    '2026-12-08': 'Inmaculada Concepción',
+    '2026-12-25': 'Navidad',
+    '2027-01-01': 'Año Nuevo',
+};
+const NOMBRES_DIA_LARGO = {lunes:'lunes',martes:'martes',miercoles:'miércoles',jueves:'jueves',viernes:'viernes'};
+function esFeriado(iso) { return Object.prototype.hasOwnProperty.call(FERIADOS_CL, iso); }
+function nombreFeriado(iso) { return FERIADOS_CL[iso] || ''; }
+function isoLocal(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+// Fechas ISO (lunes a viernes) de la semana de una fecha dada.
+function semanaDe(iso) {
+    const d = new Date(iso + 'T12:00:00');
+    const dow = d.getDay();
+    d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
+    return [0,1,2,3,4].map(i => { const x = new Date(d); x.setDate(d.getDate() + i); return isoLocal(x); });
+}
+// Feriados (lunes a viernes) de la semana de una fecha: [{fecha, nombre, dia}]
+function feriadosDeSemana(iso) {
+    return semanaDe(iso).map((f, i) => ({ fecha: f, nombre: nombreFeriado(f), dia: DIAS[i] })).filter(x => esFeriado(x.fecha));
+}
+function semanaConFeriado(iso) { return feriadosDeSemana(iso).length > 0; }
+function textoFeriados(lista) {
+    return lista.map(x => `${NOMBRES_DIA_LARGO[x.dia]} ${parseInt(x.fecha.slice(8), 10)} (${x.nombre})`).join(' y ');
+}
+const AVISO_SEMANA_FERIADO = 'Semana con feriado: no hay día remoto, todos van presencial toda la semana. Solo se consideran las visitas a obra y las excepciones.';
+
 // ══════════════════ TELETRABAJO / RUTAS ══════════════════
 let dataTeletrabajo = { patrones: {}, excepciones: [] };
 let teletrabajoDia = null;
@@ -1255,7 +1304,40 @@ const NOMBRES_RESPALDO = {
 // Jefatura que aprueba las rutas semanales propuestas ahora se define por
 // grupo (ver gruposRuta / aprobadoresDeCliente), no como lista fija.
 
+// Aviso (y bloqueo de "Remoto") cuando la fecha de la excepción cae en una semana con feriado.
+function actualizarAvisoFeriadoExc() {
+    const fecha = document.getElementById('exc-fecha').value;
+    const aviso = document.getElementById('aviso-feriado-exc');
+    const opRemoto = document.querySelector('#exc-tipo option[value="remoto"]');
+    const hay = fecha && semanaConFeriado(fecha);
+    if (opRemoto) {
+        opRemoto.disabled = !!hay;
+        if (hay && document.getElementById('exc-tipo').value === 'remoto') { document.getElementById('exc-tipo').value = 'presencial'; toggleObraExcepcion(); }
+    }
+    if (!aviso) return;
+    if (fecha && esFeriado(fecha)) { aviso.textContent = `El ${fmt(fecha)} es feriado (${nombreFeriado(fecha)}).`; aviso.style.display = 'block'; }
+    else if (hay) { aviso.textContent = `Esa semana tiene feriado (${textoFeriados(feriadosDeSemana(fecha))}). ${AVISO_SEMANA_FERIADO}`; aviso.style.display = 'block'; }
+    else aviso.style.display = 'none';
+}
+
+// Aviso en "Mi ruta": próximas semanas con feriado (las próximas 8 semanas).
+function renderAvisoFeriadoPatron() {
+    const cont = document.getElementById('aviso-feriado-patron');
+    if (!cont) return;
+    const lunes = inicioSemana(0), vistas = [], lineas = [];
+    for (let i = 0; i < 8; i++) {
+        const d = new Date(lunes); d.setDate(lunes.getDate() + i * 7);
+        const iso = isoLocal(d);
+        const fer = feriadosDeSemana(iso).filter(x => x.fecha >= isoLocal(new Date()) || i === 0);
+        if (fer.length && !vistas.includes(iso)) { vistas.push(iso); lineas.push(`Semana del ${fmt(semanaDe(iso)[0])}: feriado ${textoFeriados(fer)}.`); }
+    }
+    if (!lineas.length) { cont.style.display = 'none'; return; }
+    cont.innerHTML = `<b>Semanas con feriado:</b> ${lineas.map(escHtml).join(' ')}<br>${AVISO_SEMANA_FERIADO} Tu día de teletrabajo fijo no se aplica esas semanas.`;
+    cont.style.display = 'block';
+}
+
 function renderChipsPatron() {
+    renderAvisoFeriadoPatron();
     document.querySelectorAll('#dias-teletrabajo .dia-chip').forEach(chip => {
         chip.classList.toggle('activo', chip.dataset.dia === teletrabajoDia);
     });
@@ -1605,6 +1687,8 @@ async function guardarExcepcion() {
     const obras = tipo === 'visita_obra' ? [...excObrasSeleccionadas] : undefined;
     const detalle = tipo === 'otros' ? document.getElementById('exc-otros-detalle').value.trim() : undefined;
     if (!fecha) { alert('Elige una fecha'); return; }
+    if (esFeriado(fecha)) { alert(`El ${fmt(fecha)} es feriado (${nombreFeriado(fecha)}): no necesita excepción.`); return; }
+    if (tipo === 'remoto' && semanaConFeriado(fecha)) { alert('Esa semana tiene feriado: no se puede elegir un día remoto, es presencial toda la semana. Puedes registrar visita a obra u otros motivos.'); return; }
     if (tipo === 'visita_obra' && !obras.length) { alert('Selecciona al menos una obra'); return; }
     try {
         const res = await fetch(`${API}/teletrabajo/excepcion`, {
@@ -1678,6 +1762,14 @@ function patronEnFecha(email, fechaISO) {
 // Estado efectivo de una persona en una fecha: excepción propia si existe, si no su patrón fijo según el día de la semana.
 // (Sin ruta aprobada ese día se supone presencial: es lo que usan los estacionamientos.)
 function estadoEnFecha(email, fechaISO, diaSemana) {
+    if (esFeriado(fechaISO)) return { estado: 'feriado', obras: [], detalle: nombreFeriado(fechaISO) };
+    const semFer = semanaConFeriado(fechaISO);
+    const r = estadoBaseEnFecha(email, fechaISO, diaSemana);
+    // Semana con feriado: el remoto no existe, se va presencial.
+    if (semFer && r.estado === 'remoto') return { estado: 'presencial', obras: [], detalle: '' };
+    return r;
+}
+function estadoBaseEnFecha(email, fechaISO, diaSemana) {
     const exc = dataTeletrabajo.excepciones.find(e => e.email === email && e.fecha === fechaISO);
     if (exc) return { estado: exc.tipo, obras: exc.obras || [], detalle: exc.detalle || '' };
     const patron = patronEnFecha(email, fechaISO) || { teletrabajoDia: null, visitaObra: [], otros: [] };
@@ -1690,6 +1782,7 @@ function estadoEnFecha(email, fechaISO, diaSemana) {
 }
 // Para la vista del equipo: si ese día no había ruta aprobada ni excepción, se dice "Sin ruta" en vez de suponer presencial.
 function estadoVistaEquipo(email, fechaISO, diaSemana) {
+    if (esFeriado(fechaISO)) return { estado: 'feriado', obras: [], detalle: nombreFeriado(fechaISO) };
     const hayExc = dataTeletrabajo.excepciones.some(e => e.email === email && e.fecha === fechaISO);
     if (!hayExc && !patronEnFecha(email, fechaISO)) return { estado: 'sin_ruta', obras: [], detalle: '' };
     return estadoEnFecha(email, fechaISO, diaSemana);
@@ -1714,7 +1807,15 @@ function renderSemana() {
     document.getElementById('week-label').textContent = `${fmt(fechas[0])} — ${fmt(fechas[4])}`;
 
     document.getElementById('semana-head').innerHTML =
-        '<th>Persona</th>' + DIAS.map((d,i) => `<th>${DIAS_LABEL[d]}<br><span style="font-weight:400;">${fmt(fechas[i])}</span></th>`).join('');
+        '<th>Persona</th>' + DIAS.map((d,i) => esFeriado(fechas[i])
+            ? `<th class="th-feriado">${DIAS_LABEL[d]}<br><span style="font-weight:400;">${fmt(fechas[i])}</span><br><span style="font-weight:700;font-size:0.7rem;">FERIADO</span></th>`
+            : `<th>${DIAS_LABEL[d]}<br><span style="font-weight:400;">${fmt(fechas[i])}</span></th>`).join('');
+    const avisoF = document.getElementById('aviso-feriado-semana');
+    if (avisoF) {
+        const fer = feriadosDeSemana(fechas[0]);
+        if (fer.length) { avisoF.textContent = `Feriado: ${textoFeriados(fer)}. ${AVISO_SEMANA_FERIADO}`; avisoF.style.display = 'block'; }
+        else avisoF.style.display = 'none';
+    }
 
     // Solo aparecen quienes ya tienen una ruta APROBADA. Una propuesta pendiente no aparece hasta que se apruebe.
     const personas = Object.keys(dataTeletrabajo.patrones);
@@ -1739,6 +1840,7 @@ function renderSemana() {
     document.getElementById('semana-body').innerHTML = personas.map(email => {
         const celdas = DIAS.map((dia,i) => {
             const { estado, obras, detalle } = estadoVistaEquipo(email, fechas[i], dia);
+            if (estado === 'feriado') return `<td class="td-feriado" title="${escHtml(detalle)}">Feriado</td>`;
             const label = estado === 'remoto' ? 'Remoto'
                 : estado === 'visita_obra' ? (obras.length ? obras.join(', ') : 'Visita a Obra')
                 : estado === 'otros' ? (detalle ? `Otros — ${detalle}` : 'Otros motivos')
