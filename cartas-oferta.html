@@ -339,7 +339,7 @@ input[type=file] { display: none; }
       </div>
       <div id="ds19-aviso-lectura" style="display:none;background:rgba(246,173,85,0.12);border:1px solid #f6ad55;border-radius:var(--radius);padding:10px 14px;font-size:0.8rem;color:var(--ink);margin-bottom:14px;line-height:1.5;"></div>
       <div style="font-size:0.78rem;color:var(--ink2);margin-bottom:16px;">
-        Las escrituras sirven para completar las Tablas 3a/3b con el N° de página donde aparece cada requisito (puedes revisarlas y corregirlas en cada beneficiario antes de generar el Word). Si no subes la escritura de alguien, esas columnas quedan en blanco en el Word de su lote.
+        Las escrituras sirven para completar las Tablas 3a/3b con el N° de cláusula donde aparece cada requisito (puedes revisarlo y corregirlo en cada beneficiario antes de generar el Word). Si no subes la escritura de alguien, esas columnas quedan en blanco en el Word de su lote.
       </div>
       <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;">
         <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--ink);">📥 Subir escrituras — todas juntas, en cualquier orden</div>
@@ -1199,7 +1199,7 @@ function ds19RevisionHtml(li, b, esc) {
   const bi = ds19Lotes[li].beneficiarios.indexOf(b);
   const faltan = REQUISITOS_DS19.filter(n => !esc.requisitos[n] && n !== 'Estacionamiento').length;
   const avisos = (esc.avisos || []);
-  const resumen = `${REQUISITOS_DS19.length - faltan - (esc.requisitos['Estacionamiento'] ? 0 : 1)} páginas halladas`
+  const resumen = `${REQUISITOS_DS19.length - faltan - (esc.requisitos['Estacionamiento'] ? 0 : 1)} cláusulas halladas`
     + (faltan ? ` · <span style="color:#f6ad55;">${faltan} sin hallar</span>` : '')
     + (esc.precioUf ? ` · precio ${ds19Esc(esc.precioUf)} UF` : '');
   const filas = REQUISITOS_DS19.map((nombre, ri) => {
@@ -1208,14 +1208,14 @@ function ds19RevisionHtml(li, b, esc) {
     const alerta = !val ? (nombre === 'Estacionamiento' ? '' : ' background:rgba(246,173,85,.18);') : (d?.debil ? ' background:rgba(246,173,85,.18);' : '');
     return `<tr>
       <td style="padding:2px 6px;border:1px solid var(--border);color:var(--ink);">${ds19Esc(nombre)}</td>
-      <td style="padding:2px;border:1px solid var(--border);text-align:center;"><input type="number" min="1" ${esc.totalPaginas ? `max="${esc.totalPaginas}"` : ''} value="${ds19Esc(val)}" onchange="ds19EditarPagina(${li},${bi},${ri},this.value)" style="width:56px;text-align:center;font-size:0.76rem;padding:2px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--ink);${alerta}"></td>
-      <td style="padding:2px 6px;border:1px solid var(--border);color:var(--ink3);font-size:0.68rem;">${d ? ds19Esc(d.fragmento).slice(0, 200) : (nombre === 'Estacionamiento' ? 'no se encontró (normal si la vivienda no tiene)' : 'no se encontró: búscalo en el PDF y escribe la página')}</td>
+      <td style="padding:2px;border:1px solid var(--border);text-align:center;white-space:nowrap;"><input type="text" maxlength="8" value="${ds19Esc(val)}" onchange="ds19EditarPagina(${li},${bi},${ri},this.value)" title="N° de cláusula (va al Word)" style="width:56px;text-align:center;font-size:0.76rem;padding:2px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--ink);${alerta}">${d?.pagina ? `<div style="font-size:0.62rem;color:var(--ink3);">pág. ${ds19Esc(d.pagina)}</div>` : ''}</td>
+      <td style="padding:2px 6px;border:1px solid var(--border);color:var(--ink3);font-size:0.68rem;">${d ? ds19Esc(d.fragmento).slice(0, 200) : (nombre === 'Estacionamiento' ? 'no se encontró (normal si la vivienda no tiene)' : 'no se encontró: búscalo en el PDF y escribe el N° de cláusula')}</td>
     </tr>`;
   }).join('');
-  return `<details style="margin-top:4px;"><summary style="cursor:pointer;font-size:0.72rem;color:var(--ink2);">Revisar páginas leídas — ${resumen}</summary>
+  return `<details style="margin-top:4px;"><summary style="cursor:pointer;font-size:0.72rem;color:var(--ink2);">Revisar cláusulas leídas — ${resumen}</summary>
     ${avisos.length ? `<div style="font-size:0.7rem;color:#f6ad55;margin:4px 0;">${avisos.map(ds19Esc).join('<br>')}</div>` : ''}
     <table style="border-collapse:collapse;width:100%;font-size:0.72rem;margin-top:4px;"><tbody>${filas}</tbody></table>
-    <div style="font-size:0.66rem;color:var(--ink3);margin-top:2px;">Número de página del PDF de la escritura. Lo que corrijas aquí es lo que va al Word.</div>
+    <div style="font-size:0.66rem;color:var(--ink3);margin-top:2px;">Lo que va al Word es el N° de cláusula (campo editable). La «pág.» es la página del PDF, solo para que lo revises rápido.</div>
   </details>`;
 }
 function ds19EditarPagina(li, bi, ri, valor) {
@@ -1223,7 +1223,7 @@ function ds19EditarPagina(li, bi, ri, valor) {
   const esc = ds19Lotes[li].escrituras[limpiarRut(b.rut)];
   if (!esc) return;
   const v = String(valor || '').trim();
-  esc.requisitos[REQUISITOS_DS19[ri]] = /^\d{1,4}$/.test(v) ? v : '';
+  esc.requisitos[REQUISITOS_DS19[ri]] = /^\d{1,3}(\s*bis)?$/i.test(v) ? v.toUpperCase() : '';
 }
 
 function ds19TablaLoteHtml(li) {
@@ -1233,7 +1233,7 @@ function ds19TablaLoteHtml(li) {
           <th style="padding:4px;border:1px solid var(--border);color:var(--ink);">N°</th>
           <th style="padding:4px;border:1px solid var(--border);text-align:left;color:var(--ink);">Nombre</th>
           <th style="padding:4px;border:1px solid var(--border);color:var(--ink);">RUT</th>
-          <th style="padding:4px;border:1px solid var(--border);color:var(--ink);">Escritura / Páginas</th>
+          <th style="padding:4px;border:1px solid var(--border);color:var(--ink);">Escritura / Cláusulas</th>
         </tr></thead>
         <tbody>
           ${lote.beneficiarios.map(b => {
@@ -1378,12 +1378,12 @@ function ds19Calzar(it, resultado) {
   const requisitos = {};
   REQUISITOS_DS19.forEach(nombre => {
     const r = resultado.requisitos?.[nombre];
-    requisitos[nombre] = r ? String(r.pagina ?? '') : '';
+    requisitos[nombre] = r ? String(r.clausula ?? '') : ''; // el formulario pide el N° de cláusula
   });
   const detalle = {};
   REQUISITOS_DS19.forEach(nombre => {
     const r = resultado.requisitos?.[nombre];
-    detalle[nombre] = r ? { fragmento: r.fragmento || '', debil: (r.ancla || 1) > 1 } : null;
+    detalle[nombre] = r ? { pagina: r.pagina || '', fragmento: r.fragmento || '', debil: (r.ancla || 1) > 1 } : null;
   });
   const destino = ds19Lotes[hallado.li];
   const rut = limpiarRut(hallado.b.rut);
