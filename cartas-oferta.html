@@ -292,10 +292,10 @@ input[type=file] { display: none; }
       <div style="font-weight:700;font-size:0.9rem;margin-bottom:10px;color:var(--ink);">Datos que no vienen en la Resolución</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <input type="date" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-fecha-ingreso" title="Fecha ingreso">
-        <div style="display:flex;gap:6px;align-items:center;" title="Cada Word (lote de 10) lleva un correlativo: AAAAMMDD_1, AAAAMMDD_2, …">
+        <div style="display:flex;gap:6px;align-items:center;" title="Todos los Word de esta Resolución llevan la misma carpeta. Cambia el N° solo al trabajar otra resolución el mismo día.">
           <input style="flex:1;min-width:0;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-carpeta" placeholder="Carpeta (AAAAMMDD, se pone sola)" oninput="this.dataset.manual='1'">
           <span style="font-size:0.8rem;color:var(--ink2);">_</span>
-          <input type="number" min="1" max="999" value="1" id="ds19-carpeta-n" title="N° con que parte el correlativo (si ya ingresaste carpetas ese día, pon el siguiente)" style="width:62px;padding:9px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);">
+          <input type="number" min="1" max="999" value="1" id="ds19-carpeta-n" title="N° de la resolución del día: _1 la primera, _2 si ingresas otra resolución el mismo día" style="width:62px;padding:9px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);">
         </div>
         <select style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-vendedor">
           <option value="">Vendedor (inmobiliaria)…</option>
@@ -1474,7 +1474,8 @@ function ds19AnoBeneficio() {
   return String(campo.value);
 }
 
-// Nombre de carpeta de la solicitud: AAAAMMDD_n (n sube de a uno por cada Word/lote).
+// Nombre de carpeta de la solicitud: AAAAMMDD_n. Todos los Word de una misma Resolución llevan el mismo n;
+// n sube solo cuando se trabaja otra resolución el mismo día.
 function ds19CarpetaBase() {
   const f = document.getElementById('ds19-fecha-ingreso').value; // yyyy-mm-dd
   return f ? f.replace(/-/g, '') : '';
@@ -1486,7 +1487,7 @@ function ds19ActualizarCarpetaBase() {
 function ds19NombreCarpeta(li) {
   const base = (document.getElementById('ds19-carpeta').value || ds19CarpetaBase()).trim().replace(/_\d+$/, '');
   const n0 = parseInt(document.getElementById('ds19-carpeta-n').value, 10);
-  return `${base}_${(isNaN(n0) || n0 < 1 ? 1 : n0) + li}`;
+  return `${base}_${isNaN(n0) || n0 < 1 ? 1 : n0}`; // el correlativo es por resolución, no por lote
 }
 
 async function ds19GenerarWordLote(li) {
