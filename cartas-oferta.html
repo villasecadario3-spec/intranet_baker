@@ -292,7 +292,11 @@ input[type=file] { display: none; }
       <div style="font-weight:700;font-size:0.9rem;margin-bottom:10px;color:var(--ink);">Datos que no vienen en la Resolución</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <input type="date" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-fecha-ingreso" title="Fecha ingreso">
-        <input style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-carpeta" placeholder="Nombre Carpeta de Solicitud">
+        <div style="display:flex;gap:6px;align-items:center;" title="Cada Word (lote de 10) lleva un correlativo: AAAAMMDD_1, AAAAMMDD_2, …">
+          <input style="flex:1;min-width:0;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-carpeta" placeholder="Carpeta (AAAAMMDD, se pone sola)" oninput="this.dataset.manual='1'">
+          <span style="font-size:0.8rem;color:var(--ink2);">_</span>
+          <input type="number" min="1" max="999" value="1" id="ds19-carpeta-n" title="N° con que parte el correlativo (si ya ingresaste carpetas ese día, pon el siguiente)" style="width:62px;padding:9px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);">
+        </div>
         <select style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;background:var(--bg2);color:var(--ink);" id="ds19-vendedor">
           <option value="">Vendedor (inmobiliaria)…</option>
           <option value="INMOBILIARIA E INVERSIONES BAKER SPA">INMOBILIARIA E INVERSIONES BAKER SPA</option>
@@ -335,7 +339,7 @@ input[type=file] { display: none; }
       </div>
       <div id="ds19-aviso-lectura" style="display:none;background:rgba(246,173,85,0.12);border:1px solid #f6ad55;border-radius:var(--radius);padding:10px 14px;font-size:0.8rem;color:var(--ink);margin-bottom:14px;line-height:1.5;"></div>
       <div style="font-size:0.78rem;color:var(--ink2);margin-bottom:16px;">
-        Las escrituras sirven para completar las Tablas 3a/3b con el N° de cláusula. Si no subes la escritura de alguien, esas columnas quedan en blanco en el Word de su lote.
+        Las escrituras sirven para completar las Tablas 3a/3b con el N° de página donde aparece cada requisito (puedes revisarlas y corregirlas en cada beneficiario antes de generar el Word). Si no subes la escritura de alguien, esas columnas quedan en blanco en el Word de su lote.
       </div>
       <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;">
         <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--ink);">📥 Subir escrituras — todas juntas, en cualquier orden</div>
@@ -1190,6 +1194,38 @@ const ds19Norm = t => String(t == null ? '' : t).normalize('NFD').replace(/[\u03
 let ds19ArchivoSeq = 0;
 let ds19Escrituras = []; // todas las escrituras enviadas (de cualquier lote): { id, file, nombre, tamano, estado, mensaje }
 
+// Detalle revisable de lo que se leyó en la escritura: página de cada requisito (editable).
+function ds19RevisionHtml(li, b, esc) {
+  const bi = ds19Lotes[li].beneficiarios.indexOf(b);
+  const faltan = REQUISITOS_DS19.filter(n => !esc.requisitos[n] && n !== 'Estacionamiento').length;
+  const avisos = (esc.avisos || []);
+  const resumen = `${REQUISITOS_DS19.length - faltan - (esc.requisitos['Estacionamiento'] ? 0 : 1)} páginas halladas`
+    + (faltan ? ` · <span style="color:#f6ad55;">${faltan} sin hallar</span>` : '')
+    + (esc.precioUf ? ` · precio ${ds19Esc(esc.precioUf)} UF` : '');
+  const filas = REQUISITOS_DS19.map((nombre, ri) => {
+    const d = esc.detalle?.[nombre];
+    const val = esc.requisitos[nombre] || '';
+    const alerta = !val ? (nombre === 'Estacionamiento' ? '' : ' background:rgba(246,173,85,.18);') : (d?.debil ? ' background:rgba(246,173,85,.18);' : '');
+    return `<tr>
+      <td style="padding:2px 6px;border:1px solid var(--border);color:var(--ink);">${ds19Esc(nombre)}</td>
+      <td style="padding:2px;border:1px solid var(--border);text-align:center;"><input type="number" min="1" ${esc.totalPaginas ? `max="${esc.totalPaginas}"` : ''} value="${ds19Esc(val)}" onchange="ds19EditarPagina(${li},${bi},${ri},this.value)" style="width:56px;text-align:center;font-size:0.76rem;padding:2px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--ink);${alerta}"></td>
+      <td style="padding:2px 6px;border:1px solid var(--border);color:var(--ink3);font-size:0.68rem;">${d ? ds19Esc(d.fragmento).slice(0, 200) : (nombre === 'Estacionamiento' ? 'no se encontró (normal si la vivienda no tiene)' : 'no se encontró: búscalo en el PDF y escribe la página')}</td>
+    </tr>`;
+  }).join('');
+  return `<details style="margin-top:4px;"><summary style="cursor:pointer;font-size:0.72rem;color:var(--ink2);">Revisar páginas leídas — ${resumen}</summary>
+    ${avisos.length ? `<div style="font-size:0.7rem;color:#f6ad55;margin:4px 0;">${avisos.map(ds19Esc).join('<br>')}</div>` : ''}
+    <table style="border-collapse:collapse;width:100%;font-size:0.72rem;margin-top:4px;"><tbody>${filas}</tbody></table>
+    <div style="font-size:0.66rem;color:var(--ink3);margin-top:2px;">Número de página del PDF de la escritura. Lo que corrijas aquí es lo que va al Word.</div>
+  </details>`;
+}
+function ds19EditarPagina(li, bi, ri, valor) {
+  const b = ds19Lotes[li].beneficiarios[bi];
+  const esc = ds19Lotes[li].escrituras[limpiarRut(b.rut)];
+  if (!esc) return;
+  const v = String(valor || '').trim();
+  esc.requisitos[REQUISITOS_DS19[ri]] = /^\d{1,4}$/.test(v) ? v : '';
+}
+
 function ds19TablaLoteHtml(li) {
   const lote = ds19Lotes[li];
   return `<table style="border-collapse:collapse;width:100%;font-size:0.78rem;margin-bottom:10px;">
@@ -1197,13 +1233,14 @@ function ds19TablaLoteHtml(li) {
           <th style="padding:4px;border:1px solid var(--border);color:var(--ink);">N°</th>
           <th style="padding:4px;border:1px solid var(--border);text-align:left;color:var(--ink);">Nombre</th>
           <th style="padding:4px;border:1px solid var(--border);color:var(--ink);">RUT</th>
-          <th style="padding:4px;border:1px solid var(--border);color:var(--ink);">Escritura / Cláusulas</th>
+          <th style="padding:4px;border:1px solid var(--border);color:var(--ink);">Escritura / Páginas</th>
         </tr></thead>
         <tbody>
           ${lote.beneficiarios.map(b => {
             const esc = lote.escrituras[limpiarRut(b.rut)];
             let estadoTxt = '— sin escritura (quedará en blanco)';
             if (esc?.estado === 'listo') estadoTxt = `✅ ${ds19Esc(esc.nombreArchivo)}` + (esc.calzadoPor && esc.calzadoPor !== 'RUT leído en la escritura' ? ` <span style="font-size:0.68rem;color:var(--ink3);">(calzada por ${ds19Esc(esc.calzadoPor)})</span>` : '');
+            if (esc?.estado === 'listo') estadoTxt += ds19RevisionHtml(li, b, esc);
             return `<tr>
               <td style="padding:3px;border:1px solid var(--border);text-align:center;color:var(--ink);">${b.numero_tabla_res_ex}${b.sector ? `<div style="font-size:0.62rem;color:var(--ink3);">${ds19Esc(b.sector)}</div>` : ''}</td>
               <td style="padding:3px;border:1px solid var(--border);color:var(--ink);">${b.nombre}</td>
@@ -1341,12 +1378,17 @@ function ds19Calzar(it, resultado) {
   const requisitos = {};
   REQUISITOS_DS19.forEach(nombre => {
     const r = resultado.requisitos?.[nombre];
-    requisitos[nombre] = r ? String(r.clausula ?? '') : '';
+    requisitos[nombre] = r ? String(r.pagina ?? '') : '';
+  });
+  const detalle = {};
+  REQUISITOS_DS19.forEach(nombre => {
+    const r = resultado.requisitos?.[nombre];
+    detalle[nombre] = r ? { fragmento: r.fragmento || '', debil: (r.ancla || 1) > 1 } : null;
   });
   const destino = ds19Lotes[hallado.li];
   const rut = limpiarRut(hallado.b.rut);
   const previa = destino.escrituras[rut];
-  destino.escrituras[rut] = { estado: 'listo', nombreArchivo: it.nombre, requisitos, calzadoPor: via };
+  destino.escrituras[rut] = { estado: 'listo', nombreArchivo: it.nombre, requisitos, detalle, avisos: resultado.avisos || [], precioUf: resultado.precio_uf || '', totalPaginas: resultado.total_paginas || 0, calzadoPor: via };
   it.estado = 'listo';
   it.mensaje = `Calzada con ${hallado.b.nombre} (${hallado.b.rut}) → Lote ${hallado.li + 1}`
     + (previa && previa.estado === 'listo' && previa.nombreArchivo !== it.nombre ? ` — reemplazó a «${previa.nombreArchivo}», que ya estaba cargada` : '')
@@ -1432,12 +1474,27 @@ function ds19AnoBeneficio() {
   return String(campo.value);
 }
 
+// Nombre de carpeta de la solicitud: AAAAMMDD_n (n sube de a uno por cada Word/lote).
+function ds19CarpetaBase() {
+  const f = document.getElementById('ds19-fecha-ingreso').value; // yyyy-mm-dd
+  return f ? f.replace(/-/g, '') : '';
+}
+function ds19ActualizarCarpetaBase() {
+  const c = document.getElementById('ds19-carpeta');
+  if (c && !c.dataset.manual) c.value = ds19CarpetaBase();
+}
+function ds19NombreCarpeta(li) {
+  const base = (document.getElementById('ds19-carpeta').value || ds19CarpetaBase()).trim().replace(/_\d+$/, '');
+  const n0 = parseInt(document.getElementById('ds19-carpeta-n').value, 10);
+  return `${base}_${(isNaN(n0) || n0 < 1 ? 1 : n0) + li}`;
+}
+
 async function ds19GenerarWordLote(li) {
   const lote = ds19Lotes[li];
   const payload = {
     proyecto: {
       fecha_ingreso: document.getElementById('ds19-fecha-ingreso').value || new Date().toLocaleDateString('es-CL'),
-      nombre_carpeta: document.getElementById('ds19-carpeta').value,
+      nombre_carpeta: ds19NombreCarpeta(li),
       vendedor: document.getElementById('ds19-vendedor').value,
       codigo_proyecto: document.getElementById('ds19-codigo').value,
       nombre_proyecto: document.getElementById('ds19-nombreproyecto').value,
@@ -1629,7 +1686,12 @@ function cortarDescargarZip() {
 
 // ── INIT ──────────────────────────────────────────────────────
 const elFechaIngresoDS19 = document.getElementById('ds19-fecha-ingreso');
-if (elFechaIngresoDS19) elFechaIngresoDS19.value = new Date().toISOString().slice(0,10);
+if (elFechaIngresoDS19) {
+  const hoy = new Date();
+  elFechaIngresoDS19.value = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
+  elFechaIngresoDS19.addEventListener('change', ds19ActualizarCarpetaBase);
+  ds19ActualizarCarpetaBase();
+}
 initAuth();
 </script>
 </body>
