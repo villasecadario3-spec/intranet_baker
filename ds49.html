@@ -231,6 +231,15 @@
           </select>
         </div>
         <div class="field"><label>N° familias postulantes</label><input type="text" id="cfgFamilias" placeholder="Ej: 289"></div>
+        <div class="field"><label>Tipología de proyecto <span style="font-weight:400;color:var(--txt-dim)">(solo formato RM)</span></label>
+          <select id="cfgTipologia">
+            <option value="CNT" selected>CNT – Construcción en Nuevos Terrenos</option>
+            <option value="MP">MP – Megaproyecto</option>
+            <option value="PC">PC – Pequeño Condominio</option>
+            <option value="">Sin marcar</option>
+          </select>
+        </div>
+        <div class="field"><label>Etapa <span style="font-weight:400;color:var(--txt-dim)">(si es Megaproyecto, formato RM)</span></label><input type="text" id="cfgEtapa" placeholder="Ej: Etapa 1"></div>
         <div class="field field-full"><label>Entidad patrocinante</label>
           <select id="cfgEntidad">
             <option value="ENTIDAD PATROCINANTE BROTAR" selected>Entidad Patrocinante Brotar</option>
@@ -415,6 +424,8 @@ function cfg() {
     nFamilias: document.getElementById('cfgFamilias').value,
     entidad: document.getElementById('cfgEntidad').value,
     formato: document.getElementById('cfgFormato').value,
+    tipologia: document.getElementById('cfgTipologia').value,
+    etapa: document.getElementById('cfgEtapa').value,
   };
 }
 
@@ -464,7 +475,7 @@ async function generarFichas() {
       progressCount.textContent = `${folio} / ${total}`;
       progressFill.style.width = Math.round((folio / total) * 85) + '%';
       progressLog.textContent = filename;
-      const doc = buildDoc(row, config, folio, logoBytes, COLS);
+      const doc = config.formato === 'RM' ? buildDocRM(row, config, folio, logoBytes, COLS) : buildDoc(row, config, folio, logoBytes, COLS);
       const blob = await Packer.toBlob(doc);
       const arrayBuffer = await blob.arrayBuffer();
       allDocxFiles.push({ name: filename, data: new Uint8Array(arrayBuffer) });
@@ -1083,6 +1094,567 @@ function buildDoc(row, pd, folio, logoBuffer, COLS) {
   });
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+//  FORMATO REGIÓN METROPOLITANA (Ficha Diagnóstico CNT-MP V.2.4)
+//  Se arma siguiendo la plantilla oficial RM. Lo que la encuesta
+//  (Etapa 1) no pregunta se deja en blanco para completar a mano.
+// ═══════════════════════════════════════════════════════════════
+const RM_ESTCIVIL = ['Casado','Viudo','Soltero','Conviviente Civil','Divorciado'];
+const RM_PARENT   = ['Hijo/a','Cónyuge','Conviviente','Padre','Madre','Nieto','Otro Familiar','No Familiar'];
+const RM_ESTUDIOS = ['Bás. Incompleta','Básica Completa','Media Incomp.','Media Completa','Técnico-Prof. Completa','Técnico-Prof. Incompleta','Universitaria Completa','Universitaria Incompleta','Pre-Escolar','Sin Estudios'];
+const RM_LABORAL  = ['Trabajo Permanente','Trabajo Esporádico','Cesante','Jubilado/Pensionado','Dueña(o) de Casa','Estudiante','Trabajador y Estudiante','Menor de Edad s/ocupac.'];
+const RM_GASTOS   = ['$0','De $1 a $9.999','De $10 mil a $19.999','De $20 mil a $29.999','De $30 mil a $39.999','De $40 mil a $49.999','$50 Mil o Más'];
+
+// Convención de equivalencias entre la encuesta y la ficha RM (se pueden ajustar aquí).
+// Dependiente -> Trabajo Permanente / Independiente -> Trabajo Esporádico.
+const RM_MAP_LABORAL_DEPENDIENTE = 'Trabajo Permanente';
+const RM_MAP_LABORAL_INDEPENDIENTE = 'Trabajo Esporádico';
+
+function nrm(s) {
+  return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+function triSN(v) { const n = nrm(v); return n === 'si' ? 'si' : (n === 'no' ? 'no' : ''); }
+const rmMark = (b) => b ? '☒' : '☐';
+function rmOptLines(options, sel, otro) {
+  const l = options.map(o => rmMark(o === sel) + ' ' + o);
+  if (otro) l.push('☒ Otro: ' + otro);
+  return l;
+}
+// cada mapeo devuelve { sel, otro }
+function rmMapEstCivil(v) {
+  const n = nrm(v); if (!n) return { sel: null, otro: '' };
+  if (n.startsWith('casad')) return { sel: 'Casado', otro: '' };
+  if (n.startsWith('viud')) return { sel: 'Viudo', otro: '' };
+  if (n.startsWith('solter')) return { sel: 'Soltero', otro: '' };
+  if (n.includes('conviviente')) return { sel: 'Conviviente Civil', otro: '' };
+  if (n.startsWith('divorc')) return { sel: 'Divorciado', otro: '' };
+  return { sel: null, otro: val(v) };
+}
+function rmMapParentesco(v) {
+  const n = nrm(v); if (!n) return { sel: null, otro: '' };
+  if (n.startsWith('hij')) return { sel: 'Hijo/a', otro: '' };
+  if (n.startsWith('conyuge')) return { sel: 'Cónyuge', otro: '' };
+  if (n.startsWith('conviviente')) return { sel: 'Conviviente', otro: '' };
+  if (n.startsWith('padre')) return { sel: 'Padre', otro: '' };
+  if (n.startsWith('madre')) return { sel: 'Madre', otro: '' };
+  if (n.startsWith('niet') || n.startsWith('nieto')) return { sel: 'Nieto', otro: '' };
+  if (n.startsWith('no familiar')) return { sel: 'No Familiar', otro: '' };
+  if (n.startsWith('otro')) return { sel: 'Otro Familiar', otro: '' };
+  return { sel: null, otro: val(v) };
+}
+function rmMapEstudios(v) {
+  const n = nrm(v); if (!n) return { sel: null, otro: '' };
+  const inc = /incomp|icomp/.test(n);
+  if (n.includes('sin estudio')) return { sel: 'Sin Estudios', otro: '' };
+  if (n.startsWith('pre')) return { sel: 'Pre-Escolar', otro: '' };
+  if (n.startsWith('basic')) return { sel: inc ? 'Bás. Incompleta' : 'Básica Completa', otro: '' };
+  if (n.startsWith('media')) return { sel: inc ? 'Media Incomp.' : 'Media Completa', otro: '' };
+  if (n.startsWith('tecnic')) return { sel: inc ? 'Técnico-Prof. Incompleta' : 'Técnico-Prof. Completa', otro: '' };
+  if (n.startsWith('universit')) return { sel: inc ? 'Universitaria Incompleta' : 'Universitaria Completa', otro: '' };
+  return { sel: null, otro: val(v) };
+}
+function rmMapLaboral(v) {
+  const n = nrm(v); if (!n) return { sel: null, otro: '' };
+  if (n.startsWith('estudiante')) return { sel: 'Estudiante', otro: '' };
+  if (n.startsWith('dependiente')) return { sel: RM_MAP_LABORAL_DEPENDIENTE, otro: '' };
+  if (n.startsWith('independiente')) return { sel: RM_MAP_LABORAL_INDEPENDIENTE, otro: '' };
+  if (n.startsWith('cesante')) return { sel: 'Cesante', otro: '' };
+  if (n.startsWith('jubilad') || n.includes('pension')) return { sel: 'Jubilado/Pensionado', otro: '' };
+  if (n.includes('hogar') || n.includes('duen')) return { sel: 'Dueña(o) de Casa', otro: '' };
+  if (n.startsWith('menor')) return { sel: 'Menor de Edad s/ocupac.', otro: '' };
+  return { sel: null, otro: val(v) };
+}
+
+function rmTitleCase(str) {
+  const small = new Set(['de', 'del', 'la', 'las', 'los', 'y', 'e']);
+  return val(str).toLowerCase().split(/(\s+)/).map((w, i) => {
+    if (!w.trim()) return w;
+    if (i > 0 && small.has(w)) return w;
+    return w.replace(/(^|[-'])([a-záéíóúñü])/g, (m, a, b) => a + b.toUpperCase());
+  }).join('');
+}
+
+function extractMembersRM(row) {
+  const get = (i) => val(row[i]);
+  const out = [{
+    nombre: get(1), ap1: get(2), ap2: get(3), rut: get(4), estCivil: get(5), genero: get(6),
+    parentesco: 'Postulante', edad: get(7), adm: get(8), estudios: get(9), laboral: get(10),
+    indig: get(11), pueblo: get(13), nac: get(14), resid: get(15), enf: get(16),
+    disc: get(18), cred: get(19), discCual: get(20), mr: get(21), valech: get(22),
+  }];
+  [24, 48, 72, 96, 120, 144].forEach(b => {
+    if (!get(b) && !get(b + 1)) return;
+    out.push({
+      nombre: get(b), ap1: get(b + 1), ap2: get(b + 2), rut: get(b + 3), estCivil: get(b + 4), genero: get(b + 5),
+      parentesco: get(b + 6), edad: get(b + 7), adm: get(b + 8), estudios: get(b + 9), laboral: get(b + 10),
+      indig: get(b + 11), pueblo: get(b + 13), nac: get(b + 14), resid: get(b + 15), enf: get(b + 16),
+      disc: get(b + 18), cred: get(b + 19), discCual: get(b + 20), mr: get(b + 21), valech: get(b + 22),
+    });
+  });
+  return out;
+}
+
+// ── helpers de celdas RM ──
+function rmP(text, o = {}) {
+  const { bold = false, size = 16, align = AlignmentType.LEFT, italic = false, before = 0, keepNext = false, pageBreak = false } = o;
+  return new Paragraph({ alignment: align, keepNext, pageBreakBefore: pageBreak, spacing: { before, after: 0 }, children: [new TextRun({ text: String(text == null ? '' : text), bold, italic, size, font: 'Arial' })] });
+}
+function rmC(lines, o = {}) {
+  const { w, fs = 16, bold = false, shade = null, span = 1, align = AlignmentType.LEFT, v = VerticalAlign.TOP, borders = BORDERS } = o;
+  let arr = Array.isArray(lines) ? lines : [lines];
+  if (!arr.length) arr = [''];
+  return new TableCell({
+    columnSpan: span, width: { size: w, type: WidthType.DXA }, borders, verticalAlign: v,
+    shading: shade ? { fill: shade, type: ShadingType.CLEAR } : undefined,
+    margins: { top: 40, bottom: 40, left: 70, right: 70 },
+    children: arr.map(t => rmP(t, { bold, size: fs, align })),
+  });
+}
+const rmH = (lines, o = {}) => rmC(lines, { bold: true, shade: 'D9D9D9', align: AlignmentType.CENTER, v: VerticalAlign.CENTER, ...o });
+function rmTable(widths, rows) {
+  return new Table({ width: { size: widths.reduce((a, b) => a + b, 0), type: WidthType.DXA }, columnWidths: widths, rows });
+}
+function rmFit(base, total) {
+  const s = base.reduce((a, b) => a + b, 0);
+  const w = base.map(x => Math.round(x * total / s));
+  w[w.length - 1] += total - w.reduce((a, b) => a + b, 0);
+  return w;
+}
+function rmFooter() {
+  return { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'Sección Habilitación Social Versión 2.4, Septiembre 2016', size: 16, font: 'Calibri' })] })] }) };
+}
+const XC = (b) => b ? 'X' : '';
+
+const RM_CONV = [
+  '4.1.- Los problemas/diferencias los solucionamos conversando y llegando a acuerdos.',
+  '4.2.- La mayor parte de las personas del barrio cumplimos las reglas que acordamos.',
+  '4.3.- Es de mi interés conocer y compartir con las personas del barrio.',
+  '4.4.- Las personas del barrio están dispuestas a colaborar si alguien tiene problemas.',
+];
+// índice en COLS.conviv de la encuesta que corresponde a 4.1..4.4
+const RM_CONV_IDX = [0, 1, 2, 4];
+const RM_USO = [
+  '6.1.- Los juegos infantiles son ocupados por los niños y niñas del barrio.',
+  '6.2.- La sede social se encuentra ocupada con actividades de las personas del barrio.',
+  '6.3.- Veo a los padres y madres jugando con sus hijos/as en la plaza.',
+  '6.4.- La cancha se encuentra ocupada en distintos deportes.',
+  '6.5.- La cancha es ocupada, tanto por hombres como por mujeres.',
+];
+const RM_EQUIP_EXISTENTE = [
+  'Áreas verdes','Ciclo vías','Contenedores de basura diferenciado por tipo de desecho','Escenario o anfiteatro',
+  'Estacionamientos de Automóviles','Estacionamientos de Bicicletas','Huertos Urbanos','Juegos de mesa','Juegos infantiles',
+  'Luminarias','Mesa de ping-pong metálica empotrada','Multicancha','Plaza Activa (Máquinas de ejercicio)','Sala multiuso','Otros (cuáles?)',
+];
+const RM_ATRIB_VIV = [
+  { l: 'Ventilación Adecuada', k: ['Con buena ventilación'] },
+  { l: 'Distribución Adecuada de Espacios', k: [] },
+  { l: 'Superficie Adecuada', k: ['Con espacios suficientes'] },
+  { l: 'Segura', k: ['Segura'] },
+  { l: 'Ampliable', k: ['Una vivienda ampliable'] },
+  { l: 'Adecuada Aislación Acústica', k: [] },
+  { l: 'Adecuada Aislación Térmica', k: [] },
+];
+const RM_ATRIB_BARRIO = [
+  { l: 'Cercanía con servicios básicos', k: ['Cercanía con servicios básicos'] },
+  { l: 'El equipamiento urbano del barrio (plazas, juegos, sede social, etc.)', k: ['El equipamiento urbano del barrio'] },
+  { l: 'Espacios públicos inclusivos que faciliten el desplazamiento', k: [] },
+  { l: 'Con buena iluminación', k: ['Con buena iluminación'] },
+  { l: 'Seguridad', k: [] },
+  { l: 'Buena accesibilidad vehicular y peatonal del conjunto habitacional', k: [] },
+];
+// atributos de la encuesta que no tienen casilla en la ficha RM -> van a "Otros: ¿Cuáles?"
+const RM_ATRIB_OTROS_VIV = ['Sólida', 'Una bonita fachada', 'Con jardín'];
+const RM_ATRIB_OTROS_BARRIO = ['Un bonito barrio'];
+// equipamiento adicional: etiqueta RM, clave en la encuesta
+const RM_EQ_ADIC_IZQ = [
+  ['Áreas verdes adicionales','Áreas verdes adicionales'],['Bibliotecas','Bibliotecas'],['Ciclo vías','Ciclo vías'],
+  ['Contenedores de basura diferenciado por tipo de desecho','Contenedores de basura diferenciado por tipo de desecho'],
+  ['Escenario o anfiteatro','Escenario o anfiteatro'],['Estacionamientos de Automóviles','Estacionamientos de Automóviles'],
+  ['Estacionamientos de Bicicletas','Estacionamientos de Bicicletas'],['Huertos Urbanos','Huertos Urbanos'],
+];
+const RM_EQ_ADIC_DER = [
+  ['Infocentro','Infocentro'],['Juegos de mesa','Juegos de mesa'],['Juegos infantiles','Juegos infantiles'],['Luminarias','Luminarias'],
+  ['Mesa de ping-pong metálica empotrada','Mesa de ping-pong'],['Multicancha','Multicancha'],
+  ['Plaza Activa (Máquinas de ejercicio)','Plaza Activa (Máquinas de ejercicio)'],['Sala multiuso','Sala multiuso'],
+];
+// filas del cuadro 2.1 (etiqueta RM, etiqueta de columna en la encuesta)
+const RM_USO_FILAS = [
+  ['Áreas verdes adicionales','Áreas verdes adicionales'],['Bibliotecas','Bibliotecas'],['Ciclo vías','Ciclo vías'],
+  ['Contenedores de basura diferenciado por tipo de desecho','Contenedores de basura diferenciado por tipo de desecho'],
+  ['Escenario o anfiteatro','Escenario o anfiteatro'],['Estacionamientos de Automóviles','Estacionamientos de Automóviles'],
+  ['Estacionamientos de Bicicletas','Estacionamientos de Bicicletas'],['Huertos Urbanos','Huertos Urbanos'],
+  ['Infocentro','Infocentro'],['Juegos de mesa','Juegos de mesa'],['Juegos infantiles','Juegos infantiles'],['Luminarias','Luminarias'],
+  ['Mesa de ping-pong metálica empotrada','Mesa de ping-pong'],['Multicancha','Multicancha'],
+  ['Plaza Activa (Máquinas de ejercicio)','Plaza Activa (Máquinas de ejercicio)'],['Sala multiuso','Sala multiuso'],['Otros. ¿Cuál/es?','Otros. ¿Cuál/es?'],
+];
+// temas: a = área, t = texto en ficha RM, k = texto en la encuesta (para buscar la X)
+const RM_TEMAS = [
+  ['Adulto Mayor','1. Características de esta etapa de vida','Características de esta etapa de vida'],
+  ['Adulto Mayor','2. Recomendaciones para familias que asumen cuidados de adulto mayor no valente','Recomendaciones para familias que asumen cuidados de adulto mayor'],
+  ['Adulto Mayor','3. Recomendaciones para un envejecimiento activo','Recomendaciones para un envejecimiento activo'],
+  ['Adulto Mayor','4. Red social especializada en Adulto Mayor','Red social especializada en Adulto Mayor'],
+  ['Educación y Cultura','1. Formación y Capacitación Laboral','Formación y Capacitación Laboral'],
+  ['Educación y Cultura','2. Nivelación de Estudios','Nivelación de Estudios'],
+  ['Educación y Cultura','3. Oferta cultural existente en el territorio','Oferta cultural existente en el territorio'],
+  ['Educación y Cultura','4. Organización vecinal para el desarrollo cultural','Organización vecinal para el desarrollo cultural'],
+  ['Educación y Cultura','5. Personas Inmigrantes','Personas Inmigrantes'],
+  ['Educación y Cultura','6. Pueblos originarios','Pueblos originarios'],
+  ['Familia','1. Divorcio y separaciones de hecho','Divorcio y separaciones de'],
+  ['Familia','2. Ley de herencia','Ley de herencia'],
+  ['Familia','3. Patrimonio reservado de la mujer casada (art. 150 código civil)','Patrimonio reservado de la mujer casada'],
+  ['Familia','4. Pensión alimenticia','Pensión alimenticia'],
+  ['Familia','5. Violencia intrafamiliar','Violencia intrafamiliar'],
+  ['Mujeres','1. Fortalecimiento de liderazgo','Fortalecimiento de liderazgo'],
+  ['Mujeres','2. Violencia hacia la mujer','Violencia hacia la mujer'],
+  ['Participación Comunitaria','1. Capacitación en elaboración de proyectos','Capacitación en elaboración de proyectos'],
+  ['Participación Comunitaria','2. Convivencia vecinal','Convivencia vecinal'],
+  ['Participación Comunitaria','3. Ley de copropiedad y comité de administración','Ley de copropiedad y comité de administración'],
+  ['Participación Comunitaria','4. Roles y funciones directiva y tipos de liderazgo','Roles y funciones directiva y tipos de liderazgo'],
+  ['Participación Comunitaria','5. Tipos de organización y su legislación','Tipos de organización y su legislación'],
+  ['Salud','1. Alcoholismo y/o drogadicción','Alcoholismo y/o drogadicción'],
+  ['Salud','2. Alimentación saludable','Alimentación saludable'],
+  ['Salud','3. Red asistencial de salud en el territorio','Red asistencial de salud en el territorio'],
+  ['Salud','4. Salud mental','Salud mental'],
+  ['Salud','5. Sexualidad y salud reproductiva','Sexualidad y salud reproductiva'],
+  ['Salud','6. Tipos de previsión en salud (FONASA – ISAPRE)','Tipos de previsión en salud'],
+  ['Seguridad ante situaciones de emergencia','1. Recomendaciones para enfrentar situaciones de emergencia y catástrofes naturales','Recomendaciones para enfrentar situaciones de emergencia'],
+  ['Seguridad ante situaciones de emergencia','2. Recomendaciones para la seguridad en el hogar','Recomendaciones para la seguridad en el hogar'],
+  ['Seguridad Ciudadana','1. Organización vecinal para la seguridad en el barrio','Organización vecinal para la seguridad en el barrio'],
+  ['Seguridad Ciudadana','2. Red Institucional que aborda temas de seguridad','Red Institucional que aborda temas de seguridad'],
+  ['Vivienda y Barrio','1. Ampliación de la vivienda','Ampliación de la vivienda'],
+  ['Vivienda y Barrio','2. Cuidado del medio ambiente y reciclaje','Cuidado del medio ambiente y reciclaje'],
+  ['Vivienda y Barrio','3. Cuidado y mantención de la vivienda','Cuidado y mantención de la vivienda'],
+  ['Vivienda y Barrio','4. Mejoramiento de la vivienda y el entorno','Mejoramiento de la vivienda y el entorno'],
+];
+
+function buildDocRM(row, pd, folio, logoBuffer, COLS) {
+  const members = extractMembersRM(row);
+  const post = members[0];
+  const grupo = members.slice(1);
+  const WP = CONTENT_P, WL = CONTENT_L;
+  const tc = rmTitleCase;
+  const nombreCompleto = (m) => [tc(m.nombre), tc(m.ap1), tc(m.ap2)].filter(Boolean).join(' ');
+  const apellidos = (m) => [tc(m.ap1), tc(m.ap2)].filter(Boolean).join(' ');
+  const nrmIn = (raw, label) => !!label && nrm(raw).includes(nrm(label));
+  const titulo = (t, pb = false) => rmP(t, { bold: true, size: 20, before: pb ? 0 : 160, keepNext: true, pageBreak: pb });
+  const sub = (t, pb = false) => rmP(t, { bold: true, size: 18, before: pb ? 0 : 100, keepNext: true, pageBreak: pb });
+  const nota = (t) => rmP(t, { italic: true, size: 16, before: 40, keepNext: true });
+  const gap = (n = 80) => new Paragraph({ keepNext: true, spacing: { before: n, after: 0 }, children: [] });
+
+  // ── Encabezado ──
+  const hw = rmFit([1500, 5200, 4100], WP);
+  const folioW = hw[2];
+  const headerTable = new Table({ width: { size: WP, type: WidthType.DXA }, columnWidths: hw, rows: [new TableRow({ children: [
+    new TableCell({ width: { size: hw[0], type: WidthType.DXA }, borders: NO_BORDERS, margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      children: [new Paragraph({ children: [new ImageRun({ data: logoBuffer, type: 'png', transformation: { width: 100, height: 82 } })] })] }),
+    new TableCell({ width: { size: hw[1], type: WidthType.DXA }, borders: NO_BORDERS, verticalAlign: VerticalAlign.CENTER, margins: { top: 40, bottom: 40, left: 100, right: 40 }, children: [
+      rmP('FICHA DIAGNÓSTICA FAMILIA POSTULANTE', { bold: true, size: 24, align: AlignmentType.CENTER }),
+      rmP('D.S. N° 49, V. y U., DE 2011', { bold: true, size: 20, align: AlignmentType.CENTER }),
+      rmP('(PROYECTOS CNT – MP – PC)', { bold: true, size: 20, align: AlignmentType.CENTER }),
+    ] }),
+    new TableCell({ width: { size: hw[2], type: WidthType.DXA }, borders: NO_BORDERS, verticalAlign: VerticalAlign.BOTTOM, margins: { top: 40, bottom: 40, left: 60, right: 0 }, children: [
+      rmTable([Math.round(folioW * 0.5) - 60, folioW - Math.round(folioW * 0.5)], [
+        new TableRow({ children: [rmC('N° Folio Ficha', { w: Math.round(folioW * 0.5) - 60, bold: true, shade: 'D9D9D9' }), rmC(String(folio), { w: folioW - Math.round(folioW * 0.5) })] }),
+        new TableRow({ children: [rmC('Fecha Aplicación', { w: Math.round(folioW * 0.5) - 60, bold: true, shade: 'D9D9D9' }), rmC('', { w: folioW - Math.round(folioW * 0.5) })] }),
+        new TableRow({ children: [rmC(['Puntaje Carencia', 'Habitacional'], { w: Math.round(folioW * 0.5) - 60, bold: true, shade: 'D9D9D9' }), rmC('', { w: folioW - Math.round(folioW * 0.5) })] }),
+      ]),
+    ] }),
+  ] })] });
+
+  // ── I. Identificación grupo o comité y proyecto ──
+  const tip = pd.tipologia || '';
+  const i1 = rmFit([3600, 2400, 2400, 2400], WP);
+  const secI = rmTable(i1, [
+    new TableRow({ children: [
+      rmC(['Tipología de Proyecto (*)', '(marcar con una X, la tipología que corresponda)'], { w: i1[0], bold: true, shade: 'D9D9D9' }),
+      rmC('CNT ' + rmMark(tip === 'CNT'), { w: i1[1], v: VerticalAlign.CENTER }),
+      rmC('MP ' + rmMark(tip === 'MP'), { w: i1[2], v: VerticalAlign.CENTER }),
+      rmC('PC ' + rmMark(tip === 'PC'), { w: i1[3], v: VerticalAlign.CENTER }),
+    ] }),
+    ...[['Código Proyecto (solo si corresponde)', ''], ['Nombre del Proyecto', pd.nombreProyecto], ['Si es Megaproyecto indicar etapa', pd.etapa || ''],
+        ['Entidad Patrocinante', pd.entidad], ['Comuna', pd.comuna]].map(([a, b]) =>
+      new TableRow({ children: [rmC(a, { w: i1[0], bold: true, shade: 'D9D9D9' }), rmC(b || '', { w: i1[1] + i1[2] + i1[3], span: 3 })] })),
+  ]);
+  const i2 = rmFit([3600, 7200], WP);
+  const funcEP = rmTable(i2, [new TableRow({ children: [rmC(['Identificación de funcionario EP que aplica la ficha'], { w: i2[0], bold: true, shade: 'D9D9D9' }), rmC('', { w: i2[1] })] })]);
+
+  // ── II. Identificación del postulante ──
+  const secII = rmTable(i2, [
+    new TableRow({ children: [rmC(['Identificación de persona del grupo familiar que responde la ficha.'], { w: i2[0], bold: true, shade: 'D9D9D9' }), rmC(nombreCompleto(post), { w: i2[1] })] }),
+    new TableRow({ children: [rmC('Nombre Postulante:', { w: i2[0], bold: true, shade: 'D9D9D9' }), rmC(nombreCompleto(post), { w: i2[1] })] }),
+    new TableRow({ children: [rmC('Domicilio grupo familiar Postulante:', { w: i2[0], bold: true, shade: 'D9D9D9' }), rmC('', { w: i2[1] })] }),
+    new TableRow({ children: [rmC('Teléfono contacto:', { w: i2[0], bold: true, shade: 'D9D9D9' }), rmC('', { w: i2[1] })] }),
+    new TableRow({ children: [rmC('e-mail', { w: i2[0], bold: true, shade: 'D9D9D9' }), rmC('', { w: i2[1] })] }),
+  ]);
+  const firmas = [
+    gap(500), rmP('NOMBRE Y FIRMA PERSONA QUE RESPONDE FICHA', { bold: true, size: 18, align: AlignmentType.CENTER }),
+    rmP('RUT: ' + (post.rut || ''), { bold: true, size: 18, align: AlignmentType.CENTER }), gap(500),
+    rmP('NOMBRE Y FIRMA PROFESIONAL ENTIDAD PATROCINANTE', { bold: true, size: 18, align: AlignmentType.CENTER }),
+    rmP('RUT:', { bold: true, size: 18, align: AlignmentType.CENTER }), gap(300),
+    rmP('TIMBRE', { bold: true, size: 18, align: AlignmentType.CENTER }),
+  ];
+
+  // ── 1. Información sobre el/la postulante y 1.1 grupo familiar (apaisado) ──
+  const estudiaSN = (m) => nrm(m.laboral).startsWith('estudiante') ? 'si' : '';
+  function cellsPersona(m, n, conParentesco, W) {
+    const ec = rmMapEstCivil(m.estCivil), es = rmMapEstudios(m.estudios), lb = rmMapLaboral(m.laboral);
+    const gen = nrm(m.genero), sexF = gen.startsWith('f'), sexM = gen.startsWith('m');
+    const ind = triSN(m.indig);
+    const c = [];
+    let k = 0;
+    c.push(rmC(String(n), { w: W[k++], bold: true, align: AlignmentType.CENTER }));
+    c.push(rmC(tc(m.nombre), { w: W[k++] }));
+    c.push(rmC(apellidos(m), { w: W[k++] }));
+    c.push(rmC(m.rut, { w: W[k++] }));
+    c.push(rmC([rmMark(sexF) + ' F', rmMark(sexM) + ' M'], { w: W[k++] }));
+    c.push(rmC(rmOptLines(RM_ESTCIVIL, ec.sel, ec.otro), { w: W[k++] }));
+    c.push(rmC(m.edad, { w: W[k++], align: AlignmentType.CENTER }));
+    if (conParentesco) { const pr = rmMapParentesco(m.parentesco); c.push(rmC(rmOptLines(RM_PARENT, pr.sel, pr.otro), { w: W[k++] })); }
+    const est = estudiaSN(m);
+    c.push(rmC([rmMark(est === 'si') + ' SI', rmMark(false) + ' NO'], { w: W[k++] }));
+    c.push(rmC(rmOptLines(RM_ESTUDIOS, es.sel, es.otro), { w: W[k++] }));
+    c.push(rmC(rmOptLines(RM_LABORAL, lb.sel, lb.otro), { w: W[k++] }));
+    const indL = [rmMark(ind === 'si') + ' Si', rmMark(ind === 'no') + ' No'];
+    if (ind === 'si') indL.push('Pueblo: ' + (m.pueblo || ''));
+    c.push(rmC(indL, { w: W[k++] }));
+    return c;
+  }
+  const wPost = rmFit([500, 1500, 1800, 1300, 800, 1900, 700, 800, 2200, 2300, 1780, 1700], WL);
+  const hdrPost = ['N°', 'Nombre', 'Apellidos', 'RUN', 'Sexo', 'Estado Civil', 'Edad', ['¿Estudia', 'Actualmente?'], 'Estudios (último curso)', 'Situación Ocupacional', ['¿Tiene ascendencia', 'indígena? (*)'], ['Gastos mensuales', 'Servicios Básicos']];
+  const postRow = new TableRow({ children: [
+    ...cellsPersona(post, 1, false, wPost.slice(0, 11)),
+    rmC(RM_GASTOS.map(g => '☐ ' + g), { w: wPost[11] }),
+  ] });
+  const tablaPost = rmTable(wPost, [new TableRow({ tableHeader: true, children: hdrPost.map((h, i) => rmH(h, { w: wPost[i], fs: 15 })) }), postRow]);
+
+  const wGrp = rmFit([450, 1450, 1700, 1300, 700, 1800, 650, 1600, 950, 2250, 2450, 1730], WL);
+  const hdrGrp = ['N°', 'Nombre', 'Apellidos', 'RUN', 'Sexo', 'Estado Civil', 'Edad', ['Parentesco con', 'Postulante'], ['¿Estudia', 'Actualmente?'], 'Estudios (último curso)', 'Situación Ocupacional', ['¿Tiene ascendencia', 'indígena? (*)']];
+  const grpRows = grupo.map((m, i) => new TableRow({ cantSplit: true, children: cellsPersona(m, i + 2, true, wGrp) }));
+  const tablaGrp = rmTable(wGrp, [new TableRow({ tableHeader: true, children: hdrGrp.map((h, i) => rmH(h, { w: wGrp[i], fs: 15 })) }), ...grpRows]);
+
+  // ── 1.2 Condiciones especiales ──
+  const esExtr = (m) => !!m.nac && !nrm(m.nac).startsWith('chilen');
+  const conCond = members.filter(m => triSN(m.disc) === 'si' || esExtr(m) || triSN(m.valech) === 'si' || triSN(m.cred) === 'si');
+  const w12 = [3300, 1600, 1500, 1900, 2400, 1800, 1700, 1500, 1580];
+  const sn = (v) => rmMark(v === 'si') + ' Si   ' + rmMark(v === 'no') + ' No';
+  function tipoDisc(m) {
+    if (triSN(m.disc) !== 'si' && !m.discCual) return ['☐ Mental  ☐ Sensorial  ☐ Física'];
+    const n = nrm(m.discCual);
+    const mental = /mental|psiq|intelect|cognit|retraso|sicomot|psicomot|autis/.test(n);
+    const sens = /sensor|visual|auditiv|sord|ceg|hipoacus/.test(n);
+    const fis = /fisic|motor|motriz|parapleji|cuadripleji|amput/.test(n);
+    const l = [rmMark(mental) + ' Mental  ' + rmMark(sens) + ' Sensorial  ' + rmMark(fis) + ' Física'];
+    if (m.discCual) l.push(m.discCual);
+    return l;
+  }
+  const filas12 = conCond.map(m => {
+    const extr = esExtr(m);
+    return new TableRow({ cantSplit: true, children: [
+      rmC(nombreCompleto(m), { w: w12[0] }),
+      rmC(sn(triSN(m.cred)), { w: w12[1] }),
+      rmC(sn(triSN(m.mr)), { w: w12[2] }),
+      rmC(sn(''), { w: w12[3] }),
+      rmC(tipoDisc(m), { w: w12[4] }),
+      rmC(extr ? tc(m.nac) : '', { w: w12[5] }),
+      rmC(extr && triSN(m.resid) === 'si' ? 'Con residencia definitiva (año: ____)' : '', { w: w12[6] }),
+      rmC(sn(triSN(m.valech)), { w: w12[7] }),
+      rmC(sn(''), { w: w12[8] }),
+    ] });
+  });
+  const tabla12 = rmTable(w12, [
+    new TableRow({ tableHeader: true, children: [
+      rmH('Nombre', { w: w12[0] }), rmH('DISCAPACIDAD', { w: w12[1] + w12[2] + w12[3] + w12[4], span: 4 }),
+      rmH('PERSONA EXTRANJERA', { w: w12[5] + w12[6], span: 2 }), rmH(['Beneficiario Comisión', 'VALECH (SI/NO)'], { w: w12[7] }),
+      rmH(['Voluntario Activo CUERPO DE BOMBEROS', '(Registro Nacional de Bomberos Voluntarios) (SI/NO)'], { w: w12[8], fs: 14 }),
+    ] }),
+    new TableRow({ tableHeader: true, children: [
+      rmH('', { w: w12[0] }), rmH(['Inscrita en el Reg. Nacional', 'de la Discapacidad'], { w: w12[1], fs: 14 }), rmH('¿Tiene movilidad reducida?', { w: w12[2], fs: 14 }),
+      rmH(['¿Cuenta con Certificado de', 'Movilidad Reducida COMPIN?'], { w: w12[3], fs: 14 }), rmH('Tipo de Discapacidad', { w: w12[4], fs: 14 }),
+      rmH('Nacionalidad', { w: w12[5], fs: 14 }), rmH(['Año Obtención Residencia', 'Definitiva'], { w: w12[6], fs: 14 }), rmH('', { w: w12[7] }), rmH('', { w: w12[8] }),
+    ] }),
+    ...(filas12.length ? filas12 : [new TableRow({ children: [rmC('', { w: w12[0] }), ...w12.slice(1).map(w => rmC('', { w }))] })]),
+  ]);
+  const cuadroNo = rmTable([14600, 2680], [new TableRow({ children: [
+    rmC('En caso de no existir ningún integrante con alguna de estas condiciones, marque con una X, el siguiente cuadro', { w: 14600 }),
+    rmC(conCond.length ? '' : 'X', { w: 2680, bold: true, align: AlignmentType.CENTER, v: VerticalAlign.CENTER }),
+  ] })]);
+
+  // ── III. Situación habitacional ──
+  const sitHab = val(row[COLS.sitHab]), tipoViv = val(row[COLS.tipoViv]), sistAgua = val(row[COLS.sistAgua]), servHig = val(row[COLS.servHig]);
+  const cal = triSN(val(row[COLS.calefont]));
+  function pick(options, v, aliases = {}) {
+    const n = nrm(v); if (!n) return { sel: null, otro: '' };
+    for (const o of options) if (nrm(o) === n) return { sel: o, otro: '' };
+    for (const [k, o] of Object.entries(aliases)) if (nrm(k) === n) return { sel: o, otro: '' };
+    return { sel: null, otro: val(v) };
+  }
+  const O_SIT = ['Allegado/a', 'Arrendatario/a', 'En Situación de calle', 'En Campamento'];
+  const O_VIV = ['Departamento', 'Casa', 'Mediagua', 'Choza', 'Pieza'];
+  const O_AGUA = ['Con llave de agua dentro de la vivienda', 'Con llave de agua fuera de vivienda', 'No tiene o la acarrea'];
+  const O_HIG = ['WC conectado al alcantarillado', 'WC conectado a Fosa séptica', 'Letrina conectada a Pozo negro', 'No Posee Servicio Higiénico'];
+  const O_ELEC = ['Con medidor', 'Conexión Irregular'];
+  const s1 = pick(O_SIT, sitHab), s2 = pick(O_VIV, tipoViv), s3 = pick(O_AGUA, sistAgua), s4 = pick(O_HIG, servHig, { 'Letrina o pozo negro': 'Letrina conectada a Pozo negro' });
+  const otroL = (o) => rmMark(!!o) + ' Otro: ' + (o || '');
+  const w3 = rmFit([1, 1, 1, 1, 1, 1], WP);
+  const tablaIII = rmTable(w3, [
+    new TableRow({ children: ['1.1.- Situación Habitacional:', '1.2.- Tipo Vivienda:', '1.3.- Tipo de Sistema Agua:', '1.4.- Tipo de Servicio Higiénico:', '1.5.- Tipo de Servicio Eléctrico:', '1.6.- ¿Cuenta con Calefont?:']
+      .map((t, i) => rmH(t, { w: w3[i], fs: 15 })) }),
+    new TableRow({ children: [
+      rmC([...rmOptLines(O_SIT, s1.sel, ''), otroL(s1.otro)], { w: w3[0] }),
+      rmC([...rmOptLines(O_VIV, s2.sel, ''), otroL(s2.otro)], { w: w3[1] }),
+      rmC([...rmOptLines(O_AGUA, s3.sel, ''), otroL(s3.otro)], { w: w3[2] }),
+      rmC([...rmOptLines(O_HIG, s4.sel, ''), otroL(s4.otro)], { w: w3[3] }),
+      rmC([...rmOptLines(O_ELEC, null, ''), otroL('')], { w: w3[4] }),
+      rmC([rmMark(cal === 'si') + ' SI', rmMark(cal === 'no') + ' NO'], { w: w3[5] }),
+    ] }),
+  ]);
+  const w2 = [3600, 7200];
+  const tablaDorm = rmTable(w2, [
+    new TableRow({ children: [rmC('2.1.- N° de Dormitorios', { w: w2[0], bold: true, shade: 'D9D9D9' }), rmC(val(row[COLS.dormitorios]), { w: w2[1] })] }),
+    new TableRow({ children: [rmC('2.2.- N° de Camas', { w: w2[0], bold: true, shade: 'D9D9D9' }), rmC(val(row[COLS.camas]), { w: w2[1] })] }),
+  ]);
+  const ATRIB_ACTUAL = ['El barrio', 'El equipamiento urbano del barrio (plazas, juegos, etc.)', 'El espacio del sitio', 'La cercanía con los servicios básicos', 'La seguridad de la vivienda', 'La seguridad del barrio', 'La superficie de la vivienda', 'Relación con los vecinos', 'Relación con otras personas que viven en la vivienda', 'Otro (Cuáles?):'];
+  const w31 = [8000, 2800];
+  const tablaAtribActual = rmTable(w31, [
+    new TableRow({ children: [rmH('ATRIBUTOS', { w: w31[0] }), rmH('MARQUE CON UNA X', { w: w31[1] })] }),
+    ...ATRIB_ACTUAL.map(a => new TableRow({ children: [rmC(a, { w: w31[0] }), rmC('', { w: w31[1] })] })),
+  ]);
+  // 4. Convivencia: la encuesta responde SI/NO; se traslada Sí -> Siempre y No -> Nunca
+  const w4 = [4800, 1500, 1500, 1500, 1500];
+  const tablaConv = rmTable(w4, [
+    new TableRow({ children: [rmH('', { w: w4[0] }), rmH('Siempre', { w: w4[1] }), rmH('A veces', { w: w4[2] }), rmH('Nunca', { w: w4[3] }), rmH(['No sabe /', 'No responde'], { w: w4[4] })] }),
+    ...RM_CONV.map((t, i) => {
+      const r = triSN(val(row[COLS.conviv[RM_CONV_IDX[i]]]));
+      return new TableRow({ children: [rmC(t, { w: w4[0] }), rmC(XC(r === 'si'), { w: w4[1], bold: true, align: AlignmentType.CENTER }), rmC('', { w: w4[2] }),
+        rmC(XC(r === 'no'), { w: w4[3], bold: true, align: AlignmentType.CENTER }), rmC('', { w: w4[4] })] });
+    }),
+  ]);
+  const w45 = [8000, 1400, 1400];
+  const tabla45 = rmTable(w45, [
+    new TableRow({ children: [rmH('', { w: w45[0] }), rmH('SI', { w: w45[1] }), rmH('NO', { w: w45[2] })] }),
+    new TableRow({ children: [rmC('4.5.- ¿Ud. participa en alguna organización comunitaria de su barrio? (J.Vecinos, A. Mayor, Club Deportivo, Pastoral, entre otras)', { w: w45[0] }), rmC('', { w: w45[1] }), rmC('', { w: w45[2] })] }),
+  ]);
+  const tablaEquipExist = rmTable(w31, [
+    new TableRow({ children: [rmH('EQUIPAMIENTO', { w: w31[0] }), rmH('MARQUE CON UNA X', { w: w31[1] })] }),
+    ...RM_EQUIP_EXISTENTE.map(a => new TableRow({ children: [rmC(a, { w: w31[0] }), rmC('', { w: w31[1] })] })),
+  ]);
+  const w6 = rmFit([3800, 1400, 1400, 1400, 1400, 1400], WP);
+  const tablaUso = rmTable(w6, [
+    new TableRow({ children: [rmH('', { w: w6[0] }), rmH('Siempre', { w: w6[1] }), rmH('A veces', { w: w6[2] }), rmH('Nunca', { w: w6[3] }), rmH(['No aplica', '(no existe equipam.)'], { w: w6[4], fs: 14 }), rmH(['No sabe /', 'No responde'], { w: w6[5] })] }),
+    ...RM_USO.map(t => new TableRow({ children: [rmC(t, { w: w6[0] }), ...w6.slice(1).map(w => rmC('', { w }))] })),
+  ]);
+
+  // ── IV. Vivienda y equipamiento del proyecto ──
+  const rawAtrib = val(row[COLS.atribRaw]);
+  const rawEquip = val(row[COLS.equipRaw]);
+  const rawTemas = val(row[COLS.temasRaw]);
+  const otrosViv = RM_ATRIB_OTROS_VIV.filter(a => nrmIn(rawAtrib, a)).join(', ');
+  const otrosBarrio = RM_ATRIB_OTROS_BARRIO.filter(a => nrmIn(rawAtrib, a)).join(', ');
+  const tablaAtribViv = rmTable(w31, [
+    new TableRow({ children: [rmH('ATRIBUTOS DE LA VIVIENDA', { w: w31[0] }), rmH('MARQUE CON UNA X', { w: w31[1] })] }),
+    ...RM_ATRIB_VIV.map(a => new TableRow({ children: [rmC(a.l, { w: w31[0] }), rmC(XC(a.k.some(k => nrmIn(rawAtrib, k))), { w: w31[1], bold: true, align: AlignmentType.CENTER })] })),
+    new TableRow({ children: [rmC('Otros: ¿Cuáles? ' + otrosViv, { w: w31[0] }), rmC(XC(!!otrosViv), { w: w31[1], bold: true, align: AlignmentType.CENTER })] }),
+  ]);
+  const tablaAtribBarrio = rmTable(w31, [
+    new TableRow({ children: [rmH('ATRIBUTOS DEL BARRIO', { w: w31[0] }), rmH('MARQUE CON UNA X', { w: w31[1] })] }),
+    ...RM_ATRIB_BARRIO.map(a => new TableRow({ children: [rmC(a.l, { w: w31[0] }), rmC(XC(a.k.some(k => nrmIn(rawAtrib, k))), { w: w31[1], bold: true, align: AlignmentType.CENTER })] })),
+    new TableRow({ children: [rmC('Otros: ¿Cuáles? ' + otrosBarrio, { w: w31[0] }), rmC(XC(!!otrosBarrio), { w: w31[1], bold: true, align: AlignmentType.CENTER })] }),
+  ]);
+  const wAh = [8000, 1400, 1400];
+  const tablaAhorro1 = rmTable(wAh, [
+    new TableRow({ children: [rmH('', { w: wAh[0] }), rmH('SI', { w: wAh[1] }), rmH('NO', { w: wAh[2] })] }),
+    new TableRow({ children: [rmC('1.1 ¿Estaría dispuesto a aportar un ahorro adicional al mínimo exigido por el programa habitacional?', { w: wAh[0] }), rmC('', { w: wAh[1] }), rmC('', { w: wAh[2] })] }),
+  ]);
+  const wAh2 = [5400, 1800, 1800, 1800];
+  const tablaAhorro2 = rmTable(wAh2, [
+    new TableRow({ children: [rmH('', { w: wAh2[0] }), rmH('10 U.F', { w: wAh2[1] }), rmH('20 U.F', { w: wAh2[2] }), rmH('Superior a 20 U.F', { w: wAh2[3] })] }),
+    new TableRow({ children: [rmC('1.2 En total, ¿cuánto ahorro adicional estaría dispuesto a aportar en este Proyecto?', { w: wAh2[0] }), rmC('', { w: wAh2[1] }), rmC('', { w: wAh2[2] }), rmC('', { w: wAh2[3] })] }),
+  ]);
+  // 2. Equipamiento adicional (dos columnas)
+  const wE = [3600, 1800, 3600, 1800];
+  const canil = nrmIn(rawEquip, 'Canil para mascotas');
+  const hayOtros = nrmIn(rawEquip, 'Otros');
+  const eqRows = [];
+  for (let i = 0; i < RM_EQ_ADIC_IZQ.length; i++) {
+    const a = RM_EQ_ADIC_IZQ[i], b = RM_EQ_ADIC_DER[i];
+    eqRows.push(new TableRow({ children: [
+      rmC(a[0], { w: wE[0] }), rmC(XC(nrmIn(rawEquip, a[1])), { w: wE[1], bold: true, align: AlignmentType.CENTER }),
+      rmC(b[0], { w: wE[2] }), rmC(XC(nrmIn(rawEquip, b[1])), { w: wE[3], bold: true, align: AlignmentType.CENTER }),
+    ] }));
+  }
+  eqRows.push(new TableRow({ children: [
+    rmC('Otros. ¿Cuál/es? ' + (canil ? 'Canil para mascotas' : ''), { w: wE[0] + wE[1] + wE[2], span: 3 }),
+    rmC(XC(canil || hayOtros), { w: wE[3], bold: true, align: AlignmentType.CENTER }),
+  ] }));
+  const tablaEqAdic = rmTable(wE, [new TableRow({ children: [rmH('EQUIPAMIENTO COMUNITARIO ADICIONAL', { w: wE[0] + wE[1] + wE[2] + wE[3], span: 4 })] }), ...eqRows]);
+  // 2.1 usuarios
+  function parseUsrRM(s) {
+    const lo = nrm(s);
+    return { n: lo.includes('nin'), j: lo.includes('joven'), m: lo.includes('mujer'), h: lo.includes('hombre'), a: lo.includes('mayor') };
+  }
+  const wU = rmFit([3800, 1400, 1400, 1400, 1400, 1400], WP);
+  const usoFilas = RM_USO_FILAS.map(([lab, key]) => {
+    const col = COLS.equsrCols[key];
+    const u = parseUsrRM((col !== undefined && col >= 0) ? val(row[col]) : '');
+    return new TableRow({ children: [rmC(lab, { w: wU[0] }), ...[u.n, u.j, u.m, u.h, u.a].map((b, i) => rmC(XC(b), { w: wU[i + 1], bold: true, align: AlignmentType.CENTER }))] });
+  });
+  const tablaUsuarios = rmTable(wU, [
+    new TableRow({ children: [rmH('EQUIPAMIENTO', { w: wU[0] }), rmH(['Niñas y', 'niños'], { w: wU[1] }), rmH('Jóvenes', { w: wU[2] }), rmH(['Mujeres', '(adultas)'], { w: wU[3] }), rmH(['Hombres', '(adultos)'], { w: wU[4] }), rmH(['Personas', 'Adultas Mayores'], { w: wU[5], fs: 14 })] }),
+    ...usoFilas,
+  ]);
+
+  // ── V. Temas ──
+  const wT = [2400, 7000, 1400];
+  const temasRows = RM_TEMAS.map(([a, t, k]) => new TableRow({ cantSplit: true, children: [
+    rmC(a, { w: wT[0], bold: true }), rmC(t, { w: wT[1] }), rmC(XC(nrmIn(rawTemas, k)), { w: wT[2], bold: true, align: AlignmentType.CENTER }),
+  ] }));
+  temasRows.push(new TableRow({ children: [rmC('Otros: indique cuál(es)', { w: wT[0], bold: true }), rmC('', { w: wT[1] }), rmC('', { w: wT[2] })] }));
+  const tablaTemas = rmTable(wT, [new TableRow({ tableHeader: true, children: [rmH('ÁREAS', { w: wT[0] }), rmH('TEMAS', { w: wT[1] }), rmH(['Marque con', 'una X'], { w: wT[2] })] }), ...temasRows]);
+
+  const hf = { footers: rmFooter() };
+  const notasPost = [
+    nota('(*) Aymara, quechua, licanantay o atacameño, colla, rapanui, mapuche, yagán, kawésqar, otros.'),
+  ];
+  return new Document({
+    styles: { default: { document: { run: { font: 'Arial', size: 18 } } } },
+    sections: [
+      { properties: portraitProps(SectionType.NEXT_PAGE), ...hf, children: [
+        headerTable, gap(120),
+        titulo('I.- IDENTIFICACIÓN GRUPO O COMITÉ POSTULANTE Y PROYECTO'), gap(40), secI,
+        nota('(*) CNT: Construcción en Nuevos Terrenos; MP: Megaproyecto; PC: Pequeño Condominio'),
+        nota('(**) La información en Gris, debe ser completada por profesional de la EP'), gap(60), funcEP, gap(120),
+        titulo('II.- IDENTIFICACIÓN DEL POSTULANTE'), gap(40), secII, ...firmas,
+      ] },
+      { properties: landscapeProps(SectionType.NEXT_PAGE), ...hf, children: [
+        sub('1.- Información sobre el/la postulante'), gap(40), tablaPost, gap(120),
+        sub('1.1 Información Grupo familiar'), gap(40), ...(grupo.length ? [tablaGrp] : [nota('(Sin otros integrantes del grupo familiar declarados en la encuesta)')]),
+        ...notasPost, gap(120),
+        sub('1.2 De existir miembros del Grupo familiar que cumplan con alguna de estas condiciones, identificarlos en el siguiente cuadro:'), gap(40), tabla12, gap(60), cuadroNo,
+      ] },
+      { properties: portraitProps(SectionType.NEXT_PAGE), ...hf, children: [
+        titulo('III.- SITUACIÓN HABITACIONAL Y DEL BARRIO ACTUAL'),
+        sub('1.- Situación Habitacional Actual (Marque con una X)'), gap(40), tablaIII, gap(100),
+        sub('2.- Datos de la vivienda actual.'), nota('Conteste sólo el número de dormitorios y camas que ocupa usted y su grupo familiar.'), gap(40), tablaDorm, gap(100),
+        sub('3.- Respecto al actual lugar de residencia, indique los 3 atributos más valorados por su núcleo familiar: (Marcar con una X)'), gap(40), tablaAtribActual, gap(100),
+        sub('4.- Convivencia Comunitaria en su actual lugar de residencia.'), nota('Favor conteste qué tan de acuerdo se encuentra usted con las siguientes afirmaciones: (Marcar con un X)'), gap(40), tablaConv, gap(60), tabla45, gap(100),
+        sub('5.- Existencia de Equipamiento Comunitario en su actual lugar de residencia.', true),
+        nota('Favor marque con una X para identificar el equipamiento comunitario que existe en las cercanías (recorrido caminable a 10 cuadras aprox.), de su actual lugar de residencia:'), gap(40), tablaEquipExist, gap(100),
+        sub('6.- Uso del Equipamiento comunitario existente en las cercanías de su actual lugar de residencia.'), nota('Favor conteste qué tan de acuerdo se encuentra usted con las siguientes afirmaciones: (Marcar con una X)'), gap(40), tablaUso, gap(120),
+        titulo('IV.- DE LA VIVIENDA Y DEL EQUIPAMIENTO COMUNITARIO DEL PROYECTO HABITACIONAL', true),
+        sub('1.- Respecto a la futura Vivienda y Barrio, marque con una X 3 atributos más valorados por su núcleo familiar (3 para vivienda y 3 para Barrio):'), gap(40),
+        tablaAtribViv, gap(60), tablaAtribBarrio, gap(100),
+        sub('Ahorro Adicional (Optativa)'), nota('Contestar, solo en caso que no esté definido previamente este aspecto por parte de la organización:'), gap(40), tablaAhorro1, gap(40), tablaAhorro2, gap(100),
+        sub('2.- ¿Qué Equipamiento Comunitario Adicional le gustaría que fuera parte del Proyecto Habitacional? Del siguiente listado marque con una X hasta el máximo de 4 preferencias:'), gap(40), tablaEqAdic, gap(100),
+        sub('2.1.- Según su opinión, ¿quiénes serían las personas que más ocuparían ese equipamiento? Marque con una X sus opciones.'),
+        nota('Recuerde responder sobre los 4 equipamientos elegidos en la pregunta anterior.'), gap(40), tablaUsuarios, gap(120),
+        titulo('V.- NECESIDADES E INTERESES DEL GRUPO O COMITÉ POSTULANTE', true),
+        nota('Queremos conocer sus intereses respecto de diversas temáticas. Para ello le proponemos 9 áreas, las cuales desarrollan algunos temas que creemos podrían ser interesantes y/o necesarios para trabajar.'),
+        nota('Por favor elija un máximo de 10 temas que considere importantes para usted y su familia:'), gap(40), tablaTemas,
+      ] },
+    ],
+  });
+}
 
 // ── normStr ───────────────────────────────────────────────────
 function normStr(s) {
