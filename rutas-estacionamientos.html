@@ -148,6 +148,14 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
 .tabla-semana th.th-feriado,.tabla-semana td.td-feriado{background:var(--gris-1,#eee);color:var(--txt-dim,#888);}
 .aviso-feriado{margin:0 0 12px;padding:10px 14px;background:#FFF4E0;border:1px solid #F0D9A8;border-radius:8px;font-size:0.8rem;color:#7A5A12;}
 .bq-clic{cursor:pointer;}
+.cam-celda{height:56px;padding:5px 6px;vertical-align:middle;text-align:center;font-weight:700;line-height:1.2;font-size:0.74rem;}
+.cam-celda.bq-am{border-left:2px solid var(--gris-3);}
+.cam-libre{background:rgba(26,122,74,0.12);color:var(--verde);}
+.cam-sel{background:var(--verde);color:#fff;}
+.cam-res{background:var(--rojo);color:#fff;}
+.cam-pend{background:#E9A23B;color:#fff;}
+.cam-celda .bq-s{font-weight:500;font-size:0.64rem;max-width:104px;margin:2px auto 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cam-fila-pend{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--gris-2);border-radius:8px;margin-bottom:8px;font-size:0.82rem;}
 .bq-clic:hover{filter:brightness(1.1);box-shadow:inset 0 0 0 2px rgba(0,0,0,0.28);}
 .estac-leyenda{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:0.76rem;color:var(--txt-dim);align-items:center;}
 .estac-leyenda .dot-cuad{width:11px;height:11px;border-radius:3px;display:inline-block;margin-right:4px;vertical-align:middle;}
@@ -185,6 +193,7 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
     <div class="tabs tabs-principal" id="tabs-principal" style="display:none;">
         <div class="tab" data-tab-principal="estacionamientos" onclick="cambiarTabPrincipal('estacionamientos')">🚗 Estacionamientos</div>
         <div class="tab activo" data-tab-principal="teletrabajo" onclick="cambiarTabPrincipal('teletrabajo')">🗺️ Teletrabajo / Rutas</div>
+        <div class="tab" data-tab-principal="camionetas" id="tab-camionetas" style="display:none;" onclick="cambiarTabPrincipal('camionetas')">🚐 Camionetas</div>
     </div>
 
     <!-- ═══════════ PANEL: ESTACIONAMIENTOS ═══════════ -->
@@ -358,6 +367,28 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
         </div>
     </div>
 
+    <!-- ═══════════ PANEL: CAMIONETAS (solo participantes, aprobadores y administradores) ═══════════ -->
+    <div class="panel" id="panel-principal-camionetas">
+        <div class="week-nav" style="margin-bottom:10px;">
+            <button onclick="cambiarSemanaCam(-1)">‹ Semana anterior</button>
+            <div class="week-label" id="cam-week-label"></div>
+            <button onclick="cambiarSemanaCam(1)">Semana siguiente ›</button>
+            <button class="btn btn-outline btn-sm" style="margin-left:10px;" onclick="irHoyCam()">Hoy</button>
+            <button class="btn btn-outline btn-sm" style="margin-left:auto;" onclick="cargarCamionetas()">↻ Actualizar</button>
+        </div>
+        <div class="bq-ayuda" id="cam-ayuda"></div>
+        <div id="cam-por-aprobar"></div>
+        <div style="overflow-x:auto;" id="cam-grid"></div>
+        <div id="cam-seleccion"></div>
+        <div class="estac-leyenda">
+            <span><span class="dot-cuad" style="background:rgba(26,122,74,0.25);"></span>Libre</span>
+            <span><span class="dot-cuad" style="background:var(--verde);"></span>Seleccionado</span>
+            <span><span class="dot-cuad" style="background:var(--rojo);"></span>Reservada</span>
+            <span><span class="dot-cuad" style="background:#E9A23B;"></span>Pendiente de aprobación</span>
+            <span style="margin-left:auto;">AM: 08:00 a 14:00 · PM: 15:00 a 19:00</span>
+        </div>
+    </div>
+
 </div>
 
 <div class="modal-overlay" id="modal-liberar">
@@ -475,13 +506,22 @@ async function initAuth() {
             let listaAcceso = [];
             try { listaAcceso = await fetch(`${API}/acceso-beta/rutas-estacionamientos`).then(r => r.json()); } catch(e) { listaAcceso = ADMINISTRADORES; }
             if (!listaAcceso.includes(emailActual)) {
-                window.location.href = 'index.html';
-                return;
+                // Sin acceso al módulo completo: puede entrar solo si es de alguna camioneta.
+                let porCamioneta = [];
+                try { porCamioneta = (await fetch(`${API}/camionetas/accesos`).then(r => r.json())).map(e => String(e).toLowerCase()); } catch(e) {}
+                if (!porCamioneta.includes(emailActual)) { window.location.href = 'index.html'; return; }
+                soloCamionetas = true;
             }
             personasConAcceso = listaAcceso.map(e => String(e).toLowerCase());
             nombreActual = u.name || u.username;
             const iniciales = nombreActual.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
             document.getElementById('auth-area').innerHTML = `<div class="user-chip"><div class="user-av">${iniciales}</div><span class="user-nm">${nombreActual.split(' ').slice(0,2).join(' ')}</span></div>`;
+            if (soloCamionetas) {
+                document.getElementById('fecha-hoy').textContent = '';
+                await cargarCamionetas();
+                aplicarVisibilidadEstacionamientos(true);
+                return;
+            }
             if (ADMINISTRADORES.includes(emailActual)) {
                 document.getElementById('admin-wrap').style.display = 'block';
                 document.getElementById('admin-acceso-wrap').style.display = 'block';
@@ -503,6 +543,7 @@ async function initAuth() {
 
             await cargarDatos(); // Teletrabajo — primero, porque estacionamientos ahora depende de su patrón
             await cargarTodo();  // Estacionamientos (hace falta saber quién tiene uno para decidir qué pestañas se ven)
+            await cargarCamionetas();
             aplicarVisibilidadEstacionamientos(true);
             if (VEN_SEGUIMIENTO.includes(emailActual)) {
                 document.getElementById('tab-seguimiento').style.display = '';
@@ -563,17 +604,30 @@ function puedeVerEstacionamientos() {
     return VEN_ESTACIONAMIENTOS.includes(emailActual) || spots.some(s => String(s.duenoEmail || '').toLowerCase() === emailActual);
 }
 function aplicarVisibilidadEstacionamientos(primeraVez) {
-    const ver = puedeVerEstacionamientos();
-    document.getElementById('tabs-principal').style.display = ver ? '' : 'none';
-    const enEstac = document.getElementById('panel-principal-estacionamientos').classList.contains('activo');
-    if (!ver && enEstac) cambiarTabPrincipal('teletrabajo');
-    else if (ver && primeraVez) cambiarTabPrincipal('estacionamientos');
+    const ver = {
+        estacionamientos: !soloCamionetas && puedeVerEstacionamientos(),
+        teletrabajo: !soloCamionetas,
+        camionetas: misCamionetas.length > 0,
+    };
+    document.querySelectorAll('#tabs-principal .tab').forEach(t => { t.style.display = ver[t.dataset.tabPrincipal] ? '' : 'none'; });
+    const visibles = Object.keys(ver).filter(k => ver[k]);
+    document.getElementById('tabs-principal').style.display = visibles.length > 1 ? '' : 'none';
+    const activa = ['estacionamientos', 'teletrabajo', 'camionetas'].find(t => document.getElementById('panel-principal-' + t).classList.contains('activo'));
+    if (!ver[activa]) cambiarTabPrincipal(visibles[0] || 'teletrabajo');
+    else if (primeraVez) {
+        const quiere = new URLSearchParams(location.search).get('tab');
+        if (quiere && ver[quiere]) cambiarTabPrincipal(quiere);
+        else if (ver.estacionamientos) cambiarTabPrincipal('estacionamientos');
+    }
 }
+let soloCamionetas = false; // entra al módulo solo por las camionetas (no tiene acceso a Teletrabajo / Estacionamientos)
 function cambiarTabPrincipal(tab) {
     document.querySelectorAll('#tabs-principal .tab').forEach(t => t.classList.toggle('activo', t.dataset.tabPrincipal === tab));
     document.getElementById('panel-principal-estacionamientos').classList.toggle('activo', tab === 'estacionamientos');
     document.getElementById('panel-principal-teletrabajo').classList.toggle('activo', tab === 'teletrabajo');
+    document.getElementById('panel-principal-camionetas').classList.toggle('activo', tab === 'camionetas');
     if (tab === 'teletrabajo') renderSemana();
+    if (tab === 'camionetas') renderCamionetas();
 }
 
 // ══════════════════ ESTACIONAMIENTOS ══════════════════
@@ -1240,6 +1294,245 @@ function textoFeriados(lista) {
     return lista.map(x => `${NOMBRES_DIA_LARGO[x.dia]} ${parseInt(x.fecha.slice(8), 10)} (${x.nombre})`).join(' y ');
 }
 const AVISO_SEMANA_FERIADO = 'Semana con feriado: no hay día remoto, todos van presencial toda la semana. Solo se consideran las visitas a obra y las excepciones.';
+
+
+// ══════════════════ CAMIONETAS ══════════════════
+// Solo ven cada camioneta sus participantes, su aprobador (si tiene) y los administradores: lo decide el servidor.
+let camData = { hoy: '', camionetas: [], reservas: [] };
+let misCamionetas = [];
+let semanaOffsetCam = 0;
+let camSeleccion = new Map(); // "camionetaId|fecha|bloque" -> { camionetaId, fecha, bloque }
+const CAM_BLOQUES = [{ clave: 'AM', desde: '08:00', hasta: '14:00', texto: 'mañana (08:00 a 14:00)' }, { clave: 'PM', desde: '15:00', hasta: '19:00', texto: 'tarde (15:00 a 19:00)' }];
+const DIAS_CAM_LARGO = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+
+function camFechaLarga(iso) { const d = new Date(iso + 'T12:00:00'); return `${DIAS_CAM_LARGO[d.getDay()]} ${fmt(iso)}`; }
+function camBloqueTexto(b) { return (CAM_BLOQUES.find(x => x.clave === b) || {}).texto || b; }
+function camNombreCorto(r) { const n = String(r.nombre || r.email || '').trim().split(/\s+/); return n.length > 1 ? `${n[0]} ${n[n.length > 2 ? 2 : 1][0]}.` : n[0]; }
+function camPorId(id) { return camData.camionetas.find(c => c.id === id); }
+
+async function cargarCamionetas() {
+    try {
+        const res = await fetch(`${API}/camionetas?email=${encodeURIComponent(emailActual)}`);
+        if (!res.ok) throw new Error((await res.json()).error || 'Error');
+        camData = await res.json();
+        misCamionetas = camData.camionetas || [];
+        camSeleccion.clear();
+        aplicarVisibilidadEstacionamientos(false);
+        if (document.getElementById('panel-principal-camionetas').classList.contains('activo')) renderCamionetas();
+    } catch (e) { toast('No se pudieron cargar las camionetas: ' + e.message); }
+}
+function cambiarSemanaCam(d) { semanaOffsetCam += d; camSeleccion.clear(); renderCamionetas(); }
+function irHoyCam() { semanaOffsetCam = 0; camSeleccion.clear(); renderCamionetas(); }
+
+function camReservaDe(camId, fecha, bloque) {
+    return camData.reservas.find(r => r.camionetaId === camId && r.fecha === fecha && r.bloque === bloque && (r.estado === 'pendiente' || r.estado === 'aprobada'));
+}
+
+function renderCamionetas() {
+    const grid = document.getElementById('cam-grid');
+    if (!misCamionetas.length) { grid.innerHTML = '<div class="empty">No tienes camionetas asignadas.</div>'; return; }
+    const lunes = inicioSemana(semanaOffsetCam);
+    const fechas = [0, 1, 2, 3, 4].map(i => { const d = new Date(lunes); d.setDate(lunes.getDate() + i); return isoLocal(d); });
+    document.getElementById('cam-week-label').textContent = `${fmt(fechas[0])} — ${fmt(fechas[4])}`;
+    const puedeAlguna = misCamionetas.some(c => c.puedeReservar);
+    const esAdm = misCamionetas.some(c => c.esAdmin);
+    document.getElementById('cam-ayuda').textContent = puedeAlguna
+        ? 'Haz clic en los bloques libres que necesitas (puedes elegir varios, de días distintos) y luego en «Reservar». Un día completo son mañana y tarde.'
+        + (esAdm ? ' Como administrador, haz clic en una reserva para liberarla en una emergencia.' : '')
+        : (esAdm ? 'Vista de administración: haz clic en una reserva para liberarla en una emergencia (se avisa a los participantes).' : 'Vista de consulta.');
+
+    const diasLabel = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'];
+    const cab1 = fechas.map((f, i) => `<th class="bq-dia ${f === camData.hoy ? 'hoy' : ''}" colspan="2">${diasLabel[i]}<b>${parseInt(f.slice(8), 10)}</b>${esFeriado(f) ? '<small style="display:block;font-size:0.58rem;letter-spacing:0;text-transform:none;">Feriado</small>' : ''}</th>`).join('');
+    const cab2 = fechas.map(() => CAM_BLOQUES.map(b => `<th class="bq-bloque-h ${b.clave === 'AM' ? 'bq-am' : ''}">${b.clave}<small>${b.desde}–${b.hasta}</small></th>`).join('')).join('');
+    const filas = misCamionetas.map(c => {
+        const sub = c.requiereAprobacion ? 'requiere aprobación' : 'sin aprobación (se avisa a los demás)';
+        const celdas = fechas.map(f => CAM_BLOQUES.map(b => camCeldaHtml(c, f, b)).join('')).join('');
+        return `<tr><th class="bq-spot">${escHtml(c.nombre)}<small>${escHtml(sub)}</small></th>${celdas}</tr>`;
+    }).join('');
+    grid.innerHTML = `<table class="bq-tabla"><thead><tr><th class="bq-esquina" rowspan="2">Camioneta</th>${cab1}</tr><tr>${cab2}</tr></thead><tbody>${filas}</tbody></table>`;
+    renderCamSeleccion();
+    renderCamPorAprobar();
+}
+
+function camCeldaHtml(c, fecha, bloque) {
+    const base = `cam-celda ${bloque.clave === 'AM' ? 'bq-am' : ''}`;
+    const attrs = `data-cam="${escHtml(c.id)}" data-fecha="${fecha}" data-bloque="${bloque.clave}"`;
+    if (esFeriado(fecha)) return `<td class="${base} bq-feriado" title="${escHtml(nombreFeriado(fecha))}">Feriado</td>`;
+    const pasado = fecha < camData.hoy;
+    const r = camReservaDe(c.id, fecha, bloque.clave);
+    if (r) {
+        const mia = r.email === emailActual;
+        const puedeAnular = !pasado && (mia || c.puedeAprobar);
+        const cls = r.estado === 'pendiente' ? 'cam-pend' : 'cam-res';
+        const titulo = `${r.nombre || r.email}${r.estado === 'pendiente' ? ' (pendiente de aprobación)' : ''}${r.motivo ? '\nMotivo: ' + r.motivo : ''}${puedeAnular ? (mia ? '\n\nClic para anular tu reserva' : '\n\nClic para liberar (emergencia)') : ''}`;
+        return `<td class="${base} ${cls} ${pasado ? 'bq-pasado' : ''} ${puedeAnular ? 'bq-clic' : ''}" ${attrs} title="${escHtml(titulo)}" ${puedeAnular ? 'onclick="camClickReserva(this)"' : ''}>
+            <div>${r.estado === 'pendiente' ? '⏳ ' : ''}${escHtml(mia ? 'Tú' : camNombreCorto(r))}</div>${r.motivo ? `<div class="bq-s">${escHtml(r.motivo)}</div>` : ''}</td>`;
+    }
+    if (pasado) return `<td class="${base} bq-pasado" style="color:var(--txt-dim);">—</td>`;
+    if (!c.puedeReservar) return `<td class="${base} cam-libre" style="opacity:.7;">Libre</td>`;
+    const sel = camSeleccion.has(`${c.id}|${fecha}|${bloque.clave}`);
+    return `<td class="${base} ${sel ? 'cam-sel' : 'cam-libre'} bq-clic" ${attrs} onclick="camToggle(this)" title="Clic para ${sel ? 'quitar de' : 'agregar a'} tu selección">${sel ? '✓' : 'Libre'}</td>`;
+}
+
+function camToggle(el) {
+    const { cam, fecha, bloque } = el.dataset;
+    // Una reserva se hace sobre una sola camioneta: si cambia de camioneta, se parte de nuevo.
+    if (camSeleccion.size && [...camSeleccion.values()][0].camionetaId !== cam) camSeleccion.clear();
+    const k = `${cam}|${fecha}|${bloque}`;
+    if (camSeleccion.has(k)) camSeleccion.delete(k); else camSeleccion.set(k, { camionetaId: cam, fecha, bloque });
+    renderCamionetas();
+}
+
+function renderCamSeleccion() {
+    const cont = document.getElementById('cam-seleccion');
+    if (!camSeleccion.size) { cont.innerHTML = ''; return; }
+    const items = [...camSeleccion.values()].sort((a, b) => (a.fecha + a.bloque).localeCompare(b.fecha + b.bloque));
+    const c = camPorId(items[0].camionetaId);
+    const lista = items.map(i => `${camFechaLarga(i.fecha)} · ${i.bloque}`).join(' &nbsp;|&nbsp; ');
+    cont.innerHTML = `<div class="card" style="margin-top:14px;">
+        <div style="font-weight:700;font-size:0.88rem;margin-bottom:6px;">${escHtml(c.nombre)}: ${items.length} bloque${items.length === 1 ? '' : 's'} seleccionado${items.length === 1 ? '' : 's'}</div>
+        <div style="font-size:0.78rem;color:var(--txt-mid);margin-bottom:10px;">${lista}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <input class="form-input" id="cam-motivo" maxlength="200" placeholder="Motivo o destino (opcional)" style="flex:1;min-width:220px;">
+            <button class="btn btn-primary btn-sm" id="cam-btn-reservar" onclick="camReservar()">${c.requiereAprobacion ? 'Solicitar (queda pendiente de aprobación)' : 'Reservar'}</button>
+            <button class="btn btn-outline btn-sm" onclick="camSeleccion.clear();renderCamionetas();">Limpiar</button>
+        </div></div>`;
+}
+
+async function camReservar() {
+    const items = [...camSeleccion.values()];
+    if (!items.length) return;
+    const c = camPorId(items[0].camionetaId);
+    const motivo = (document.getElementById('cam-motivo').value || '').trim();
+    const btn = document.getElementById('cam-btn-reservar'); if (btn) btn.disabled = true;
+    try {
+        const res = await fetch(`${API}/camionetas/reservar`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: emailActual, nombre: nombreActual, camionetaId: c.id, items: items.map(i => ({ fecha: i.fecha, bloque: i.bloque })), motivo })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error');
+        toast(data.estado === 'pendiente' ? 'Solicitud enviada: queda pendiente de aprobación' : 'Camioneta reservada');
+        camEnviarAvisos(data.notificar, c, data.reservas, { actor: nombreActual, motivo });
+        await cargarCamionetas();
+    } catch (e) { toast('Error: ' + e.message); if (btn) btn.disabled = false; await cargarCamionetas(); }
+}
+
+async function camClickReserva(el) {
+    const { cam, fecha, bloque } = el.dataset;
+    const c = camPorId(cam), r = camReservaDe(cam, fecha, bloque);
+    if (!c || !r) return;
+    const mia = r.email === emailActual;
+    let motivo = '';
+    if (mia) {
+        if (!confirm(`¿Anular tu reserva de ${c.nombre} el ${camFechaLarga(fecha)} (${camBloqueTexto(bloque)})?`)) return;
+    } else {
+        motivo = prompt(`Liberar la reserva de ${r.nombre || r.email} (${c.nombre}, ${camFechaLarga(fecha)}, ${camBloqueTexto(bloque)}).\n\nEscribe el motivo (se avisará a los participantes):`) || '';
+        if (!motivo.trim()) { toast('Para liberar una reserva ajena hay que escribir el motivo'); return; }
+    }
+    try {
+        const res = await fetch(`${API}/camionetas/reservas/${encodeURIComponent(r.id)}/cancelar`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: emailActual, motivo })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error');
+        toast(data.liberacion ? 'Reserva liberada' : 'Reserva anulada');
+        camEnviarAvisos(data.notificar, c, [data.reserva], { actor: nombreActual, motivo });
+        await cargarCamionetas();
+    } catch (e) { toast('Error: ' + e.message); await cargarCamionetas(); }
+}
+
+// Solicitudes pendientes (se agrupan las del mismo envío) para quien aprueba.
+function renderCamPorAprobar() {
+    const cont = document.getElementById('cam-por-aprobar');
+    const aprobables = new Set(misCamionetas.filter(c => c.puedeAprobar && c.requiereAprobacion).map(c => c.id));
+    const pend = camData.reservas.filter(r => r.estado === 'pendiente' && aprobables.has(r.camionetaId) && r.fecha >= camData.hoy);
+    if (!pend.length) { cont.innerHTML = ''; return; }
+    const grupos = new Map();
+    pend.forEach(r => { const k = r.grupo || r.id; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(r); });
+    cont.innerHTML = `<div class="card" style="margin-bottom:14px;border-color:#E9A23B;">
+        <div style="font-weight:700;font-size:0.88rem;margin-bottom:10px;">⏳ Por aprobar (${grupos.size})</div>
+        ${[...grupos.entries()].map(([k, rs]) => {
+            rs.sort((a, b) => (a.fecha + a.bloque).localeCompare(b.fecha + b.bloque));
+            const c = camPorId(rs[0].camionetaId);
+            return `<div class="cam-fila-pend"><div style="flex:1;min-width:240px;"><b>${escHtml(rs[0].nombre || rs[0].email)}</b> pide <b>${escHtml(c.nombre)}</b>:<br>
+                <span style="color:var(--txt-mid);">${rs.map(r => `${camFechaLarga(r.fecha)} ${r.bloque}`).join(' · ')}${rs[0].motivo ? ' — ' + escHtml(rs[0].motivo) : ''}</span></div>
+                <button class="btn btn-primary btn-sm" onclick="camResponder('${escHtml(k)}', true)">✅ Aprobar</button>
+                <button class="btn btn-outline btn-sm" onclick="camResponder('${escHtml(k)}', false)">✕ Rechazar</button></div>`;
+        }).join('')}</div>`;
+}
+
+async function camResponder(grupoKey, aprobar) {
+    const rs = camData.reservas.filter(r => r.estado === 'pendiente' && (r.grupo || r.id) === grupoKey);
+    if (!rs.length) return;
+    let motivo = '';
+    if (!aprobar) motivo = prompt('Motivo del rechazo (opcional, se le avisa a la persona):') || '';
+    const c = camPorId(rs[0].camionetaId);
+    let ok = 0, fallos = [];
+    for (const r of rs) {
+        try {
+            const res = await fetch(`${API}/camionetas/reservas/${encodeURIComponent(r.id)}/responder`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: emailActual, aprobar, motivo })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Error');
+            ok++;
+        } catch (e) { fallos.push(e.message); }
+    }
+    if (ok) {
+        toast(aprobar ? 'Solicitud aprobada' : 'Solicitud rechazada');
+        camEnviarAvisos({ tipo: aprobar ? 'aprobada' : 'rechazada', destinatarios: [rs[0].email] }, c, rs, { actor: nombreActual, motivo });
+    }
+    if (fallos.length) toast('Error: ' + fallos[0]);
+    await cargarCamionetas();
+}
+
+// ── Correos (se mandan desde la cuenta de quien hace la acción, como en el resto del módulo) ──
+async function camEnviarCorreo(destinatarios, asunto, html) {
+    if (!destinatarios || !destinatarios.length) return;
+    const token = await getTokenCorreo();
+    if (!token) { toast('Quedó guardado, pero no se pudo enviar el correo de aviso (permiso de correo no concedido)'); return; }
+    try {
+        const res = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+            method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: { subject: asunto, body: { contentType: 'HTML', content: html }, toRecipients: destinatarios.map(a => ({ emailAddress: { address: a } })) } }),
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+    } catch (e) { console.warn('Error enviando correo:', e.message); toast('Quedó guardado, pero falló el correo de aviso'); }
+}
+function camEnviarAvisos(notificar, c, reservas, ctx) {
+    if (!notificar || !notificar.destinatarios || !notificar.destinatarios.length) return;
+    const lista = reservas.slice().sort((a, b) => (a.fecha + a.bloque).localeCompare(b.fecha + b.bloque))
+        .map(r => `<li>${escHtml(camFechaLarga(r.fecha))} — ${escHtml(camBloqueTexto(r.bloque))}</li>`).join('');
+    const quien = escHtml(reservas[0].nombre || reservas[0].email);
+    const motivoFila = ctx.motivo ? `<p>Motivo: <i>${escHtml(ctx.motivo)}</i></p>` : '';
+    const link = `${window.location.origin}/rutas-estacionamientos.html?tab=camionetas`;
+    const boton = `<p><a href="${link}" style="background:#1a7a4a;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:bold;display:inline-block;">Abrir Camionetas</a></p>`;
+    const nombreC = escHtml(c.nombre);
+    const marco = cuerpo => `<div style="font-family:Arial,sans-serif;color:#1C1A18;">${cuerpo}</div>`;
+    let asunto, cuerpo;
+    switch (notificar.tipo) {
+        case 'reserva':
+            asunto = `Camioneta ${c.nombre} reservada por ${reservas[0].nombre || reservas[0].email}`;
+            cuerpo = `<p><b>${quien}</b> reservó la camioneta <b>${nombreC}</b>:</p><ul>${lista}</ul>${motivoFila}${boton}`; break;
+        case 'solicitud':
+            asunto = `Solicitud de camioneta ${c.nombre} — ${reservas[0].nombre || reservas[0].email}`;
+            cuerpo = `<p><b>${quien}</b> solicitó la camioneta <b>${nombreC}</b> y necesita tu aprobación:</p><ul>${lista}</ul>${motivoFila}${boton}`; break;
+        case 'aprobada':
+            asunto = `Tu reserva de la camioneta ${c.nombre} fue aprobada`;
+            cuerpo = `<p>Tu solicitud de la camioneta <b>${nombreC}</b> fue <b style="color:#1a7a4a;">aprobada</b> por ${escHtml(ctx.actor)}:</p><ul>${lista}</ul>${boton}`; break;
+        case 'rechazada':
+            asunto = `Tu solicitud de la camioneta ${c.nombre} fue rechazada`;
+            cuerpo = `<p>Tu solicitud de la camioneta <b>${nombreC}</b> fue <b style="color:#C0392B;">rechazada</b> por ${escHtml(ctx.actor)}:</p><ul>${lista}</ul>${motivoFila}`; break;
+        case 'liberada':
+            asunto = `Camioneta ${c.nombre}: reserva liberada por administración`;
+            cuerpo = `<p>La reserva de <b>${quien}</b> en la camioneta <b>${nombreC}</b> fue <b>liberada</b> por ${escHtml(ctx.actor)} (administración):</p><ul>${lista}</ul>${motivoFila}${boton}`; break;
+        default: return;
+    }
+    camEnviarCorreo(notificar.destinatarios, asunto, marco(cuerpo));
+}
 
 // ══════════════════ TELETRABAJO / RUTAS ══════════════════
 let dataTeletrabajo = { patrones: {}, excepciones: [] };
