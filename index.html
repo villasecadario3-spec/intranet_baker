@@ -983,6 +983,12 @@ async function aplicarAccesos(email) {
         const lista = await fetch('https://api.ibaker.cl/acceso-beta/rutas-estacionamientos').then(r => r.json());
         ACCESOS_MODULOS['rutas-estacionamientos.html'] = lista;
     } catch(e) { console.warn('No se pudo cargar la lista de acceso beta:', e.message); }
+    // Quienes usan una camioneta compartida también ven la tarjeta (entran solo a la pestaña Camionetas).
+    try {
+        const porCamioneta = await fetch('https://api.ibaker.cl/camionetas/accesos').then(r => r.json());
+        const actual = ACCESOS_MODULOS['rutas-estacionamientos.html'] || [];
+        ACCESOS_MODULOS['rutas-estacionamientos.html'] = [...new Set([...actual, ...porCamioneta.map(e => String(e).toLowerCase())])];
+    } catch(e) { console.warn('No se pudo cargar la lista de camionetas:', e.message); }
     // Control de Dotación: la tarjeta aparece si la persona tiene acceso a al menos una obra
     // (lo decide el servidor), en vez de una lista fija de correos. Si el servidor no responde,
     // queda la lista fija de abajo.
