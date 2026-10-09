@@ -1534,7 +1534,7 @@ async function ds19GenerarWordLote(li) {
 
 // ── RECORTE MASIVO DE ESCRITURAS (hasta las firmas) ──────────────
 let cortarJobId = null;
-const CORTAR_MAX_MB = 10; // cada PDF viaja en su propio envío; el servidor admite ~11 MB por envío
+const CORTAR_MAX_MB = 300; // cada PDF viaja en su propio envío (multipart); el servidor admite hasta 300 MB por archivo
 
 function cortarLeerArchivoBase64(file) {
   return new Promise((resolve, reject) => {
@@ -1600,11 +1600,11 @@ async function cortarSubirLote() {
       return false;
     }
     try {
-      const base64 = await cortarLeerArchivoBase64(f);
-      await cortarLeerRespuesta(await fetch(`${API_BASE}/recorte-escrituras/lote/${cortarJobId}/${ruta}`, {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ nombre: f.name, base64 })
-      }));
+      const fd = new FormData(); fd.append('archivo', f, f.name);
+      let res;
+      try { res = await fetch(`${API_BASE}/recorte-escrituras/lote/${cortarJobId}/${ruta}-f`, { method: 'POST', body: fd }); }
+      catch (e) { throw new Error('no hay conexión con el servidor'); }
+      await cortarLeerRespuesta(res);
       return true;
     } catch(e) { omitidos.push(`${f.name} — ${e.message}`); return false; }
   };
