@@ -1506,7 +1506,9 @@ async function ds19EsperarLecturaEscritura(jobId, it) {
 async function ds19ProcesarArchivo(it) {
   try {
     it.estado = 'subiendo'; it.mensaje = `Subiendo (${ds19Mb(it.tamano)})…`; ds19RefrescarGlobal();
-    const fd = new FormData(); fd.append('archivo', it.file, it.file.name);
+    const fd = new FormData();
+    fd.append('resolucion', (ds19Proyecto && ds19Proyecto.resoluciones_texto) || (document.getElementById('ds19-resoluciones') || {}).value || '');
+    fd.append('archivo', it.file, it.file.name);
     let res;
     try { res = await fetch(`${API_BASE}/ds19/procesar-escritura-archivo`, { method: 'POST', body: fd }); }
     catch (e) { throw new Error('No hay conexión con el servidor. Revisa tu conexión e intenta de nuevo.'); }
