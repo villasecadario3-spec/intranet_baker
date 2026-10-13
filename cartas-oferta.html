@@ -335,16 +335,16 @@ input[type=file] { display: none; }
         </div>
       </div>
       <div style="font-weight:700;font-size:0.9rem;margin-bottom:8px;color:var(--ink);">
-        Beneficiarios encontrados: <span id="ds19-total-beneficiarios">0</span> — agrupados en <span id="ds19-total-lotes">0</span> lote(s) de hasta 10
+        Beneficiarios en la Resolución: <span id="ds19-total-beneficiarios">0</span> — con escritura: <span id="ds19-total-conesc">0</span> → <span id="ds19-total-lotes">0</span> lote(s) de hasta 10 <span style="font-weight:400;color:var(--ink2);">(se arman solo con las personas cuya escritura subes)</span>
       </div>
       <div id="ds19-aviso-lectura" style="display:none;background:rgba(246,173,85,0.12);border:1px solid #f6ad55;border-radius:var(--radius);padding:10px 14px;font-size:0.8rem;color:var(--ink);margin-bottom:14px;line-height:1.5;"></div>
       <div style="font-size:0.78rem;color:var(--ink2);margin-bottom:16px;">
-        Las escrituras sirven para completar las Tablas 3a/3b con el N° de cláusula donde aparece cada requisito (puedes revisarlo y corregirlo en cada beneficiario antes de generar el Word). Si no subes la escritura de alguien, esas columnas quedan en blanco en el Word de su lote.
+        Primero sube la Resolución y luego las escrituras que tengas (no tienen que ser todas). Con ellas se arman los lotes de 10, en el orden en que las vas subiendo, y cada Word lleva solo a esas personas, con las Tablas 3a/3b completas con el N° de cláusula de cada requisito (puedes revisarlo y corregirlo en cada persona antes de generar). Si más adelante llegan más escrituras, súbelas y se suman al último lote hasta completar 10, o abren uno nuevo.
       </div>
       <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;">
         <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--ink);">📥 Subir escrituras — todas juntas, en cualquier orden</div>
         <div style="font-size:0.78rem;color:var(--ink2);margin-bottom:10px;line-height:1.5;">
-          Sube todas las que tengas sin pensar en el lote: cada una se asigna sola a su comprador (por el RUT que se lee dentro del PDF) y queda cargada en el lote que le corresponde. Leer una escritura escaneada puede tardar varios minutos; puedes dejar la página abierta.
+          Sube las que tengas, en cualquier orden: cada una se asigna sola a su comprador (por el RUT que se lee dentro del PDF) y esa persona entra al lote que se esté armando (hasta 10 por lote). Leer una escritura escaneada puede tardar varios minutos; puedes dejar la página abierta.
         </div>
         <input type="file" id="ds19-global-file" accept=".pdf" multiple onchange="ds19MostrarSeleccionGlobal()">
         <div style="font-size:0.78rem;color:var(--ink2);margin-bottom:8px;" id="ds19-global-archivos">Ningún archivo seleccionado todavía</div>
@@ -354,7 +354,9 @@ input[type=file] { display: none; }
         </div>
         <div id="ds19-estado-global" style="margin-top:12px;"></div>
       </div>
+      <div id="ds19-lotes-vacio" style="font-size:0.82rem;color:var(--ink2);margin:6px 0 14px;">Aún no hay lotes: sube las escrituras que tengas y se armarán lotes de hasta 10 con esas personas. Quienes no tengan escritura no entran a ningún lote.</div>
       <div id="ds19-lotes"></div>
+      <div id="ds19-pendientes" style="margin-top:6px;"></div>
     </div>
   </div><!-- /panelDS19 -->
 
@@ -1169,15 +1171,10 @@ function ds19MostrarResultado(resultado) {
   document.getElementById('ds19-resoluciones').value = ds19Proyecto.resoluciones_texto || '';
   document.getElementById('ds19-programa').value = ds19Proyecto.programa || 'DS19';
 
-  ds19Lotes = [];
+  ds19Lotes = []; // los lotes se arman con las escrituras que se vayan subiendo (hasta 10 personas por lote)
   ds19Escrituras = []; // las escrituras de una Resolución anterior no valen para esta
-  for (let i = 0; i < ds19Beneficiarios.length; i += 10) {
-    ds19Lotes.push({ beneficiarios: ds19Beneficiarios.slice(i, i + 10), escrituras: {} });
-  }
-
-  document.getElementById('ds19-total-beneficiarios').textContent = ds19Beneficiarios.length;
-  document.getElementById('ds19-total-lotes').textContent = ds19Lotes.length;
   ds19RenderLotes();
+  ds19ActualizarTotales();
   ds19RefrescarGlobal();
   document.getElementById('ds19-revision').style.display = 'block';
 }
@@ -1302,16 +1299,16 @@ function ds19ConEscritura(li) {
   return l.beneficiarios.filter(b => l.escrituras[limpiarRut(b.rut)]?.estado === 'listo').length;
 }
 function ds19ResumenLoteHtml(li) {
-  const c = ds19ConEscritura(li), n = ds19Lotes[li].beneficiarios.length;
-  return c ? `<span style="color:#68d391;font-weight:600;"> · ${c} de ${n} con escritura</span>`
-           : `<span style="color:var(--ink3);font-weight:400;"> · sin escrituras todavía</span>`;
+  const n = ds19Lotes[li].beneficiarios.length;
+  return n >= 10 ? `<span style="color:#68d391;font-weight:600;"> · lote completo (10 de 10)</span>`
+                 : `<span style="color:var(--ink2);font-weight:400;"> · ${n} de 10 — puede seguir sumando escrituras</span>`;
 }
 
 function ds19EstadoHtml() {
   const arch = ds19Escrituras;
-  const total = ds19Lotes.reduce((s, l) => s + l.beneficiarios.length, 0);
-  const conEsc = ds19Lotes.reduce((s, _, li) => s + ds19ConEscritura(li), 0);
-  const lotesCon = ds19Lotes.filter((_, li) => ds19ConEscritura(li) > 0).length;
+  const total = ds19Beneficiarios.length;
+  const conEsc = ds19Lotes.reduce((s, l) => s + l.beneficiarios.length, 0);
+  const lotesCon = ds19Lotes.length;
   if (!arch.length && !conEsc) return '';
   const listos = arch.filter(a => a.estado === 'listo').length;
   const errores = arch.filter(a => a.estado === 'error').length;
@@ -1326,31 +1323,61 @@ function ds19EstadoHtml() {
     </div>`;
 }
 
-function ds19RenderLotes() {
-  const cont = document.getElementById('ds19-lotes');
-  cont.innerHTML = ds19Lotes.map((lote, li) => {
-    const bDesde = lote.beneficiarios[0], bHasta = lote.beneficiarios[lote.beneficiarios.length - 1];
-    // Si la Resolución viene por sectores, la numeración reinicia en cada uno: se indica el sector.
-    const etiqueta = b => b && b.sector ? ` (${ds19Esc(b.sector)})` : '';
-    const desde = bDesde?.numero_tabla_res_ex + (bDesde?.sector === bHasta?.sector ? '' : etiqueta(bDesde));
-    const hasta = bHasta?.numero_tabla_res_ex + etiqueta(bHasta);
-    return `
-    <div id="ds19-lote-${li}" style="background:var(--panel);border:1px solid ${ds19ConEscritura(li) ? '#68d391' : 'var(--border)'};border-radius:var(--radius);padding:16px;margin-bottom:14px;">
-      <div style="font-weight:700;font-size:0.88rem;margin-bottom:8px;color:var(--ink);">Lote ${li+1} — Beneficiarios N° ${desde} al ${hasta}<span id="ds19-resumen-lote-${li}">${ds19ResumenLoteHtml(li)}</span></div>
+// Un lote = hasta 10 personas CON escritura, en el orden en que se fueron subiendo (dentro del lote, en el orden de la Resolución).
+function ds19TituloLote(li) {
+  const l = ds19Lotes[li];
+  const nums = l.beneficiarios.map(b => b.numero_tabla_res_ex + (b.sector ? ` (${ds19Esc(b.sector)})` : '')).join(', ');
+  return `Lote ${li + 1} — ${l.beneficiarios.length} persona${l.beneficiarios.length === 1 ? '' : 's'} (N° ${nums})`;
+}
+function ds19LoteHtml(li) {
+  return `
+    <div id="ds19-lote-${li}" style="background:var(--panel);border:1px solid #68d391;border-radius:var(--radius);padding:16px;margin-bottom:14px;">
+      <div style="font-weight:700;font-size:0.88rem;margin-bottom:8px;color:var(--ink);"><span id="ds19-titulo-lote-${li}">${ds19TituloLote(li)}</span><span id="ds19-resumen-lote-${li}">${ds19ResumenLoteHtml(li)}</span></div>
       <div id="ds19-tabla-${li}">${ds19TablaLoteHtml(li)}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-primary" onclick="ds19GenerarWordLote(${li})">📄 Generar Word de este lote</button>
       </div>
     </div>`;
-  }).join('');
+}
+function ds19RenderLotes() {
+  document.getElementById('ds19-lotes').innerHTML = ds19Lotes.map((_, li) => ds19LoteHtml(li)).join('');
+}
+// Suma a la persona al último lote (o abre uno nuevo si ya tiene 10). Si ya tenía escritura, la reemplaza en su mismo lote.
+function ds19AgregarEscritura(b, esc) {
+  const rut = limpiarRut(b.rut);
+  let li = ds19Lotes.findIndex(l => rut in l.escrituras);
+  if (li >= 0) { ds19Lotes[li].escrituras[rut] = esc; return li; }
+  li = ds19Lotes.length - 1;
+  if (li < 0 || ds19Lotes[li].beneficiarios.length >= 10) { ds19Lotes.push({ beneficiarios: [], escrituras: {} }); li++; }
+  const l = ds19Lotes[li];
+  l.beneficiarios.push(b);
+  l.beneficiarios.sort((x, y) => ds19Beneficiarios.indexOf(x) - ds19Beneficiarios.indexOf(y));
+  l.escrituras[rut] = esc;
+  return li;
+}
+function ds19ActualizarTotales() {
+  const conEsc = ds19Lotes.reduce((s, l) => s + l.beneficiarios.length, 0);
+  document.getElementById('ds19-total-beneficiarios').textContent = ds19Beneficiarios.length;
+  document.getElementById('ds19-total-conesc').textContent = conEsc;
+  document.getElementById('ds19-total-lotes').textContent = ds19Lotes.length;
+  document.getElementById('ds19-lotes-vacio').style.display = ds19Lotes.length ? 'none' : 'block';
+  // personas de la Resolución que todavía no tienen escritura (no entran a ningún lote)
+  const con = new Set(ds19Lotes.flatMap(l => Object.keys(l.escrituras)));
+  const pend = ds19Beneficiarios.filter(b => !con.has(limpiarRut(b.rut)));
+  const el = document.getElementById('ds19-pendientes');
+  el.innerHTML = (ds19Beneficiarios.length && pend.length && ds19Lotes.length)
+    ? `<details style="font-size:0.78rem;color:var(--ink2);"><summary style="cursor:pointer;">Sin escritura todavía (${pend.length}) — no entran a ningún lote</summary>
+        <div style="margin-top:4px;line-height:1.5;">${pend.map(b => `${ds19Esc(b.numero_tabla_res_ex)}. ${ds19Esc(b.nombre)} (${ds19Esc(b.rut)})`).join('<br>')}</div></details>`
+    : '';
 }
 
 // Actualiza solo la tabla, el resumen y el borde de un lote.
 function ds19RefrescarLote(li) {
   const t = document.getElementById(`ds19-tabla-${li}`), r = document.getElementById(`ds19-resumen-lote-${li}`), c = document.getElementById(`ds19-lote-${li}`);
+  const ti = document.getElementById(`ds19-titulo-lote-${li}`);
+  if (ti) ti.textContent = ds19TituloLote(li);
   if (t) t.innerHTML = ds19TablaLoteHtml(li);
   if (r) r.innerHTML = ds19ResumenLoteHtml(li);
-  if (c) c.style.borderColor = ds19ConEscritura(li) ? '#68d391' : '';
 }
 function ds19RefrescarGlobal() {
   const e = document.getElementById('ds19-estado-global');
@@ -1380,21 +1407,18 @@ function ds19RutEnTexto(t) {
 }
 function ds19BuscarPorRut(rut) {
   if (!rut) return null;
-  for (let i = 0; i < ds19Lotes.length; i++) {
-    const b = ds19Lotes[i].beneficiarios.find(x => limpiarRut(x.rut) === rut);
-    if (b) return { li: i, b };
-  }
-  return null;
+  const b = ds19Beneficiarios.find(x => limpiarRut(x.rut) === rut);
+  return b ? { b } : null;
 }
 function ds19BuscarPorNombre(nombreArchivo) {
   const palabras = ds19Norm(String(nombreArchivo).replace(/\.pdf$/i, '')).split(' ')
     .filter(t => t.length >= 2 && !/^(escritura|escrituras|compraventa|copia|final|rut|firmada|firmado|v\d*|\d+)$/.test(t));
   if (palabras.length < 2) return null;
   const hallados = [];
-  ds19Lotes.forEach((lote, li) => lote.beneficiarios.forEach(b => {
+  ds19Beneficiarios.forEach(b => {
     const tokens = new Set(ds19Norm(b.nombre).split(' '));
-    if (palabras.every(t => tokens.has(t))) hallados.push({ li, b });
-  }));
+    if (palabras.every(t => tokens.has(t))) hallados.push({ b });
+  });
   return hallados.length === 1 ? hallados[0] : null;
 }
 function ds19Calzar(it, resultado) {
@@ -1429,17 +1453,21 @@ function ds19Calzar(it, resultado) {
     const r = resultado.requisitos?.[nombre];
     detalle[nombre] = r ? { pagina: r.pagina || '', fragmento: r.fragmento || '', debil: (r.ancla || 1) > 1 } : null;
   });
-  const destino = ds19Lotes[hallado.li];
   const rut = limpiarRut(hallado.b.rut);
-  const previa = destino.escrituras[rut];
+  const lotePrev = ds19Lotes.find(l => rut in l.escrituras);
+  const previa = lotePrev ? lotePrev.escrituras[rut] : undefined;
   const pi = resultado.programa_info || {};
-  destino.escrituras[rut] = { estado: 'listo', nombreArchivo: it.nombre, requisitos, detalle, avisos: resultado.avisos || [], precioUf: resultado.precio_uf || '', totalPaginas: resultado.total_paginas || 0, calzadoPor: via,
+  const nuevaEsc = { estado: 'listo', nombreArchivo: it.nombre, requisitos, detalle, avisos: resultado.avisos || [], precioUf: resultado.precio_uf || '', totalPaginas: resultado.total_paginas || 0, calzadoPor: via,
     programa: pi.programa || resultado.programa_detectado || 'DS19', tramo: pi.tramo || '', programaInfo: pi };
+  const nLotes = ds19Lotes.length;
+  const liDestino = ds19AgregarEscritura(hallado.b, nuevaEsc);
   it.estado = 'listo';
-  it.mensaje = `Calzada con ${hallado.b.nombre} (${hallado.b.rut}) → Lote ${hallado.li + 1}`
+  it.mensaje = `Calzada con ${hallado.b.nombre} (${hallado.b.rut}) → Lote ${liDestino + 1}`
     + (previa && previa.estado === 'listo' && previa.nombreArchivo !== it.nombre ? ` — reemplazó a «${previa.nombreArchivo}», que ya estaba cargada` : '')
     + (via === 'nombre del archivo' ? ' — se asignó por el nombre del archivo: verifica que sea la persona correcta' : '');
-  ds19RefrescarLote(hallado.li);
+  if (ds19Lotes.length > nLotes) document.getElementById('ds19-lotes').insertAdjacentHTML('beforeend', ds19LoteHtml(liDestino));
+  else ds19RefrescarLote(liDestino);
+  ds19ActualizarTotales();
 }
 
 // ── Subir, esperar y calzar ──
