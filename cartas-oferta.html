@@ -1201,8 +1201,19 @@ function ds19RevisionHtml(li, b, esc) {
   const avisos = (esc.avisos || []);
   const resumen = `${REQUISITOS_DS19.length - faltan - (esc.requisitos['Estacionamiento'] ? 0 : 1)} cláusulas halladas`
     + (faltan ? ` · <span style="color:#f6ad55;">${faltan} sin hallar</span>` : '')
-    + (esc.precioUf ? ` · precio ${ds19Esc(esc.precioUf)} UF` : '');
-  const filas = REQUISITOS_DS19.map((nombre, ri) => {
+    + (esc.precioUf ? ` · precio ${ds19Esc(esc.precioUf)} UF` : '')
+    + ` · ${ds19Esc(esc.programa || 'DS19')}${esc.programa === 'DS1' ? (esc.tramo ? ' T' + ds19Esc(esc.tramo) : ' <span style="color:#f6ad55;">sin tramo</span>') : ''}`;
+  const pr = esc.programa || 'DS19', pi = esc.programaInfo || {};
+  const selSt = 'font-size:0.76rem;padding:2px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--ink);';
+  const filaPrograma = `<tr>
+      <td style="padding:2px 6px;border:1px solid var(--border);color:var(--ink);font-weight:600;">Programa de esta persona</td>
+      <td style="padding:2px;border:1px solid var(--border);text-align:center;white-space:nowrap;">
+        <select onchange="ds19EditarPrograma(${li},${bi},'programa',this.value)" style="${selSt}">${['DS19','DS1','DS49'].map(x => `<option value="${x}"${x === pr ? ' selected' : ''}>${x}</option>`).join('')}</select>
+        <select onchange="ds19EditarPrograma(${li},${bi},'tramo',this.value)" title="Tramo (solo DS1)" style="${selSt}${pr === 'DS1' && !esc.tramo ? 'background:rgba(246,173,85,.18);' : ''}"${pr === 'DS1' ? '' : ' disabled'}>${['', '1', '2', '3'].map(x => `<option value="${x}"${x === (esc.tramo || '') ? ' selected' : ''}>${x ? 'Tramo ' + x : 'Tramo…'}</option>`).join('')}</select>
+        ${pi.pagina ? `<div style="font-size:0.62rem;color:var(--ink3);">pág. ${ds19Esc(pi.pagina)}</div>` : ''}</td>
+      <td style="padding:2px 6px;border:1px solid var(--border);color:var(--ink3);font-size:0.68rem;">${ds19Esc(pi.fragmento || '').slice(0, 200)}</td>
+    </tr>`;
+  const filas = filaPrograma + REQUISITOS_DS19.map((nombre, ri) => {
     const d = esc.detalle?.[nombre];
     const val = esc.requisitos[nombre] || '';
     const alerta = !val ? (nombre === 'Estacionamiento' ? '' : ' background:rgba(246,173,85,.18);') : (d?.debil ? ' background:rgba(246,173,85,.18);' : '');
@@ -1217,6 +1228,39 @@ function ds19RevisionHtml(li, b, esc) {
     <table style="border-collapse:collapse;width:100%;font-size:0.72rem;margin-top:4px;"><tbody>${filas}</tbody></table>
     <div style="font-size:0.66rem;color:var(--ink3);margin-top:2px;">Lo que va al Word es el N° de cláusula (campo editable). La «pág.» es la página del PDF, solo para que lo revises rápido.</div>
   </details>`;
+}
+function ds19EditarPrograma(li, bi, campo, valor) {
+  const b = ds19Lotes[li].beneficiarios[bi];
+  const esc = ds19Lotes[li].escrituras[limpiarRut(b.rut)];
+  if (!esc) return;
+  if (campo === 'programa') { esc.programa = valor; if (valor !== 'DS1') esc.tramo = ''; ds19RefrescarLote(li); }
+  else esc.tramo = valor;
+}
+// Programa y tramo que lleva el Word de un lote, según lo que dice la escritura de cada persona.
+// La ficha admite un solo programa por Word: gana el más común y se avisa quién difiere.
+function ds19ProgramaDelLote(lote, porDefecto) {
+  const grupos = {};
+  lote.beneficiarios.forEach(b => {
+    const e = lote.escrituras[limpiarRut(b.rut)];
+    if (e && e.estado === 'listo') (grupos[e.programa || 'DS19'] = grupos[e.programa || 'DS19'] || []).push({ b, e });
+  });
+  const progs = Object.keys(grupos).sort((a, c) => grupos[c].length - grupos[a].length);
+  if (!progs.length) return { programa: porDefecto, tramo: '', aviso: '' };
+  const programa = progs[0];
+  let tramo = '';
+  if (programa === 'DS1') {
+    const t = {};
+    grupos.DS1.forEach(x => { if (x.e.tramo) t[x.e.tramo] = (t[x.e.tramo] || 0) + 1; });
+    const ts = Object.keys(t).sort((a, c) => t[c] - t[a]);
+    tramo = ts[0] || '';
+  }
+  const avisos = [];
+  if (progs.length > 1) {
+    avisos.push('Este lote mezcla programas (' + progs.map(k => `${k}: ${grupos[k].length}`).join(', ') + '). La ficha admite uno solo, se usó ' + programa + '. Distintos: ' +
+      progs.slice(1).map(k => grupos[k].map(x => x.b.nombre).join(', ')).join('; '));
+  }
+  if (programa === 'DS1' && !tramo) avisos.push('Programa DS1 sin tramo: elígelo en la revisión de la escritura.');
+  return { programa, tramo, aviso: avisos.join(' ') };
 }
 function ds19EditarPagina(li, bi, ri, valor) {
   const b = ds19Lotes[li].beneficiarios[bi];
@@ -1388,7 +1432,9 @@ function ds19Calzar(it, resultado) {
   const destino = ds19Lotes[hallado.li];
   const rut = limpiarRut(hallado.b.rut);
   const previa = destino.escrituras[rut];
-  destino.escrituras[rut] = { estado: 'listo', nombreArchivo: it.nombre, requisitos, detalle, avisos: resultado.avisos || [], precioUf: resultado.precio_uf || '', totalPaginas: resultado.total_paginas || 0, calzadoPor: via };
+  const pi = resultado.programa_info || {};
+  destino.escrituras[rut] = { estado: 'listo', nombreArchivo: it.nombre, requisitos, detalle, avisos: resultado.avisos || [], precioUf: resultado.precio_uf || '', totalPaginas: resultado.total_paginas || 0, calzadoPor: via,
+    programa: pi.programa || resultado.programa_detectado || 'DS19', tramo: pi.tramo || '', programaInfo: pi };
   it.estado = 'listo';
   it.mensaje = `Calzada con ${hallado.b.nombre} (${hallado.b.rut}) → Lote ${hallado.li + 1}`
     + (previa && previa.estado === 'listo' && previa.nombreArchivo !== it.nombre ? ` — reemplazó a «${previa.nombreArchivo}», que ya estaba cargada` : '')
@@ -1492,6 +1538,8 @@ function ds19NombreCarpeta(li) {
 
 async function ds19GenerarWordLote(li) {
   const lote = ds19Lotes[li];
+  const progLote = ds19ProgramaDelLote(lote, document.getElementById('ds19-programa').value);
+  if (progLote.aviso) toast('⚠ ' + progLote.aviso);
   const payload = {
     proyecto: {
       fecha_ingreso: document.getElementById('ds19-fecha-ingreso').value || new Date().toLocaleDateString('es-CL'),
@@ -1500,9 +1548,9 @@ async function ds19GenerarWordLote(li) {
       codigo_proyecto: document.getElementById('ds19-codigo').value,
       nombre_proyecto: document.getElementById('ds19-nombreproyecto').value,
       resoluciones_texto: document.getElementById('ds19-resoluciones').value,
-      programa: document.getElementById('ds19-programa').value,
+      programa: progLote.programa,
       ano_beneficio: ds19AnoBeneficio(),
-      tramo: '',
+      tramo: progLote.tramo,
     },
     compradores: lote.beneficiarios.map(b => {
       const esc = lote.escrituras[limpiarRut(b.rut)];
