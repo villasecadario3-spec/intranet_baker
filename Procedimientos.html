@@ -157,6 +157,7 @@
         @media(max-width:768px){nav{padding:0 16px}.nav-title{display:none}.page-header{padding:24px 16px 20px}.main{padding:20px 16px 60px}.doc-card{flex-wrap:wrap}.doc-acciones{width:100%}.btn-doc{flex:1;justify-content:center}}
     </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="metricas.js" data-modulo="procedimientos"></script>
 </head>
 <body>
 
@@ -1046,6 +1047,57 @@ async function previsualizarDoc(id) {
     }
 }
 
+// ── Correo de aviso a firmantes ───────────────────────────────
+// Sale por informatica@ibaker.cl cuando quien actúa tiene permiso de envío sobre ese buzón;
+// si no, sale desde su propia cuenta (mismo patrón que Rutas / Estacionamientos).
+const BUZON_AVISOS = 'informatica@ibaker.cl';
+async function tokenCorreo(scopes) {
+    const accounts = msalInstance.getAllAccounts();
+    if (!accounts.length) return null;
+    try { return (await msalInstance.acquireTokenSilent({ scopes, account: accounts[0] })).accessToken; }
+    catch (e) {
+        try { return (await msalInstance.acquireTokenPopup({ scopes })).accessToken; }
+        catch (e2) { console.warn('Sin permiso de correo (' + scopes.join(',') + '):', e2.message); return null; }
+    }
+}
+function escCorreo(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+async function enviarAvisoFirma(notificar) {
+    if (!notificar || !notificar.destinatarios || !notificar.destinatarios.length) return;
+    const link = window.location.origin + '/procedimientos';
+    const html = `
+        <div style="font-family:Arial,sans-serif;color:#1C1A18;">
+            <p>Hola,</p>
+            <p>El documento <b>${escCorreo(notificar.documento)}</b>${notificar.carpeta ? ' (' + escCorreo(notificar.carpeta) + ')' : ''} está <b>pendiente de tu firma</b>.</p>
+            <p>Ingresa al módulo de Procedimientos e Instructivos de la intranet, abre el documento y haz clic en <b>Firmar</b>.</p>
+            <p style="margin:20px 0;"><a href="${link}" style="background:#1a7a4a;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold;display:inline-block;">Ir a firmar</a></p>
+            <p style="font-size:0.85rem;color:#6B6762;">Este es un aviso automático de la Intranet Baker.</p>
+        </div>`;
+    const message = { subject: `Documento pendiente de tu firma: ${notificar.documento}`, body: { contentType: 'HTML', content: html },
+        toRecipients: notificar.destinatarios.map(a => ({ emailAddress: { address: a } })) };
+    const enviar = async (url, token) => {
+        const r = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message, saveToSentItems: false }) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+    };
+    try {
+        // 1) desde informatica@ibaker.cl (requiere permiso "Enviar como" sobre ese buzón)
+        let sinBuzon = false; try { sinBuzon = sessionStorage.getItem('sinBuzonAvisos') === '1'; } catch (e) {}
+        if (!sinBuzon) {
+            const tShared = await tokenCorreo(['Mail.Send.Shared']);
+            let ok = false;
+            if (tShared) { try { await enviar(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(BUZON_AVISOS)}/sendMail`, tShared); ok = true; } catch (e) { console.warn('No se pudo enviar desde ' + BUZON_AVISOS + ':', e.message); } }
+            if (ok) return;
+            try { sessionStorage.setItem('sinBuzonAvisos', '1'); } catch (e) {}   // no insistir en esta sesión
+        }
+        // 2) desde la cuenta de quien actúa
+        const t = await tokenCorreo(['Mail.Send']);
+        if (!t) throw new Error('permiso de correo no concedido');
+        await enviar('https://graph.microsoft.com/v1.0/me/sendMail', t);
+    } catch (e) {
+        console.warn('Error enviando aviso de firma:', e.message);
+        mostrarToast('Quedó guardado, pero no se pudo enviar el correo a los firmantes: avísales tú', 'err');
+    }
+}
+
 async function aprobarUno(id) {
     const res = await fetch(`${API}/docs/aprobar/${id}`, {
         method: 'POST',
@@ -1054,6 +1106,7 @@ async function aprobarUno(id) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Error desconocido');
+    if (data.notificar) enviarAvisoFirma(data.notificar);
     return data;
 }
 
@@ -1644,6 +1697,7 @@ async function firmarDocumento(id) {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Error al firmar');
+        if (data.notificar) enviarAvisoFirma(data.notificar);
         mostrarToast(data.estadoFirma === 'vigente' ? 'Firmado — el documento ya quedó vigente' : 'Firma registrada', 'ok');
         if (carpetaActual) abrirCarpeta(carpetaActual, subcarpetaActual, obraActual);
     } catch(e) { mostrarToast('Error: ' + e.message, 'err'); }
