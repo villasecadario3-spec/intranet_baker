@@ -384,7 +384,7 @@ input[type=file] { display: none; }
       <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-bottom:4px;"><input type="radio" name="cortar-modo" value="todas"> <span>El mismo documento a <b>todas</b> las escrituras</span></label>
       <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;"><input type="radio" name="cortar-modo" value="persona"> <span>Cada documento a la escritura de <b>su persona</b> <span style="color:var(--ink2);">(se asocia por el RUT que trae el documento, en su nombre de archivo o dentro de él)</span></span></label>
     </div>
-    <label style="display:flex;align-items:center;gap:8px;font-size:0.84rem;margin:14px 0 16px;cursor:pointer;color:var(--ink);"><input type="checkbox" id="cortar-nombrar" checked> <span>Nombrar cada archivo como «NOMBRE - RUT» del comprador <span style="color:var(--ink2);">(lee las primeras páginas: unos 15 segundos más por escritura)</span></span></label>
+    <label style="display:flex;align-items:center;gap:8px;font-size:0.84rem;margin:14px 0 16px;cursor:pointer;color:var(--ink);"><input type="checkbox" id="cortar-nombrar" checked> <span>Nombrar cada archivo como «RUT-DV_NOMBRE COMPLETO» del comprador (RUT sin puntos y con guion) <span style="color:var(--ink2);">(lee las primeras páginas: unos 15 segundos más por escritura)</span></span></label>
     <button class="btn btn-primary" onclick="cortarSubirLote()" style="margin-bottom:20px;">Subir y cortar</button>
 
     <div id="cortar-progreso" style="color:var(--ink);"></div>
