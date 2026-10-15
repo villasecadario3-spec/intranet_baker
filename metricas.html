@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Uso de la Intranet — Baker</title>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+<style>
+:root{--bg:#f6f5f2;--panel:#fff;--ink:#1d2433;--ink2:#667085;--line:#e4e2dc;--acc:#1f4e79;--acc2:#e8eef5}
+@media (prefers-color-scheme:dark){:root{--bg:#14171d;--panel:#1c2029;--ink:#e8eaee;--ink2:#9aa3b2;--line:#2c313c;--acc:#7fb0e0;--acc2:#222a38}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "DM Sans",system-ui,sans-serif}
+.wrap{max-width:1000px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:1.5rem;margin:0 0 4px}h2{font-size:1.05rem;margin:28px 0 10px}
+.sub{color:var(--ink2);margin:0 0 20px}
+a.volver{color:var(--acc);text-decoration:none;font-size:.9rem}
+.filtros{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:16px 0}
+label{font-size:.8rem;color:var(--ink2);display:block;margin-bottom:3px}
+input[type=date]{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit}
+button{padding:8px 14px;border-radius:8px;border:1px solid var(--acc);background:var(--acc);color:#fff;font:inherit;cursor:pointer}
+button.sec{background:transparent;color:var(--acc)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.kpi b{display:block;font-size:1.7rem}.kpi span{color:var(--ink2);font-size:.85rem}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);font-size:.9rem;vertical-align:top}
+th{background:var(--acc2);font-weight:600}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.barra{height:6px;background:var(--acc2);border-radius:3px;margin-top:5px}.barra i{display:block;height:100%;background:var(--acc);border-radius:3px}
+.acc{color:var(--ink2);font-size:.82rem}
+.msg{padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.tabla-scroll{overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="wrap" id="pagina" style="display:none">
+  <a class="volver" href="index.html">← Volver a la intranet</a>
+  <h1>Uso de la Intranet</h1>
+  <p class="sub">Visitas, personas distintas y acciones realizadas por módulo. Vista privada.</p>
+  <div id="estado" class="msg" style="display:none"></div>
+  <div id="contenido" style="display:none">
+    <div class="filtros">
+      <div><label>Desde</label><input type="date" id="desde"></div>
+      <div><label>Hasta</label><input type="date" id="hasta"></div>
+      <button onclick="cargar()">Actualizar</button>
+      <button class="sec" onclick="exportarCsv()">Exportar CSV</button>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <h2>Por módulo</h2>
+    <div class="tabla-scroll"><table id="t-mod"></table></div>
+    <h2>Acciones realizadas</h2>
+    <div class="tabla-scroll"><table id="t-acc"></table></div>
+    <h2>Por mes</h2>
+    <div class="tabla-scroll"><table id="t-mes"></table></div>
+    <p class="acc">Se mide desde la fecha en que se activó el registro. Cada persona cuenta una visita por módulo y por sesión; no se guarda el contenido de los documentos ni sus nombres.</p>
+  </div>
+</div>
+<script>
+const API_BASE='https://api.ibaker.cl';
+const msalInstance=new msal.PublicClientApplication({auth:{clientId:"9a56ab1c-d3c4-4460-9892-1d4da768ecfb",authority:"https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26",redirectUri:window.location.origin},cache:{cacheLocation:"sessionStorage"}});
+let correo='',datos=null;
+const NOMBRES={'pdf-tools':'Herramientas PDF','ds49':'Generador DS49','cartas-oferta':'Cartas oferta / Escrituración','inicio':'Inicio','dotacion':'Dotación','rutas-estacionamientos':'Rutas / Estacionamientos','salas':'Salas de reuniones','control-bodega':'Control de bodega','comunicaciones':'Comunicaciones','firma':'Firma de correo','procedimientos':'Procedimientos','obras':'Mapa de obras','softland':'Softland'};
+const nom=m=>NOMBRES[m]||m;
+const fmt=n=>Number(n||0).toLocaleString('es-CL');
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ACC={unir:'PDF unidos',dividir:'PDF divididos',comprimir:'PDF comprimidos',rotar:'PDF rotados',extraer_paginas:'Extracciones de páginas',marca_agua:'Marcas de agua',numerar:'Numeraciones',imagenes_a_pdf:'Imágenes a PDF',desbloquear:'PDF desbloqueados',pdf_a_texto:'PDF a texto',pdf_cifrados_desbloqueados:'PDF cifrados procesados',fichas_rm:'Fichas RM generadas',fichas_ohiggins:'Fichas O\'Higgins generadas',generaciones:'Generaciones (lotes de fichas)',cartas_generadas:'Cartas oferta generadas',descargas_zip:'Descargas ZIP de cartas',descargas_individual:'Descargas individuales de cartas',escrituras_leidas:'Escrituras leídas (OCR)',escrituras_cortadas:'Escrituras cortadas',formularios_ds19:'Formularios DS19 (Word)',beneficiarios_en_formularios:'Beneficiarios en formularios',lotes_ds19_generados:'Lotes DS19 generados',beneficiarios_en_lotes:'Beneficiarios en lotes'};
+const accNom=a=>ACC[a]||a.replace(/_/g,' ');
+const ADMIN_PAGINA='dvillaseca@ibaker.cl';
+const SCOPES=['User.Read'];
+function noEncontrada(){document.title='No encontrada';document.body.innerHTML='<div style="font:16px system-ui;padding:40px;color:#667085">Página no encontrada.</div>';}
+async function token(){
+  const cuentas=msalInstance.getAllAccounts();
+  if(!cuentas.length)return null;
+  try{return (await msalInstance.acquireTokenSilent({scopes:SCOPES,account:cuentas[0]})).accessToken;}
+  catch(e){try{return (await msalInstance.acquireTokenPopup({scopes:SCOPES})).accessToken;}catch(e2){return null;}}
+}
+async function iniciar(){
+  try{
+    await msalInstance.initialize();
+    const cuentas=msalInstance.getAllAccounts();
+    correo=cuentas.length?(cuentas[0].username||'').toLowerCase():'';
+    if(correo!==ADMIN_PAGINA)return noEncontrada();   // cualquier otra persona (o sin sesión) ve "no encontrada"
+    window.bakerUsuario=correo;
+    document.getElementById('pagina').style.display='block';
+    document.getElementById('contenido').style.display='block';
+    const hoy=new Date(),ini=new Date(hoy.getFullYear(),0,1);
+    document.getElementById('desde').value=ini.toISOString().slice(0,10);
+    document.getElementById('hasta').value=hoy.toISOString().slice(0,10);
+    cargar();
+  }catch(e){noEncontrada();}
+}
+async function cargar(){
+  const q=new URLSearchParams({desde:document.getElementById('desde').value,hasta:document.getElementById('hasta').value});
+  const est=document.getElementById('estado');
+  try{
+    const tk=await token();
+    const r=await fetch(API_BASE+'/metricas/resumen?'+q,{headers:tk?{Authorization:'Bearer '+tk}:{}});
+    if(r.status===403){noEncontrada();return;}
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    datos=await r.json();pintar();
+  }catch(e){document.getElementById('pagina').style.display='block';est.style.display='block';est.textContent='No se pudo cargar: '+e.message;}
+}
+function pintar(){
+  const vis=datos.modulos.reduce((s,m)=>s+m.visitas,0);
+  const acc=datos.modulos.reduce((s,m)=>s+m.acciones.reduce((t,a)=>t+a.cantidad,0),0);
+  document.getElementById('kpis').innerHTML=
+    [['Personas distintas',datos.usuariosUnicos],['Visitas a módulos',vis],['Módulos usados',datos.modulos.length],['Acciones registradas',acc]]
+    .map(([t,v])=>`<div class="kpi"><b>${fmt(v)}</b><span>${t}</span></div>`).join('');
+  const max=Math.max(1,...datos.modulos.map(m=>m.visitas));
+  document.getElementById('t-mod').innerHTML='<tr><th>Módulo</th><th class="n">Visitas</th><th class="n">Personas</th></tr>'+
+    (datos.modulos.filter(m=>m.visitas||m.usuarios).map(m=>`<tr><td>${esc(nom(m.modulo))}<div class="barra"><i style="width:${Math.round(m.visitas/max*100)}%"></i></div></td><td class="n">${fmt(m.visitas)}</td><td class="n">${fmt(m.usuarios)}</td></tr>`).join('')||'<tr><td colspan="3">Sin datos en este periodo.</td></tr>');
+  const filas=[];datos.modulos.forEach(m=>m.acciones.forEach(a=>filas.push([m.modulo,a])));
+  document.getElementById('t-acc').innerHTML='<tr><th>Módulo</th><th>Acción</th><th class="n">Veces</th><th class="n">Cantidad</th></tr>'+
+    (filas.map(([m,a])=>`<tr><td>${esc(nom(m))}</td><td>${esc(accNom(a.accion))}</td><td class="n">${fmt(a.eventos)}</td><td class="n">${fmt(a.cantidad)}</td></tr>`).join('')||'<tr><td colspan="4">Aún no hay acciones registradas.</td></tr>');
+  document.getElementById('t-mes').innerHTML='<tr><th>Mes</th><th class="n">Visitas</th><th class="n">Personas</th><th class="n">Acciones</th></tr>'+
+    (datos.meses.map(m=>`<tr><td>${m.mes}</td><td class="n">${fmt(m.visitas)}</td><td class="n">${fmt(m.usuarios)}</td><td class="n">${fmt(m.acciones)}</td></tr>`).join('')||'<tr><td colspan="4">Sin datos.</td></tr>');
+}
+function exportarCsv(){
+  if(!datos)return;
+  const l=[['modulo','accion','veces','cantidad']];
+  datos.modulos.forEach(m=>{l.push([m.modulo,'visitas',m.visitas,m.usuarios+' personas']);m.acciones.forEach(a=>l.push([m.modulo,a.accion,a.eventos,a.cantidad]));});
+  const csv='﻿'+l.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='uso_intranet.csv';a.click();
+}
+iniciar();
+</script>
+</body>
+</html>
