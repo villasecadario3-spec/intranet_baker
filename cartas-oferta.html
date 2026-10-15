@@ -142,6 +142,7 @@ input[type=file] { display: none; }
 ::-webkit-scrollbar-track { background: var(--bg2); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 </style>
+<script src="metricas.js" data-modulo="cartas-oferta"></script>
 </head>
 <body>
 
@@ -746,6 +747,7 @@ function toast(msg, err = false) {
 
 // ── HISTORIAL ────────────────────────────────────────────────
 async function registrarHistorial(accion, totalCartas, archivo) {
+  try { if (window.bakerMetrica) { bakerMetrica('cartas_generadas', totalCartas || 1); bakerMetrica('descargas_' + (accion === 'individual' ? 'individual' : 'zip'), 1); } } catch (e) {}
   try {
     await fetch(`${API_BASE}/historial-cartas`, {
       method: 'POST',
@@ -1605,6 +1607,7 @@ async function ds19GenerarWordLote(li) {
     a.click();
     URL.revokeObjectURL(url);
     toast(`Lote ${li+1} generado y descargado`);
+    try { bakerMetrica('lotes_ds19_generados', 1); bakerMetrica('beneficiarios_en_lotes', lote.beneficiarios.length); } catch (e) {}
   } catch(e) {
     toast('Error al generar el formulario: ' + e.message, true);
   }
