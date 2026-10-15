@@ -799,7 +799,29 @@
 // ── HELPERS ──────────────────────────────────────────────────────────
 const results={};
 function fmtSize(b){if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1)+'KB';return(b/1048576).toFixed(2)+'MB';}
-function readFile(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(new Uint8Array(e.target.result));r.onerror=rej;r.readAsArrayBuffer(f);});}
+function readFileRaw(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(new Uint8Array(e.target.result));r.onerror=rej;r.readAsArrayBuffer(f);});}
+// Muchas escrituras notariales vienen cifradas (clave de propietario: no dejan copiar ni
+// modificar, pero se abren sin contraseña). pdf-lib no las descifra: las unía "tal cual" y las
+// páginas quedaban en blanco. Esos archivos (y solo esos) se mandan al servidor propio
+// para quitarles el cifrado; el resto sigue procesándose 100% en el navegador.
+const API_BASE='https://api.ibaker.cl';
+function pdfPareceCifrado(bytes){
+  let s='';const paso=1<<15;
+  for(let i=0;i<bytes.length;i+=paso)s+=String.fromCharCode.apply(null,bytes.subarray(i,Math.min(i+paso,bytes.length)));
+  return /\/Encrypt\s*(?:\d+\s+\d+\s+R|<<)/.test(s);
+}
+async function readFile(f){
+  const bytes=await readFileRaw(f);
+  if(!pdfPareceCifrado(bytes))return bytes;
+  try{
+    const fd=new FormData();fd.append('archivo',new Blob([bytes],{type:'application/pdf'}),f.name||'archivo.pdf');
+    const r=await fetch(API_BASE+'/pdf/desencriptar',{method:'POST',body:fd});
+    if(!r.ok){let m='';try{m=(await r.json()).error;}catch(e){}throw new Error(m||('HTTP '+r.status));}
+    return new Uint8Array(await r.arrayBuffer());
+  }catch(e){
+    throw new Error('"'+(f.name||'El PDF')+'" está protegido (cifrado) y no se pudo desbloquear automáticamente: '+e.message+'. Prueba con la herramienta Desbloquear.');
+  }
+}
 function readDataUrl(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(f);});}
 
 // Nombre de salida con sufijo legible
@@ -1436,7 +1458,7 @@ let unlockFileData=null, unlockFileName='';
 
 async function loadUnlockFile(f){
   if(!f||f.type!=='application/pdf')return;
-  unlockFileData=await readFile(f);
+  unlockFileData=await readFileRaw(f);
   unlockFileName=f.name;
   document.getElementById('unlock-area').style.display='block';
   document.getElementById('unlock-info').textContent='Archivo: '+f.name+' — '+fmtSize(f.size);
