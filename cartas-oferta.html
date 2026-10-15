@@ -1727,6 +1727,7 @@ async function cortarEsperarResultado(total, omitidos, nAdjuntos) {
   // documentos agrega tiempo por escritura y por documento).
   const limiteMs = Math.max(20 * 60 * 1000, (total * 120 + (nAdjuntos || 0) * 40) * 1000);
   const inicio = Date.now();
+  let fallos = 0;
   while (Date.now() - inicio < limiteMs) {
     await new Promise(r => setTimeout(r, 10000));
     try {
@@ -1756,7 +1757,17 @@ async function cortarEsperarResultado(total, omitidos, nAdjuntos) {
           ? `⏳ Leyendo los documentos a pegar (${Math.min(p.hechos + 1, p.total)} de ${p.total}): ${cortarEsc(p.actual)}…`
           : `⏳ Procesando ${Math.min(p.hechos + 1, total)} de ${total}: ${cortarEsc(p.actual)}…`;
       }
-    } catch(e) { /* sigue esperando */ }
+    } catch(e) {
+      // 404 = el servidor ya no conoce el trabajo (se reinició o lo limpió): seguir esperando no sirve.
+      if (/no encontrado|404/i.test(String(e.message))) {
+        progreso.innerHTML = '❌ El servidor perdió este trabajo (probablemente se reinició mientras procesaba). Vuelve a subir las escrituras.';
+        return;
+      }
+      fallos++;
+      if (fallos >= 12) { progreso.innerHTML = `❌ Se perdió la conexión con el servidor (${cortarEsc(e.message)}). Revisa tu conexión o avisa a TI.`; return; }
+      continue;
+    }
+    fallos = 0;
   }
   progreso.innerHTML = `⚠ Está tardando más de lo normal, revisa la consola del servidor`;
 }
