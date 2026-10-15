@@ -171,6 +171,7 @@
     #auth-loading p{font-size:14px;color:var(--text-2)}
     #app-content{display:none}
   </style>
+<script src="metricas.js" data-modulo="pdf-tools"></script>
 </head>
 <body>
 
@@ -1103,6 +1104,7 @@ async function doSplit(){
   }
   const zip=buildZip(parts);
   results.split={zipBytes:zip,name:base+'_DIVIDIDO.zip'};
+  try{bakerMetrica('dividir',1);}catch(e){}
   const btn=document.getElementById('split-download');
   btn.style.display='inline-flex';
   btn.onclick=()=>{downloadBytes(results.split.zipBytes,results.split.name,'application/zip');};
@@ -1286,6 +1288,7 @@ async function doCompress(){
     resList.appendChild(row);
   }
   progBar.style.width='100%';
+  try{bakerMetrica('comprimir',compressFiles.length);}catch(e){}
   progLabel.textContent='Listo — '+compressFiles.length+' archivo'+(compressFiles.length>1?'s':'')+' comprimido'+(compressFiles.length>1?'s':'');
   const dlBtn=document.getElementById('compress-download');
   const dlLabel=document.getElementById('compress-download-label');
@@ -1435,6 +1438,7 @@ async function doPdfToText(){
     pdftxtContent=text.trim();
     document.getElementById('pdftxt-preview').value=pdftxtContent||"(No se pudo extraer texto — el PDF puede ser una imagen escaneada)";
     document.getElementById('pdftxt-download').style.display=pdftxtContent?'inline-flex':'none';
+    if(pdftxtContent){try{bakerMetrica('pdf_a_texto',1);}catch(e){}}
     document.getElementById('pdftxt-copy-btn').style.display=pdftxtContent?'inline-flex':'none';
   }catch(e){document.getElementById('pdftxt-preview').value='Error: '+e.message;}
   btn.disabled=false;btn.textContent='Extraer texto';
@@ -1554,7 +1558,13 @@ async function doUnlock(){
 }
 
 // ── HELPERS UI ────────────────────────────────────────────────────────
-function showDownload(id){document.getElementById(id).style.display='inline-flex';}
+function showDownload(id){
+  document.getElementById(id).style.display='inline-flex';
+  try{
+    const acc={'merge-download':'unir','extract-download':'extraer_paginas','rotate-download':'rotar','wm-download':'marca_agua','num-download':'numerar','img-download':'imagenes_a_pdf','unlock-download':'desbloquear'}[id];
+    if(acc)bakerMetrica(acc, id==='merge-download'?mergeFiles.length:1);
+  }catch(e){}
+}
 
 function renderFileList(listId, files, removeFn){
   const list=document.getElementById(listId);list.innerHTML='';
