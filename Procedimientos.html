@@ -418,6 +418,13 @@ let flujoObrasForzado = false; // true mientras el formulario fuerza el flujo es
 let tipoSubidaActual = 'procedimiento'; // 'procedimiento' | 'comunicacion'
 const OBRAS_ACTIVAS_PROC = OBRAS_CONSTRUCCION.slice();
 const SUBIDORES_PROCEDIMIENTOS = ['dvillaseca@ibaker.cl', 'jcumplido@ibaker.cl', 'phenriquez@ibaker.cl'];
+// Carpetas de Obras: solo su responsable puede subir (el servidor también lo exige).
+const SUBIDORES_CARPETAS_OBRAS = {
+    'Planos / Detalles Constructivos': ['mmatamala@ibaker.cl'],
+    'Procedimientos': ['phenriquez@ibaker.cl'],
+};
+function subcarpetasObrasPermitidas() { return Object.keys(SUBIDORES_CARPETAS_OBRAS).filter(c => SUBIDORES_CARPETAS_OBRAS[c].includes(emailActual)); }
+function puedeSubirAlgo() { return SUBIDORES_PROCEDIMIENTOS.includes(emailActual) || subcarpetasObrasPermitidas().length > 0; }
 const FIRMANTES_DISPONIBLES = ['dvillaseca@ibaker.cl','jcumplido@ibaker.cl','bsilva@ibaker.cl','alarrain@ibaker.cl','amolina@ibaker.cl','cgarces@ibaker.cl','pzuniga@ibaker.cl','pablo@cmcromeral.cl','crivera@ibaker.cl','jdiaz@ibaker.cl'];
 let firmantesSeleccionadosModal = new Set();
 let obrasSeleccionadasModal = new Set();
@@ -453,7 +460,7 @@ async function initAuth() {
                     <div class="user-av">${iniciales}</div>
                     <span class="user-nm">${nombre.split(' ').slice(0,2).join(' ')}</span>
                 </div>`;
-            if (SUBIDORES_PROCEDIMIENTOS.includes(emailActual)) document.getElementById('btn-subir-procedimiento').style.display = '';
+            if (puedeSubirAlgo()) document.getElementById('btn-subir-procedimiento').style.display = '';
             if (APROBADORES.includes(emailActual)) {
                 // Agrega la pestaña de Pendientes solo para aprobadores.
                 const tabsWrap = document.getElementById('tabs-wrap');
@@ -524,7 +531,10 @@ function actualizarSubcarpetasModal() {
     const selCarpeta = document.getElementById('m-subcarpeta');
     document.getElementById('grupo-subcarpeta').style.display = esObras ? '' : 'none';
     if (esObras) {
-        if (selCarpeta.options.length <= 1) selCarpeta.innerHTML = '<option value="">Selecciona la carpeta…</option>' + SUBCARPETAS_OBRAS.map(c => `<option value="${c}">${c}</option>`).join('');
+        const permitidas = SUBCARPETAS_OBRAS.filter(c => subcarpetasObrasPermitidas().includes(c));
+        const previa = selCarpeta.value;
+        selCarpeta.innerHTML = (permitidas.length === 1 ? '' : '<option value="">Selecciona la carpeta…</option>') + permitidas.map(c => `<option value="${c}">${c}</option>`).join('');
+        if (permitidas.includes(previa)) selCarpeta.value = previa;
     } else {
         selCarpeta.innerHTML = '<option value="">Selecciona la carpeta…</option>';
         document.querySelectorAll('input[name="m-aplica"]').forEach(r => { r.checked = false; });
@@ -548,7 +558,10 @@ function actualizarSubcarpetasModal() {
 
 function poblarSelectorCarpetas() {
     const sel = document.getElementById('m-carpeta');
+    const subeGeneral = SUBIDORES_PROCEDIMIENTOS.includes(emailActual);
+    const subeObras = subcarpetasObrasPermitidas().length > 0;
     CARPETAS.forEach(c => {
+        if (c === CARPETA_OBRAS ? !subeObras : !subeGeneral) return;   // solo las carpetas donde esta persona puede subir
         const opt = document.createElement('option');
         opt.value = c; opt.textContent = c;
         sel.appendChild(opt);
@@ -1383,6 +1396,11 @@ function abrirModal(tipoDoc) {
     document.getElementById('grupo-area').style.display = tipoSubidaActual === 'comunicacion' ? '' : 'none';
     document.getElementById('grupo-obras').style.display = tipoSubidaActual === 'procedimiento' ? '' : 'none';
     document.getElementById('grupo-firma').style.display = tipoSubidaActual === 'procedimiento' ? '' : 'none';
+    if (tipoSubidaActual === 'procedimiento') {
+        const selC = document.getElementById('m-carpeta');
+        const validas = Array.from(selC.options).filter(o => o.value);
+        if (validas.length === 1) selC.value = validas[0].value;   // una sola carpeta posible: queda elegida
+    }
     actualizarSubcarpetasModal();
     obrasSeleccionadasModal = new Set();
     ultimoRenderFirmaKey = null;
