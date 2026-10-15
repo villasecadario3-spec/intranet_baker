@@ -117,6 +117,7 @@
   footer img { height: 18px; vertical-align: middle; margin-right: 6px; opacity: 0.5; }
 
     </style>
+<script src="metricas.js" data-modulo="ds49"></script>
 </head>
 <body>
 <nav class="intranet-nav">
@@ -488,6 +489,7 @@ async function generarFichas() {
     zipBlob = new Blob([finalZip], { type: 'application/zip' });
     progressFill.style.width = '100%';
     progressCount.textContent = `${total} / ${total}`;
+    try { bakerMetrica('generaciones', 1); bakerMetrica('fichas_' + (config.formato === 'RM' ? 'rm' : 'ohiggins'), total); } catch (e) {}
     progressLabel.textContent = `✓ ${total} fichas listas — ${(zipBlob.size/1024/1024).toFixed(1)} MB`;
     progressLog.textContent = '';
     btnDescargar.classList.add('show');
