@@ -458,10 +458,18 @@ async function generarFichas() {
     const wb = XLSX.read(excelBuf, { type: 'array' });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-    const headerRow = data[0] || [];
+    let headerRow = data[0] || [];
+    let trimmed = data.slice(1).map(r => r.map(v => v === null || v === undefined ? '' : String(v).trim()));
+    let layoutAviso = '';
+    if (detectLayoutB(headerRow)) {
+      const ad = adaptLayoutB(headerRow, trimmed);
+      headerRow = ad.header; trimmed = ad.rows;
+      layoutAviso = 'Planilla detectada: formato RM con columnas X (leída por encabezado).';
+      if (ad.warn.length) layoutAviso += ' ⚠ Columnas no encontradas: ' + ad.warn.join(', ') + '.';
+    }
     const COLS = resolveColumns(headerRow);
-    const allRows = data.slice(1)
-      .map(r => r.map(v => v === null || v === undefined ? '' : String(v).trim()))
+    if (COLS.faltantes && COLS.faltantes.length && !layoutAviso.includes('⚠')) layoutAviso += ' ⚠ Columnas no encontradas en el Excel: ' + COLS.faltantes.join(', ') + '.';
+    const allRows = trimmed
       .filter(r => (r[1]||'').trim() !== '' || (r[2]||'').trim() !== '' || (r[4]||'').trim() !== '');
     const total = allRows.length;
     const logoBytes = Uint8Array.from(atob(SERVIU_B64_DATA), c => c.charCodeAt(0));
@@ -491,7 +499,7 @@ async function generarFichas() {
     progressCount.textContent = `${total} / ${total}`;
     try { bakerMetrica('generaciones', 1); bakerMetrica('fichas_' + (config.formato === 'RM' ? 'rm' : 'ohiggins'), total); } catch (e) {}
     progressLabel.textContent = `✓ ${total} fichas listas — ${(zipBlob.size/1024/1024).toFixed(1)} MB`;
-    progressLog.textContent = '';
+    progressLog.textContent = layoutAviso;
     btnDescargar.classList.add('show');
   } catch(err) {
     console.error('DS49 Error:', err);
@@ -686,6 +694,7 @@ function resolveColumns(headerRow) {
   // en el Excel, así que esas filas nunca se llenaban.
   equsrCols['Bibliotecas'] = idxBracket('Bibliotecas');
   equsrCols['Infocentro']  = idxBracket('Infocentro');
+  equsrCols['Mesa de ping-pong metálica empotrada'] = idxBracket('Mesa de ping-pong');
 
   const cols = {
     sitHab: idxExact('1.1.- Situación Habitacional:'),
@@ -715,10 +724,242 @@ function resolveColumns(headerRow) {
   cols.conviv.forEach((v,i) => { if (v === -1) faltantes.push('conviv[' + i + ']'); });
   Object.entries(equsrCols).forEach(([k,v]) => { if (v === -1) faltantes.push('equsr:' + k); });
   if (faltantes.length) console.warn('DS49: no se encontraron estas columnas en el Excel (revisar encabezados):', faltantes.join(', '));
+  cols.faltantes = faltantes;
 
   return cols;
 }
  
+// ── Layout "RM Forms" (encuesta con columnas X por opción) ────────────────
+// Esta planilla trae columnas extra (apellidos combinados, nombre completo,
+// una columna "X" por cada opción) y por eso NO calza con la lectura por
+// posición de la Etapa_1. Se detecta por encabezado y se traduce al formato
+// canónico que ya entienden buildDoc / buildDocRM; además se adjunta a cada
+// fila un objeto .B con todos los datos de la encuesta ya leídos por título.
+function nh(s) {
+  return nrm(s).replace(/[¿?]/g, '').replace(/\s+/g, ' ').trim();
+}
+function nk(s) { return nrm(s).replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim(); }
+function detectLayoutB(headerRow) {
+  const H = headerRow.map(nh);
+  return H.includes('nombres del postulante') && H.some(h => h === 'g_postulante_m' || h === 'nombre completo postulante');
+}
+// lista separada por comas (ignora las comas dentro de paréntesis) y comparación por inicio exacto
+function bxList(raw) {
+  const out = []; let d = 0, cur = '';
+  for (const ch of String(raw || '')) {
+    if (ch === '(') d++;
+    if (ch === ')') d = Math.max(0, d - 1);
+    if (ch === ',' && d === 0) { out.push(cur); cur = ''; } else cur += ch;
+  }
+  out.push(cur);
+  return out.map(nk).filter(Boolean);
+}
+function bxIncl(raw, label) { const k = nk(label); return !!k && bxList(raw).some(it => it === k || it.startsWith(k)); }
+
+function adaptLayoutB(headerRow, rawRows) {
+  const H = headerRow.map(nh);
+  const find = (re, from = 0, to = H.length) => { for (let i = Math.max(0, from); i < Math.min(H.length, to); i++) if (re.test(H[i])) return i; return -1; };
+  const warn = [];
+  const need = (name, i) => { if (i < 0) warn.push(name); return i; };
+
+  const iTit = need('Nombres del Postulante', find(/^nombres del postulante$/));
+  const starts = [];
+  for (let n = 1; n <= 6; n++) starts.push(find(new RegExp('^nombres del integrante ' + n + '$')));
+  const iHab = find(/situacion habitacional/);
+  // límites de bloque
+  const blocks = [{ s: iTit, e: starts[0] >= 0 ? starts[0] : iHab }];
+  starts.forEach((s, k) => {
+    const next = starts.slice(k + 1).find(x => x >= 0);
+    blocks.push({ s, e: next !== undefined ? next : iHab });
+  });
+
+  const personaCols = (blk, n) => {
+    const { s, e } = blk;
+    if (s < 0) return null;
+    const f = (re) => find(re, s, e);
+    const g = (re) => find(re);
+    const c = {
+      nombre: s,
+      ap1: s + 1,
+      ap2: n === 0 ? find(/^segundo apellido/, s, e) : -1,
+      rut: f(/^rut/),
+      genero: f(/^genero/),
+      estCivil: f(/^estado civil/),
+      edad: f(/^edad/),
+      parentesco: n === 0 ? -1 : f(/^parentesco/),
+      estudia: n <= 1 ? f(/estudia actualmente/) : g(new RegExp('^el integrante ' + n + ' estudia actualmente')),
+      estudios: f(/^estudios/),
+      laboral: f(/^situacion (laboral|ocupacional)/),
+      gastos: n === 0 ? f(/cuanto gastas/) : -1,
+      indig: f(/(tienes|tiene) ascendencia indigena/),
+      cert: f(/certificado/),
+      pueblo: f(/pueblo originario/),
+      extranjero: f(/extranjero/),
+      nac: f(/^nacionalidad/),
+      resid: f(/cuent\w* con residencia definitiva/),
+      residAnio: f(/ano obtuvo la residencia/),
+      disc: f(/presenta alguna situacion de discapacidad/),
+      regDisc: f(/registro nacional de discapacidad/),
+      cred: f(/cuent\w* con credencial de discapacidad/),
+      mr: f(/movilidad reducida/),
+      discTipo: n === 0 ? f(/^tipo de discapacidad$/) : g(new RegExp('^tipo de discapacidad integrante ' + n + '$')),
+      valech: f(/informe valech/),
+      bomberos: f(/bomberos/),
+    };
+    return c;
+  };
+  const colsPersona = blocks.map((b, n) => personaCols(b, n));
+
+  // ── secciones generales ──
+  const G = {
+    sitHab: need('1.1 Situación Habitacional', find(/situacion habitacional/)),
+    tipoViv: need('1.2 Tipo Vivienda', find(/tipo vivienda/)),
+    agua: need('1.3 Sistema Agua', find(/tipo de sistema agua/)),
+    hig: need('1.4 Servicio Higiénico', find(/tipo de servicio higienico/)),
+    elec: find(/tipo de servicio electrico/),
+    calef: need('1.6 Calefont', find(/cuenta con calefont/)),
+    dorm: need('N° de dormitorios', find(/dormitorios/)),
+    camas: need('N° de camas', find(/^n.{0,2} de camas/)),
+    atribAct: need('Atributos del lugar actual', find(/respecto al lugar actual de residencia/)),
+    conv: [
+      find(/^1\.- los problemas/), find(/^2\.- la mayor parte/), find(/^3\.- es de mi interes/), find(/^4\.- las personas del barrio/),
+    ],
+    partic: find(/participa en alguna organizacion/),
+    equipEx: find(/equipamiento comunitario que existe/),
+    uso: [/juegos infantiles son ocupados/, /sede social se encuentra/, /padres y madres jugando/, /cancha se encuentra ocupada/, /cancha es ocupada tanto/].map(re => find(re)),
+    atribViv: find(/seleccione 3 atributos.*vivienda$/),
+    atribBar: find(/seleccione 3 atributos.*el barrio$/),
+    equipAd: need('Equipamiento adicional', find(/equipamiento comunitario adicional/)),
+    temas: need('Temas de interés', find(/queremos conocer sus intereses/)),
+    dom: find(/^domicilio postulante/), tel: find(/^telefono/), mail: find(/^correo/),
+    otAct: find(/^3_otros$/), otViv: find(/^4_otros$/), otBar: find(/^5_otros$/), otEq: find(/^6_otros$/), otTem: find(/^7_otros$/),
+  };
+  G.conv.forEach((v, i) => { if (v < 0) warn.push('Convivencia ' + (i + 1)); });
+  // cuadro 3.1 usuarios: etiqueta entre corchetes al final del encabezado
+  const usrIdx = [];
+  headerRow.forEach((h, i) => {
+    const t = String(h || '');
+    if (/^3\.1\.-\s*seg/i.test(nrm(t).replace(/^/, '')) || nh(t).startsWith('3.1.- segun su opinion')) {
+      const m = t.match(/\[([^\]]+)\]\s*$/);
+      if (m) usrIdx.push({ label: m[1].trim(), i });
+    }
+  });
+  if (!usrIdx.length) warn.push('Cuadro 3.1 (uso del equipamiento)');
+
+  // ── encabezado canónico (idéntico al de Etapa_1 donde el código lo busca) ──
+  const CH = [];
+  const CANON = {
+    sitHab: '1.1.- Situación Habitacional:', tipoViv: '1.2.- Tipo Vivienda:', agua: '1.3.- Tipo de Sistema Agua:',
+    hig: '1.4.- Tipo de Servicio Higiénico:', dorm: 'N° de dormitorios', camas: 'N° de camas', calef: 'Posee calefont',
+  };
+  const CONV_H = [
+    '1.- Los problemas los solucionamos conversando y llegando a acuerdos.',
+    '2.- La mayor parte de las personas del barrio cumplimos las reglas que acordamos.',
+    '3.- Es de mi interés conocer y compartir con las personas del barrio.',
+    '4.- Existen varias organizaciones comunitarias en el barrio.',
+    '5.- Las personas del barrio siempre están dispuestas a colaborar si alguien tiene problemas.',
+  ];
+  const BASE = 167;
+  const extraHeaders = [
+    CANON.sitHab, CANON.tipoViv, CANON.agua, CANON.hig, CANON.dorm, CANON.camas, CANON.calef,
+    ...CONV_H,
+    '1.- Respecto a la futura Vivienda y Barrio. Seleccione 3 atributos',
+    '2.¿Qué Equipamiento Comunitario Adicional le gustaría que fuera parte del Proyecto?',
+    'Favor elija máximo 10 temas',
+  ];
+  const USR_LABELS = ['Áreas verdes adicionales', 'Plaza Activa (Máquinas de ejercicio)', 'Contenedores de basura diferenciado por tipo de desecho', 'Huertos Urbanos', 'Multicancha', 'Ciclo vías', 'Estacionamientos de Bicicletas', 'Escenario o anfiteatro', 'Estacionamientos de Automóviles', 'Juegos infantiles', 'Juegos de mesa', 'Luminarias', 'Mesa de ping-pong', 'Sala multiuso', 'Bibliotecas', 'Infocentro', 'Canil para mascotas', 'Otros'];
+  USR_LABELS.forEach(l => extraHeaders.push('2.1.- Según su opinión, ¿Quiénes serían las personas que más ocuparían ese equipamiento? [' + l + ']'));
+  const header = new Array(BASE).fill('');
+  extraHeaders.forEach(h => header.push(h));
+
+  const mapAtribA = (viv, bar) => {
+    const out = [];
+    const add = (cond, l) => { if (cond) out.push(l); };
+    add(bxIncl(viv, 'Ventilación adecuada'), 'Con buena ventilación');
+    add(bxIncl(viv, 'Superficie adecuada'), 'Con espacios suficientes');
+    add(bxIncl(viv, 'Segura'), 'Segura');
+    add(bxIncl(viv, 'Ampliable'), 'Una vivienda ampliable');
+    add(bxIncl(bar, 'Cercanía con servicios básicos'), 'Cercanía con servicios básicos');
+    add(bxIncl(bar, 'El equipamiento urbano del barrio'), 'El equipamiento urbano del barrio (plazas, juegos, etc.)');
+    add(bxIncl(bar, 'Con buena iluminación'), 'Con buena iluminación');
+    return out.join(', ');
+  };
+  const edadNum = (v) => { const n = parseInt(String(v).replace(/[^0-9]/g, ''), 10); return isNaN(n) ? null : n; };
+
+  const rows = [];
+  rawRows.forEach(r => {
+    const get = (i) => (i >= 0 && i < r.length) ? val(r[i]) : '';
+    const mk = (n) => {
+      const c = colsPersona[n];
+      if (!c) return null;
+      const m = {
+        nombre: get(c.nombre), ap1: get(c.ap1), ap2: get(c.ap2), rut: get(c.rut),
+        genero: get(c.genero), estCivil: get(c.estCivil), edad: get(c.edad), parentesco: n === 0 ? 'Postulante' : get(c.parentesco),
+        estudia: get(c.estudia), estudios: get(c.estudios), laboral: get(c.laboral), gastos: get(c.gastos),
+        indig: get(c.indig), cert: get(c.cert), pueblo: get(c.pueblo), extranjero: get(c.extranjero), nac: get(c.nac),
+        resid: get(c.resid), residAnio: get(c.residAnio), disc: get(c.disc), regDisc: get(c.regDisc), cred: get(c.cred),
+        mr: get(c.mr), discCual: get(c.discTipo), valech: get(c.valech), bomberos: get(c.bomberos), enf: '',
+      };
+      const ed = edadNum(m.edad);
+      m.adm = ed !== null && ed >= 60 ? 'si' : 'no';
+      // los que no son extranjeros se dan por chilenos para la tabla 1.2
+      if (!m.nac && nrm(m.extranjero) === 'no') m.nac = 'Chilena';
+      return m;
+    };
+    const post = mk(0);
+    const integ = [];
+    for (let n = 1; n <= 6; n++) {
+      const m = mk(n);
+      if (m && (m.nombre || m.ap1)) integ.push(m);
+    }
+    const members = [post, ...integ];
+    const B = {
+      members,
+      sitHab: get(G.sitHab), tipoViv: get(G.tipoViv), agua: get(G.agua), hig: get(G.hig), elec: get(G.elec), calef: get(G.calef),
+      dorm: get(G.dorm), camas: get(G.camas),
+      atribAct: get(G.atribAct), conv: G.conv.map(get), partic: get(G.partic),
+      equipEx: get(G.equipEx), uso: G.uso.map(get),
+      atribViv: get(G.atribViv), atribBar: get(G.atribBar), equipAd: get(G.equipAd), temas: get(G.temas),
+      dom: get(G.dom), tel: get(G.tel), mail: get(G.mail),
+      otros: { act: get(G.otAct), viv: get(G.otViv), bar: get(G.otBar), eq: get(G.otEq), tem: get(G.otTem) },
+      usuarios: usrIdx.map(u => ({ label: u.label, v: get(u.i) })),
+      gastos: post ? post.gastos : '',
+    };
+
+    // fila canónica (posiciones de Etapa_1)
+    const out = new Array(BASE + extraHeaders.length).fill('');
+    const put = (b, m) => {
+      out[b + 0] = m.nombre; out[b + 1] = m.ap1; out[b + 2] = m.ap2; out[b + 3] = m.rut; out[b + 4] = m.estCivil;
+      out[b + 5] = m.genero; out[b + 6] = m.parentesco === 'Postulante' ? '' : m.parentesco; out[b + 7] = m.edad; out[b + 8] = m.adm;
+      out[b + 9] = m.estudios; out[b + 10] = m.laboral; out[b + 11] = m.indig; out[b + 13] = m.pueblo; out[b + 14] = m.nac;
+      out[b + 15] = m.resid; out[b + 16] = m.enf; out[b + 18] = m.disc; out[b + 19] = m.cred; out[b + 20] = m.discCual;
+      out[b + 21] = m.mr; out[b + 22] = m.valech;
+    };
+    // titular: nombre en 1, apellidos 2-3, rut 4 ... (offset -0 con base 0 => nombre en 0 no sirve; titular usa índice base 0 = 'b+1')
+    const t = post;
+    out[1] = t.nombre; out[2] = t.ap1; out[3] = t.ap2; out[4] = t.rut; out[5] = t.estCivil; out[6] = t.genero; out[7] = t.edad;
+    out[8] = t.adm; out[9] = t.estudios; out[10] = t.laboral; out[11] = t.indig; out[13] = t.pueblo; out[14] = t.nac; out[15] = t.resid;
+    out[16] = t.enf; out[18] = t.disc; out[19] = t.cred; out[20] = t.discCual; out[21] = t.mr; out[22] = t.valech;
+    integ.forEach((m, k) => { const b = 24 + 24 * k; put(b, m); });
+
+    let p = BASE;
+    out[p++] = B.sitHab; out[p++] = B.tipoViv; out[p++] = B.agua; out[p++] = B.hig; out[p++] = B.dorm; out[p++] = B.camas; out[p++] = B.calef;
+    const cv = (v) => { const n = nrm(v); return n === 'siempre' ? 'Si' : (n === 'nunca' ? 'No' : ''); };
+    out[p++] = cv(B.conv[0]); out[p++] = cv(B.conv[1]); out[p++] = cv(B.conv[2]); out[p++] = ''; out[p++] = cv(B.conv[3]);
+    out[p++] = mapAtribA(B.atribViv, B.atribBar);
+    out[p++] = B.equipAd;
+    out[p++] = B.temas;
+    USR_LABELS.forEach(l => {
+      const key = nk(l);
+      const hit = B.usuarios.find(u => l === 'Otros' ? nk(u.label).startsWith('otros') : (nk(u.label) === key || nk(u.label).startsWith(key)));
+      out[p++] = hit ? hit.v : '';
+    });
+    out.B = B;
+    rows.push(out);
+  });
+  return { header, rows, warn };
+}
+
 // ─── Bordes ───────────────────────────────────────────────────────────────────
 const BD = { style: BorderStyle.SINGLE, size: 6, color: '000000' };
 const BORDERS = { top: BD, bottom: BD, left: BD, right: BD };
@@ -1158,6 +1399,9 @@ function rmMapEstudios(v) {
 }
 function rmMapLaboral(v) {
   const n = nrm(v); if (!n) return { sel: null, otro: '' };
+  if (n.startsWith('trabajador y estudiante')) return { sel: 'Trabajador y Estudiante', otro: '' };
+  if (n.startsWith('trabajo permanente')) return { sel: 'Trabajo Permanente', otro: '' };
+  if (n.startsWith('trabajo esporadico')) return { sel: 'Trabajo Esporádico', otro: '' };
   if (n.startsWith('estudiante')) return { sel: 'Estudiante', otro: '' };
   if (n.startsWith('dependiente')) return { sel: RM_MAP_LABORAL_DEPENDIENTE, otro: '' };
   if (n.startsWith('independiente')) return { sel: RM_MAP_LABORAL_INDEPENDIENTE, otro: '' };
@@ -1178,6 +1422,7 @@ function rmTitleCase(str) {
 }
 
 function extractMembersRM(row) {
+  if (row.B) return row.B.members;
   const get = (i) => val(row[i]);
   const out = [{
     nombre: get(1), ap1: get(2), ap2: get(3), rut: get(4), estCivil: get(5), genero: get(6),
@@ -1334,11 +1579,14 @@ function buildDocRM(row, pd, folio, logoBuffer, COLS) {
   const members = extractMembersRM(row);
   const post = members[0];
   const grupo = members.slice(1);
+  const BB = row.B || null; // datos leídos por encabezado (planilla RM con columnas X)
   const WP = CONTENT_P, WL = CONTENT_L;
   const tc = rmTitleCase;
   const nombreCompleto = (m) => [tc(m.nombre), tc(m.ap1), tc(m.ap2)].filter(Boolean).join(' ');
   const apellidos = (m) => [tc(m.ap1), tc(m.ap2)].filter(Boolean).join(' ');
   const nrmIn = (raw, label) => !!label && nrm(raw).includes(nrm(label));
+  const bxIn = (raw, label) => bxIncl(raw, label.replace(/\s*\(.*$/, '').replace(/[.:?¿]/g, '').replace('cercanía con los', 'cercania de los'));
+  const respUso = (v) => { const n = nrm(v); return n.startsWith('siempre') ? 0 : n.startsWith('a veces') ? 1 : n.startsWith('nunca') ? 2 : n.startsWith('no aplica') ? 3 : n.startsWith('no sabe') || n.startsWith('no responde') ? 4 : -1; };
   const titulo = (t, pb = false) => rmP(t, { bold: true, size: 20, before: pb ? 0 : 160, keepNext: true, pageBreak: pb });
   const sub = (t, pb = false) => rmP(t, { bold: true, size: 18, before: pb ? 0 : 100, keepNext: true, pageBreak: pb });
   const nota = (t) => rmP(t, { italic: true, size: 16, before: 40, keepNext: true });
@@ -1385,9 +1633,9 @@ function buildDocRM(row, pd, folio, logoBuffer, COLS) {
   const secII = rmTable(i2, [
     new TableRow({ children: [rmC(['Identificación de persona del grupo familiar que responde la ficha.'], { w: i2[0], bold: true, shade: 'D9D9D9' }), rmC(nombreCompleto(post), { w: i2[1] })] }),
     new TableRow({ children: [rmC('Nombre Postulante:', { w: i2[0], bold: true, shade: 'D9D9D9' }), rmC(nombreCompleto(post), { w: i2[1] })] }),
-    new TableRow({ children: [rmC('Domicilio grupo familiar Postulante:', { w: i2[0], bold: true, shade: 'D9D9D9' }), rmC('', { w: i2[1] })] }),
-    new TableRow({ children: [rmC('Teléfono contacto:', { w: i2[0], bold: true, shade: 'D9D9D9' }), rmC('', { w: i2[1] })] }),
-    new TableRow({ children: [rmC('e-mail', { w: i2[0], bold: true, shade: 'D9D9D9' }), rmC('', { w: i2[1] })] }),
+    new TableRow({ children: [rmC('Domicilio grupo familiar Postulante:', { w: i2[0], bold: true, shade: 'D9D9D9' }), rmC(BB ? BB.dom : '', { w: i2[1] })] }),
+    new TableRow({ children: [rmC('Teléfono contacto:', { w: i2[0], bold: true, shade: 'D9D9D9' }), rmC(BB ? BB.tel : '', { w: i2[1] })] }),
+    new TableRow({ children: [rmC('e-mail', { w: i2[0], bold: true, shade: 'D9D9D9' }), rmC(BB ? BB.mail : '', { w: i2[1] })] }),
   ]);
   const firmas = [
     gap(500), rmP('NOMBRE Y FIRMA PERSONA QUE RESPONDE FICHA', { bold: true, size: 18, align: AlignmentType.CENTER }),
@@ -1398,7 +1646,7 @@ function buildDocRM(row, pd, folio, logoBuffer, COLS) {
   ];
 
   // ── 1. Información sobre el/la postulante y 1.1 grupo familiar (apaisado) ──
-  const estudiaSN = (m) => nrm(m.laboral).startsWith('estudiante') ? 'si' : '';
+  const estudiaSN = (m) => { const t = triSN(m.estudia); if (t) return t; return nrm(m.laboral).includes('estudiante') ? 'si' : (BB ? 'no' : ''); };
   function cellsPersona(m, n, conParentesco, W) {
     const ec = rmMapEstCivil(m.estCivil), es = rmMapEstudios(m.estudios), lb = rmMapLaboral(m.laboral);
     const gen = nrm(m.genero), sexF = gen.startsWith('f'), sexM = gen.startsWith('m');
@@ -1414,7 +1662,7 @@ function buildDocRM(row, pd, folio, logoBuffer, COLS) {
     c.push(rmC(m.edad, { w: W[k++], align: AlignmentType.CENTER }));
     if (conParentesco) { const pr = rmMapParentesco(m.parentesco); c.push(rmC(rmOptLines(RM_PARENT, pr.sel, pr.otro), { w: W[k++] })); }
     const est = estudiaSN(m);
-    c.push(rmC([rmMark(est === 'si') + ' SI', rmMark(false) + ' NO'], { w: W[k++] }));
+    c.push(rmC([rmMark(est === 'si') + ' SI', rmMark(est === 'no') + ' NO'], { w: W[k++] }));
     c.push(rmC(rmOptLines(RM_ESTUDIOS, es.sel, es.otro), { w: W[k++] }));
     c.push(rmC(rmOptLines(RM_LABORAL, lb.sel, lb.otro), { w: W[k++] }));
     const indL = [rmMark(ind === 'si') + ' Si', rmMark(ind === 'no') + ' No'];
@@ -1424,9 +1672,15 @@ function buildDocRM(row, pd, folio, logoBuffer, COLS) {
   }
   const wPost = rmFit([500, 1500, 1800, 1300, 800, 1900, 700, 800, 2200, 2300, 1780, 1700], WL);
   const hdrPost = ['N°', 'Nombre', 'Apellidos', 'RUN', 'Sexo', 'Estado Civil', 'Edad', ['¿Estudia', 'Actualmente?'], 'Estudios (último curso)', 'Situación Ocupacional', ['¿Tiene ascendencia', 'indígena? (*)'], ['Gastos mensuales', 'Servicios Básicos']];
+  const gastoIdx = (() => {
+    const g = post && post.gastos ? String(post.gastos).replace(/\./g, '') : '';
+    const mm = g.match(/\d+/); if (!mm) return -1;
+    const n = parseInt(mm[0], 10);
+    return n >= 50000 ? 6 : n >= 40000 ? 5 : n >= 30000 ? 4 : n >= 20000 ? 3 : n >= 10000 ? 2 : n >= 1 ? 1 : 0;
+  })();
   const postRow = new TableRow({ children: [
     ...cellsPersona(post, 1, false, wPost.slice(0, 11)),
-    rmC(RM_GASTOS.map(g => '☐ ' + g), { w: wPost[11] }),
+    rmC(RM_GASTOS.map((g, gi) => rmMark(gastoIdx === gi) + ' ' + g), { w: wPost[11] }),
   ] });
   const tablaPost = rmTable(wPost, [new TableRow({ tableHeader: true, children: hdrPost.map((h, i) => rmH(h, { w: wPost[i], fs: 15 })) }), postRow]);
 
@@ -1437,7 +1691,7 @@ function buildDocRM(row, pd, folio, logoBuffer, COLS) {
 
   // ── 1.2 Condiciones especiales ──
   const esExtr = (m) => !!m.nac && !nrm(m.nac).startsWith('chilen');
-  const conCond = members.filter(m => triSN(m.disc) === 'si' || esExtr(m) || triSN(m.valech) === 'si' || triSN(m.cred) === 'si');
+  const conCond = members.filter(m => triSN(m.disc) === 'si' || esExtr(m) || triSN(m.valech) === 'si' || triSN(m.cred) === 'si' || triSN(m.bomberos) === 'si');
   const w12 = [3300, 1600, 1500, 1900, 2400, 1800, 1700, 1500, 1580];
   const sn = (v) => rmMark(v === 'si') + ' Si   ' + rmMark(v === 'no') + ' No';
   function tipoDisc(m) {
@@ -1454,14 +1708,14 @@ function buildDocRM(row, pd, folio, logoBuffer, COLS) {
     const extr = esExtr(m);
     return new TableRow({ cantSplit: true, children: [
       rmC(nombreCompleto(m), { w: w12[0] }),
-      rmC(sn(triSN(m.cred)), { w: w12[1] }),
+      rmC(sn(BB ? triSN(m.regDisc) : triSN(m.cred)), { w: w12[1] }),
       rmC(sn(triSN(m.mr)), { w: w12[2] }),
-      rmC(sn(''), { w: w12[3] }),
+      rmC(sn(BB ? triSN(m.cred) : ''), { w: w12[3] }),
       rmC(tipoDisc(m), { w: w12[4] }),
       rmC(extr ? tc(m.nac) : '', { w: w12[5] }),
-      rmC(extr && triSN(m.resid) === 'si' ? 'Con residencia definitiva (año: ____)' : '', { w: w12[6] }),
+      rmC(extr && triSN(m.resid) === 'si' ? ('Con residencia definitiva (año: ' + (m.residAnio || '____') + ')') : '', { w: w12[6] }),
       rmC(sn(triSN(m.valech)), { w: w12[7] }),
-      rmC(sn(''), { w: w12[8] }),
+      rmC(sn(triSN(m.bomberos)), { w: w12[8] }),
     ] });
   });
   const tabla12 = rmTable(w12, [
@@ -1496,6 +1750,7 @@ function buildDocRM(row, pd, folio, logoBuffer, COLS) {
   const O_AGUA = ['Con llave de agua dentro de la vivienda', 'Con llave de agua fuera de vivienda', 'No tiene o la acarrea'];
   const O_HIG = ['WC conectado al alcantarillado', 'WC conectado a Fosa séptica', 'Letrina conectada a Pozo negro', 'No Posee Servicio Higiénico'];
   const O_ELEC = ['Con medidor', 'Conexión Irregular'];
+  const s5 = pick(O_ELEC, BB ? BB.elec : '');
   const s1 = pick(O_SIT, sitHab), s2 = pick(O_VIV, tipoViv), s3 = pick(O_AGUA, sistAgua), s4 = pick(O_HIG, servHig, { 'Letrina o pozo negro': 'Letrina conectada a Pozo negro' });
   const otroL = (o) => rmMark(!!o) + ' Otro: ' + (o || '');
   const w3 = rmFit([1, 1, 1, 1, 1, 1], WP);
@@ -1507,7 +1762,7 @@ function buildDocRM(row, pd, folio, logoBuffer, COLS) {
       rmC([...rmOptLines(O_VIV, s2.sel, ''), otroL(s2.otro)], { w: w3[1] }),
       rmC([...rmOptLines(O_AGUA, s3.sel, ''), otroL(s3.otro)], { w: w3[2] }),
       rmC([...rmOptLines(O_HIG, s4.sel, ''), otroL(s4.otro)], { w: w3[3] }),
-      rmC([...rmOptLines(O_ELEC, null, ''), otroL('')], { w: w3[4] }),
+      rmC([...rmOptLines(O_ELEC, s5.sel, ''), otroL(s5.otro)], { w: w3[4] }),
       rmC([rmMark(cal === 'si') + ' SI', rmMark(cal === 'no') + ' NO'], { w: w3[5] }),
     ] }),
   ]);
@@ -1520,13 +1775,18 @@ function buildDocRM(row, pd, folio, logoBuffer, COLS) {
   const w31 = [8000, 2800];
   const tablaAtribActual = rmTable(w31, [
     new TableRow({ children: [rmH('ATRIBUTOS', { w: w31[0] }), rmH('MARQUE CON UNA X', { w: w31[1] })] }),
-    ...ATRIB_ACTUAL.map(a => new TableRow({ children: [rmC(a, { w: w31[0] }), rmC('', { w: w31[1] })] })),
+    ...ATRIB_ACTUAL.map((a, ai) => { const hit = BB && (ai === ATRIB_ACTUAL.length - 1 ? !!BB.otros.act : bxIn(BB.atribAct, a)); return new TableRow({ children: [rmC(ai === ATRIB_ACTUAL.length - 1 && BB && BB.otros.act ? a + ' ' + BB.otros.act : a, { w: w31[0] }), rmC(XC(hit), { w: w31[1], bold: true, align: AlignmentType.CENTER })] }); }),
   ]);
   // 4. Convivencia: la encuesta responde SI/NO; se traslada Sí -> Siempre y No -> Nunca
   const w4 = [4800, 1500, 1500, 1500, 1500];
   const tablaConv = rmTable(w4, [
     new TableRow({ children: [rmH('', { w: w4[0] }), rmH('Siempre', { w: w4[1] }), rmH('A veces', { w: w4[2] }), rmH('Nunca', { w: w4[3] }), rmH(['No sabe /', 'No responde'], { w: w4[4] })] }),
     ...RM_CONV.map((t, i) => {
+      if (BB) {
+        const o = respUso(BB.conv[i]);
+        const cs = [0, 1, 2, 4].map(oi => rmC(XC(o === oi), { w: w4[[0, 1, 2, 4].indexOf(oi) + 1], bold: true, align: AlignmentType.CENTER }));
+        return new TableRow({ children: [rmC(t, { w: w4[0] }), ...cs] });
+      }
       const r = triSN(val(row[COLS.conviv[RM_CONV_IDX[i]]]));
       return new TableRow({ children: [rmC(t, { w: w4[0] }), rmC(XC(r === 'si'), { w: w4[1], bold: true, align: AlignmentType.CENTER }), rmC('', { w: w4[2] }),
         rmC(XC(r === 'no'), { w: w4[3], bold: true, align: AlignmentType.CENTER }), rmC('', { w: w4[4] })] });
@@ -1535,32 +1795,34 @@ function buildDocRM(row, pd, folio, logoBuffer, COLS) {
   const w45 = [8000, 1400, 1400];
   const tabla45 = rmTable(w45, [
     new TableRow({ children: [rmH('', { w: w45[0] }), rmH('SI', { w: w45[1] }), rmH('NO', { w: w45[2] })] }),
-    new TableRow({ children: [rmC('4.5.- ¿Ud. participa en alguna organización comunitaria de su barrio? (J.Vecinos, A. Mayor, Club Deportivo, Pastoral, entre otras)', { w: w45[0] }), rmC('', { w: w45[1] }), rmC('', { w: w45[2] })] }),
+    new TableRow({ children: [rmC('4.5.- ¿Ud. participa en alguna organización comunitaria de su barrio? (J.Vecinos, A. Mayor, Club Deportivo, Pastoral, entre otras)', { w: w45[0] }), rmC(XC(BB && triSN(BB.partic) === 'si'), { w: w45[1], bold: true, align: AlignmentType.CENTER }), rmC(XC(BB && triSN(BB.partic) === 'no'), { w: w45[2], bold: true, align: AlignmentType.CENTER })] }),
   ]);
   const tablaEquipExist = rmTable(w31, [
     new TableRow({ children: [rmH('EQUIPAMIENTO', { w: w31[0] }), rmH('MARQUE CON UNA X', { w: w31[1] })] }),
-    ...RM_EQUIP_EXISTENTE.map(a => new TableRow({ children: [rmC(a, { w: w31[0] }), rmC('', { w: w31[1] })] })),
+    ...RM_EQUIP_EXISTENTE.map((a, ei) => new TableRow({ children: [rmC(a, { w: w31[0] }), rmC(XC(BB && (ei === RM_EQUIP_EXISTENTE.length - 1 ? false : bxIn(BB.equipEx, a.replace('Estacionamientos de Automóviles', 'Estacionamiento de automoviles').replace('Estacionamientos de Bicicletas', 'Estacionamiento de bicicletas').replace('Mesa de ping-pong metálica empotrada', 'Mesa de ping-pong')))), { w: w31[1], bold: true, align: AlignmentType.CENTER })] })),
   ]);
   const w6 = rmFit([3800, 1400, 1400, 1400, 1400, 1400], WP);
   const tablaUso = rmTable(w6, [
     new TableRow({ children: [rmH('', { w: w6[0] }), rmH('Siempre', { w: w6[1] }), rmH('A veces', { w: w6[2] }), rmH('Nunca', { w: w6[3] }), rmH(['No aplica', '(no existe equipam.)'], { w: w6[4], fs: 14 }), rmH(['No sabe /', 'No responde'], { w: w6[5] })] }),
-    ...RM_USO.map(t => new TableRow({ children: [rmC(t, { w: w6[0] }), ...w6.slice(1).map(w => rmC('', { w }))] })),
+    ...RM_USO.map((t, ui) => { const o = BB ? respUso(BB.uso[ui]) : -1; return new TableRow({ children: [rmC(t, { w: w6[0] }), ...w6.slice(1).map((w, wi) => rmC(XC(o === wi), { w, bold: true, align: AlignmentType.CENTER }))] }); }),
   ]);
 
   // ── IV. Vivienda y equipamiento del proyecto ──
   const rawAtrib = val(row[COLS.atribRaw]);
-  const rawEquip = val(row[COLS.equipRaw]);
-  const rawTemas = val(row[COLS.temasRaw]);
-  const otrosViv = RM_ATRIB_OTROS_VIV.filter(a => nrmIn(rawAtrib, a)).join(', ');
-  const otrosBarrio = RM_ATRIB_OTROS_BARRIO.filter(a => nrmIn(rawAtrib, a)).join(', ');
+  const rawEquip = BB ? BB.equipAd : val(row[COLS.equipRaw]);
+  const rawTemas = BB ? BB.temas : val(row[COLS.temasRaw]);
+  const otrosViv = BB ? BB.otros.viv : RM_ATRIB_OTROS_VIV.filter(a => nrmIn(rawAtrib, a)).join(', ');
+  const otrosBarrio = BB ? BB.otros.bar : RM_ATRIB_OTROS_BARRIO.filter(a => nrmIn(rawAtrib, a)).join(', ');
+  const atrVivMark = (a) => BB ? bxIncl(BB.atribViv, a.l.replace('Térmica', 'ter').replace('Aislación', 'aislación')) && true : a.k.some(k => nrmIn(rawAtrib, k));
+  const atrBarMark = (a) => BB ? bxIncl(BB.atribBar, a.l.replace(/\s*\(.*$/, '')) : a.k.some(k => nrmIn(rawAtrib, k));
   const tablaAtribViv = rmTable(w31, [
     new TableRow({ children: [rmH('ATRIBUTOS DE LA VIVIENDA', { w: w31[0] }), rmH('MARQUE CON UNA X', { w: w31[1] })] }),
-    ...RM_ATRIB_VIV.map(a => new TableRow({ children: [rmC(a.l, { w: w31[0] }), rmC(XC(a.k.some(k => nrmIn(rawAtrib, k))), { w: w31[1], bold: true, align: AlignmentType.CENTER })] })),
+    ...RM_ATRIB_VIV.map(a => new TableRow({ children: [rmC(a.l, { w: w31[0] }), rmC(XC(atrVivMark(a)), { w: w31[1], bold: true, align: AlignmentType.CENTER })] })),
     new TableRow({ children: [rmC('Otros: ¿Cuáles? ' + otrosViv, { w: w31[0] }), rmC(XC(!!otrosViv), { w: w31[1], bold: true, align: AlignmentType.CENTER })] }),
   ]);
   const tablaAtribBarrio = rmTable(w31, [
     new TableRow({ children: [rmH('ATRIBUTOS DEL BARRIO', { w: w31[0] }), rmH('MARQUE CON UNA X', { w: w31[1] })] }),
-    ...RM_ATRIB_BARRIO.map(a => new TableRow({ children: [rmC(a.l, { w: w31[0] }), rmC(XC(a.k.some(k => nrmIn(rawAtrib, k))), { w: w31[1], bold: true, align: AlignmentType.CENTER })] })),
+    ...RM_ATRIB_BARRIO.map(a => new TableRow({ children: [rmC(a.l, { w: w31[0] }), rmC(XC(atrBarMark(a)), { w: w31[1], bold: true, align: AlignmentType.CENTER })] })),
     new TableRow({ children: [rmC('Otros: ¿Cuáles? ' + otrosBarrio, { w: w31[0] }), rmC(XC(!!otrosBarrio), { w: w31[1], bold: true, align: AlignmentType.CENTER })] }),
   ]);
   const wAh = [8000, 1400, 1400];
@@ -1576,7 +1838,7 @@ function buildDocRM(row, pd, folio, logoBuffer, COLS) {
   // 2. Equipamiento adicional (dos columnas)
   const wE = [3600, 1800, 3600, 1800];
   const canil = nrmIn(rawEquip, 'Canil para mascotas');
-  const hayOtros = nrmIn(rawEquip, 'Otros');
+  const hayOtros = nrmIn(rawEquip, 'Otros') || !!(BB && BB.otros.eq);
   const eqRows = [];
   for (let i = 0; i < RM_EQ_ADIC_IZQ.length; i++) {
     const a = RM_EQ_ADIC_IZQ[i], b = RM_EQ_ADIC_DER[i];
@@ -1586,7 +1848,7 @@ function buildDocRM(row, pd, folio, logoBuffer, COLS) {
     ] }));
   }
   eqRows.push(new TableRow({ children: [
-    rmC('Otros. ¿Cuál/es? ' + (canil ? 'Canil para mascotas' : ''), { w: wE[0] + wE[1] + wE[2], span: 3 }),
+    rmC('Otros. ¿Cuál/es? ' + [canil ? 'Canil para mascotas' : '', BB ? BB.otros.eq : ''].filter(Boolean).join(', '), { w: wE[0] + wE[1] + wE[2], span: 3 }),
     rmC(XC(canil || hayOtros), { w: wE[3], bold: true, align: AlignmentType.CENTER }),
   ] }));
   const tablaEqAdic = rmTable(wE, [new TableRow({ children: [rmH('EQUIPAMIENTO COMUNITARIO ADICIONAL', { w: wE[0] + wE[1] + wE[2] + wE[3], span: 4 })] }), ...eqRows]);
@@ -1598,7 +1860,13 @@ function buildDocRM(row, pd, folio, logoBuffer, COLS) {
   const wU = rmFit([3800, 1400, 1400, 1400, 1400, 1400], WP);
   const usoFilas = RM_USO_FILAS.map(([lab, key]) => {
     const col = COLS.equsrCols[key];
-    const u = parseUsrRM((col !== undefined && col >= 0) ? val(row[col]) : '');
+    let usrTxt = (col !== undefined && col >= 0) ? val(row[col]) : '';
+    if (BB) {
+      const kk = nk(key);
+      const hit = BB.usuarios.find(u => /^otros/.test(kk) ? nk(u.label).startsWith('otros') : (nk(u.label) === kk || nk(u.label).startsWith(kk)));
+      usrTxt = hit ? hit.v : '';
+    }
+    const u = parseUsrRM(usrTxt);
     return new TableRow({ children: [rmC(lab, { w: wU[0] }), ...[u.n, u.j, u.m, u.h, u.a].map((b, i) => rmC(XC(b), { w: wU[i + 1], bold: true, align: AlignmentType.CENTER }))] });
   });
   const tablaUsuarios = rmTable(wU, [
