@@ -1062,6 +1062,7 @@ async function tokenCorreo(scopes) {
 }
 function escCorreo(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 async function enviarAvisoFirma(notificar) {
+    console.log('[Aviso firma] notificar =', notificar);
     if (!notificar || !notificar.destinatarios || !notificar.destinatarios.length) return;
     const link = window.location.origin + '/procedimientos';
     const html = `
@@ -1077,6 +1078,7 @@ async function enviarAvisoFirma(notificar) {
     const enviar = async (url, token) => {
         const r = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message, saveToSentItems: false }) });
         if (!r.ok) throw new Error('HTTP ' + r.status);
+        console.log('[Aviso firma] enviado a', notificar.destinatarios.join(', '), 'vía', url.includes('/me/') ? 'cuenta propia' : BUZON_AVISOS);
     };
     try {
         // 1) desde informatica@ibaker.cl (requiere permiso "Enviar como" sobre ese buzón)
@@ -1085,13 +1087,14 @@ async function enviarAvisoFirma(notificar) {
             const tShared = await tokenCorreo(['Mail.Send.Shared']);
             let ok = false;
             if (tShared) { try { await enviar(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(BUZON_AVISOS)}/sendMail`, tShared); ok = true; } catch (e) { console.warn('No se pudo enviar desde ' + BUZON_AVISOS + ':', e.message); } }
-            if (ok) return;
+            if (ok) { mostrarToast('Aviso de firma enviado a ' + notificar.destinatarios.join(', '), 'ok'); return; }
             try { sessionStorage.setItem('sinBuzonAvisos', '1'); } catch (e) {}   // no insistir en esta sesión
         }
         // 2) desde la cuenta de quien actúa
         const t = await tokenCorreo(['Mail.Send']);
         if (!t) throw new Error('permiso de correo no concedido');
         await enviar('https://graph.microsoft.com/v1.0/me/sendMail', t);
+        mostrarToast('Aviso de firma enviado a ' + notificar.destinatarios.join(', '), 'ok');
     } catch (e) {
         console.warn('Error enviando aviso de firma:', e.message);
         mostrarToast('Quedó guardado, pero no se pudo enviar el correo a los firmantes: avísales tú', 'err');
@@ -1106,6 +1109,7 @@ async function aprobarUno(id) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Error desconocido');
+    console.log('[Aprobar] respuesta del servidor:', data);
     if (data.notificar) enviarAvisoFirma(data.notificar);
     return data;
 }
