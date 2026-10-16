@@ -104,6 +104,14 @@ tr.tot td{font-weight:800;border-bottom:0}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;background:#fff;border:1.5px solid var(--bord);border-radius:99px;padding:9px 13px;min-height:42px}
 .chip input{width:18px;height:18px;accent-color:var(--red)}
+.pills{display:flex;gap:6px;margin-bottom:12px}
+.pills button{flex:1;font:700 13px var(--font);padding:11px 4px;min-height:44px;border:1.5px solid var(--bord);border-radius:99px;background:#fff;color:var(--mute)}
+.pills button.on{background:var(--obs);border-color:var(--obs);color:#fff}
+.acc .col{display:flex;flex-direction:column;align-items:flex-end;gap:0;flex-shrink:0}
+.acc.ed{align-items:flex-start}
+.lnk.peligro{color:#fff;background:var(--red);border-radius:8px;padding:6px 10px;text-decoration:none}
+.lnk:disabled{opacity:.3}
+.adm h3{margin-bottom:10px}
 .empty{text-align:center;color:var(--mute);font-size:14px;padding:26px 10px}
 </style>
 </head>
@@ -306,7 +314,7 @@ async function cargarDia(){
   p.trabajadores.forEach(t => {
     if (porId[t.id]) { const l = porId[t.id]; lineas[t.id] = { estado:l.estado, partes: l.partes.map(x => ({actividad:x.actividad, motivo:x.motivo||'', comentario:x.comentario||''})), nuevo:false }; }
     else if (prevId[t.id]) {
-      const l = prevId[t.id], partes = l.partes.filter(x => x.actividad !== OTROS).map(x => ({ actividad:x.actividad, motivo:'', comentario:'' }));
+      const l = prevId[t.id], partes = l.partes.filter(x => x.actividad !== OTROS && e.actividades.includes(x.actividad)).map(x => ({ actividad:x.actividad, motivo:'', comentario:'' }));
       // se copia solo la actividad; el día parte como jornada completa. Si el día anterior estuvo ausente o en "Otros", hay que volver a elegir.
       lineas[t.id] = { estado:'completa', partes: partes.length ? [partes[0]] : [{actividad:'',motivo:'',comentario:''}], nuevo:false, copiado: partes.length > 0 };
     } else lineas[t.id] = { ...lineaVacia(true), nuevo: !!(previo || (actual && !porId[t.id])) };
@@ -489,84 +497,157 @@ $('btnCsv').addEventListener('click', () => {
 });
 
 // ───────── Administrar ─────────
-let cfgAdmin = null;
+// Cada acción se guarda al instante (no hay botón "Guardar" global).
+let cfgAdmin = null, admProy = 0, admSec = 'trab', admEsp = 0, admEditando = null, admConfirmar = null;
+const CARGOS_SUGERIDOS = ['Jornal', 'Ayudante de Urbanización', 'Maestro Urbanización', 'Maestro 1ª', 'Maestro 2ª', 'Jefe de Terreno', 'Capataz', 'Operador'];
+const slug = s => s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40);
+const emailOk = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+
 async function cargarAdmin(){
   $('admOut').innerHTML = '<div class="empty">Cargando…</div>';
   try { cfgAdmin = await api('GET', '/mo/admin/config'); } catch(e){ $('admOut').innerHTML = `<div class="banner err">${esc(e.message)}</div>`; return; }
-  const h = cfgAdmin.proyectos.map((p,pi) => `<div class="card" data-p="${pi}"><h3>${esc(p.nombre)} ${p.cc?`<small style="color:var(--mute)">· CC ${esc(p.cc)}</small>`:''}</h3>
-    <h5>Trabajadores (uno por línea: Nombre | Cargo | inactivo)</h5>
-    <p class="help">Agrega “| inactivo” al final de quien ya no trabaja: deja de aparecer, pero su historial se conserva.</p>
-    <textarea data-k="trab" rows="6">${esc(p.trabajadores.map(t => `${t.nombre} | ${t.cargo||''}${t.activo===false?' | inactivo':''}`).join('\n'))}</textarea>
-    ${p.especialidades.map((e,ei) => `<h5>Actividades de ${esc(e.nombre)} (una por línea)</h5><textarea data-k="act" data-e="${ei}" rows="4">${esc((e.actividades||[]).join('\n'))}</textarea>`).join('')}
-  </div>`).join('') + `<div class="card"><h3>Jefes de terreno</h3>
-    <p class="help">Quienes registran el trabajo diario. Cada uno ve solo el proyecto y las especialidades que le asignes.</p>
-    <div id="boxJefes"></div>
-    <div class="addbox">
-      <label class="f" for="jEmail">Correo</label><input type="text" id="jEmail" inputmode="email" autocapitalize="off" placeholder="nombre@ibaker.cl">
-      <label class="f" for="jProy" style="margin-top:10px">Proyecto</label><select id="jProy">${cfgAdmin.proyectos.map(p=>`<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('')}</select>
-      <label class="f" style="margin-top:10px">Especialidades</label><div id="jEsp" class="chips"></div>
-      <button class="btn red" id="btnAddJefe" style="width:100%;margin-top:12px">Agregar jefe de terreno</button>
-    </div></div>
-    <div class="card"><h3>Consulta</h3>
-    <p class="help">Ven el Resumen y descargan el Excel de todos los proyectos, pero no registran.</p>
-    <div id="boxCons"></div>
-    <div class="addbox"><label class="f" for="cEmail">Correo</label><input type="text" id="cEmail" inputmode="email" autocapitalize="off" placeholder="nombre@ibaker.cl">
-      <button class="btn red" id="btnAddCons" style="width:100%;margin-top:12px">Agregar persona de consulta</button></div></div>
-    <p class="help" id="pendiente" style="text-align:center"></p>
-    <button class="btn red" id="btnAdmGuardar" style="width:100%">Guardar configuración</button>`;
-  $('admOut').innerHTML = h;
-  $('btnAdmGuardar').onclick = guardarAdmin;
-  $('jProy').onchange = pintarChipsEsp; $('btnAddJefe').onclick = agregarJefe; $('btnAddCons').onclick = agregarCons;
-  pintarChipsEsp(); pintarAccesos();
+  cfgAdmin.admins = cfgAdmin.admins || [];
+  if (admProy >= cfgAdmin.proyectos.length) admProy = 0;
+  pintarAdmin();
 }
-const emailOk = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
-const marcarPendiente = () => { $('pendiente').textContent = 'Hay cambios sin guardar. Presiona “Guardar configuración”.'; };
-function pintarChipsEsp(){
-  const p = cfgAdmin.proyectos.find(x => x.id === $('jProy').value);
-  $('jEsp').innerHTML = `<label class="chip"><input type="checkbox" id="jTodas" checked> Todas</label>` +
-    p.especialidades.map(e => `<label class="chip"><input type="checkbox" class="jE" value="${esc(e.id)}" disabled> ${esc(e.nombre)}</label>`).join('');
-  $('jTodas').onchange = () => document.querySelectorAll('#jEsp .jE').forEach(c => { c.disabled = $('jTodas').checked; if ($('jTodas').checked) c.checked = false; });
+async function guardarCfg(msg){
+  try {
+    await api('PUT', '/mo/admin/config', cfgAdmin);
+    toast(msg || 'Guardado ✔');
+    ctx = await api('GET', '/mo/contexto'); guardarLS('mo_ctx', ctx);
+    return true;
+  } catch(e){ toast(e.message, 5000); await cargarAdmin(); return false; }
 }
-function pintarAccesos(){
-  const nomP = id => (cfgAdmin.proyectos.find(p => p.id === id) || { nombre:id }).nombre;
-  const nomE = (pid, eid) => { const p = cfgAdmin.proyectos.find(x => x.id === pid); const e = p && p.especialidades.find(x => x.id === eid); return e ? e.nombre : eid; };
-  $('boxJefes').innerHTML = cfgAdmin.jefes.length ? cfgAdmin.jefes.map((j,i) => `<div class="acc"><div><b>${esc(j.email)}</b><br><span>${esc(nomP(j.proyecto))} · ${(j.especialidades||['*']).includes('*') ? 'Todas las especialidades' : j.especialidades.map(e => esc(nomE(j.proyecto,e))).join(', ')}</span></div><button class="lnk" data-qj="${i}">Quitar</button></div>`).join('') : '<p class="help">Aún no hay jefes de terreno.</p>';
-  $('boxCons').innerHTML = cfgAdmin.consulta.length ? cfgAdmin.consulta.map((e,i) => `<div class="acc"><div><b>${esc(e)}</b></div><button class="lnk" data-qc="${i}">Quitar</button></div>`).join('') : '<p class="help">Aún no hay personas de consulta.</p>';
-  $('boxJefes').querySelectorAll('[data-qj]').forEach(b => b.onclick = () => { cfgAdmin.jefes.splice(+b.dataset.qj, 1); pintarAccesos(); marcarPendiente(); });
-  $('boxCons').querySelectorAll('[data-qc]').forEach(b => b.onclick = () => { cfgAdmin.consulta.splice(+b.dataset.qc, 1); pintarAccesos(); marcarPendiente(); });
+function dosToques(clave, btn, textoOk, accion){
+  // primer toque: pide confirmar (3 s); segundo toque: ejecuta
+  if (admConfirmar === clave){ admConfirmar = null; accion(); return; }
+  admConfirmar = clave; const t = btn.textContent; btn.textContent = textoOk; btn.classList.add('peligro');
+  setTimeout(() => { if (admConfirmar === clave){ admConfirmar = null; if (btn.isConnected){ btn.textContent = t; btn.classList.remove('peligro'); } } }, 3000);
 }
-function agregarJefe(){
-  const email = $('jEmail').value.trim().toLowerCase(), proyecto = $('jProy').value;
-  if (!emailOk(email)) { toast('Escribe un correo válido'); return; }
-  const todas = $('jTodas').checked, esp = todas ? ['*'] : [...document.querySelectorAll('#jEsp .jE:checked')].map(c => c.value);
-  if (!esp.length) { toast('Marca al menos una especialidad, o “Todas”'); return; }
-  const i = cfgAdmin.jefes.findIndex(j => j.email === email && j.proyecto === proyecto);
-  const nuevo = { email, proyecto, especialidades: esp };
-  if (i >= 0) cfgAdmin.jefes[i] = nuevo; else cfgAdmin.jefes.push(nuevo);
-  $('jEmail').value = ''; pintarChipsEsp(); pintarAccesos(); marcarPendiente();
+function pintarAdmin(){
+  const secs = [['trab','Trabajadores'],['act','Actividades'],['acc','Accesos']];
+  const p = cfgAdmin.proyectos[admProy];
+  $('admOut').innerHTML = `
+    <div class="card"><label class="f" for="admProy">Proyecto</label>
+      <select id="admProy">${cfgAdmin.proyectos.map((x,i) => `<option value="${i}" ${i===admProy?'selected':''}>${esc(x.nombre)}</option>`).join('')}</select></div>
+    <div class="pills">${secs.map(([k,n]) => `<button data-sec="${k}" class="${admSec===k?'on':''}">${n}</button>`).join('')}</div>
+    <div id="admCuerpo"></div>`;
+  $('admProy').onchange = () => { admProy = +$('admProy').value; admEsp = 0; admEditando = null; pintarAdmin(); };
+  document.querySelectorAll('.pills [data-sec]').forEach(b => b.onclick = () => { admSec = b.dataset.sec; admEditando = null; pintarAdmin(); });
+  if (admSec === 'trab') pintarTrabajadores(p); else if (admSec === 'act') pintarActividades(p); else pintarAccesosAdm(p);
 }
-function agregarCons(){
-  const email = $('cEmail').value.trim().toLowerCase();
-  if (!emailOk(email)) { toast('Escribe un correo válido'); return; }
-  if (!cfgAdmin.consulta.includes(email)) cfgAdmin.consulta.push(email);
-  $('cEmail').value = ''; pintarAccesos(); marcarPendiente();
-}
-const slug = s => s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40);
-async function guardarAdmin(){
-  const c = JSON.parse(JSON.stringify(cfgAdmin));
-  document.querySelectorAll('#admOut [data-p]').forEach(card => {
-    const p = c.proyectos[+card.dataset.p], previos = Object.fromEntries(p.trabajadores.map(t => [t.nombre.toLowerCase(), t]));
-    p.trabajadores = card.querySelector('[data-k=trab]').value.split('\n').map(x => x.trim()).filter(Boolean).map(l => {
-      const [nombre, cargo, est] = l.split('|').map(x => (x||'').trim()); const prev = previos[nombre.toLowerCase()];
-      return { id: prev ? prev.id : 't-' + slug(nombre) + '-' + Math.random().toString(36).slice(2,5), nombre, cargo: cargo || '', activo: !/inactiv/i.test(est || '') };
-    });
-    // quien se borró de la lista pero tenía historial queda inactivo (no se pierde)
-    Object.values(previos).forEach(t => { if (!p.trabajadores.some(x => x.id === t.id)) p.trabajadores.push({ ...t, activo:false }); });
-    card.querySelectorAll('[data-k=act]').forEach(ta => { p.especialidades[+ta.dataset.e].actividades = ta.value.split('\n').map(x => x.trim()).filter(Boolean); });
+
+// ── Trabajadores ──
+function pintarTrabajadores(p){
+  const activos = p.trabajadores.filter(t => t.activo !== false), bajas = p.trabajadores.filter(t => t.activo === false);
+  const fila = t => admEditando === t.id
+    ? `<div class="acc ed"><div style="flex:1"><input type="text" id="eNom" value="${esc(t.nombre)}" placeholder="Nombre completo"><input type="text" id="eCar" list="listaCargos" value="${esc(t.cargo||'')}" placeholder="Cargo" style="margin-top:8px"></div>
+         <div class="col"><button class="btn sm red" data-ok="${esc(t.id)}">Guardar</button><button class="lnk" data-cancel="1">Cancelar</button></div></div>`
+    : `<div class="acc"><div><b>${esc(t.nombre)}</b><br><span>${esc(t.cargo || 'Sin cargo')}</span></div>
+         <div class="col">${t.activo===false ? `<button class="lnk" data-react="${esc(t.id)}">Reactivar</button>` : `<button class="lnk" data-edit="${esc(t.id)}">Editar</button><button class="lnk" data-baja="${esc(t.id)}">Dar de baja</button>`}</div></div>`;
+  $('admCuerpo').innerHTML = `
+    <div class="card"><h3>Agregar trabajador</h3>
+      <label class="f" for="nNom">Nombre completo</label><input type="text" id="nNom" placeholder="Ej: Juan Pérez Soto" autocomplete="off">
+      <label class="f" for="nCar" style="margin-top:10px">Cargo</label><input type="text" id="nCar" list="listaCargos" placeholder="Elige o escribe el cargo" autocomplete="off">
+      <datalist id="listaCargos">${CARGOS_SUGERIDOS.map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+      <button class="btn red" id="btnAddTrab" style="width:100%;margin-top:12px">Agregar trabajador</button></div>
+    <div class="card"><h3>En la cuadrilla (${activos.length})</h3>
+      <p class="help">Son los que le aparecen al jefe de terreno. Si alguien ya no trabaja, usa “Dar de baja”: deja de aparecer, pero su historial se conserva.</p>
+      ${activos.length > 7 ? '<input type="text" id="buscaTrab" placeholder="Buscar por nombre…" style="margin-bottom:6px">' : ''}
+      <div id="listaTrab">${activos.length ? activos.map(fila).join('') : '<p class="help">Aún no hay trabajadores en este proyecto.</p>'}</div></div>
+    ${bajas.length ? `<div class="card"><h3>Dados de baja (${bajas.length})</h3>${bajas.map(fila).join('')}</div>` : ''}`;
+  const cuerpo = $('admCuerpo');
+  $('btnAddTrab').onclick = async () => {
+    const nombre = $('nNom').value.trim().replace(/\s+/g,' '), cargo = $('nCar').value.trim();
+    if (nombre.length < 5 || !nombre.includes(' ')) { toast('Escribe nombre y apellido'); return; }
+    if (!cargo) { toast('Indica el cargo'); return; }
+    if (p.trabajadores.some(t => t.activo !== false && t.nombre.toLowerCase() === nombre.toLowerCase())) { toast('Ya existe un trabajador activo con ese nombre'); return; }
+    const prev = p.trabajadores.find(t => t.activo === false && t.nombre.toLowerCase() === nombre.toLowerCase());
+    if (prev) { prev.activo = true; prev.cargo = cargo; } else p.trabajadores.push({ id: 't-' + slug(nombre) + '-' + Math.random().toString(36).slice(2,6), nombre, cargo, activo: true });
+    if (await guardarCfg(prev ? 'Reactivado ✔' : 'Trabajador agregado ✔')) pintarAdmin();
+  };
+  const bt = $('buscaTrab'); if (bt) bt.oninput = () => { const q = bt.value.toLowerCase(); $('listaTrab').querySelectorAll('.acc').forEach(a => a.classList.toggle('hide', !a.textContent.toLowerCase().includes(q))); };
+  cuerpo.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { admEditando = b.dataset.edit; pintarAdmin(); });
+  cuerpo.querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => { admEditando = null; pintarAdmin(); });
+  cuerpo.querySelectorAll('[data-ok]').forEach(b => b.onclick = async () => {
+    const t = p.trabajadores.find(x => x.id === b.dataset.ok), nombre = $('eNom').value.trim().replace(/\s+/g,' '), cargo = $('eCar').value.trim();
+    if (nombre.length < 5 || !cargo) { toast('Completa nombre y cargo'); return; }
+    t.nombre = nombre; t.cargo = cargo; admEditando = null; if (await guardarCfg('Cambios guardados ✔')) pintarAdmin();
   });
-  // los accesos (jefes de terreno y consulta) ya vienen editados en c.jefes / c.consulta
-  try { await api('PUT', '/mo/admin/config', c); toast('Configuración guardada ✔'); ctx = await api('GET', '/mo/contexto'); guardarLS('mo_ctx', ctx); armarSelectoresRegistro(); armarResumen(); cargarAdmin(); }
-  catch(e){ toast(e.message, 5000); }
+  cuerpo.querySelectorAll('[data-baja]').forEach(b => b.onclick = () => dosToques('baja' + b.dataset.baja, b, '¿Confirmar baja?', async () => {
+    p.trabajadores.find(x => x.id === b.dataset.baja).activo = false; if (await guardarCfg('Dado de baja ✔')) pintarAdmin(); }));
+  cuerpo.querySelectorAll('[data-react]').forEach(b => b.onclick = async () => { p.trabajadores.find(x => x.id === b.dataset.react).activo = true; if (await guardarCfg('Reactivado ✔')) pintarAdmin(); });
+}
+
+// ── Actividades ──
+function pintarActividades(p){
+  if (admEsp >= p.especialidades.length) admEsp = 0;
+  const e = p.especialidades[admEsp]; e.actividades = e.actividades || [];
+  $('admCuerpo').innerHTML = `
+    <div class="card"><label class="f" for="admEsp">Especialidad</label>
+      <select id="admEsp">${p.especialidades.map((x,i) => `<option value="${i}" ${i===admEsp?'selected':''}>${esc(x.nombre)} (${(x.actividades||[]).length})</option>`).join('')}</select></div>
+    <div class="card"><h3>Agregar actividad</h3>
+      <input type="text" id="nAct" placeholder="Ej: Excavación de zanja" maxlength="60" autocomplete="off">
+      <button class="btn red" id="btnAddAct" style="width:100%;margin-top:12px">Agregar actividad</button></div>
+    <div class="card"><h3>Actividades de ${esc(e.nombre)}</h3>
+      <p class="help">Son las opciones que ve el jefe de terreno al asignar a cada trabajador. “Otros (no se pudo trabajar)” siempre está disponible.</p>
+      ${e.actividades.length ? e.actividades.map((a,i) => `<div class="acc"><div><b>${esc(a)}</b></div><div class="col"><button class="lnk" data-up="${i}" ${i===0?'disabled':''}>↑</button><button class="lnk" data-qa="${i}">Quitar</button></div></div>`).join('') : '<p class="help">Esta especialidad aún no tiene actividades.</p>'}</div>`;
+  $('admEsp').onchange = () => { admEsp = +$('admEsp').value; pintarAdmin(); };
+  $('btnAddAct').onclick = async () => {
+    const a = $('nAct').value.trim().replace(/\s+/g,' ');
+    if (a.length < 3) { toast('Escribe el nombre de la actividad'); return; }
+    if (a.toLowerCase() === OTROS.toLowerCase()) { toast('“Otros” ya existe siempre'); return; }
+    if (e.actividades.some(x => x.toLowerCase() === a.toLowerCase())) { toast('Esa actividad ya existe'); return; }
+    e.actividades.push(a); if (await guardarCfg('Actividad agregada ✔')) pintarAdmin();
+  };
+  document.querySelectorAll('[data-up]').forEach(b => b.onclick = async () => { const i = +b.dataset.up; [e.actividades[i-1], e.actividades[i]] = [e.actividades[i], e.actividades[i-1]]; if (await guardarCfg('Orden actualizado ✔')) pintarAdmin(); });
+  document.querySelectorAll('[data-qa]').forEach(b => b.onclick = () => dosToques('qa' + b.dataset.qa, b, '¿Quitar?', async () => { e.actividades.splice(+b.dataset.qa, 1); if (await guardarCfg('Actividad quitada ✔')) pintarAdmin(); }));
+}
+
+// ── Accesos ──
+function pintarAccesosAdm(p){
+  const nomE = (pid, eid) => { const pr = cfgAdmin.proyectos.find(x => x.id === pid); const x = pr && pr.especialidades.find(y => y.id === eid); return x ? x.nombre : eid; };
+  const nomP = id => (cfgAdmin.proyectos.find(x => x.id === id) || { nombre:id }).nombre;
+  const lista = (arr, attr) => arr.length ? arr.map((x,i) => `<div class="acc"><div><b>${esc(x.email || x)}</b>${x.proyecto ? `<br><span>${esc(nomP(x.proyecto))} · ${(x.especialidades||['*']).includes('*') ? 'Todas las especialidades' : x.especialidades.map(e => esc(nomE(x.proyecto,e))).join(', ')}</span>` : ''}</div><button class="lnk" data-${attr}="${i}">Quitar</button></div>`).join('') : '<p class="help">Aún no hay nadie.</p>';
+  $('admCuerpo').innerHTML = `
+    <div class="card"><h3>Jefes de terreno</h3>
+      <p class="help">Registran el trabajo diario. Cada uno ve solo el proyecto y las especialidades que le asignes.</p>
+      ${lista(cfgAdmin.jefes, 'qj')}
+      <div class="addbox">
+        <label class="f" for="jEmail">Correo</label><input type="text" id="jEmail" inputmode="email" autocapitalize="off" placeholder="nombre@ibaker.cl">
+        <label class="f" for="jProy" style="margin-top:10px">Proyecto</label><select id="jProy">${cfgAdmin.proyectos.map(x => `<option value="${esc(x.id)}" ${x.id===p.id?'selected':''}>${esc(x.nombre)}</option>`).join('')}</select>
+        <label class="f" style="margin-top:10px">Especialidades</label><div id="jEsp" class="chips"></div>
+        <button class="btn red" id="btnAddJefe" style="width:100%;margin-top:12px">Agregar jefe de terreno</button></div></div>
+    <div class="card"><h3>Consulta</h3>
+      <p class="help">Ven el Resumen y descargan el Excel de todos los proyectos, pero no registran.</p>
+      ${lista(cfgAdmin.consulta, 'qc')}
+      <div class="addbox"><label class="f" for="cEmail">Correo</label><input type="text" id="cEmail" inputmode="email" autocapitalize="off" placeholder="nombre@ibaker.cl">
+        <button class="btn red" id="btnAddCons" style="width:100%;margin-top:12px">Agregar persona de consulta</button></div></div>
+    <div class="card"><h3>Administradores</h3>
+      <p class="help">Pueden administrar trabajadores, actividades y accesos. TI (dvillaseca@ibaker.cl) siempre tiene acceso.</p>
+      ${lista(cfgAdmin.admins, 'qa2')}
+      <div class="addbox"><label class="f" for="aEmail">Correo</label><input type="text" id="aEmail" inputmode="email" autocapitalize="off" placeholder="nombre@ibaker.cl">
+        <button class="btn red" id="btnAddAdm" style="width:100%;margin-top:12px">Agregar administrador</button></div></div>`;
+  const chips = () => { const pr = cfgAdmin.proyectos.find(x => x.id === $('jProy').value);
+    $('jEsp').innerHTML = `<label class="chip"><input type="checkbox" id="jTodas" checked> Todas</label>` + pr.especialidades.map(e => `<label class="chip"><input type="checkbox" class="jE" value="${esc(e.id)}" disabled> ${esc(e.nombre)}</label>`).join('');
+    $('jTodas').onchange = () => document.querySelectorAll('#jEsp .jE').forEach(c => { c.disabled = $('jTodas').checked; if ($('jTodas').checked) c.checked = false; }); };
+  $('jProy').onchange = chips; chips();
+  $('btnAddJefe').onclick = async () => {
+    const email = $('jEmail').value.trim().toLowerCase(), proyecto = $('jProy').value;
+    if (!emailOk(email)) { toast('Escribe un correo válido'); return; }
+    const esp = $('jTodas').checked ? ['*'] : [...document.querySelectorAll('#jEsp .jE:checked')].map(c => c.value);
+    if (!esp.length) { toast('Marca al menos una especialidad, o “Todas”'); return; }
+    const i = cfgAdmin.jefes.findIndex(j => j.email === email && j.proyecto === proyecto), nuevo = { email, proyecto, especialidades: esp };
+    if (i >= 0) cfgAdmin.jefes[i] = nuevo; else cfgAdmin.jefes.push(nuevo);
+    if (await guardarCfg('Jefe de terreno agregado ✔')) pintarAdmin();
+  };
+  const agregarEn = (campo, idInput, msg) => async () => {
+    const email = $(idInput).value.trim().toLowerCase(); if (!emailOk(email)) { toast('Escribe un correo válido'); return; }
+    if (!cfgAdmin[campo].includes(email)) cfgAdmin[campo].push(email); if (await guardarCfg(msg)) pintarAdmin(); };
+  $('btnAddCons').onclick = agregarEn('consulta', 'cEmail', 'Agregado ✔');
+  $('btnAddAdm').onclick = agregarEn('admins', 'aEmail', 'Administrador agregado ✔');
+  const quitar = (attr, arr, msg) => document.querySelectorAll(`[data-${attr}]`).forEach(b => b.onclick = () => dosToques(attr + b.dataset[attr], b, '¿Quitar?', async () => { arr.splice(+b.dataset[attr], 1); if (await guardarCfg(msg)) pintarAdmin(); }));
+  quitar('qj', cfgAdmin.jefes, 'Acceso quitado ✔'); quitar('qc', cfgAdmin.consulta, 'Acceso quitado ✔'); quitar('qa2', cfgAdmin.admins, 'Administrador quitado ✔');
 }
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw-mo.js').catch(()=>{});
