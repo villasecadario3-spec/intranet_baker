@@ -1,0 +1,16 @@
+{
+  "name": "Registro de Mano de Obra — Baker",
+  "short_name": "Registro MO",
+  "description": "Registro diario de mano de obra en terreno",
+  "start_url": "registro-mo.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#050506",
+  "theme_color": "#050506",
+  "lang": "es",
+  "icons": [
+    { "src": "icon-mo-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-mo-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
