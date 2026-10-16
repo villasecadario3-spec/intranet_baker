@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Registro MO">
+<title>Registro de Mano de Obra — Baker</title>
+<link rel="manifest" href="manifest-mo.json">
+<link rel="icon" type="image/png" href="icon-mo-192.png">
+<link rel="apple-touch-icon" href="icon-mo-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+<style>
+:root{
+  --red:#FF002E; --red-dark:#C60023; --red-soft:#FCE9EB;
+  --obs:#050506; --iron:#24252b; --fog:#8b8d97;
+  --page:#F7F6F5; --surf:#FFFFFF; --bord:#E7E4E1; --ink:#111113; --mute:#6b6d75;
+  --ok:#1a7f4b; --ok-soft:#E6F4EC; --warn:#9a6700; --warn-soft:#FFF4D6;
+  --r:12px; --font:'Montserrat',system-ui,sans-serif;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--font);background:var(--page);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased;padding-bottom:calc(150px + env(safe-area-inset-bottom))}
+header{position:sticky;top:0;z-index:50;background:var(--obs);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;gap:10px}
+header .tt{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;line-height:1.25;flex:1}
+header .tt small{display:block;color:var(--fog);font-weight:600;letter-spacing:.04em;text-transform:none;font-size:11px}
+.back{color:#fff;text-decoration:none;font-size:20px;line-height:1;padding:6px 8px 6px 0}
+.av{width:30px;height:30px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.net{font-size:10px;font-weight:700;padding:3px 8px;border-radius:99px;background:var(--ok);color:#fff}
+.net.off{background:var(--warn);color:#fff}
+nav.tabs{display:flex;background:var(--surf);border-bottom:1px solid var(--bord);position:sticky;top:calc(50px + env(safe-area-inset-top));z-index:40}
+nav.tabs button{flex:1;padding:13px 4px;font:600 13px var(--font);border:0;background:none;color:var(--mute);border-bottom:3px solid transparent;min-height:46px}
+nav.tabs button.on{color:var(--ink);border-bottom-color:var(--red)}
+main{max-width:720px;margin:0 auto;padding:14px 14px 0}
+.card{background:var(--surf);border:1px solid var(--bord);border-radius:var(--r);padding:14px;margin-bottom:12px}
+label.f{display:block;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);margin-bottom:5px}
+select,input[type=date],input[type=text],textarea{width:100%;font:500 16px var(--font);padding:12px;border:1.5px solid var(--bord);border-radius:10px;background:#fff;color:var(--ink);min-height:48px;appearance:none;-webkit-appearance:none}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none' stroke='%236b6d75' stroke-width='2'%3E%3Cpath d='M1 1l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
+textarea{min-height:110px;font-size:14px;font-family:ui-monospace,Menlo,Consolas,monospace}
+select:focus,input:focus,textarea:focus{outline:none;border-color:var(--red)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row{display:grid;gap:10px;margin-bottom:10px}
+.banner{border-radius:10px;padding:11px 13px;font-size:13px;font-weight:600;margin-bottom:12px;line-height:1.4}
+.banner.info{background:var(--warn-soft);color:var(--warn)}
+.banner.ok{background:var(--ok-soft);color:var(--ok)}
+.banner.err{background:var(--red-soft);color:var(--red-dark)}
+.banner button{margin-top:8px;font:700 12px var(--font);border:0;background:var(--obs);color:#fff;border-radius:8px;padding:9px 12px;min-height:38px}
+.tool{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+.tool .grow{flex:1}
+.btn{font:700 14px var(--font);border:0;border-radius:10px;padding:12px 16px;min-height:46px;background:var(--obs);color:#fff;cursor:pointer}
+.btn.red{background:var(--red)} .btn.ghost{background:#fff;color:var(--ink);border:1.5px solid var(--bord)}
+.btn:disabled{opacity:.45}
+.btn.sm{min-height:38px;padding:8px 12px;font-size:12px}
+/* trabajador */
+.w{background:var(--surf);border:1.5px solid var(--bord);border-radius:var(--r);padding:13px;margin-bottom:10px}
+.w.nuevo{border-color:var(--red);box-shadow:0 0 0 3px var(--red-soft)}
+.w.falta{border-color:#e6b800}
+.w .top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+.w .nm{font-weight:700;font-size:15px}
+.w .cg{font-size:11px;font-weight:600;color:var(--mute);background:var(--page);border:1px solid var(--bord);border-radius:99px;padding:2px 9px}
+.w .nv{font-size:10px;font-weight:800;color:#fff;background:var(--red);border-radius:99px;padding:2px 8px;letter-spacing:.04em}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:9px}
+.seg button{font:700 12px var(--font);padding:10px 2px;min-height:44px;border:1.5px solid var(--bord);border-radius:10px;background:#fff;color:var(--mute)}
+.seg button.on{background:var(--obs);border-color:var(--obs);color:#fff}
+.seg button.on.aus{background:var(--red);border-color:var(--red)}
+.parte{margin-bottom:8px}
+.parte .hdl{font-size:11px;font-weight:700;color:var(--mute);margin:0 0 4px}
+.lnk{background:none;border:0;font:700 12px var(--font);color:var(--red-dark);padding:6px 0;min-height:36px;text-decoration:underline}
+.otros{background:var(--warn-soft);border-radius:10px;padding:10px;margin-top:8px}
+.otros input[type=text]{min-height:44px;font-size:15px;margin-top:8px}
+/* resumen en vivo */
+.sum{background:var(--surf);border:1px solid var(--bord);border-radius:var(--r);padding:12px 14px;margin-bottom:12px}
+.sum h4{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin-bottom:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);text-align:left;padding:6px 4px;border-bottom:1px solid var(--bord)}
+td{padding:8px 4px;border-bottom:1px solid var(--bord);vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+tr.tot td{font-weight:800;border-bottom:0}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.kpi{background:var(--surf);border:1px solid var(--bord);border-radius:var(--r);padding:11px}
+.kpi b{display:block;font-size:22px;font-weight:800}
+.kpi span{font-size:10px;font-weight:700;color:var(--mute);letter-spacing:.05em;text-transform:uppercase}
+.scroll-x{overflow-x:auto}
+/* barra inferior */
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:60;background:rgba(255,255,255,.97);backdrop-filter:blur(8px);border-top:1px solid var(--bord);padding:10px 14px calc(10px + env(safe-area-inset-bottom))}
+.dock .in{max-width:720px;margin:0 auto;display:flex;gap:10px;align-items:center}
+.dock .tot{font-size:12px;font-weight:700;color:var(--mute);line-height:1.3;min-width:78px}
+.dock .tot b{display:block;font-size:20px;color:var(--ink);font-weight:800}
+.dock .btn{flex:1}
+.hide{display:none!important}
+.login{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:24px}
+.login h1{font-size:20px;font-weight:800}.login p{color:var(--mute);font-size:14px;max-width:300px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom));background:var(--obs);color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:100;max-width:90vw;text-align:center}
+.help{font-size:12px;color:var(--mute);line-height:1.5;margin:4px 0 10px}
+.adm h3{font-size:14px;font-weight:800;margin:4px 0 8px}
+.adm h5{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);margin:12px 0 4px}
+.empty{text-align:center;color:var(--mute);font-size:14px;padding:26px 10px}
+</style>
+</head>
+<body>
+<header>
+  <a class="back" href="index.html" id="volver" title="Volver a la intranet">‹</a>
+  <div class="tt">Registro de Mano de Obra<small id="hdSub">Cuadrillas en terreno</small></div>
+  <span class="net" id="net">En línea</span>
+  <div class="av hide" id="av"></div>
+</header>
+
+<div id="login" class="login hide">
+  <h1>Registro de Mano de Obra</h1>
+  <p>Inicia sesión con tu cuenta Baker para registrar el trabajo diario de tu cuadrilla.</p>
+  <button class="btn red" id="btnLogin">Iniciar sesión con Microsoft</button>
+  <p id="loginMsg"></p>
+</div>
+
+<div id="app" class="hide">
+<nav class="tabs" id="tabs">
+  <button data-t="reg" class="on">Registrar</button>
+  <button data-t="res" id="tabRes">Resumen</button>
+  <button data-t="adm" id="tabAdm" class="hide">Administrar</button>
+</nav>
+<main>
+  <!-- ═════ REGISTRAR ═════ -->
+  <section id="t-reg">
+    <div id="colaBanner" class="banner info hide"></div>
+    <div class="card">
+      <div class="row">
+        <div><label class="f" for="selProy">Proyecto</label><select id="selProy"></select></div>
+        <div class="row2">
+          <div><label class="f" for="selEsp">Especialidad</label><select id="selEsp"></select></div>
+          <div><label class="f" for="inFecha">Fecha</label><input type="date" id="inFecha"></div>
+        </div>
+      </div>
+    </div>
+    <div id="estadoReg"></div>
+    <div id="lista"></div>
+    <div id="resumenVivo" class="sum hide"></div>
+  </section>
+
+  <!-- ═════ RESUMEN ═════ -->
+  <section id="t-res" class="hide">
+    <div class="card">
+      <div class="row2">
+        <div><label class="f" for="rDesde">Desde</label><input type="date" id="rDesde"></div>
+        <div><label class="f" for="rHasta">Hasta</label><input type="date" id="rHasta"></div>
+      </div>
+      <div style="margin-top:10px"><label class="f" for="rProy">Proyecto</label><select id="rProy"></select></div>
+      <div class="tool" style="margin:12px 0 0"><button class="btn red grow" id="btnRes">Ver resumen</button><button class="btn ghost" id="btnCsv" disabled>Descargar Excel (CSV)</button></div>
+    </div>
+    <div id="resOut"></div>
+  </section>
+
+  <!-- ═════ ADMIN ═════ -->
+  <section id="t-adm" class="hide adm">
+    <div id="admOut"></div>
+  </section>
+</main>
+</div>
+
+<div class="dock hide" id="dock"><div class="in">
+  <div class="tot"><b id="dkHd">0</b>hombre-día</div>
+  <button class="btn red" id="btnGuardar" disabled>Confirmar y guardar</button>
+</div></div>
+<div class="toast hide" id="toast"></div>
+
+<script>
+const API = 'https://api.ibaker.cl';
+const OTROS = 'Otros';
+const COLA_KEY = 'mo_cola_v1';
+const msalInstance = new msal.PublicClientApplication({
+  auth:{ clientId:'9a56ab1c-d3c4-4460-9892-1d4da768ecfb', authority:'https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26', redirectUri: window.location.origin },
+  cache:{ cacheLocation:'localStorage' }   // la sesión dura todo el turno en el celular
+});
+let ctx = null, cuenta = null;
+let sel = { proy:null, esp:null, fecha:null };
+let lineas = {};       // trabajadorId -> { estado, partes:[{actividad,motivo,comentario}], nuevo }
+let origenCopiado = null, guardadoInfo = null, soloLectura = false;
+let ultimasFilas = [];
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtHd = n => (Math.round(n*10)/10).toString().replace('.',',');
+const fmtFecha = f => { const [y,m,d] = f.split('-'); return `${d}/${m}/${y}`; };
+function toast(msg, ms=3200){ const t=$('toast'); t.textContent=msg; t.classList.remove('hide'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.add('hide'),ms); }
+const leerLS = (k, def) => { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch(e){ return def; } };
+const guardarLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} };
+
+// ───────── Sesión ─────────
+async function token(){
+  const req = { scopes:['User.Read'], account:cuenta };
+  try { return (await msalInstance.acquireTokenSilent(req)).accessToken; }
+  catch(e){
+    if (!navigator.onLine) throw new Error('sin-conexion');
+    return (await msalInstance.acquireTokenPopup(req)).accessToken;
+  }
+}
+async function api(metodo, ruta, cuerpo){
+  const t = await token();
+  const r = await fetch(API + ruta, { method:metodo, headers:{ 'Authorization':'Bearer '+t, 'Content-Type':'application/json' }, body: cuerpo ? JSON.stringify(cuerpo) : undefined });
+  let j = {}; try { j = await r.json(); } catch(e){}
+  if (!r.ok) { const err = new Error(j.error || ('Error ' + r.status)); err.status = r.status; throw err; }
+  return j;
+}
+async function iniciar(){
+  window.addEventListener('online', actualizarRed); window.addEventListener('offline', actualizarRed); actualizarRed();
+  try { await msalInstance.initialize(); } catch(e){ console.error(e); }
+  const cuentas = msalInstance.getAllAccounts();
+  if (!cuentas.length) { $('login').classList.remove('hide'); return; }
+  cuenta = cuentas[0];
+  await arrancarApp();
+}
+$('btnLogin').addEventListener('click', async () => {
+  $('loginMsg').textContent = '';
+  try {
+    const r = await msalInstance.loginPopup({ scopes:['User.Read'] });
+    cuenta = r.account; msalInstance.setActiveAccount(cuenta);
+    $('login').classList.add('hide'); await arrancarApp();
+  } catch(e){ $('loginMsg').textContent = 'No se pudo iniciar sesión. Intenta de nuevo.'; }
+});
+async function arrancarApp(){
+  try { ctx = await api('GET', '/mo/contexto'); }
+  catch(e){
+    if (e.status === 403) { $('login').classList.remove('hide'); $('login').innerHTML = '<h1>Sin acceso</h1><p>Tu cuenta no tiene acceso a este módulo. Si deberías tenerlo, pide a TI que te asigne tu proyecto.</p>'; return; }
+    if (!navigator.onLine || e.message === 'sin-conexion' || e instanceof TypeError) { const c = leerLS('mo_ctx', null); if (c) { ctx = c; toast('Sin conexión: usando datos guardados'); } else { $('login').classList.remove('hide'); $('login').innerHTML = '<h1>Sin conexión</h1><p>Abre la aplicación una vez con señal para poder usarla sin conexión.</p>'; return; } }
+    else { $('login').classList.remove('hide'); $('loginMsg').textContent = e.message; return; }
+  }
+  guardarLS('mo_ctx', ctx);
+  const nombre = (cuenta.name || cuenta.username || '').trim();
+  $('av').textContent = nombre.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase(); $('av').classList.remove('hide');
+  $('app').classList.remove('hide');
+  $('tabRes').classList.toggle('hide', !ctx.puedeConsultar && ctx.rol !== 'jefe');
+  $('tabAdm').classList.toggle('hide', !ctx.puedeAdministrar);
+  armarSelectoresRegistro(); armarResumen(); procesarCola();
+}
+function actualizarRed(){ const on = navigator.onLine; $('net').textContent = on ? 'En línea' : 'Sin conexión'; $('net').classList.toggle('off', !on); if (on && ctx) procesarCola(); }
+
+// ───────── Pestañas ─────────
+$('tabs').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+  ['reg','res','adm'].forEach(t => $('t-'+t).classList.toggle('hide', t !== b.dataset.t));
+  $('dock').classList.toggle('hide', b.dataset.t !== 'reg' || !puedeRegistrarAqui());
+  if (b.dataset.t === 'adm') cargarAdmin();
+});
+
+// ───────── Registrar ─────────
+const proyActual = () => ctx.proyectos.find(p => p.id === sel.proy);
+const espActual  = () => { const p = proyActual(); return p && p.especialidades.find(e => e.id === sel.esp); };
+const puedeRegistrarAqui = () => { const e = espActual(); return !!(e && e.puedeRegistrar); };
+function ventanaFechas(){
+  const hoy = ctx.hoy; const d = new Date(hoy+'T12:00:00'); d.setDate(d.getDate() - ctx.diasEdicion);
+  return { min: ctx.rol === 'admin' ? '' : d.toISOString().slice(0,10), max: hoy };
+}
+function armarSelectoresRegistro(){
+  const sp = $('selProy'); sp.innerHTML = ctx.proyectos.map(p => `<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('');
+  if (!ctx.proyectos.length) { $('estadoReg').innerHTML = '<div class="empty">Aún no tienes proyectos asignados.</div>'; return; }
+  const ult = leerLS('mo_ultsel', {}); if (ult.proy && ctx.proyectos.some(p=>p.id===ult.proy)) sp.value = ult.proy;
+  const v = ventanaFechas(); $('inFecha').max = v.max; if (v.min) $('inFecha').min = v.min; else $('inFecha').removeAttribute('min');
+  $('inFecha').value = ctx.hoy;
+  cambioProyecto(ult.esp);
+}
+function cambioProyecto(espPref){
+  sel.proy = $('selProy').value; const p = proyActual();
+  $('selEsp').innerHTML = p.especialidades.map(e => `<option value="${esc(e.id)}">${esc(e.nombre)}</option>`).join('');
+  if (espPref && p.especialidades.some(e => e.id === espPref)) $('selEsp').value = espPref;
+  cambioContexto();
+}
+async function cambioContexto(){
+  sel.proy = $('selProy').value; sel.esp = $('selEsp').value; sel.fecha = $('inFecha').value || ctx.hoy;
+  guardarLS('mo_ultsel', { proy: sel.proy, esp: sel.esp });
+  await cargarDia();
+}
+$('selProy').addEventListener('change', () => cambioProyecto());
+$('selEsp').addEventListener('change', cambioContexto);
+$('inFecha').addEventListener('change', cambioContexto);
+
+const claveDia = () => `${sel.proy}|${sel.esp}|${sel.fecha}`;
+function lineaVacia(nuevo){ return { estado:'completa', partes:[{ actividad:'', motivo:'', comentario:'' }], nuevo: !!nuevo }; }
+
+async function cargarDia(){
+  lineas = {}; origenCopiado = null; guardadoInfo = null; soloLectura = false;
+  const p = proyActual(), e = espActual(); if (!p || !e) return;
+  $('estadoReg').innerHTML = '<div class="empty">Cargando…</div>'; $('lista').innerHTML = '';
+  const pend = leerLS(COLA_KEY, {})[claveDia()];
+  let actual = null, previo = null, sinRed = false;
+  if (pend) { actual = { lineas: pend.payload.lineas.map(l => ({ trabajadorId:l.trabajadorId, estado:l.estado, partes:l.partes })), pendiente:true }; }
+  else {
+    try {
+      actual = (await api('GET', `/mo/registro?proyecto=${encodeURIComponent(sel.proy)}&especialidad=${encodeURIComponent(sel.esp)}&fecha=${sel.fecha}`)).registro;
+      if (!actual && e.puedeRegistrar) previo = (await api('GET', `/mo/ultimo?proyecto=${encodeURIComponent(sel.proy)}&especialidad=${encodeURIComponent(sel.esp)}&fecha=${sel.fecha}`)).registro;
+    } catch(err){ if (err.status) toast(err.message); else sinRed = true; }
+  }
+  const dentro = ctx.rol === 'admin' || (new Date(ctx.hoy+'T12:00:00') - new Date(sel.fecha+'T12:00:00'))/86400000 <= ctx.diasEdicion;
+  soloLectura = !e.puedeRegistrar || !dentro;
+  const porId = {}; ((actual && actual.lineas) || []).forEach(l => porId[l.trabajadorId] = l);
+  const prevId = {}; ((previo && previo.lineas) || []).forEach(l => prevId[l.trabajadorId] = l);
+  p.trabajadores.forEach(t => {
+    if (porId[t.id]) { const l = porId[t.id]; lineas[t.id] = { estado:l.estado, partes: l.partes.map(x => ({actividad:x.actividad, motivo:x.motivo||'', comentario:x.comentario||''})), nuevo:false }; }
+    else if (prevId[t.id]) {
+      const l = prevId[t.id], partes = l.partes.filter(x => x.actividad !== OTROS).map(x => ({ actividad:x.actividad, motivo:'', comentario:'' }));
+      // se copia solo la actividad; el día parte como jornada completa. Si el día anterior estuvo ausente o en "Otros", hay que volver a elegir.
+      lineas[t.id] = { estado:'completa', partes: partes.length ? [partes[0]] : [{actividad:'',motivo:'',comentario:''}], nuevo:false, copiado: partes.length > 0 };
+    } else lineas[t.id] = { ...lineaVacia(true), nuevo: !!(previo || (actual && !porId[t.id])) };
+  });
+  if (previo) origenCopiado = previo.fecha;
+  if (actual && !actual.pendiente) guardadoInfo = actual;
+  let html = '';
+  if (sinRed) html += '<div class="banner info">Sin conexión: puedes registrar igual. Se enviará solo cuando vuelva la señal.</div>';
+  if (pend) html += '<div class="banner info">Este día tiene un registro <b>pendiente de enviar</b>. Se enviará cuando haya señal.</div>';
+  if (guardadoInfo) {
+    const cuando = guardadoInfo.actualizadoEn ? new Date(guardadoInfo.actualizadoEn).toLocaleString('es-CL', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+    html += `<div class="banner ok">Registro guardado${cuando ? ' el ' + esc(cuando) : ''}.${soloLectura ? '' : ' Puedes corregirlo.'}</div>`;
+  }
+  if (origenCopiado) html += `<div class="banner info">Se copiaron las actividades del <b>${fmtFecha(origenCopiado)}</b>. Revisa, corrige lo que cambió y presiona <b>Confirmar y guardar</b>.</div>`;
+  if (soloLectura && e.puedeRegistrar) html += '<div class="banner err">Este día ya no se puede modificar.</div>';
+  if (!e.puedeRegistrar) html += '<div class="banner info">Solo lectura. Usa la pestaña Resumen para ver los registros.</div>';
+  if (!e.actividades.length) html += '<div class="banner err">Esta especialidad aún no tiene actividades configuradas. Pide a TI que las agregue.</div>';
+  $('estadoReg').innerHTML = html;
+  pintar();
+}
+
+function opcionesActividad(e, sel_){
+  return `<option value="">Elegir actividad…</option>` + e.actividades.map(a => `<option ${a===sel_?'selected':''}>${esc(a)}</option>`).join('') + `<option value="${OTROS}" ${sel_===OTROS?'selected':''}>Otros (no se pudo trabajar)</option>`;
+}
+function parteHtml(tid, i, pt, n, e){
+  const otros = pt.actividad === OTROS;
+  return `<div class="parte">
+    ${n>1 ? `<div class="hdl">Actividad ${i+1} (½ día)</div>` : ''}
+    <select data-act="${esc(tid)}|${i}" ${soloLectura?'disabled':''}>${opcionesActividad(e, pt.actividad)}</select>
+    ${otros ? `<div class="otros"><label class="f">Motivo</label>
+      <select data-mot="${esc(tid)}|${i}" ${soloLectura?'disabled':''}><option value="">Elegir motivo…</option>${ctx.motivos.map(m=>`<option ${m===pt.motivo?'selected':''}>${esc(m)}</option>`).join('')}</select>
+      <input type="text" data-com="${esc(tid)}|${i}" maxlength="300" placeholder="Comentario (obligatorio). Ej: llovió, no se pudo excavar" value="${esc(pt.comentario)}" ${soloLectura?'disabled':''}></div>` : ''}
+  </div>`;
+}
+function lineaCompleta(l){
+  if (l.estado === 'ausente') return true;
+  return l.partes.every(pt => pt.actividad && (pt.actividad !== OTROS || (pt.motivo && pt.comentario.trim())));
+}
+function pintar(){
+  const p = proyActual(), e = espActual(); if (!p || !e) return;
+  if (!p.trabajadores.length) { $('lista').innerHTML = '<div class="empty">Este proyecto no tiene trabajadores cargados todavía.</div>'; actualizarResumenVivo(); return; }
+  $('lista').innerHTML = p.trabajadores.map(t => {
+    const l = lineas[t.id]; const falta = !lineaCompleta(l);
+    const dividido = l.estado === 'completa' && l.partes.length === 2;
+    return `<div class="w ${l.nuevo?'nuevo':''} ${falta?'falta':''}" data-w="${esc(t.id)}">
+      <div class="top"><span class="nm">${esc(t.nombre)}</span><span class="cg">${esc(t.cargo || 'Sin cargo')}</span>${l.nuevo?'<span class="nv">NUEVO · ASIGNAR</span>':''}</div>
+      <div class="seg">
+        <button data-est="completa" class="${l.estado==='completa'?'on':''}" ${soloLectura?'disabled':''}>Jornada completa</button>
+        <button data-est="media" class="${l.estado==='media'?'on':''}" ${soloLectura?'disabled':''}>Media jornada</button>
+        <button data-est="ausente" class="${l.estado==='ausente'?'on aus':''}" ${soloLectura?'disabled':''}>Ausente</button>
+      </div>
+      ${l.estado==='ausente' ? '' : l.partes.map((pt,i) => parteHtml(t.id,i,pt,l.partes.length,e)).join('')}
+      ${l.estado==='completa' && !soloLectura ? `<button class="lnk" data-div="${esc(t.id)}">${dividido?'Quitar división (1 sola actividad)':'Dividir el día en 2 actividades'}</button>` : ''}
+    </div>`; }).join('');
+  actualizarResumenVivo();
+}
+$('lista').addEventListener('click', ev => {
+  const w = ev.target.closest('[data-w]'); if (!w || soloLectura) return; const tid = w.dataset.w, l = lineas[tid];
+  const b = ev.target.closest('[data-est]');
+  if (b){
+    l.estado = b.dataset.est; l.nuevo = false; l.copiado = false;
+    if (l.estado === 'ausente') l.partes = [];
+    else if (l.estado === 'media') l.partes = [l.partes[0] || { actividad:'', motivo:'', comentario:'' }];
+    else if (!l.partes.length) l.partes = [{ actividad:'', motivo:'', comentario:'' }];
+    pintar(); return;
+  }
+  if (ev.target.closest('[data-div]')){
+    l.partes = l.partes.length === 2 ? [l.partes[0]] : [l.partes[0], { actividad:'', motivo:'', comentario:'' }]; pintar();
+  }
+});
+$('lista').addEventListener('change', ev => {
+  const t = ev.target; const w = t.closest('[data-w]'); if (!w) return; const l = lineas[w.dataset.w];
+  if (t.dataset.act){ const [,i] = t.dataset.act.split('|'); l.partes[+i].actividad = t.value; l.nuevo = false; l.copiado = false; if (t.value !== OTROS){ l.partes[+i].motivo=''; l.partes[+i].comentario=''; } pintar(); }
+  else if (t.dataset.mot){ const [,i] = t.dataset.mot.split('|'); l.partes[+i].motivo = t.value; actualizarResumenVivo(); }
+});
+$('lista').addEventListener('input', ev => {
+  const t = ev.target; if (!t.dataset.com) return; const w = t.closest('[data-w]'); const [,i] = t.dataset.com.split('|');
+  lineas[w.dataset.w].partes[+i].comentario = t.value; actualizarResumenVivo();
+});
+
+function hdDeLinea(l){ return l.estado === 'completa' ? 1 : (l.estado === 'media' ? 0.5 : 0); }
+function actualizarResumenVivo(){
+  const p = proyActual(); if (!p) return;
+  const porAct = {}; let tot = 0, ok = true, aus = 0, sinAsignar = 0;
+  p.trabajadores.forEach(t => {
+    const l = lineas[t.id]; if (!l) return;
+    if (!lineaCompleta(l)) { ok = false; sinAsignar++; }
+    if (l.estado === 'ausente') { aus++; return; }
+    l.partes.forEach(pt => { if (!pt.actividad) return; const hd = hdDeLinea(l) / l.partes.length; const o = porAct[pt.actividad] || (porAct[pt.actividad] = { n:0, hd:0 }); o.n++; o.hd += hd; tot += hd; });
+  });
+  const filas = Object.entries(porAct).sort((a,b)=>b[1].hd-a[1].hd);
+  $('resumenVivo').classList.toggle('hide', !filas.length && !aus);
+  $('resumenVivo').innerHTML = `<h4>Resumen del día</h4><table><thead><tr><th>Actividad</th><th class="n">Personas</th><th class="n">HD</th></tr></thead><tbody>
+    ${filas.map(([a,o]) => `<tr><td>${a===OTROS?'Otros (no se pudo trabajar)':esc(a)}</td><td class="n">${o.n}</td><td class="n">${fmtHd(o.hd)}</td></tr>`).join('')}
+    ${aus ? `<tr><td>Ausentes</td><td class="n">${aus}</td><td class="n">0</td></tr>` : ''}
+    <tr class="tot"><td>Total cuadrilla</td><td class="n">${p.trabajadores.length}</td><td class="n">${fmtHd(tot)}</td></tr></tbody></table>`;
+  $('dkHd').textContent = fmtHd(tot);
+  const puede = puedeRegistrarAqui() && !soloLectura && p.trabajadores.length > 0;
+  $('dock').classList.toggle('hide', !puedeRegistrarAqui() || $('t-reg').classList.contains('hide'));
+  $('btnGuardar').disabled = !(puede && ok);
+  $('btnGuardar').textContent = ok ? (guardadoInfo ? 'Guardar cambios' : 'Confirmar y guardar') : `Faltan ${sinAsignar} por completar`;
+}
+
+function armarPayload(){
+  const p = proyActual();
+  return { proyecto: sel.proy, especialidad: sel.esp, fecha: sel.fecha,
+    lineas: p.trabajadores.map(t => { const l = lineas[t.id]; return { trabajadorId:t.id, estado:l.estado,
+      partes: l.estado==='ausente' ? [] : l.partes.map(x => ({ actividad:x.actividad, motivo: x.actividad===OTROS?x.motivo:'', comentario: x.actividad===OTROS?x.comentario.trim():'' })) }; }) };
+}
+$('btnGuardar').addEventListener('click', async () => {
+  const payload = armarPayload(); $('btnGuardar').disabled = true; $('btnGuardar').textContent = 'Guardando…';
+  try {
+    const r = await api('POST', '/mo/registro', payload);
+    quitarDeCola(claveDia()); toast(`Guardado ✔  ${fmtHd(r.hdTotal)} hombre-día`); await cargarDia();
+  } catch(e){
+    if (e.status) { toast(e.message, 5000); actualizarResumenVivo(); }   // el servidor lo rechazó: no se encola
+    else { encolar(claveDia(), payload); toast('Sin señal: queda pendiente de enviar', 4500); await cargarDia(); mostrarCola(); }
+  }
+});
+
+// ───────── Cola sin conexión ─────────
+function encolar(k, payload){ const c = leerLS(COLA_KEY, {}); c[k] = { payload, en: Date.now() }; guardarLS(COLA_KEY, c); mostrarCola(); }
+function quitarDeCola(k){ const c = leerLS(COLA_KEY, {}); delete c[k]; guardarLS(COLA_KEY, c); mostrarCola(); }
+function mostrarCola(){
+  const n = Object.keys(leerLS(COLA_KEY, {})).length, b = $('colaBanner');
+  b.classList.toggle('hide', !n);
+  if (n) b.innerHTML = `Tienes <b>${n}</b> registro${n>1?'s':''} pendiente${n>1?'s':''} de enviar.<br><button id="btnReintentar">Enviar ahora</button>`;
+  const r = $('btnReintentar'); if (r) r.onclick = procesarCola;
+}
+let enviandoCola = false;
+async function procesarCola(){
+  mostrarCola(); if (enviandoCola || !navigator.onLine || !ctx) return;
+  const c = leerLS(COLA_KEY, {}); const claves = Object.keys(c); if (!claves.length) return;
+  enviandoCola = true; let enviados = 0;
+  for (const k of claves){
+    try { await api('POST', '/mo/registro', c[k].payload); quitarDeCola(k); enviados++; }
+    catch(e){
+      if (e.status) { quitarDeCola(k); toast(`Un registro pendiente fue rechazado: ${e.message}`, 6000); }
+      else break;
+    }
+  }
+  enviandoCola = false;
+  if (enviados){ toast(`Se enviaron ${enviados} registro${enviados>1?'s':''} pendiente${enviados>1?'s':''} ✔`); if (!$('t-reg').classList.contains('hide')) cargarDia(); }
+}
+
+// ───────── Resumen ─────────
+function lunesDe(fechaIso){ const d = new Date(fechaIso+'T12:00:00'); const dow = (d.getDay()+6)%7; d.setDate(d.getDate()-dow); return d.toISOString().slice(0,10); }
+function armarResumen(){
+  $('rHasta').value = ctx.hoy; $('rDesde').value = lunesDe(ctx.hoy);
+  $('rProy').innerHTML = '<option value="">Todos mis proyectos</option>' + ctx.proyectos.map(p => `<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('');
+}
+$('btnRes').addEventListener('click', async () => {
+  $('resOut').innerHTML = '<div class="empty">Cargando…</div>'; $('btnCsv').disabled = true;
+  try {
+    const q = `desde=${$('rDesde').value}&hasta=${$('rHasta').value}` + ($('rProy').value ? `&proyecto=${encodeURIComponent($('rProy').value)}` : '');
+    ultimasFilas = (await api('GET', '/mo/registros?' + q)).filas; pintarResumen(); $('btnCsv').disabled = !ultimasFilas.length;
+  } catch(e){ $('resOut').innerHTML = `<div class="banner err">${esc(e.message)}</div>`; }
+});
+function pintarResumen(){
+  const f = ultimasFilas; if (!f.length){ $('resOut').innerHTML = '<div class="empty">No hay registros en ese período.</div>'; return; }
+  const sum = (arr, fn) => arr.reduce((s,x) => s + fn(x), 0);
+  const prod = f.filter(x => x.actividad && x.actividad !== OTROS), otros = f.filter(x => x.actividad === OTROS), aus = f.filter(x => x.estado === 'ausente');
+  const dias = new Set(f.map(x => x.fecha)).size;
+  const agrupa = (arr, key) => { const m = {}; arr.forEach(x => { const k = key(x); const o = m[k] || (m[k] = { hd:0, n:0 }); o.hd += x.hd; o.n++; }); return Object.entries(m); };
+  let h = `<div class="kpis"><div class="kpi"><b>${fmtHd(sum(f,x=>x.hd))}</b><span>HD totales</span></div><div class="kpi"><b>${fmtHd(sum(prod,x=>x.hd))}</b><span>HD en partidas</span></div><div class="kpi"><b>${fmtHd(sum(otros,x=>x.hd))}</b><span>HD en “Otros”</span></div></div>`;
+  h += `<div class="sum"><h4>Por actividad</h4><div class="scroll-x"><table><thead><tr><th>Proyecto · Especialidad · Actividad</th><th class="n">HD</th></tr></thead><tbody>` +
+    agrupa(prod, x => `${x.proyecto} · ${x.especialidad} · ${x.actividad}`).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,o]) => `<tr><td>${esc(k)}</td><td class="n">${fmtHd(o.hd)}</td></tr>`).join('') + `<tr class="tot"><td>Total en partidas</td><td class="n">${fmtHd(sum(prod,x=>x.hd))}</td></tr></tbody></table></div></div>`;
+  if (otros.length) h += `<div class="sum"><h4>“Otros”: no se pudo trabajar</h4><div class="scroll-x"><table><thead><tr><th>Fecha</th><th>Motivo / comentario</th><th class="n">HD</th></tr></thead><tbody>` +
+    otros.map(x => `<tr><td>${fmtFecha(x.fecha)}</td><td><b>${esc(x.motivo)}</b> · ${esc(x.trabajador)}<br><span style="color:var(--mute)">${esc(x.comentario)}</span></td><td class="n">${fmtHd(x.hd)}</td></tr>`).join('') + `</tbody></table></div></div>`;
+  h += `<div class="sum"><h4>Por día</h4><table><thead><tr><th>Fecha</th><th class="n">HD</th><th class="n">Ausentes</th></tr></thead><tbody>` +
+    [...new Set(f.map(x=>x.fecha))].sort().map(d => `<tr><td>${fmtFecha(d)}</td><td class="n">${fmtHd(sum(f.filter(x=>x.fecha===d),x=>x.hd))}</td><td class="n">${aus.filter(x=>x.fecha===d).length}</td></tr>`).join('') + `</tbody></table></div>`;
+  $('resOut').innerHTML = h;
+}
+$('btnCsv').addEventListener('click', () => {
+  const cab = ['Fecha','Proyecto','Especialidad','Trabajador','Cargo','Estado','Actividad','Motivo (Otros)','Comentario','HD','Registrado por'];
+  const cel = v => { v = String(v ?? ''); return /[";\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; };
+  const lin = ultimasFilas.map(x => [fmtFecha(x.fecha),x.proyecto,x.especialidad,x.trabajador,x.cargo,x.estado==='completa'?'Jornada completa':x.estado==='media'?'Media jornada':'Ausente',x.actividad,x.motivo,x.comentario,String(x.hd).replace('.',','),x.jefe].map(cel).join(';'));
+  const blob = new Blob(['﻿' + [cab.join(';'), ...lin].join('\r\n')], { type:'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `mano_obra_${$('rDesde').value}_${$('rHasta').value}.csv`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+});
+
+// ───────── Administrar ─────────
+let cfgAdmin = null;
+async function cargarAdmin(){
+  $('admOut').innerHTML = '<div class="empty">Cargando…</div>';
+  try { cfgAdmin = await api('GET', '/mo/admin/config'); } catch(e){ $('admOut').innerHTML = `<div class="banner err">${esc(e.message)}</div>`; return; }
+  const h = cfgAdmin.proyectos.map((p,pi) => `<div class="card" data-p="${pi}"><h3>${esc(p.nombre)} ${p.cc?`<small style="color:var(--mute)">· CC ${esc(p.cc)}</small>`:''}</h3>
+    <h5>Trabajadores (uno por línea: Nombre | Cargo | inactivo)</h5>
+    <p class="help">Agrega “| inactivo” al final de quien ya no trabaja: deja de aparecer, pero su historial se conserva.</p>
+    <textarea data-k="trab" rows="6">${esc(p.trabajadores.map(t => `${t.nombre} | ${t.cargo||''}${t.activo===false?' | inactivo':''}`).join('\n'))}</textarea>
+    ${p.especialidades.map((e,ei) => `<h5>Actividades de ${esc(e.nombre)} (una por línea)</h5><textarea data-k="act" data-e="${ei}" rows="4">${esc((e.actividades||[]).join('\n'))}</textarea>`).join('')}
+  </div>`).join('') + `<div class="card"><h3>Accesos</h3>
+    <h5>Jefes de terreno (uno por línea: correo | proyecto | especialidades o *)</h5>
+    <p class="help">Proyectos: ${cfgAdmin.proyectos.map(p=>`<b>${esc(p.id)}</b>`).join(', ')}. Especialidades: alcantarillado, aguas-lluvias, pavimentacion, agua-potable. Usa * para todas.</p>
+    <textarea data-k="jefes" rows="5">${esc(cfgAdmin.jefes.map(j => `${j.email} | ${j.proyecto} | ${(j.especialidades||['*']).join(',')}`).join('\n'))}</textarea>
+    <h5>Consulta (ven los reportes de todos los proyectos; un correo por línea)</h5>
+    <textarea data-k="cons" rows="3">${esc(cfgAdmin.consulta.join('\n'))}</textarea></div>
+    <button class="btn red" id="btnAdmGuardar" style="width:100%">Guardar configuración</button>`;
+  $('admOut').innerHTML = h;
+  $('btnAdmGuardar').onclick = guardarAdmin;
+}
+const slug = s => s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40);
+async function guardarAdmin(){
+  const c = JSON.parse(JSON.stringify(cfgAdmin));
+  document.querySelectorAll('#admOut [data-p]').forEach(card => {
+    const p = c.proyectos[+card.dataset.p], previos = Object.fromEntries(p.trabajadores.map(t => [t.nombre.toLowerCase(), t]));
+    p.trabajadores = card.querySelector('[data-k=trab]').value.split('\n').map(x => x.trim()).filter(Boolean).map(l => {
+      const [nombre, cargo, est] = l.split('|').map(x => (x||'').trim()); const prev = previos[nombre.toLowerCase()];
+      return { id: prev ? prev.id : 't-' + slug(nombre) + '-' + Math.random().toString(36).slice(2,5), nombre, cargo: cargo || '', activo: !/inactiv/i.test(est || '') };
+    });
+    // quien se borró de la lista pero tenía historial queda inactivo (no se pierde)
+    Object.values(previos).forEach(t => { if (!p.trabajadores.some(x => x.id === t.id)) p.trabajadores.push({ ...t, activo:false }); });
+    card.querySelectorAll('[data-k=act]').forEach(ta => { p.especialidades[+ta.dataset.e].actividades = ta.value.split('\n').map(x => x.trim()).filter(Boolean); });
+  });
+  c.jefes = document.querySelector('[data-k=jefes]').value.split('\n').map(x => x.trim()).filter(Boolean).map(l => {
+    const [email, proyecto, esp] = l.split('|').map(x => (x||'').trim());
+    return { email: (email||'').toLowerCase(), proyecto, especialidades: (esp || '*').split(',').map(x => x.trim()).filter(Boolean) };
+  });
+  const malos = c.jefes.filter(j => !j.email.includes('@') || !c.proyectos.some(p => p.id === j.proyecto));
+  if (malos.length) { toast('Revisa los accesos: correo o proyecto no válido (' + (malos[0].email || '?') + ')', 5000); return; }
+  c.consulta = document.querySelector('[data-k=cons]').value.split('\n').map(x => x.trim().toLowerCase()).filter(Boolean);
+  try { await api('PUT', '/mo/admin/config', c); toast('Configuración guardada ✔'); ctx = await api('GET', '/mo/contexto'); guardarLS('mo_ctx', ctx); armarSelectoresRegistro(); armarResumen(); cargarAdmin(); }
+  catch(e){ toast(e.message, 5000); }
+}
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw-mo.js').catch(()=>{});
+iniciar();
+</script>
+</body>
+</html>
