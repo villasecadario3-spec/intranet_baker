@@ -310,6 +310,7 @@
             footer { padding:20px 22px; flex-direction:column; gap:14px; }
         }
     </style>
+<script src="metricas.js" data-modulo="inicio"></script>
 </head>
 <body>
 
@@ -675,6 +676,14 @@
                 <div class="mod-desc">Accesos a las herramientas de gestión de bodega y materiales.</div>
                 <div class="mod-link">Acceder <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
             </a>
+            <a class="mod-card" href="registro-mo.html" data-modulo="registro-mo.html" data-nombre="Registro de Mano de Obra">
+                <div class="mod-top">
+                    <div class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div>
+                </div>
+                <div class="mod-nombre">Registro de Mano de Obra</div>
+                <div class="mod-desc">Registro diario del trabajo de las cuadrillas en terreno, pensado para usar desde el celular.</div>
+                <div class="mod-link">Acceder <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+            </a>
             <div class="ayuda-card" id="ayuda">
                 <div class="ayuda-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="11" y1="18" x2="13" y2="18"/></svg></div>
                 <div class="ayuda-body">
@@ -971,6 +980,9 @@ const ACCESOS_MODULOS = {
     "organigrama.html": [
         "dvillaseca@ibaker.cl","jcumplido@ibaker.cl"
     ],
+    "registro-mo.html": [
+        "dvillaseca@ibaker.cl"
+    ],
     "control-bodega.html": [
         "dvillaseca@ibaker.cl","jcumplido@ibaker.cl","phenriquez@ibaker.cl","dcatalan@ibaker.cl"
     ]
@@ -1001,6 +1013,14 @@ async function aplicarAccesos(email) {
         const r = await fetch('https://api.ibaker.cl/dotacion/obras?email=' + encodeURIComponent(correo), { headers });
         if (r.ok) ACCESOS_MODULOS['dotacion.html'] = (await r.json()).length ? [correo] : [];
     } catch(e) { console.warn('No se pudo consultar el acceso a Control de Dotación:', e.message); }
+    // Registro de Mano de Obra: la tarjeta aparece si el servidor reconoce a la persona como jefe de terreno,
+    // consulta o administrador (se administra desde el propio módulo). Si no responde, queda la lista fija.
+    try {
+        const t = await msalInstance.acquireTokenSilent({ scopes: ['User.Read'], account: msalInstance.getAllAccounts()[0] });
+        const r = await fetch('https://api.ibaker.cl/mo/contexto', { headers: { Authorization: 'Bearer ' + t.accessToken } });
+        if (r.ok) ACCESOS_MODULOS['registro-mo.html'] = [correo];
+        else if (r.status === 403) ACCESOS_MODULOS['registro-mo.html'] = [];
+    } catch(e) { console.warn('No se pudo consultar el acceso a Registro de Mano de Obra:', e.message); }
     document.querySelectorAll('[data-modulo]').forEach(card => {
         const modulo = card.getAttribute('data-modulo');
         const lista  = ACCESOS_MODULOS[modulo];
