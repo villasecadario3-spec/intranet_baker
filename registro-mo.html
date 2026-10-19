@@ -112,6 +112,8 @@ tr.tot td{font-weight:800;border-bottom:0}
 .lnk.peligro{color:#fff;background:var(--red);border-radius:8px;padding:6px 10px;text-decoration:none}
 .lnk:disabled{opacity:.3}
 .adm h3{margin-bottom:10px}
+.bk{font-size:10px;font-weight:800;color:#fff;background:var(--obs);border-radius:99px;padding:2px 7px;vertical-align:middle;letter-spacing:.04em}
+.auto{font-size:11px;font-weight:600;color:var(--mute)}
 .empty{text-align:center;color:var(--mute);font-size:14px;padding:26px 10px}
 </style>
 </head>
@@ -543,9 +545,11 @@ function pintarTrabajadores(p){
   const fila = t => admEditando === t.id
     ? `<div class="acc ed"><div style="flex:1"><input type="text" id="eNom" value="${esc(t.nombre)}" placeholder="Nombre completo"><input type="text" id="eCar" list="listaCargos" value="${esc(t.cargo||'')}" placeholder="Cargo" style="margin-top:8px"></div>
          <div class="col"><button class="btn sm red" data-ok="${esc(t.id)}">Guardar</button><button class="lnk" data-cancel="1">Cancelar</button></div></div>`
-    : `<div class="acc"><div><b>${esc(t.nombre)}</b><br><span>${esc(t.cargo || 'Sin cargo')}</span></div>
-         <div class="col">${t.activo===false ? `<button class="lnk" data-react="${esc(t.id)}">Reactivar</button>` : `<button class="lnk" data-edit="${esc(t.id)}">Editar</button><button class="lnk" data-baja="${esc(t.id)}">Dar de baja</button>`}</div></div>`;
+    : `<div class="acc"><div><b>${esc(t.nombre)}</b>${t.origen==='buk' ? ' <span class="bk">Buk</span>' : ''}<br><span>${esc(t.cargo || 'Sin cargo')}</span></div>
+         <div class="col">${t.origen==='buk' ? '<span class="auto">Automático</span>' : t.activo===false ? `<button class="lnk" data-react="${esc(t.id)}">Reactivar</button>` : `<button class="lnk" data-edit="${esc(t.id)}">Editar</button><button class="lnk" data-baja="${esc(t.id)}">Dar de baja</button>`}</div></div>`;
   $('admCuerpo').innerHTML = `
+    <div class="card" id="cardBuk"><h3>Sincronización con Buk</h3><div id="bukEstado" class="help">Consultando…</div>
+      <button class="btn ghost sm" id="btnBuk">Actualizar ahora</button></div>
     <div class="card"><h3>Agregar trabajador</h3>
       <label class="f" for="nNom">Nombre completo</label><input type="text" id="nNom" placeholder="Ej: Juan Pérez Soto" autocomplete="off">
       <label class="f" for="nCar" style="margin-top:10px">Cargo</label><input type="text" id="nCar" list="listaCargos" placeholder="Elige o escribe el cargo" autocomplete="off">
@@ -566,6 +570,7 @@ function pintarTrabajadores(p){
     if (prev) { prev.activo = true; prev.cargo = cargo; } else p.trabajadores.push({ id: 't-' + slug(nombre) + '-' + Math.random().toString(36).slice(2,6), nombre, cargo, activo: true });
     if (await guardarCfg(prev ? 'Reactivado ✔' : 'Trabajador agregado ✔')) pintarAdmin();
   };
+  pintarEstadoBuk(p); $('btnBuk').onclick = async () => { $('btnBuk').disabled = true; try { await api('POST', '/mo/admin/buk-sync'); } catch(e){ toast(e.message, 4000); } pintarEstadoBuk(p, true); };
   const bt = $('buscaTrab'); if (bt) bt.oninput = () => { const q = bt.value.toLowerCase(); $('listaTrab').querySelectorAll('.acc').forEach(a => a.classList.toggle('hide', !a.textContent.toLowerCase().includes(q))); };
   cuerpo.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { admEditando = b.dataset.edit; pintarAdmin(); });
   cuerpo.querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => { admEditando = null; pintarAdmin(); });
@@ -577,6 +582,24 @@ function pintarTrabajadores(p){
   cuerpo.querySelectorAll('[data-baja]').forEach(b => b.onclick = () => dosToques('baja' + b.dataset.baja, b, '¿Confirmar baja?', async () => {
     p.trabajadores.find(x => x.id === b.dataset.baja).activo = false; if (await guardarCfg('Dado de baja ✔')) pintarAdmin(); }));
   cuerpo.querySelectorAll('[data-react]').forEach(b => b.onclick = async () => { p.trabajadores.find(x => x.id === b.dataset.react).activo = true; if (await guardarCfg('Reactivado ✔')) pintarAdmin(); });
+}
+
+let bukTimer = null;
+async function pintarEstadoBuk(p, esperar){
+  clearTimeout(bukTimer);
+  const el = $('bukEstado'); if (!el) return;
+  let e; try { e = await api('GET', '/mo/admin/buk-estado'); } catch(err){ el.textContent = 'No se pudo consultar el estado.'; return; }
+  const btn = $('btnBuk'); if (btn) btn.disabled = e.corriendo;
+  if (e.corriendo) {
+    el.innerHTML = `Sincronizando con Buk… página ${e.paginas} de ${e.totalPaginas || '?'}`;
+    bukTimer = setTimeout(() => { if ($('bukEstado') && admSec === 'trab') pintarEstadoBuk(p, true); }, 3000); return;
+  }
+  if (esperar) { try { cfgAdmin = await api('GET', '/mo/admin/config'); const np = cfgAdmin.proyectos[admProy]; if (admSec === 'trab') { pintarAdmin(); return; } } catch(err){} }
+  const hace = e.actualizadoEn ? Math.max(0, Math.round((Date.now() - new Date(e.actualizadoEn)) / 60000)) : null;
+  const n = (e.coincidencias || {})[p.id];
+  el.innerHTML = (e.error ? `<b style="color:var(--red-dark)">Última consulta con error:</b> ${esc(e.error)}<br>` : '') +
+    (hace === null ? 'Aún no se ha sincronizado.' : `Última actualización hace ${hace < 1 ? 'menos de 1 minuto' : hace + ' min'}. ${typeof n === 'number' ? `<b>${n}</b> personas activas de este proyecto vienen de Buk.` : ''}`) +
+    '<br>Se actualiza sola cada 60 minutos. Quienes vienen de Buk no se editan aquí: si alguien se desvincula, deja de aparecer solo.';
 }
 
 // ── Actividades ──
