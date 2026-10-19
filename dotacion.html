@@ -454,6 +454,7 @@
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+<script src="metricas.js" data-modulo="dotacion"></script>
 </head>
 <body>
 
@@ -529,9 +530,10 @@
   <div class="ingreso-card" style="margin-bottom:16px;">
     <div style="font-weight:700;font-size:13px;margin-bottom:6px;">📋 Carga masiva de personal proyectado</div>
     <p style="font-size:12px;color:var(--muted,#777);margin-bottom:10px;">
-      Para agregar varias personas proyectadas de una vez, en vez de una por una. Sube un CSV con las mismas columnas que "Dotación Activa": <b>nombre,rut,cargo,cc,fecha_desde,fecha_hasta,costo_empresa</b> (costo_empresa es opcional — vacío si quieres que se calcule solo).
+      Para agregar varias personas proyectadas de una vez, en vez de una por una. Sube un archivo <b>Excel (.xlsx)</b> o CSV (con coma o punto y coma) con las columnas: <b>nombre, rut, cargo, cc, fecha_desde, fecha_hasta, costo_empresa</b> (costo_empresa es opcional — vacío si quieres que se calcule solo). El RUT puede ir con o sin puntos y guión, y las fechas como 01-11-2026 o 2026-11-01.
+      <a href="#" onclick="descargarPlantillaProyectados();return false;" style="font-weight:600;">Descargar plantilla Excel</a>
     </p>
-    <input type="file" id="proyectados-csv-input" accept=".csv" style="margin-bottom:8px;">
+    <input type="file" id="proyectados-csv-input" accept=".xlsx,.xls,.csv,.txt" style="margin-bottom:8px;">
     <button class="btn btn-primary btn-sm" onclick="previsualizarProyectadosCSV()">Revisar archivo</button>
     <div id="proyectados-csv-preview" style="margin-top:12px;"></div>
   </div>
@@ -3567,27 +3569,95 @@ function renderCostosTabla() {
 }
 
 // ── Carga masiva de personal proyectado ──────────────────────────
-function parseProyectadosCSV(texto) {
-  const lineas = texto.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-  if (!lineas.length) return { filas: [], errores: [] };
-  const header = lineas[0].toLowerCase();
-  const empiezaEnHeader = header.includes('rut') && header.includes('nombre');
-  const dataLineas = empiezaEnHeader ? lineas.slice(1) : lineas;
+// Convierte lo que venga en una celda a texto limpio
+const _celda = v => (v === null || v === undefined) ? '' : String(v).trim();
+// Fechas: acepta AAAA-MM-DD, AAAA/MM/DD, DD-MM-AAAA, DD/MM/AAAA y el número de serie de Excel
+function normalizarFechaCarga(v){
+  if (typeof v === 'number' && Number.isFinite(v) && v > 20000 && v < 80000 && typeof XLSX !== 'undefined') {
+    const d = XLSX.SSF.parse_date_code(v);
+    if (d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+  }
+  const t = _celda(v);
+  let m = t.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  m = t.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/);
+  if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  return t;
+}
+// RUT: sin puntos, guión ni espacios
+const normalizarRutCarga = v => _celda(v).replace(/[.\-\s]/g, '').toUpperCase();
+// Costo: tolera $ y puntos de miles ("$1.250.000")
+function normalizarCostoCarga(v){
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  let t = _celda(v).replace(/[$\s]/g, '');
+  if (!t) return null;
+  if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+  const n = Number(t.replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+// Texto CSV -> filas (detecta ; , o tabulación; respeta comillas)
+function csvAFilas(texto){
+  texto = texto.replace(/^\uFEFF/, '');
+  const primera = (texto.split(/\r?\n/).find(l => l.trim()) || '');
+  const cuenta = c => (primera.match(new RegExp('\\' + c, 'g')) || []).length;
+  const sep = [';', ',', '\t'].sort((x, y) => cuenta(y) - cuenta(x))[0];
+  return texto.split(/\r?\n/).filter(l => l.trim()).map(linea => {
+    const out = []; let cur = '', q = false;
+    for (let i = 0; i < linea.length; i++) {
+      const ch = linea[i];
+      if (ch === '"') { if (q && linea[i+1] === '"') { cur += '"'; i++; } else q = !q; }
+      else if (ch === sep && !q) { out.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    out.push(cur); return out;
+  });
+}
+// Archivo (.xlsx/.xls/.csv) -> filas
+async function archivoAFilas(archivo){
+  if (/\.xlsx?$/i.test(archivo.name)) {
+    if (typeof XLSX === 'undefined') throw new Error('No se pudo cargar la librería de Excel — revisa tu conexión e intenta de nuevo.');
+    const wb = XLSX.read(await archivo.arrayBuffer(), { type: 'array' });
+    const hoja = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(hoja, { header: 1, raw: true, defval: '' }).filter(r => r.some(c => _celda(c) !== ''));
+  }
+  return csvAFilas(await archivo.text());
+}
+// Columnas por nombre de encabezado (si no hay encabezado, van en el orden de siempre)
+const _ORDEN_PROY = ['nombre','rut','cargo','cc','fecha_desde','fecha_hasta','costo_empresa'];
+function _mapaColumnas(encabezado){
+  const alias = { nombre:['nombre','nombres','trabajador'], rut:['rut','run'], cargo:['cargo'], cc:['cc','centro','centro de gestion','centro de gestión','centro de costo','cg'],
+    fecha_desde:['fecha_desde','desde','fecha desde','inicio','fecha inicio'], fecha_hasta:['fecha_hasta','hasta','fecha hasta','termino','término','fecha termino','fecha término'],
+    costo_empresa:['costo_empresa','costo empresa','costo','costo_emp'] };
+  const norm = t => _celda(t).toLowerCase();
+  const mapa = {};
+  _ORDEN_PROY.forEach((k, i) => { const j = encabezado.findIndex(h => alias[k].includes(norm(h))); mapa[k] = j >= 0 ? j : i; });
+  return mapa;
+}
+
+function parseProyectadosCSV(texto) { return parseProyectadosFilas(csvAFilas(texto)); }
+
+function parseProyectadosFilas(filasCrudas) {
+  if (!filasCrudas.length) return { filas: [], errores: [] };
+  const h0 = filasCrudas[0].map(c => _celda(c).toLowerCase());
+  const empiezaEnHeader = h0.includes('rut') || h0.includes('run') || (h0.some(c => c.includes('rut')) && h0.some(c => c.includes('nombre')));
+  const mapa = empiezaEnHeader ? _mapaColumnas(filasCrudas[0]) : Object.fromEntries(_ORDEN_PROY.map((k, i) => [k, i]));
+  const dataLineas = empiezaEnHeader ? filasCrudas.slice(1) : filasCrudas;
   const filas = [];
   const errores = [];
   const rutsEnEsteArchivo = new Set();
 
   dataLineas.forEach((linea, i) => {
     const numFila = i + (empiezaEnHeader ? 2 : 1);
-    const partes = linea.split(',').map(s => s.trim());
-    const [nombre, rut, cargo, cc, desde, hasta, costoTxt] = partes;
+    const nombre = _celda(linea[mapa.nombre]), rut = normalizarRutCarga(linea[mapa.rut]), cargo = _celda(linea[mapa.cargo]), cc = _celda(linea[mapa.cc]);
+    const desde = normalizarFechaCarga(linea[mapa.fecha_desde]), hasta = normalizarFechaCarga(linea[mapa.fecha_hasta]);
+    const costoNum = normalizarCostoCarga(linea[mapa.costo_empresa]);
 
     if (!nombre) { errores.push(`Fila ${numFila}: falta el nombre`); return; }
-    if (!rut || !isValidRutLimpio(rut)) { errores.push(`Fila ${numFila}: RUT inválido ("${rut||''}") — 8-9 dígitos sin puntos ni guión`); return; }
+    if (!rut || !isValidRutLimpio(rut)) { errores.push(`Fila ${numFila}: RUT inválido ("${rut||''}") — debe tener 8 o 9 caracteres incluido el dígito verificador`); return; }
     if (!cargo) { errores.push(`Fila ${numFila}: falta el cargo`); return; }
     if (!cc) { errores.push(`Fila ${numFila}: falta el centro de gestión`); return; }
-    if (!desde || !/^\d{4}-\d{2}-\d{2}$/.test(desde)) { errores.push(`Fila ${numFila}: fecha_desde inválida ("${desde||''}") — formato AAAA-MM-DD`); return; }
-    if (!hasta || !/^\d{4}-\d{2}-\d{2}$/.test(hasta)) { errores.push(`Fila ${numFila}: fecha_hasta inválida ("${hasta||''}") — formato AAAA-MM-DD`); return; }
+    if (!desde || !/^\d{4}-\d{2}-\d{2}$/.test(desde)) { errores.push(`Fila ${numFila}: fecha_desde inválida ("${desde||''}") — usa 01-11-2026 o 2026-11-01`); return; }
+    if (!hasta || !/^\d{4}-\d{2}-\d{2}$/.test(hasta)) { errores.push(`Fila ${numFila}: fecha_hasta inválida ("${hasta||''}") — usa 01-11-2026 o 2026-11-01`); return; }
     if (desde > hasta) { errores.push(`Fila ${numFila}: fecha_desde es posterior a fecha_hasta`); return; }
 
     const rutlimpio = rut.toUpperCase();
@@ -3597,7 +3667,7 @@ function parseProyectadosCSV(texto) {
     if (rutsEnEsteArchivo.has(claveFila)) { errores.push(`Fila ${numFila}: RUT ${rutlimpio} repetido en el mismo archivo para ese cargo+centro`); return; }
     rutsEnEsteArchivo.add(claveFila);
 
-    const costoManual = costoTxt && Number.isFinite(Number(costoTxt)) ? Math.round(Number(costoTxt)) : null;
+    const costoManual = costoNum !== null ? Math.round(costoNum) : null;
     filas.push({
       id: claveFila, rutlimpio, cc, role: cargo, name: nombre, rut: rutlimpio,
       fc: desde, status: 'finiquitado', fs: hasta, motivo: 'vencimiento_plazo', source: 'proyectado', costoManual
@@ -3612,9 +3682,10 @@ let proyectadosCSVPendientes = [];
 async function previsualizarProyectadosCSV() {
   const input = document.getElementById('proyectados-csv-input');
   const archivo = input.files[0];
-  if (!archivo) { toast('Selecciona un archivo CSV primero'); return; }
-  const texto = await archivo.text();
-  const { filas, errores } = parseProyectadosCSV(texto);
+  if (!archivo) { toast('Selecciona un archivo Excel o CSV primero'); return; }
+  let crudas;
+  try { crudas = await archivoAFilas(archivo); } catch(e) { toast('No se pudo leer el archivo: ' + e.message); return; }
+  const { filas, errores } = parseProyectadosFilas(crudas);
   proyectadosCSVPendientes = filas;
   const cont = document.getElementById('proyectados-csv-preview');
 
@@ -3636,6 +3707,17 @@ async function previsualizarProyectadosCSV() {
     html += `<div style="font-size:12px;color:var(--muted,#777);">El archivo no tiene filas válidas.</div>`;
   }
   cont.innerHTML = html;
+}
+
+function descargarPlantillaProyectados() {
+  if (typeof XLSX === 'undefined') { toast('No se pudo cargar la librería de Excel — revisa tu conexión e intenta de nuevo.'); return; }
+  const datos = [['nombre','rut','cargo','cc','fecha_desde','fecha_hasta','costo_empresa'],
+                 ['Juan Pérez Soto','12345678K','Jornal','CG0266301','2026-11-01','2026-12-31','']];
+  const hoja = XLSX.utils.aoa_to_sheet(datos);
+  hoja['!cols'] = [{wch:28},{wch:13},{wch:26},{wch:14},{wch:13},{wch:13},{wch:15}];
+  ['B2','E2','F2'].forEach(c => { if (hoja[c]) { hoja[c].t = 's'; hoja[c].z = '@'; } });   // texto, para que Excel no toque RUT ni fechas
+  const libro = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(libro, hoja, 'Proyectados');
+  XLSX.writeFile(libro, 'plantilla_personal_proyectado.xlsx');
 }
 
 function confirmarCargaProyectadosCSV() {
