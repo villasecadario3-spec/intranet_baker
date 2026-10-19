@@ -105,7 +105,7 @@ tr.tot td{font-weight:800;border-bottom:0}
 .chip{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;background:#fff;border:1.5px solid var(--bord);border-radius:99px;padding:9px 13px;min-height:42px}
 .chip input{width:18px;height:18px;accent-color:var(--red)}
 .pills{display:flex;gap:6px;margin-bottom:12px}
-.pills button{flex:1;font:700 13px var(--font);padding:11px 4px;min-height:44px;border:1.5px solid var(--bord);border-radius:99px;background:#fff;color:var(--mute)}
+.pills button{flex:1;font:700 12.5px var(--font);padding:11px 4px;min-height:44px;border:1.5px solid var(--bord);border-radius:99px;background:#fff;color:var(--mute)}
 .pills button.on{background:var(--obs);border-color:var(--obs);color:#fff}
 .acc .col{display:flex;flex-direction:column;align-items:flex-end;gap:0;flex-shrink:0}
 .acc.ed{align-items:flex-start}
@@ -115,6 +115,18 @@ tr.tot td{font-weight:800;border-bottom:0}
 .bk{font-size:10px;font-weight:800;color:#fff;background:var(--obs);border-radius:99px;padding:2px 7px;vertical-align:middle;letter-spacing:.04em}
 .auto{font-size:11px;font-weight:600;color:var(--mute)}
 .empty{text-align:center;color:var(--mute);font-size:14px;padding:26px 10px}
+
+.grp{margin-bottom:14px}
+.grp>h4{font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);margin:6px 2px 6px;display:flex;align-items:center;gap:8px}
+.grp>h4 span{background:var(--obs);color:#fff;border-radius:99px;font-size:11px;padding:1px 8px}
+.grp.pend>h4{color:var(--red)}.grp.pend>h4 span{background:var(--red)}
+.dsp{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border:1px solid var(--bord);border-radius:12px;padding:10px 12px;margin-bottom:6px}
+.dsp b{display:block;font-size:14px}.dsp small{color:var(--mute);font-size:12px}
+.dsp .btn{min-height:40px;padding:0 14px}
+.grp.bloq .dsp{opacity:.65;background:var(--page)}
+.lock{font-size:12px;font-weight:700;color:var(--mute);text-align:right}
+.hint{font-size:12px;color:var(--mute);margin:4px 2px}
+.lnk.lib{color:var(--mute);font-weight:600}
 </style>
 </head>
 <body>
@@ -192,7 +204,8 @@ const msalInstance = new msal.PublicClientApplication({
 });
 let ctx = null, cuenta = null;
 let sel = { proy:null, esp:null, fecha:null };
-let lineas = {};       // trabajadorId -> { estado, partes:[{actividad,motivo,comentario}], nuevo }
+let lineas = {};       // SOLO los trabajadores tomados por esta especialidad: trabajadorId -> { estado, partes:[{actividad,motivo,comentario}] }
+let ocupados = {};     // trabajadores ya tomados por otra especialidad ese día
 let origenCopiado = null, guardadoInfo = null, soloLectura = false;
 let ultimasFilas = [];
 
@@ -294,34 +307,50 @@ $('selEsp').addEventListener('change', cambioContexto);
 $('inFecha').addEventListener('change', cambioContexto);
 
 const claveDia = () => `${sel.proy}|${sel.esp}|${sel.fecha}`;
-function lineaVacia(nuevo){ return { estado:'completa', partes:[{ actividad:'', motivo:'', comentario:'' }], nuevo: !!nuevo }; }
+const parteVacia = () => ({ actividad:'', motivo:'', comentario:'' });
+const parteOtros = () => ({ actividad:OTROS, motivo:'', comentario:'' });
+function lineaVacia(){ return { estado:'completa', partes:[parteVacia()] }; }
+let nombres = {};      // trabajadorId -> { nombre, cargo } (incluye gente dada de baja que ya estaba en el registro)
+
+// Normaliza una línea recibida del servidor (registros antiguos de media jornada traían una sola parte)
+function lineaDesdeServidor(l){
+  let partes = (l.partes || []).map(x => ({ actividad:x.actividad, motivo:x.motivo||'', comentario:x.comentario||'' }));
+  if (l.estado === 'media') {
+    if (partes.length === 1) partes.push(parteOtros());
+    if (partes.length === 2 && partes[1].actividad !== OTROS) partes[1] = parteOtros();
+  }
+  return { estado:l.estado, partes };
+}
 
 async function cargarDia(){
-  lineas = {}; origenCopiado = null; guardadoInfo = null; soloLectura = false;
+  lineas = {}; ocupados = {}; origenCopiado = null; guardadoInfo = null; soloLectura = false;
   const p = proyActual(), e = espActual(); if (!p || !e) return;
   $('estadoReg').innerHTML = '<div class="empty">Cargando…</div>'; $('lista').innerHTML = '';
+  const q = `proyecto=${encodeURIComponent(sel.proy)}&especialidad=${encodeURIComponent(sel.esp)}&fecha=${sel.fecha}`;
   const pend = leerLS(COLA_KEY, {})[claveDia()];
   let actual = null, previo = null, sinRed = false;
-  if (pend) { actual = { lineas: pend.payload.lineas.map(l => ({ trabajadorId:l.trabajadorId, estado:l.estado, partes:l.partes })), pendiente:true }; }
-  else {
-    try {
-      actual = (await api('GET', `/mo/registro?proyecto=${encodeURIComponent(sel.proy)}&especialidad=${encodeURIComponent(sel.esp)}&fecha=${sel.fecha}`)).registro;
-      if (!actual && e.puedeRegistrar) previo = (await api('GET', `/mo/ultimo?proyecto=${encodeURIComponent(sel.proy)}&especialidad=${encodeURIComponent(sel.esp)}&fecha=${sel.fecha}`)).registro;
-    } catch(err){ if (err.status) toast(err.message); else sinRed = true; }
-  }
+  try {
+    ocupados = (await api('GET', `/mo/ocupacion?${q}`)).ocupados || {};
+    if (pend) actual = { lineas: pend.payload.lineas, pendiente:true };
+    else {
+      actual = (await api('GET', `/mo/registro?${q}`)).registro;
+      if (!actual && e.puedeRegistrar) previo = (await api('GET', `/mo/ultimo?${q}`)).registro;
+    }
+  } catch(err){ if (err.status) toast(err.message); else { sinRed = true; if (pend) actual = { lineas: pend.payload.lineas, pendiente:true }; } }
   const dentro = ctx.rol === 'admin' || (new Date(ctx.hoy+'T12:00:00') - new Date(sel.fecha+'T12:00:00'))/86400000 <= ctx.diasEdicion;
   soloLectura = !e.puedeRegistrar || !dentro;
-  const porId = {}; ((actual && actual.lineas) || []).forEach(l => porId[l.trabajadorId] = l);
-  const prevId = {}; ((previo && previo.lineas) || []).forEach(l => prevId[l.trabajadorId] = l);
-  p.trabajadores.forEach(t => {
-    if (porId[t.id]) { const l = porId[t.id]; lineas[t.id] = { estado:l.estado, partes: l.partes.map(x => ({actividad:x.actividad, motivo:x.motivo||'', comentario:x.comentario||''})), nuevo:false }; }
-    else if (prevId[t.id]) {
-      const l = prevId[t.id], partes = l.partes.filter(x => x.actividad !== OTROS && e.actividades.includes(x.actividad)).map(x => ({ actividad:x.actividad, motivo:'', comentario:'' }));
-      // se copia solo la actividad; el día parte como jornada completa. Si el día anterior estuvo ausente o en "Otros", hay que volver a elegir.
-      lineas[t.id] = { estado:'completa', partes: partes.length ? [partes[0]] : [{actividad:'',motivo:'',comentario:''}], nuevo:false, copiado: partes.length > 0 };
-    } else lineas[t.id] = { ...lineaVacia(true), nuevo: !!(previo || (actual && !porId[t.id])) };
-  });
-  if (previo) origenCopiado = previo.fecha;
+  nombres = {}; p.trabajadores.forEach(t => nombres[t.id] = { nombre:t.nombre, cargo:t.cargo });
+  ((actual && actual.lineas) || []).forEach(l => { if (!nombres[l.trabajadorId]) nombres[l.trabajadorId] = { nombre: l.nombre || l.trabajadorId, cargo: l.cargo || '' }; });
+  if (actual) actual.lineas.forEach(l => { lineas[l.trabajadorId] = lineaDesdeServidor(l); });
+  else if (previo) {
+    // se copian solo quienes estaban en actividades el día anterior, siguen activos y no los tomó otra especialidad hoy
+    previo.lineas.forEach(l => {
+      if (!p.trabajadores.some(t => t.id === l.trabajadorId) || ocupados[l.trabajadorId]) return;
+      const pt = (l.partes || []).find(x => x.actividad !== OTROS && e.actividades.includes(x.actividad));
+      if (pt) lineas[l.trabajadorId] = { estado:'completa', partes:[{ actividad:pt.actividad, motivo:'', comentario:'' }], copiado:true };
+    });
+    if (Object.keys(lineas).length) origenCopiado = previo.fecha;
+  }
   if (actual && !actual.pendiente) guardadoInfo = actual;
   let html = '';
   if (sinRed) html += '<div class="banner info">Sin conexión: puedes registrar igual. Se enviará solo cuando vuelva la señal.</div>';
@@ -330,7 +359,7 @@ async function cargarDia(){
     const cuando = guardadoInfo.actualizadoEn ? new Date(guardadoInfo.actualizadoEn).toLocaleString('es-CL', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
     html += `<div class="banner ok">Registro guardado${cuando ? ' el ' + esc(cuando) : ''}.${soloLectura ? '' : ' Puedes corregirlo.'}</div>`;
   }
-  if (origenCopiado) html += `<div class="banner info">Se copiaron las actividades del <b>${fmtFecha(origenCopiado)}</b>. Revisa, corrige lo que cambió y presiona <b>Confirmar y guardar</b>.</div>`;
+  if (origenCopiado) html += `<div class="banner info">Se copió la cuadrilla del <b>${fmtFecha(origenCopiado)}</b>. Revisa, mueve a quien cambió de actividad y presiona <b>Confirmar y guardar</b>.</div>`;
   if (soloLectura && e.puedeRegistrar) html += '<div class="banner err">Este día ya no se puede modificar.</div>';
   if (!e.puedeRegistrar) html += '<div class="banner info">Solo lectura. Usa la pestaña Resumen para ver los registros.</div>';
   if (!e.actividades.length) html += '<div class="banner err">Esta especialidad aún no tiene actividades configuradas. Pide a TI que las agregue.</div>';
@@ -341,55 +370,89 @@ async function cargarDia(){
 function opcionesActividad(e, sel_){
   return `<option value="">Elegir actividad…</option>` + e.actividades.map(a => `<option ${a===sel_?'selected':''}>${esc(a)}</option>`).join('') + `<option value="${OTROS}" ${sel_===OTROS?'selected':''}>Otros (no se pudo trabajar)</option>`;
 }
-function parteHtml(tid, i, pt, n, e){
-  const otros = pt.actividad === OTROS;
+function otrosHtml(tid, i, pt, ph){
+  return `<div class="otros"><label class="f">Motivo</label>
+    <select data-mot="${esc(tid)}|${i}" ${soloLectura?'disabled':''}><option value="">Elegir motivo…</option>${ctx.motivos.map(m=>`<option ${m===pt.motivo?'selected':''}>${esc(m)}</option>`).join('')}</select>
+    <input type="text" data-com="${esc(tid)}|${i}" maxlength="300" placeholder="${esc(ph)}" value="${esc(pt.comentario)}" ${soloLectura?'disabled':''}></div>`;
+}
+function parteHtml(tid, i, pt, l, e){
+  const media = l.estado === 'media', n = l.partes.length;
+  if (media && i === 1) return `<div class="parte"><div class="hdl">Otros · ½ día restante</div>${otrosHtml(tid, i, pt, '¿Qué hizo en el medio día restante? (obligatorio)')}</div>`;
   return `<div class="parte">
-    ${n>1 ? `<div class="hdl">Actividad ${i+1} (½ día)</div>` : ''}
+    ${media ? '<div class="hdl">Actividad · ½ día</div>' : (n>1 ? `<div class="hdl">Actividad ${i+1} (½ día)</div>` : '')}
     <select data-act="${esc(tid)}|${i}" ${soloLectura?'disabled':''}>${opcionesActividad(e, pt.actividad)}</select>
-    ${otros ? `<div class="otros"><label class="f">Motivo</label>
-      <select data-mot="${esc(tid)}|${i}" ${soloLectura?'disabled':''}><option value="">Elegir motivo…</option>${ctx.motivos.map(m=>`<option ${m===pt.motivo?'selected':''}>${esc(m)}</option>`).join('')}</select>
-      <input type="text" data-com="${esc(tid)}|${i}" maxlength="300" placeholder="Comentario (obligatorio). Ej: llovió, no se pudo excavar" value="${esc(pt.comentario)}" ${soloLectura?'disabled':''}></div>` : ''}
+    ${pt.actividad === OTROS ? otrosHtml(tid, i, pt, 'Comentario (obligatorio). Ej: llovió, no se pudo excavar') : ''}
   </div>`;
 }
 function lineaCompleta(l){
   if (l.estado === 'ausente') return true;
   return l.partes.every(pt => pt.actividad && (pt.actividad !== OTROS || (pt.motivo && pt.comentario.trim())));
 }
+function tarjeta(tid, e){
+  const l = lineas[tid], n = nombres[tid] || { nombre:tid, cargo:'' }, falta = !lineaCompleta(l);
+  const dividido = l.estado === 'completa' && l.partes.length === 2;
+  return `<div class="w ${falta?'falta':''}" data-w="${esc(tid)}">
+    <div class="top"><span class="nm">${esc(n.nombre)}</span><span class="cg">${esc(n.cargo || 'Sin cargo')}</span></div>
+    <div class="seg">
+      <button data-est="completa" class="${l.estado==='completa'?'on':''}" ${soloLectura?'disabled':''}>Jornada completa</button>
+      <button data-est="media" class="${l.estado==='media'?'on':''}" ${soloLectura?'disabled':''}>Media jornada</button>
+      <button data-est="ausente" class="${l.estado==='ausente'?'on aus':''}" ${soloLectura?'disabled':''}>Ausente</button>
+    </div>
+    ${l.estado==='ausente' ? '' : l.partes.map((pt,i) => parteHtml(tid,i,pt,l,e)).join('')}
+    ${l.estado==='completa' && !soloLectura ? `<button class="lnk" data-div="${esc(tid)}">${dividido?'Quitar división (1 sola actividad)':'Dividir el día en 2 actividades'}</button>` : ''}
+    ${soloLectura ? '' : `<button class="lnk lib" data-lib="${esc(tid)}">Liberar (sacar de ${esc(e.nombre)})</button>`}
+  </div>`;
+}
 function pintar(){
   const p = proyActual(), e = espActual(); if (!p || !e) return;
+  const claimed = Object.keys(lineas);
+  const libres = p.trabajadores.filter(t => !lineas[t.id] && !ocupados[t.id]);
+  const bloq = p.trabajadores.filter(t => !lineas[t.id] && ocupados[t.id]);
   if (!p.trabajadores.length) { $('lista').innerHTML = '<div class="empty">Este proyecto no tiene trabajadores cargados todavía.</div>'; actualizarResumenVivo(); return; }
-  $('lista').innerHTML = p.trabajadores.map(t => {
-    const l = lineas[t.id]; const falta = !lineaCompleta(l);
-    const dividido = l.estado === 'completa' && l.partes.length === 2;
-    return `<div class="w ${l.nuevo?'nuevo':''} ${falta?'falta':''}" data-w="${esc(t.id)}">
-      <div class="top"><span class="nm">${esc(t.nombre)}</span><span class="cg">${esc(t.cargo || 'Sin cargo')}</span>${l.nuevo?'<span class="nv">NUEVO · ASIGNAR</span>':''}</div>
-      <div class="seg">
-        <button data-est="completa" class="${l.estado==='completa'?'on':''}" ${soloLectura?'disabled':''}>Jornada completa</button>
-        <button data-est="media" class="${l.estado==='media'?'on':''}" ${soloLectura?'disabled':''}>Media jornada</button>
-        <button data-est="ausente" class="${l.estado==='ausente'?'on aus':''}" ${soloLectura?'disabled':''}>Ausente</button>
-      </div>
-      ${l.estado==='ausente' ? '' : l.partes.map((pt,i) => parteHtml(t.id,i,pt,l.partes.length,e)).join('')}
-      ${l.estado==='completa' && !soloLectura ? `<button class="lnk" data-div="${esc(t.id)}">${dividido?'Quitar división (1 sola actividad)':'Dividir el día en 2 actividades'}</button>` : ''}
-    </div>`; }).join('');
+  const grupos = [];
+  const porAsignar = claimed.filter(t => lineas[t].estado !== 'ausente' && !lineas[t].partes[0].actividad);
+  if (porAsignar.length) grupos.push(['Por asignar', porAsignar, 'pend']);
+  e.actividades.forEach(a => { const ids = claimed.filter(t => lineas[t].estado !== 'ausente' && lineas[t].partes[0].actividad === a); if (ids.length) grupos.push([a, ids]); });
+  const otros = claimed.filter(t => lineas[t].estado !== 'ausente' && lineas[t].partes[0].actividad === OTROS);
+  if (otros.length) grupos.push(['Otros (no se pudo trabajar)', otros]);
+  const aus = claimed.filter(t => lineas[t].estado === 'ausente');
+  if (aus.length) grupos.push(['Ausentes', aus]);
+  let h = '';
+  if (!claimed.length && !soloLectura) h += `<div class="empty">Tu cuadrilla de <b>${esc(e.nombre)}</b> está vacía hoy.<br>Agrega a las personas que trabajarán en esta especialidad.</div>`;
+  h += grupos.map(([nom, ids, cls]) => `<div class="grp ${cls||''}"><h4>${esc(nom)} <span>${ids.length}</span></h4>${ids.map(t => tarjeta(t, e)).join('')}</div>`).join('');
+  if (libres.length && !soloLectura) h += `<div class="grp disp"><h4>Disponibles <span>${libres.length}</span></h4>
+    ${libres.map(t => `<div class="dsp"><div><b>${esc(t.nombre)}</b><small>${esc(t.cargo || 'Sin cargo')}</small></div><button class="btn ghost" data-add="${esc(t.id)}">Agregar</button></div>`).join('')}
+    ${libres.length > 1 ? '<button class="lnk" data-addall="1">Agregar a todos</button>' : ''}</div>`;
+  if (bloq.length) h += `<div class="grp bloq"><h4>En otra especialidad hoy <span>${bloq.length}</span></h4>
+    ${bloq.map(t => `<div class="dsp"><div><b>${esc(t.nombre)}</b><small>${esc(t.cargo || 'Sin cargo')}</small></div><span class="lock">🔒 ${esc(ocupados[t.id].nombre)}</span></div>`).join('')}
+    <p class="hint">Para usarlos aquí, primero libéralos en esa especialidad.</p></div>`;
+  $('lista').innerHTML = h;
   actualizarResumenVivo();
 }
 $('lista').addEventListener('click', ev => {
-  const w = ev.target.closest('[data-w]'); if (!w || soloLectura) return; const tid = w.dataset.w, l = lineas[tid];
+  if (soloLectura) return;
+  const add = ev.target.closest('[data-add]');
+  if (add){ lineas[add.dataset.add] = lineaVacia(); pintar(); return; }
+  if (ev.target.closest('[data-addall]')){
+    proyActual().trabajadores.forEach(t => { if (!lineas[t.id] && !ocupados[t.id]) lineas[t.id] = lineaVacia(); }); pintar(); return;
+  }
+  const w = ev.target.closest('[data-w]'); if (!w) return; const tid = w.dataset.w, l = lineas[tid];
+  if (ev.target.closest('[data-lib]')){ delete lineas[tid]; pintar(); return; }
   const b = ev.target.closest('[data-est]');
   if (b){
-    l.estado = b.dataset.est; l.nuevo = false; l.copiado = false;
+    l.estado = b.dataset.est; l.copiado = false;
     if (l.estado === 'ausente') l.partes = [];
-    else if (l.estado === 'media') l.partes = [l.partes[0] || { actividad:'', motivo:'', comentario:'' }];
-    else if (!l.partes.length) l.partes = [{ actividad:'', motivo:'', comentario:'' }];
+    else if (l.estado === 'media') { const a = l.partes[0] && l.partes[0].actividad !== OTROS ? l.partes[0] : parteVacia(); l.partes = [a, (l.partes[1] && l.partes[1].actividad === OTROS) ? l.partes[1] : parteOtros()]; }
+    else l.partes = l.partes.length ? [l.partes[0]] : [parteVacia()];
     pintar(); return;
   }
   if (ev.target.closest('[data-div]')){
-    l.partes = l.partes.length === 2 ? [l.partes[0]] : [l.partes[0], { actividad:'', motivo:'', comentario:'' }]; pintar();
+    l.partes = l.partes.length === 2 ? [l.partes[0]] : [l.partes[0], parteVacia()]; pintar();
   }
 });
 $('lista').addEventListener('change', ev => {
   const t = ev.target; const w = t.closest('[data-w]'); if (!w) return; const l = lineas[w.dataset.w];
-  if (t.dataset.act){ const [,i] = t.dataset.act.split('|'); l.partes[+i].actividad = t.value; l.nuevo = false; l.copiado = false; if (t.value !== OTROS){ l.partes[+i].motivo=''; l.partes[+i].comentario=''; } pintar(); }
+  if (t.dataset.act){ const [,i] = t.dataset.act.split('|'); l.partes[+i].actividad = t.value; l.copiado = false; if (t.value !== OTROS){ l.partes[+i].motivo=''; l.partes[+i].comentario=''; } pintar(); }
   else if (t.dataset.mot){ const [,i] = t.dataset.mot.split('|'); l.partes[+i].motivo = t.value; actualizarResumenVivo(); }
 });
 $('lista').addEventListener('input', ev => {
@@ -397,12 +460,13 @@ $('lista').addEventListener('input', ev => {
   lineas[w.dataset.w].partes[+i].comentario = t.value; actualizarResumenVivo();
 });
 
-function hdDeLinea(l){ return l.estado === 'completa' ? 1 : (l.estado === 'media' ? 0.5 : 0); }
+function hdDeLinea(l){ return l.estado === 'ausente' ? 0 : 1; }   // media jornada = 1 hombre-día (½ actividad + ½ "Otros" justificado)
 function actualizarResumenVivo(){
   const p = proyActual(); if (!p) return;
   const porAct = {}; let tot = 0, ok = true, aus = 0, sinAsignar = 0;
-  p.trabajadores.forEach(t => {
-    const l = lineas[t.id]; if (!l) return;
+  const ids = Object.keys(lineas);
+  ids.forEach(tid => {
+    const l = lineas[tid];
     if (!lineaCompleta(l)) { ok = false; sinAsignar++; }
     if (l.estado === 'ausente') { aus++; return; }
     l.partes.forEach(pt => { if (!pt.actividad) return; const hd = hdDeLinea(l) / l.partes.length; const o = porAct[pt.actividad] || (porAct[pt.actividad] = { n:0, hd:0 }); o.n++; o.hd += hd; tot += hd; });
@@ -412,18 +476,18 @@ function actualizarResumenVivo(){
   $('resumenVivo').innerHTML = `<h4>Resumen del día</h4><table><thead><tr><th>Actividad</th><th class="n">Personas</th><th class="n">HD</th></tr></thead><tbody>
     ${filas.map(([a,o]) => `<tr><td>${a===OTROS?'Otros (no se pudo trabajar)':esc(a)}</td><td class="n">${o.n}</td><td class="n">${fmtHd(o.hd)}</td></tr>`).join('')}
     ${aus ? `<tr><td>Ausentes</td><td class="n">${aus}</td><td class="n">0</td></tr>` : ''}
-    <tr class="tot"><td>Total cuadrilla</td><td class="n">${p.trabajadores.length}</td><td class="n">${fmtHd(tot)}</td></tr></tbody></table>`;
+    <tr class="tot"><td>Total cuadrilla</td><td class="n">${ids.length}</td><td class="n">${fmtHd(tot)}</td></tr></tbody></table>`;
   $('dkHd').textContent = fmtHd(tot);
-  const puede = puedeRegistrarAqui() && !soloLectura && p.trabajadores.length > 0;
+  const vacia = ids.length === 0;
+  const puede = puedeRegistrarAqui() && !soloLectura && p.trabajadores.length > 0 && (!vacia || !!guardadoInfo);
   $('dock').classList.toggle('hide', !puedeRegistrarAqui() || $('t-reg').classList.contains('hide'));
   $('btnGuardar').disabled = !(puede && ok);
-  $('btnGuardar').textContent = ok ? (guardadoInfo ? 'Guardar cambios' : 'Confirmar y guardar') : `Faltan ${sinAsignar} por completar`;
+  $('btnGuardar').textContent = !ok ? `Faltan ${sinAsignar} por completar` : (vacia ? (guardadoInfo ? 'Guardar (cuadrilla vacía)' : 'Agrega personas a tu cuadrilla') : (guardadoInfo ? 'Guardar cambios' : 'Confirmar y guardar'));
 }
 
 function armarPayload(){
-  const p = proyActual();
   return { proyecto: sel.proy, especialidad: sel.esp, fecha: sel.fecha,
-    lineas: p.trabajadores.map(t => { const l = lineas[t.id]; return { trabajadorId:t.id, estado:l.estado,
+    lineas: Object.keys(lineas).map(tid => { const l = lineas[tid]; return { trabajadorId:tid, estado:l.estado,
       partes: l.estado==='ausente' ? [] : l.partes.map(x => ({ actividad:x.actividad, motivo: x.actividad===OTROS?x.motivo:'', comentario: x.actividad===OTROS?x.comentario.trim():'' })) }; }) };
 }
 $('btnGuardar').addEventListener('click', async () => {
@@ -527,7 +591,7 @@ function dosToques(clave, btn, textoOk, accion){
   setTimeout(() => { if (admConfirmar === clave){ admConfirmar = null; if (btn.isConnected){ btn.textContent = t; btn.classList.remove('peligro'); } } }, 3000);
 }
 function pintarAdmin(){
-  const secs = [['trab','Trabajadores'],['act','Actividades'],['acc','Accesos']];
+  const secs = [['trab','Trabajadores'],['act','Actividades'],['acc','Accesos'],['proy','Proyectos']];
   const p = cfgAdmin.proyectos[admProy];
   $('admOut').innerHTML = `
     <div class="card"><label class="f" for="admProy">Proyecto</label>
@@ -536,7 +600,7 @@ function pintarAdmin(){
     <div id="admCuerpo"></div>`;
   $('admProy').onchange = () => { admProy = +$('admProy').value; admEsp = 0; admEditando = null; pintarAdmin(); };
   document.querySelectorAll('.pills [data-sec]').forEach(b => b.onclick = () => { admSec = b.dataset.sec; admEditando = null; pintarAdmin(); });
-  if (admSec === 'trab') pintarTrabajadores(p); else if (admSec === 'act') pintarActividades(p); else pintarAccesosAdm(p);
+  if (admSec === 'trab') pintarTrabajadores(p); else if (admSec === 'act') pintarActividades(p); else if (admSec === 'proy') pintarProyectos(); else pintarAccesosAdm(p);
 }
 
 // ── Trabajadores ──
@@ -609,13 +673,27 @@ function pintarActividades(p){
   $('admCuerpo').innerHTML = `
     <div class="card"><label class="f" for="admEsp">Especialidad</label>
       <select id="admEsp">${p.especialidades.map((x,i) => `<option value="${i}" ${i===admEsp?'selected':''}>${esc(x.nombre)} (${(x.actividades||[]).length})</option>`).join('')}</select></div>
-    <div class="card"><h3>Agregar actividad</h3>
+    <div class="card"><h3>Agregar especialidad</h3>
+      <p class="help">Una especialidad es un frente de trabajo (ej: Muros de contención). Cada una tiene sus propias actividades.</p>
+      <input type="text" id="nEsp" placeholder="Ej: Muros de contención" maxlength="40" autocomplete="off">
+      <button class="btn ghost" id="btnAddEsp" style="width:100%;margin-top:12px">Agregar especialidad</button></div>
+    <div class="card"><h3>Agregar actividad a ${esc(e.nombre)}</h3>
       <input type="text" id="nAct" placeholder="Ej: Excavación de zanja" maxlength="60" autocomplete="off">
       <button class="btn red" id="btnAddAct" style="width:100%;margin-top:12px">Agregar actividad</button></div>
     <div class="card"><h3>Actividades de ${esc(e.nombre)}</h3>
       <p class="help">Son las opciones que ve el jefe de terreno al asignar a cada trabajador. “Otros (no se pudo trabajar)” siempre está disponible.</p>
-      ${e.actividades.length ? e.actividades.map((a,i) => `<div class="acc"><div><b>${esc(a)}</b></div><div class="col"><button class="lnk" data-up="${i}" ${i===0?'disabled':''}>↑</button><button class="lnk" data-qa="${i}">Quitar</button></div></div>`).join('') : '<p class="help">Esta especialidad aún no tiene actividades.</p>'}</div>`;
+      ${e.actividades.length ? e.actividades.map((a,i) => `<div class="acc"><div><b>${esc(a)}</b></div><div class="col"><button class="lnk" data-up="${i}" ${i===0?'disabled':''}>↑</button><button class="lnk" data-qa="${i}">Quitar</button></div></div>`).join('') : '<p class="help">Esta especialidad aún no tiene actividades.</p>'}</div>
+    <div class="card"><h3>Quitar especialidad</h3><p class="help">Solo se puede quitar si todavía no tiene registros. Si ya se usó, el sistema no lo permite para no perder el historial.</p>
+      <button class="btn ghost" id="btnQuitarEsp" style="width:100%">Quitar ${esc(e.nombre)}</button></div>`;
   $('admEsp').onchange = () => { admEsp = +$('admEsp').value; pintarAdmin(); };
+  $('btnAddEsp').onclick = async () => {
+    const nombre = $('nEsp').value.trim().replace(/\s+/g,' ');
+    if (nombre.length < 3) { toast('Escribe el nombre de la especialidad'); return; }
+    if (p.especialidades.some(x => x.nombre.toLowerCase() === nombre.toLowerCase())) { toast('Esa especialidad ya existe'); return; }
+    let id = slug(nombre) || 'esp', k = 2; while (p.especialidades.some(x => x.id === id)) id = slug(nombre) + '-' + k++;
+    p.especialidades.push({ id, nombre, actividades: [] }); admEsp = p.especialidades.length - 1;
+    if (await guardarCfg('Especialidad agregada ✔ Ahora agrégale sus actividades')) pintarAdmin();
+  };
   $('btnAddAct').onclick = async () => {
     const a = $('nAct').value.trim().replace(/\s+/g,' ');
     if (a.length < 3) { toast('Escribe el nombre de la actividad'); return; }
@@ -623,8 +701,39 @@ function pintarActividades(p){
     if (e.actividades.some(x => x.toLowerCase() === a.toLowerCase())) { toast('Esa actividad ya existe'); return; }
     e.actividades.push(a); if (await guardarCfg('Actividad agregada ✔')) pintarAdmin();
   };
+  $('btnQuitarEsp').onclick = () => dosToques('qesp', $('btnQuitarEsp'), '¿Seguro? Toca de nuevo', async () => {
+    if (p.especialidades.length <= 1) { toast('El proyecto debe tener al menos una especialidad'); return; }
+    p.especialidades.splice(admEsp, 1); admEsp = 0; if (await guardarCfg('Especialidad quitada ✔')) pintarAdmin(); });
   document.querySelectorAll('[data-up]').forEach(b => b.onclick = async () => { const i = +b.dataset.up; [e.actividades[i-1], e.actividades[i]] = [e.actividades[i], e.actividades[i-1]]; if (await guardarCfg('Orden actualizado ✔')) pintarAdmin(); });
   document.querySelectorAll('[data-qa]').forEach(b => b.onclick = () => dosToques('qa' + b.dataset.qa, b, '¿Quitar?', async () => { e.actividades.splice(+b.dataset.qa, 1); if (await guardarCfg('Actividad quitada ✔')) pintarAdmin(); }));
+}
+
+// ── Proyectos ──
+function pintarProyectos(){
+  $('admCuerpo').innerHTML = `
+    <div class="card"><h3>Agregar proyecto</h3>
+      <label class="f" for="nPNom">Nombre del proyecto</label><input type="text" id="nPNom" placeholder="Ej: Mirador El Roble" maxlength="60" autocomplete="off">
+      <label class="f" for="nPCc" style="margin-top:10px">Centro de costo en Buk (opcional)</label>
+      <input type="text" id="nPCc" placeholder="Ej: CG030" maxlength="40" autocomplete="off">
+      <p class="help">Si lo llenas, la cuadrilla se carga sola desde Buk con el personal activo de ese centro de costo (termina en 6301 = urbanización). Si lo dejas vacío, agregas los trabajadores a mano. Puede tener varios códigos separados por coma.</p>
+      <button class="btn red" id="btnAddProy" style="width:100%;margin-top:6px">Agregar proyecto</button></div>
+    <div class="card"><h3>Proyectos (${cfgAdmin.proyectos.length})</h3>
+      <p class="help">Se crean con las 4 especialidades estándar (Alcantarillado, Aguas lluvias, Pavimentación y Agua potable); puedes agregar más en la pestaña Actividades. Después hay que darle acceso a los jefes en la pestaña Accesos.</p>
+      ${cfgAdmin.proyectos.map((x,i) => `<div class="acc"><div><b>${esc(x.nombre)}</b><br><span>${x.especialidades.length} especialidades · ${x.trabajadores.filter(t=>t.activo!==false).length} trabajadores${x.buk && x.buk.prefijos.length ? ' · Buk ' + esc(x.buk.prefijos.join(', ')) : ''}</span></div><button class="lnk" data-qp="${i}">Quitar</button></div>`).join('')}</div>`;
+  $('btnAddProy').onclick = async () => {
+    const nombre = $('nPNom').value.trim().replace(/\s+/g,' ');
+    if (nombre.length < 3) { toast('Escribe el nombre del proyecto'); return; }
+    if (cfgAdmin.proyectos.some(x => x.nombre.toLowerCase() === nombre.toLowerCase())) { toast('Ya existe un proyecto con ese nombre'); return; }
+    let id = slug(nombre) || 'proyecto', k = 2; while (cfgAdmin.proyectos.some(x => x.id === id)) id = slug(nombre) + '-' + k++;
+    const prefijos = $('nPCc').value.split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
+    const np = { id, nombre, cc: '', especialidades: ['Alcantarillado','Aguas lluvias','Pavimentación','Agua potable'].map(n => ({ id: slug(n), nombre: n, actividades: [] })), trabajadores: [] };
+    if (prefijos.length) np.buk = { prefijos, terminaEn: '6301' };
+    cfgAdmin.proyectos.push(np); admProy = cfgAdmin.proyectos.length - 1; admSec = 'act'; admEsp = 0;
+    if (await guardarCfg('Proyecto agregado ✔ Ahora define las actividades de cada especialidad')) pintarAdmin();
+  };
+  document.querySelectorAll('[data-qp]').forEach(b => b.onclick = () => dosToques('qp' + b.dataset.qp, b, '¿Quitar?', async () => {
+    if (cfgAdmin.proyectos.length <= 1) { toast('Debe quedar al menos un proyecto'); return; }
+    cfgAdmin.proyectos.splice(+b.dataset.qp, 1); admProy = 0; if (await guardarCfg('Proyecto quitado ✔')) pintarAdmin(); }));
 }
 
 // ── Accesos ──
