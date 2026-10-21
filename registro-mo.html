@@ -127,6 +127,13 @@ tr.tot td{font-weight:800;border-bottom:0}
 .lock{font-size:12px;font-weight:700;color:var(--mute);text-align:right}
 .hint{font-size:12px;color:var(--mute);margin:4px 2px}
 .lnk.lib{color:var(--mute);font-weight:600}
+
+.tg{width:24px;height:24px;border:1.5px solid var(--bord);border-radius:6px;background:#fff;color:var(--ink);font:700 15px/1 var(--font);margin-right:8px;cursor:pointer;vertical-align:middle;padding:0}
+tr.gr td:first-child{font-weight:600}
+tr.sub td{font-size:13px;color:var(--ink);background:var(--page);border-top:1px dashed var(--bord)}
+tr.sub td:first-child{padding-left:42px}
+.npers{font-size:11px;font-weight:600;color:var(--mute);margin-left:4px}
+.cg2{font-size:11px;font-weight:600;color:var(--mute);background:#fff;border:1px solid var(--bord);border-radius:99px;padding:1px 8px;margin-left:4px}
 </style>
 </head>
 <body>
@@ -546,7 +553,23 @@ function pintarResumen(){
   const dias = new Set(f.map(x => x.fecha)).size;
   const agrupa = (arr, key) => { const m = {}; arr.forEach(x => { const k = key(x); const o = m[k] || (m[k] = { hd:0, n:0 }); o.hd += x.hd; o.n++; }); return Object.entries(m); };
   let h = `<div class="kpis"><div class="kpi"><b>${fmtHd(sum(f,x=>x.hd))}</b><span>HD totales</span></div><div class="kpi"><b>${fmtHd(sum(prod,x=>x.hd))}</b><span>HD en partidas</span></div><div class="kpi"><b>${fmtHd(sum(otros,x=>x.hd))}</b><span>HD en “Otros”</span></div></div>`;
-  h += `<div class="sum"><h4>Por actividad</h4><div class="scroll-x"><table><thead><tr><th>Proyecto · Especialidad · Actividad</th><th class="n">HD</th></tr></thead><tbody>` +
+  // Por actividad, con desglose desplegable de las personas (+ / −)
+  const grupos = {};
+  prod.forEach(x => {
+    const k = `${x.proyecto} · ${x.especialidad} · ${x.actividad}`;
+    const g = grupos[k] || (grupos[k] = { hd:0, personas:{} });
+    g.hd += x.hd;
+    const pk = x.trabajador + '|' + x.cargo, pe = g.personas[pk] || (g.personas[pk] = { nombre:x.trabajador, cargo:x.cargo, hd:0, dias:new Set() });
+    pe.hd += x.hd; pe.dias.add(x.fecha);
+  });
+  const claves = Object.keys(grupos).sort((a,b) => a.localeCompare(b));
+  const multiDia = dias > 1;
+  h += `<div class="sum"><h4>Por actividad <button class="lnk" id="btnExpTodo" style="float:right;text-transform:none;letter-spacing:0;font-size:12px">Desplegar todo</button></h4><div class="scroll-x"><table id="tblAct"><thead><tr><th>Proyecto · Especialidad · Actividad</th><th class="n">HD</th></tr></thead><tbody>` +
+    claves.map((k,i) => {
+      const g = grupos[k], pers = Object.values(g.personas).sort((a,b) => a.nombre.localeCompare(b.nombre));
+      return `<tr class="gr"><td><button class="tg" data-tg="${i}" aria-expanded="false" aria-label="Ver personas">+</button>${esc(k)} <span class="npers">${pers.length} ${pers.length === 1 ? 'persona' : 'personas'}</span></td><td class="n">${fmtHd(g.hd)}</td></tr>` +
+        pers.map(pe => `<tr class="sub hide" data-g="${i}"><td>${esc(pe.nombre)} <span class="cg2">${esc(pe.cargo || 'Sin cargo')}</span>${multiDia ? ` <span class="npers">${pe.dias.size} ${pe.dias.size === 1 ? 'día' : 'días'}</span>` : ''}</td><td class="n">${fmtHd(pe.hd)}</td></tr>`).join('');
+    }).join('') + `<tr class="tot"><td>Total en partidas</td><td class="n">${fmtHd(sum(prod,x=>x.hd))}</td></tr></tbody></table></div></div>`;
     agrupa(prod, x => `${x.proyecto} · ${x.especialidad} · ${x.actividad}`).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,o]) => `<tr><td>${esc(k)}</td><td class="n">${fmtHd(o.hd)}</td></tr>`).join('') + `<tr class="tot"><td>Total en partidas</td><td class="n">${fmtHd(sum(prod,x=>x.hd))}</td></tr></tbody></table></div></div>`;
   if (otros.length) h += `<div class="sum"><h4>“Otros”: no se pudo trabajar</h4><div class="scroll-x"><table><thead><tr><th>Fecha</th><th>Motivo / comentario</th><th class="n">HD</th></tr></thead><tbody>` +
     otros.map(x => `<tr><td>${fmtFecha(x.fecha)}</td><td><b>${esc(x.motivo)}</b> · ${esc(x.trabajador)}<br><span style="color:var(--mute)">${esc(x.comentario)}</span></td><td class="n">${fmtHd(x.hd)}</td></tr>`).join('') + `</tbody></table></div></div>`;
@@ -554,6 +577,22 @@ function pintarResumen(){
     [...new Set(f.map(x=>x.fecha))].sort().map(d => `<tr><td>${fmtFecha(d)}</td><td class="n">${fmtHd(sum(f.filter(x=>x.fecha===d),x=>x.hd))}</td><td class="n">${aus.filter(x=>x.fecha===d).length}</td></tr>`).join('') + `</tbody></table></div>`;
   $('resOut').innerHTML = h;
 }
+$('resOut').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-tg]');
+  if (b) {
+    const abrir = b.getAttribute('aria-expanded') !== 'true';
+    b.setAttribute('aria-expanded', abrir); b.textContent = abrir ? '−' : '+';
+    document.querySelectorAll(`#tblAct tr.sub[data-g="${b.dataset.tg}"]`).forEach(r => r.classList.toggle('hide', !abrir));
+    return;
+  }
+  if (ev.target.id === 'btnExpTodo') {
+    const botones = [...document.querySelectorAll('#tblAct [data-tg]')];
+    const abrir = botones.some(x => x.getAttribute('aria-expanded') !== 'true');
+    botones.forEach(x => { x.setAttribute('aria-expanded', abrir); x.textContent = abrir ? '−' : '+'; });
+    document.querySelectorAll('#tblAct tr.sub').forEach(r => r.classList.toggle('hide', !abrir));
+    ev.target.textContent = abrir ? 'Contraer todo' : 'Desplegar todo';
+  }
+});
 $('btnCsv').addEventListener('click', () => {
   const cab = ['Fecha','Proyecto','Especialidad','Trabajador','Cargo','Estado','Actividad','Motivo (Otros)','Comentario','HD','Registrado por'];
   const cel = v => { v = String(v ?? ''); return /[";\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; };
