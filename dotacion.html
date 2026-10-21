@@ -1300,6 +1300,44 @@ function refrescarDesdeExcel(x, w){
   const igual = n.fc === x.fc && n.fs === x.fs && n.status === x.status && n.motivo === x.motivo && n.sigueDescartaFs === x.sigueDescartaFs;
   return igual ? x : n;
 }
+// Una persona debe aparecer UNA sola vez. Duplicados que se generaban:
+//  - Alguien cargado antes como "proyectado" (contrato a plazo) que luego aparece en el Excel de BUK:
+//    quedaban las dos filas y se sumaba doble en los costos. Se une en la fila de BUK; si BUK no trae
+//    término y el proyectado sí, se conserva ese término (fecha y motivo).
+//  - Filas con exactamente el mismo id (RUT + centro + cargo): se deja una, la que tenga trabajo manual.
+function limpiarDuplicados(lista){
+  let n = 0;
+  const porRut = new Map();
+  lista.forEach(x => { if (!porRut.has(x.rutlimpio)) porRut.set(x.rutlimpio, []); porRut.get(x.rutlimpio).push(x); });
+  const quitar = new Set(), reemplazo = new Map();
+  porRut.forEach(grupo => {
+    if (grupo.length < 2) return;
+    const reales = grupo.filter(x => x.source !== 'proyectado');
+    const proy = grupo.filter(x => x.source === 'proyectado');
+    if (reales.length && proy.length) {
+      let destino = reales.find(x => x.source === 'excel') || reales[0];
+      proy.forEach(pr => {
+        if (!tieneMotivo(destino) && !destino.fs && pr.status === 'finiquitado' && pr.fs) {
+          destino = { ...destino, status: 'finiquitado', fs: pr.fs, motivo: pr.motivo || 'vencimiento_plazo' };
+          reemplazo.set(grupo.find(x => x.source === 'excel') || reales[0], destino);
+        }
+        quitar.add(pr); n++;
+      });
+    }
+    // mismo id repetido
+    const vistos = new Map();
+    grupo.forEach(x => {
+      if (quitar.has(x)) return;
+      const previo = vistos.get(x.id);
+      if (!previo) { vistos.set(x.id, x); return; }
+      const mejor = (tieneTrabajoManual(x) && !tieneTrabajoManual(previo)) ? x : previo;
+      quitar.add(mejor === x ? previo : x); vistos.set(x.id, mejor); n++;
+    });
+  });
+  if (!n) return { lista, n: 0 };
+  const out = lista.filter(x => !quitar.has(x)).map(x => reemplazo.get(x) || x);
+  return { lista: out, n };
+}
 function combinarConExcel(actuales, desdeExcel){
   let lista = actuales.slice();
   const r = { nuevos: 0, actualizados: 0, finiquitosAuto: 0, unificados: 0, duplicadasConservadas: 0 };
@@ -1329,6 +1367,8 @@ function combinarConExcel(actuales, desdeExcel){
       if (nuevo.status === 'finiquitado' && destino.status !== 'finiquitado') r.finiquitosAuto++;
     }
   });
+  const lim = limpiarDuplicados(lista);
+  lista = lim.lista; r.unificados += lim.n;
   return { lista, ...r };
 }
 function verificarAreaExcel(filas){
@@ -1513,20 +1553,71 @@ async function cargarDesdeServidor() {
     return null;
   }
 }
+// Versión de los datos que esta pantalla tiene. El servidor solo acepta guardar si sigue siendo la
+// última: así nadie pisa sin darse cuenta lo que otra persona guardó antes.
+let dotVersion = 0;
+function aplicarDatosServidor(d){
+  workers = d.workers; meta = d.meta || meta;
+  descuentos = Array.isArray(d.descuentos) ? d.descuentos : [];
+  dotVersion = Number(d.version) || 0;
+  const lim = limpiarDuplicados(workers); workers = lim.lista;
+  asegurarCuentas(workers.map(w => w.cc));
+  return lim.n;
+}
+async function recargarDesdeServidor(){
+  const d = await cargarDesdeServidor();
+  if (!d || !Array.isArray(d.workers)) return false;
+  aplicarDatosServidor(d);
+  renderMesRealSelect(); renderAll();
+  ocultarAvisoNuevaVersion();
+  return true;
+}
+// Devuelve true si guardó, false si no (conflicto o error).
 async function guardarEnServidor(showToast) {
   try {
     const res = await dotFetch(`/dotacion`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workers, meta, descuentos, email: usuarioActual ? usuarioActual.username.toLowerCase() : '' }),
+      body: JSON.stringify({ workers, meta, descuentos, version: dotVersion, email: usuarioActual ? usuarioActual.username.toLowerCase() : '' }),
     });
+    if (res.status === 409) {
+      await recargarDesdeServidor();
+      toast('Otra persona guardó cambios antes que tú. Se actualizó la pantalla con lo último: revisa y repite tu cambio si hace falta.', 7000);
+      return false;
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const j = await res.json().catch(() => ({}));
+    if (j && j.version !== undefined) dotVersion = Number(j.version) || dotVersion;
+    ocultarAvisoNuevaVersion();
     if (showToast) toast('Cambios guardados en el servidor');
+    return true;
   } catch(e) {
     console.error('guardarEnServidor error:', e);
     toast('No se pudo guardar en el servidor (' + e.message + '). Usa "Descargar respaldo (JSON)" para no perder el trabajo.');
+    return false;
   }
 }
+// Aviso cuando otra persona guardó mientras esta pantalla seguía abierta.
+function ocultarAvisoNuevaVersion(){ const b = document.getElementById('aviso-version'); if (b) b.style.display = 'none'; }
+async function revisarNuevaVersion(){
+  try {
+    const res = await dotFetch('/dotacion/version');
+    if (!res.ok) return;
+    const j = await res.json();
+    if (Number(j.version) > dotVersion) {
+      let b = document.getElementById('aviso-version');
+      if (!b) {
+        b = document.createElement('div'); b.id = 'aviso-version';
+        b.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:9999;background:#1b1b1b;color:#fff;padding:10px 14px;border-radius:10px;font-size:13px;box-shadow:0 4px 18px rgba(0,0,0,.35);display:flex;gap:12px;align-items:center;max-width:92vw';
+        b.innerHTML = '<span>Otra persona guardó cambios en esta obra.</span><button class="btn btn-primary btn-sm" onclick="recargarDesdeServidor()">Actualizar</button>';
+        document.body.appendChild(b);
+      }
+      b.style.display = 'flex';
+    }
+  } catch(e) {}
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && typeof OBRA !== 'undefined' && OBRA.id) revisarNuevaVersion(); });
+setInterval(() => { if (!document.hidden && typeof OBRA !== 'undefined' && OBRA.id && document.getElementById('main-wrap').style.display === 'block') revisarNuevaVersion(); }, 90000);
 
 // Trae datos frescos del Excel y los combina con lo que ya está guardado:
 // las personas que ya tienen una salida confirmada a mano (motivo/estado)
@@ -1542,7 +1633,12 @@ async function sincronizarConBUK(silencioso) {
     const r = combinarConExcel(workers, desdeExcel);
     workers = r.lista;
     asegurarCuentas(workers.map(w => w.cc));
-    await guardarEnServidor(false);
+    if (!(await guardarEnServidor(false))) {
+      // Alguien guardó a la vez: ya se recargó lo suyo; se vuelve a combinar con el Excel y se guarda de nuevo.
+      const r2 = combinarConExcel(workers, desdeExcel);
+      workers = r2.lista;
+      await guardarEnServidor(false);
+    }
     renderMesRealSelect();
     renderAll();
     const detalle = [
@@ -1890,12 +1986,12 @@ const CARGOS_LIST = ["Administrador de Obra","Administrativo RRHH","Albañil","A
 let pendingExitId = null;
 let costoAutoFilled = false;
 
-function toast(msg){
+function toast(msg, ms){
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(t._timer);
-  t._timer = setTimeout(()=> t.classList.remove('show'), 2200);
+  t._timer = setTimeout(()=> t.classList.remove('show'), ms || 2200);
 }
 
 function monthKey(y,m){ return y + '-' + String(m).padStart(2,'0'); }
@@ -1957,10 +2053,7 @@ const SEED_VERSION = SEED_WORKERS.length + '_' + (SEED_WORKERS[0]||{}).id;
 async function loadState(){
   const guardado = await cargarDesdeServidor();
   if(guardado && Array.isArray(guardado.workers) && guardado.workers.length){
-    workers = guardado.workers;
-    meta = guardado.meta || meta;
-    descuentos = Array.isArray(guardado.descuentos) ? guardado.descuentos : [];
-    asegurarCuentas(workers.map(w => w.cc));
+    aplicarDatosServidor(guardado);
   } else {
     // Primera vez que corre en el servidor — siembra con lo que traía este
     // archivo (ya filtrado a Mirador El Pino) y lo sube.
