@@ -598,11 +598,13 @@ $('resOut').addEventListener('click', ev => {
 const horaChile = iso => { if (!iso) return ['','']; const d = new Date(iso); if (isNaN(d)) return ['','']; const o = { timeZone:'America/Santiago' };
   return [d.toLocaleDateString('es-CL', { ...o, day:'2-digit', month:'2-digit', year:'numeric' }).replace(/-/g, '/'), d.toLocaleTimeString('es-CL', { ...o, hour:'2-digit', minute:'2-digit', hour12:false })]; };
 const ESTADO_TXT = { completa:'Jornada completa', media:'Media jornada', ausente:'Ausente' };
-const CAB_INFORME = ['Fecha','Proyecto','Especialidad','Trabajador','Cargo','Estado','Actividad','Motivo (Otros)','Comentario','HD','Fecha de registro','Hora de registro','Registrado por'];
+const CAB_INFORME = ['Fecha','Proyecto','Especialidad','Trabajador','Cargo','Estado','Actividad','Motivo (Otros)','Comentario','HD','Hora de registro','Registrado por'];
 function filasInforme(){
   return [...ultimasFilas].sort((a,b) => a.proyecto.localeCompare(b.proyecto) || a.fecha.localeCompare(b.fecha) || a.especialidad.localeCompare(b.especialidad) || a.trabajador.localeCompare(b.trabajador))
     .map(x => { const [fr, hr] = horaChile(x.registradoEn);
-      return [fmtFecha(x.fecha), x.proyecto, x.especialidad, x.trabajador, x.cargo, ESTADO_TXT[x.estado] || x.estado, x.actividad, x.motivo, x.comentario, x.hd, fr, hr, x.jefe]; });
+      // la fecha ya está en la columna A; si se registró OTRO día (corrección posterior), se avisa junto a la hora
+      const [dd, mm, aa] = fr.split('/'), otroDia = fr && `${aa}-${mm}-${dd}` !== x.fecha;
+      return [fmtFecha(x.fecha), x.proyecto, x.especialidad, x.trabajador, x.cargo, ESTADO_TXT[x.estado] || x.estado, x.actividad, x.motivo, x.comentario, x.hd, hr ? (otroDia ? `${hr} (registrado el ${dd}/${mm})` : hr) : '', x.jefe]; });
 }
 function descargar(blob, nombre){ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
 $('btnCsv').addEventListener('click', () => {
@@ -626,7 +628,7 @@ $('btnXlsx').addEventListener('click', async () => {
       while (usados.has(hoja.toLowerCase())) hoja = hoja.slice(0, 28) + ' ' + n++;
       usados.add(hoja.toLowerCase());
       const ws = XLSX.utils.aoa_to_sheet([CAB_INFORME, ...filas.filter(r => r[1] === nombre)]);
-      ws['!cols'] = [12,22,16,32,24,16,22,22,36,6,14,10,26].map(w => ({ wch:w }));
+      ws['!cols'] = [12,22,16,32,24,16,22,22,36,6,26,26].map(w => ({ wch:w }));
       ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s:{ r:0, c:0 }, e:{ r:Math.max(1, filas.filter(r => r[1] === nombre).length), c:CAB_INFORME.length - 1 } }) };
       ws['!freeze'] = { xSplit:0, ySplit:1 };
       XLSX.utils.book_append_sheet(libro, ws, hoja);
