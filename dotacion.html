@@ -202,7 +202,10 @@
   .row > div:last-child{ border-right:none; }
   .row:last-child{ border-bottom:none; }
   .row:hover{ background:#FAF8F3; }
-  .row.is-out{ opacity:.55; }
+  /* Quien tiene "Con término" (ya salió o salida proyectada) va en gris, pero legible y editable */
+  .row.is-out{ background:#E4E1DB; }
+  .row.is-out:hover{ background:#DAD7D0; }
+  .row.is-out .name{ color:#5b5852; }
 
   .name{ font-weight:600; font-size:14px; }
   .rut{ font-family:var(--font-mono); font-size:11.5px; color:var(--steel); margin-top:1px; }
@@ -2822,7 +2825,7 @@ function renderRoster(){
       ? (prev.prevCosto || costoMensual({...w, role: prev.prevRole}))
       : null;
     return `
-    <div class="row ${departed?'is-out':''}" data-id="${w.id}">
+    <div class="row ${hasEnd?'is-out':''}" data-id="${w.id}">
       <div>
         <div class="name">${w.name} ${w.source==='ingreso'?'<span class="badge-ingreso">Ingreso</span>':''} ${w.source==='proyectado'?'<span class="badge-ingreso" style="background:#EEF2FF;color:#4F46E5;">Proyectado</span>':''}
           <button class="btn btn-ghost btn-sm" style="padding:1px 6px;font-size:10px;color:var(--red);margin-left:6px;" title="Eliminar de la dotación" onclick="eliminarWorker('${w.id}')">✕</button>
