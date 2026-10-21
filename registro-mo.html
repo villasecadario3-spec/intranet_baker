@@ -164,10 +164,7 @@ tr.sub td:first-child{padding-left:42px}
     <div class="card">
       <div class="row">
         <div><label class="f" for="selProy">Proyecto</label><select id="selProy"></select></div>
-        <div class="row2">
-          <div><label class="f" for="selEsp">Especialidad</label><select id="selEsp"></select></div>
-          <div><label class="f" for="inFecha">Fecha</label><input type="date" id="inFecha"></div>
-        </div>
+        <div><label class="f" for="inFecha">Fecha</label><input type="date" id="inFecha"></div>
       </div>
     </div>
     <div id="estadoReg"></div>
@@ -211,8 +208,8 @@ const msalInstance = new msal.PublicClientApplication({
   cache:{ cacheLocation:'localStorage' }   // la sesión dura todo el turno en el celular
 });
 let ctx = null, cuenta = null;
-let sel = { proy:null, esp:null, fecha:null };
-let lineas = {};       // SOLO los trabajadores tomados por esta especialidad: trabajadorId -> { estado, partes:[{actividad,motivo,comentario}] }
+let sel = { proy:null, fecha:null };
+let lineas = {};       // trabajadorId -> { esp, estado, partes:[{actividad,motivo,comentario}] }  (solo quienes están en la cuadrilla de hoy)
 let ocupados = {};     // trabajadores ya tomados por otra especialidad ese día
 let origenCopiado = null, guardadoInfo = null, soloLectura = false;
 let ultimasFilas = [];
@@ -285,8 +282,9 @@ $('tabs').addEventListener('click', e => {
 
 // ───────── Registrar ─────────
 const proyActual = () => ctx.proyectos.find(p => p.id === sel.proy);
-const espActual  = () => { const p = proyActual(); return p && p.especialidades.find(e => e.id === sel.esp); };
-const puedeRegistrarAqui = () => { const e = espActual(); return !!(e && e.puedeRegistrar); };
+const espsEditables = () => { const p = proyActual(); return p ? p.especialidades.filter(e => e.puedeRegistrar) : []; };
+const espPorId = id => { const p = proyActual(); return p && p.especialidades.find(e => e.id === id); };
+const puedeRegistrarAqui = () => !!ctx && !!proyActual() && espsEditables().length > 0;
 function ventanaFechas(){
   const hoy = ctx.hoy; const d = new Date(hoy+'T12:00:00'); d.setDate(d.getDate() - ctx.diasEdicion);
   return { min: ctx.rol === 'admin' ? '' : d.toISOString().slice(0,10), max: hoy };
@@ -297,80 +295,84 @@ function armarSelectoresRegistro(){
   const ult = leerLS('mo_ultsel', {}); if (ult.proy && ctx.proyectos.some(p=>p.id===ult.proy)) sp.value = ult.proy;
   const v = ventanaFechas(); $('inFecha').max = v.max; if (v.min) $('inFecha').min = v.min; else $('inFecha').removeAttribute('min');
   $('inFecha').value = ctx.hoy;
-  cambioProyecto(ult.esp);
-}
-function cambioProyecto(espPref){
-  sel.proy = $('selProy').value; const p = proyActual();
-  $('selEsp').innerHTML = p.especialidades.map(e => `<option value="${esc(e.id)}">${esc(e.nombre)}</option>`).join('');
-  if (espPref && p.especialidades.some(e => e.id === espPref)) $('selEsp').value = espPref;
   cambioContexto();
 }
 async function cambioContexto(){
-  sel.proy = $('selProy').value; sel.esp = $('selEsp').value; sel.fecha = $('inFecha').value || ctx.hoy;
-  guardarLS('mo_ultsel', { proy: sel.proy, esp: sel.esp });
+  sel.proy = $('selProy').value; sel.fecha = $('inFecha').value || ctx.hoy;
+  guardarLS('mo_ultsel', { proy: sel.proy });
   await cargarDia();
 }
-$('selProy').addEventListener('change', () => cambioProyecto());
-$('selEsp').addEventListener('change', cambioContexto);
+$('selProy').addEventListener('change', cambioContexto);
 $('inFecha').addEventListener('change', cambioContexto);
 
-const claveDia = () => `${sel.proy}|${sel.esp}|${sel.fecha}`;
+const claveDia = () => `dia|${sel.proy}|${sel.fecha}`;
 const parteVacia = () => ({ actividad:'', motivo:'', comentario:'' });
 const parteOtros = () => ({ actividad:OTROS, motivo:'', comentario:'' });
-function lineaVacia(){ return { estado:'completa', partes:[parteVacia()] }; }
+const lineaNueva = esp => ({ esp, estado:'completa', partes:[parteVacia()] });
 let nombres = {};      // trabajadorId -> { nombre, cargo } (incluye gente dada de baja que ya estaba en el registro)
 
 // Normaliza una línea recibida del servidor (registros antiguos de media jornada traían una sola parte)
-function lineaDesdeServidor(l){
+function lineaDesdeServidor(l, esp){
   let partes = (l.partes || []).map(x => ({ actividad:x.actividad, motivo:x.motivo||'', comentario:x.comentario||'' }));
   if (l.estado === 'media') {
     if (partes.length === 1) partes.push(parteOtros());
     if (partes.length === 2 && partes[1].actividad !== OTROS) partes[1] = parteOtros();
   }
-  return { estado:l.estado, partes };
+  return { esp, estado:l.estado, partes };
+}
+function lineasDeRegistros(regs, soloActivos){
+  const out = {}, p = proyActual();
+  (regs || []).forEach(r => (r.lineas || []).forEach(l => {
+    if (soloActivos && !p.trabajadores.some(t => t.id === l.trabajadorId)) return;
+    out[l.trabajadorId] = lineaDesdeServidor(l, r.especialidad);
+  }));
+  return out;
 }
 
 async function cargarDia(){
   lineas = {}; ocupados = {}; origenCopiado = null; guardadoInfo = null; soloLectura = false;
-  const p = proyActual(), e = espActual(); if (!p || !e) return;
+  const p = proyActual(); if (!p) return;
   $('estadoReg').innerHTML = '<div class="empty">Cargando…</div>'; $('lista').innerHTML = '';
-  const q = `proyecto=${encodeURIComponent(sel.proy)}&especialidad=${encodeURIComponent(sel.esp)}&fecha=${sel.fecha}`;
+  const q = `proyecto=${encodeURIComponent(sel.proy)}&fecha=${sel.fecha}`;
   const pend = leerLS(COLA_KEY, {})[claveDia()];
   let actual = null, previo = null, sinRed = false;
   try {
-    ocupados = (await api('GET', `/mo/ocupacion?${q}`)).ocupados || {};
-    if (pend) actual = { lineas: pend.payload.lineas, pendiente:true };
-    else {
-      actual = (await api('GET', `/mo/registro?${q}`)).registro;
-      if (!actual && e.puedeRegistrar) previo = (await api('GET', `/mo/ultimo?${q}`)).registro;
-    }
-  } catch(err){ if (err.status) toast(err.message); else { sinRed = true; if (pend) actual = { lineas: pend.payload.lineas, pendiente:true }; } }
+    const d = await api('GET', `/mo/dia?${q}`);
+    ocupados = d.ocupados || {}; actual = d.registros || [];
+    if (pend) actual = pend.payload.registros.map(r => ({ especialidad:r.especialidad, lineas:r.lineas, pendiente:true }));
+    else if (!actual.some(r => (r.lineas || []).length) && espsEditables().length) previo = await api('GET', `/mo/dia?${q}&previo=1`);
+  } catch(err){ if (err.status) toast(err.message); else { sinRed = true; if (pend) actual = pend.payload.registros.map(r => ({ especialidad:r.especialidad, lineas:r.lineas, pendiente:true })); } }
   const dentro = ctx.rol === 'admin' || (new Date(ctx.hoy+'T12:00:00') - new Date(sel.fecha+'T12:00:00'))/86400000 <= ctx.diasEdicion;
-  soloLectura = !e.puedeRegistrar || !dentro;
+  soloLectura = !puedeRegistrarAqui() || !dentro;
   nombres = {}; p.trabajadores.forEach(t => nombres[t.id] = { nombre:t.nombre, cargo:t.cargo });
-  ((actual && actual.lineas) || []).forEach(l => { if (!nombres[l.trabajadorId]) nombres[l.trabajadorId] = { nombre: l.nombre || l.trabajadorId, cargo: l.cargo || '' }; });
-  if (actual) actual.lineas.forEach(l => { lineas[l.trabajadorId] = lineaDesdeServidor(l); });
-  else if (previo) {
-    // se copian solo quienes estaban en actividades el día anterior, siguen activos y no los tomó otra especialidad hoy
-    previo.lineas.forEach(l => {
-      if (!p.trabajadores.some(t => t.id === l.trabajadorId) || ocupados[l.trabajadorId]) return;
-      const pt = (l.partes || []).find(x => x.actividad !== OTROS && e.actividades.includes(x.actividad));
-      if (pt) lineas[l.trabajadorId] = { estado:'completa', partes:[{ actividad:pt.actividad, motivo:'', comentario:'' }], copiado:true };
+  (actual || []).forEach(r => (r.lineas || []).forEach(l => { if (!nombres[l.trabajadorId]) nombres[l.trabajadorId] = { nombre: l.nombre || l.trabajadorId, cargo: l.cargo || '' }; }));
+  const editables = new Set(espsEditables().map(e => e.id));
+  if (actual && actual.some(r => (r.lineas || []).length)) {
+    lineas = lineasDeRegistros(actual.filter(r => editables.has(r.especialidad) || r.pendiente), false);
+    const reales = actual.filter(r => !r.pendiente && (r.lineas || []).length);
+    if (reales.length) guardadoInfo = { actualizadoEn: reales.map(r => r.actualizadoEn).filter(Boolean).sort().pop() };
+  } else if (previo && previo.fecha) {
+    // se copia la distribución del último día: solo gente activa que no esté tomada por otra persona hoy
+    const copiadas = lineasDeRegistros(previo.registros.filter(r => editables.has(r.especialidad)), true);
+    Object.keys(copiadas).forEach(tid => {
+      const l = copiadas[tid], e = espPorId(l.esp); if (ocupados[tid] || !e) return;
+      const pt = l.partes.find(x => x.actividad !== OTROS && e.actividades.includes(x.actividad));
+      if (pt) lineas[tid] = { esp:l.esp, estado:'completa', partes:[{ actividad:pt.actividad, motivo:'', comentario:'' }], copiado:true };
     });
     if (Object.keys(lineas).length) origenCopiado = previo.fecha;
   }
-  if (actual && !actual.pendiente) guardadoInfo = actual;
   let html = '';
   if (sinRed) html += '<div class="banner info">Sin conexión: puedes registrar igual. Se enviará solo cuando vuelva la señal.</div>';
   if (pend) html += '<div class="banner info">Este día tiene un registro <b>pendiente de enviar</b>. Se enviará cuando haya señal.</div>';
   if (guardadoInfo) {
-    const cuando = guardadoInfo.actualizadoEn ? new Date(guardadoInfo.actualizadoEn).toLocaleString('es-CL', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+    const cuando = guardadoInfo.actualizadoEn ? new Date(guardadoInfo.actualizadoEn).toLocaleString('es-CL', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false }) : '';
     html += `<div class="banner ok">Registro guardado${cuando ? ' el ' + esc(cuando) : ''}.${soloLectura ? '' : ' Puedes corregirlo.'}</div>`;
   }
-  if (origenCopiado) html += `<div class="banner info">Se copió la cuadrilla del <b>${fmtFecha(origenCopiado)}</b>. Revisa, mueve a quien cambió de actividad y presiona <b>Confirmar y guardar</b>.</div>`;
-  if (soloLectura && e.puedeRegistrar) html += '<div class="banner err">Este día ya no se puede modificar.</div>';
-  if (!e.puedeRegistrar) html += '<div class="banner info">Solo lectura. Usa la pestaña Resumen para ver los registros.</div>';
-  if (!e.actividades.length) html += '<div class="banner err">Esta especialidad aún no tiene actividades configuradas. Pide a TI que las agregue.</div>';
+  if (origenCopiado) html += `<div class="banner info">Se copió la cuadrilla del <b>${fmtFecha(origenCopiado)}</b> (especialidad y actividad de cada uno). Revisa, mueve a quien cambió y presiona <b>Confirmar y guardar</b>.</div>`;
+  if (soloLectura && puedeRegistrarAqui()) html += '<div class="banner err">Este día ya no se puede modificar.</div>';
+  if (!puedeRegistrarAqui()) html += '<div class="banner info">Solo lectura. Usa la pestaña Resumen para ver los registros.</div>';
+  const sinAct = espsEditables().filter(e => !e.actividades.length).map(e => e.nombre);
+  if (sinAct.length) html += `<div class="banner err">Estas especialidades aún no tienen actividades configuradas: ${esc(sinAct.join(', '))}. Pide a TI que las agregue.</div>`;
   $('estadoReg').innerHTML = html;
   pintar();
 }
@@ -393,57 +395,58 @@ function parteHtml(tid, i, pt, l, e){
   </div>`;
 }
 function lineaCompleta(l){
+  if (!l.esp) return false;
   if (l.estado === 'ausente') return true;
   return l.partes.every(pt => pt.actividad && (pt.actividad !== OTROS || (pt.motivo && pt.comentario.trim())));
 }
-function tarjeta(tid, e){
-  const l = lineas[tid], n = nombres[tid] || { nombre:tid, cargo:'' }, falta = !lineaCompleta(l);
+function opcionesEsp(sel_){
+  return `<option value="">Elegir especialidad…</option>` + espsEditables().map(e => `<option value="${esc(e.id)}" ${e.id===sel_?'selected':''}>${esc(e.nombre)}</option>`).join('');
+}
+function tarjeta(tid){
+  const l = lineas[tid], n = nombres[tid] || { nombre:tid, cargo:'' }, e = espPorId(l.esp), falta = !lineaCompleta(l);
   const dividido = l.estado === 'completa' && l.partes.length === 2;
+  const puedeEsp = soloLectura ? false : true;
   return `<div class="w ${falta?'falta':''}" data-w="${esc(tid)}">
     <div class="top"><span class="nm">${esc(n.nombre)}</span><span class="cg">${esc(n.cargo || 'Sin cargo')}</span></div>
+    <label class="f" style="margin-top:0">Especialidad</label>
+    ${e && !e.puedeRegistrar ? `<div class="lock">🔒 ${esc(e.nombre)}</div>` : `<select data-esp="${esc(tid)}" ${puedeEsp?'':'disabled'}>${opcionesEsp(l.esp)}</select>`}
     <div class="seg">
       <button data-est="completa" class="${l.estado==='completa'?'on':''}" ${soloLectura?'disabled':''}>Jornada completa</button>
       <button data-est="media" class="${l.estado==='media'?'on':''}" ${soloLectura?'disabled':''}>Media jornada</button>
       <button data-est="ausente" class="${l.estado==='ausente'?'on aus':''}" ${soloLectura?'disabled':''}>Ausente</button>
     </div>
-    ${l.estado==='ausente' ? '' : l.partes.map((pt,i) => parteHtml(tid,i,pt,l,e)).join('')}
-    ${l.estado==='completa' && !soloLectura ? `<button class="lnk" data-div="${esc(tid)}">${dividido?'Quitar división (1 sola actividad)':'Dividir el día en 2 actividades'}</button>` : ''}
-    ${soloLectura ? '' : `<button class="lnk lib" data-lib="${esc(tid)}">Liberar (sacar de ${esc(e.nombre)})</button>`}
+    ${l.estado==='ausente' || !e ? '' : l.partes.map((pt,i) => parteHtml(tid,i,pt,l,e)).join('')}
+    ${l.estado==='completa' && !soloLectura && e ? `<button class="lnk" data-div="${esc(tid)}">${dividido?'Quitar división (1 sola actividad)':'Dividir el día en 2 actividades'}</button>` : ''}
+    ${soloLectura ? '' : `<button class="lnk lib" data-lib="${esc(tid)}">Sacar de la cuadrilla de hoy</button>`}
   </div>`;
 }
 function pintar(){
-  const p = proyActual(), e = espActual(); if (!p || !e) return;
+  const p = proyActual(); if (!p) return;
+  if (!p.trabajadores.length) { $('lista').innerHTML = '<div class="empty">Este proyecto no tiene trabajadores cargados todavía.</div>'; actualizarResumenVivo(); return; }
   const claimed = Object.keys(lineas);
+  const sinEsp = claimed.filter(t => !lineas[t].esp);
   const libres = p.trabajadores.filter(t => !lineas[t.id] && !ocupados[t.id]);
   const bloq = p.trabajadores.filter(t => !lineas[t.id] && ocupados[t.id]);
-  if (!p.trabajadores.length) { $('lista').innerHTML = '<div class="empty">Este proyecto no tiene trabajadores cargados todavía.</div>'; actualizarResumenVivo(); return; }
-  const grupos = [];
-  const porAsignar = claimed.filter(t => lineas[t].estado !== 'ausente' && !lineas[t].partes[0].actividad);
-  if (porAsignar.length) grupos.push(['Por asignar', porAsignar, 'pend']);
-  e.actividades.forEach(a => { const ids = claimed.filter(t => lineas[t].estado !== 'ausente' && lineas[t].partes[0].actividad === a); if (ids.length) grupos.push([a, ids]); });
-  const otros = claimed.filter(t => lineas[t].estado !== 'ausente' && lineas[t].partes[0].actividad === OTROS);
-  if (otros.length) grupos.push(['Otros (no se pudo trabajar)', otros]);
-  const aus = claimed.filter(t => lineas[t].estado === 'ausente');
-  if (aus.length) grupos.push(['Ausentes', aus]);
+  const idxAct = t => { const l = lineas[t], e = espPorId(l.esp); const a = l.estado === 'ausente' ? 9998 : (e ? e.actividades.indexOf(l.partes[0].actividad) : -1); return a < 0 ? 9999 : a; };
+  const ordenNombre = (a, b) => (nombres[a].nombre || '').localeCompare(nombres[b].nombre || '');
   let h = '';
-  if (!claimed.length && !soloLectura) h += `<div class="empty">Tu cuadrilla de <b>${esc(e.nombre)}</b> está vacía hoy.<br>Agrega a las personas que trabajarán en esta especialidad.</div>`;
-  h += grupos.map(([nom, ids, cls]) => `<div class="grp ${cls||''}"><h4>${esc(nom)} <span>${ids.length}</span></h4>${ids.map(t => tarjeta(t, e)).join('')}</div>`).join('');
-  if (libres.length && !soloLectura) h += `<div class="grp disp"><h4>Disponibles <span>${libres.length}</span></h4>
-    ${libres.map(t => `<div class="dsp"><div><b>${esc(t.nombre)}</b><small>${esc(t.cargo || 'Sin cargo')}</small></div><button class="btn ghost" data-add="${esc(t.id)}">Agregar</button></div>`).join('')}
-    ${libres.length > 1 ? '<button class="lnk" data-addall="1">Agregar a todos</button>' : ''}</div>`;
-  if (bloq.length) h += `<div class="grp bloq"><h4>En otra especialidad hoy <span>${bloq.length}</span></h4>
+  if (!claimed.length && !soloLectura) h += '<div class="empty">Aún no hay nadie asignado hoy.<br>Reparte a tu gente en las especialidades usando la lista de abajo.</div>';
+  if (sinEsp.length) h += `<div class="grp pend"><h4>Sin especialidad <span>${sinEsp.length}</span></h4>${sinEsp.map(t => tarjeta(t)).join('')}</div>`;
+  p.especialidades.forEach(e => {
+    const ids = claimed.filter(t => lineas[t].esp === e.id).sort((a, b) => idxAct(a) - idxAct(b) || ordenNombre(a, b));
+    if (ids.length) h += `<div class="grp"><h4>${esc(e.nombre)} <span>${ids.length}</span></h4>${ids.map(t => tarjeta(t)).join('')}</div>`;
+  });
+  if (libres.length && !soloLectura) h += `<div class="grp disp"><h4>Por asignar <span>${libres.length}</span></h4>
+    <p class="hint" style="margin:0 2px 8px">Elige la especialidad de cada persona para sumarla a tu cuadrilla de hoy.</p>
+    ${libres.map(t => `<div class="dsp"><div><b>${esc(t.nombre)}</b><small>${esc(t.cargo || 'Sin cargo')}</small></div><select data-asig="${esc(t.id)}" class="asig">${opcionesEsp('')}</select></div>`).join('')}</div>`;
+  if (bloq.length) h += `<div class="grp bloq"><h4>Registrados por otra persona <span>${bloq.length}</span></h4>
     ${bloq.map(t => `<div class="dsp"><div><b>${esc(t.nombre)}</b><small>${esc(t.cargo || 'Sin cargo')}</small></div><span class="lock">🔒 ${esc(ocupados[t.id].nombre)}</span></div>`).join('')}
-    <p class="hint">Para usarlos aquí, primero libéralos en esa especialidad.</p></div>`;
+    <p class="hint">Ya están en una especialidad que tú no administras ese día.</p></div>`;
   $('lista').innerHTML = h;
   actualizarResumenVivo();
 }
 $('lista').addEventListener('click', ev => {
   if (soloLectura) return;
-  const add = ev.target.closest('[data-add]');
-  if (add){ lineas[add.dataset.add] = lineaVacia(); pintar(); return; }
-  if (ev.target.closest('[data-addall]')){
-    proyActual().trabajadores.forEach(t => { if (!lineas[t.id] && !ocupados[t.id]) lineas[t.id] = lineaVacia(); }); pintar(); return;
-  }
   const w = ev.target.closest('[data-w]'); if (!w) return; const tid = w.dataset.w, l = lineas[tid];
   if (ev.target.closest('[data-lib]')){ delete lineas[tid]; pintar(); return; }
   const b = ev.target.closest('[data-est]');
@@ -459,7 +462,17 @@ $('lista').addEventListener('click', ev => {
   }
 });
 $('lista').addEventListener('change', ev => {
-  const t = ev.target; const w = t.closest('[data-w]'); if (!w) return; const l = lineas[w.dataset.w];
+  const t = ev.target;
+  if (t.dataset.asig){                                   // asignar a la cuadrilla con su especialidad
+    if (!t.value) return; lineas[t.dataset.asig] = lineaNueva(t.value); pintar(); return;
+  }
+  const w = t.closest('[data-w]'); if (!w) return; const l = lineas[w.dataset.w];
+  if (t.dataset.esp !== undefined){                      // mover a otra especialidad
+    l.esp = t.value; l.copiado = false;
+    const e = espPorId(l.esp);                           // las actividades son de cada especialidad: se reeligen
+    l.partes = l.partes.map(pt => (pt.actividad === OTROS || (e && e.actividades.includes(pt.actividad))) ? pt : parteVacia());
+    pintar(); return;
+  }
   if (t.dataset.act){ const [,i] = t.dataset.act.split('|'); l.partes[+i].actividad = t.value; l.copiado = false; if (t.value !== OTROS){ l.partes[+i].motivo=''; l.partes[+i].comentario=''; } pintar(); }
   else if (t.dataset.mot){ const [,i] = t.dataset.mot.split('|'); l.partes[+i].motivo = t.value; actualizarResumenVivo(); }
 });
@@ -477,12 +490,15 @@ function actualizarResumenVivo(){
     const l = lineas[tid];
     if (!lineaCompleta(l)) { ok = false; sinAsignar++; }
     if (l.estado === 'ausente') { aus++; return; }
-    l.partes.forEach(pt => { if (!pt.actividad) return; const hd = hdDeLinea(l) / l.partes.length; const o = porAct[pt.actividad] || (porAct[pt.actividad] = { n:0, hd:0 }); o.n++; o.hd += hd; tot += hd; });
+    const e = espPorId(l.esp);
+    l.partes.forEach(pt => { if (!pt.actividad || !e) return; const hd = hdDeLinea(l) / l.partes.length;
+      const k = pt.actividad === OTROS ? 'Otros (no se pudo trabajar)' : `${e.nombre} · ${pt.actividad}`;
+      const o = porAct[k] || (porAct[k] = { n:0, hd:0 }); o.n++; o.hd += hd; tot += hd; });
   });
   const filas = Object.entries(porAct).sort((a,b)=>b[1].hd-a[1].hd);
   $('resumenVivo').classList.toggle('hide', !filas.length && !aus);
   $('resumenVivo').innerHTML = `<h4>Resumen del día</h4><table><thead><tr><th>Actividad</th><th class="n">Personas</th><th class="n">HD</th></tr></thead><tbody>
-    ${filas.map(([a,o]) => `<tr><td>${a===OTROS?'Otros (no se pudo trabajar)':esc(a)}</td><td class="n">${o.n}</td><td class="n">${fmtHd(o.hd)}</td></tr>`).join('')}
+    ${filas.map(([a,o]) => `<tr><td>${esc(a)}</td><td class="n">${o.n}</td><td class="n">${fmtHd(o.hd)}</td></tr>`).join('')}
     ${aus ? `<tr><td>Ausentes</td><td class="n">${aus}</td><td class="n">0</td></tr>` : ''}
     <tr class="tot"><td>Total cuadrilla</td><td class="n">${ids.length}</td><td class="n">${fmtHd(tot)}</td></tr></tbody></table>`;
   $('dkHd').textContent = fmtHd(tot);
@@ -490,18 +506,20 @@ function actualizarResumenVivo(){
   const puede = puedeRegistrarAqui() && !soloLectura && p.trabajadores.length > 0 && (!vacia || !!guardadoInfo);
   $('dock').classList.toggle('hide', !puedeRegistrarAqui() || $('t-reg').classList.contains('hide'));
   $('btnGuardar').disabled = !(puede && ok);
-  $('btnGuardar').textContent = !ok ? `Faltan ${sinAsignar} por completar` : (vacia ? (guardadoInfo ? 'Guardar (cuadrilla vacía)' : 'Agrega personas a tu cuadrilla') : (guardadoInfo ? 'Guardar cambios' : 'Confirmar y guardar'));
+  $('btnGuardar').textContent = !ok ? `Faltan ${sinAsignar} por completar` : (vacia ? (guardadoInfo ? 'Guardar (cuadrilla vacía)' : 'Asigna a tu gente para guardar') : (guardadoInfo ? 'Guardar cambios' : 'Confirmar y guardar'));
 }
 
+// Se envían TODAS las especialidades que este usuario administra (las que quedaron sin gente van vacías: así se liberan).
 function armarPayload(){
-  return { proyecto: sel.proy, especialidad: sel.esp, fecha: sel.fecha,
-    lineas: Object.keys(lineas).map(tid => { const l = lineas[tid]; return { trabajadorId:tid, estado:l.estado,
-      partes: l.estado==='ausente' ? [] : l.partes.map(x => ({ actividad:x.actividad, motivo: x.actividad===OTROS?x.motivo:'', comentario: x.actividad===OTROS?x.comentario.trim():'' })) }; }) };
+  return { proyecto: sel.proy, fecha: sel.fecha,
+    registros: espsEditables().map(e => ({ especialidad: e.id,
+      lineas: Object.keys(lineas).filter(tid => lineas[tid].esp === e.id).map(tid => { const l = lineas[tid]; return { trabajadorId:tid, estado:l.estado,
+        partes: l.estado==='ausente' ? [] : l.partes.map(x => ({ actividad:x.actividad, motivo: x.actividad===OTROS?x.motivo:'', comentario: x.actividad===OTROS?x.comentario.trim():'' })) }; }) })) };
 }
 $('btnGuardar').addEventListener('click', async () => {
   const payload = armarPayload(); $('btnGuardar').disabled = true; $('btnGuardar').textContent = 'Guardando…';
   try {
-    const r = await api('POST', '/mo/registro', payload);
+    const r = await api('POST', '/mo/dia', payload);
     quitarDeCola(claveDia()); toast(`Guardado ✔  ${fmtHd(r.hdTotal)} hombre-día`); await cargarDia();
   } catch(e){
     if (e.status) { toast(e.message, 5000); actualizarResumenVivo(); }   // el servidor lo rechazó: no se encola
@@ -524,7 +542,8 @@ async function procesarCola(){
   const c = leerLS(COLA_KEY, {}); const claves = Object.keys(c); if (!claves.length) return;
   enviandoCola = true; let enviados = 0;
   for (const k of claves){
-    try { await api('POST', '/mo/registro', c[k].payload); quitarDeCola(k); enviados++; }
+    const pl = c[k].payload;
+    try { if (pl.registros) await api('POST', '/mo/dia', pl); else await api('POST', '/mo/registro', pl); quitarDeCola(k); enviados++; }   // el formato antiguo (una especialidad) se sigue aceptando
     catch(e){
       if (e.status) { quitarDeCola(k); toast(`Un registro pendiente fue rechazado: ${e.message}`, 6000); }
       else break;
