@@ -464,9 +464,9 @@
           <div class="field">
             <label>Nivel de compresión</label>
             <select id="compress-level">
-              <option value="low">Baja — mejor calidad, menor reducción</option>
-              <option value="mid" selected>Media — equilibrio entre calidad y tamaño</option>
-              <option value="high">Alta — mayor reducción, menor calidad</option>
+              <option value="low">Baja — mejor calidad, menor reducción (~150 dpi)</option>
+              <option value="mid" selected>Media — equilibrio entre calidad y tamaño (~110 dpi)</option>
+              <option value="high">Alta — mayor reducción, menor calidad (~80 dpi)</option>
             </select>
           </div>
           <div class="controls">
@@ -1256,13 +1256,49 @@ function addCompressFiles(files){
   document.getElementById('compress-results-list').innerHTML='';
 }
 function removeCompressFile(i){compressFiles.splice(i,1);addCompressFiles([]);}
+function clearCompressFiles(){compressFiles=[];compressResultFiles=[];document.getElementById('compress-input').value='';document.getElementById('compress-progress').style.display='none';addCompressFiles([]);}
 let compressResultFiles=[];
+// Compresion real: pdf-lib solo "re-guarda" (no baja el peso de escaneos). Aqui cada pagina se
+// dibuja con pdf.js y se vuelve a guardar como JPEG a menor resolucion/calidad. Si el resultado
+// no queda mas liviano que el original, se entrega el original (nunca se agranda un archivo).
+const COMPRESS_NIVELES={
+  low:{escala:2.0,calidad:0.78,lado:3200},
+  mid:{escala:1.5,calidad:0.62,lado:2400},
+  high:{escala:1.1,calidad:0.48,lado:1700}
+};
+async function comprimirPdfRaster(bytes,nivel,onPag){
+  const {PDFDocument}=PDFLib;
+  const cfg=COMPRESS_NIVELES[nivel]||COMPRESS_NIVELES.mid;
+  const src=await pdfjsLib.getDocument({data:bytes.slice()}).promise;
+  const out=await PDFDocument.create();
+  for(let n=1;n<=src.numPages;n++){
+    if(onPag)onPag(n,src.numPages);
+    const page=await src.getPage(n);
+    const v1=page.getViewport({scale:1});
+    let esc=cfg.escala;
+    const lado=Math.max(v1.width,v1.height)*esc;
+    if(lado>cfg.lado)esc=esc*cfg.lado/lado;
+    const vp=page.getViewport({scale:esc});
+    const cv=document.createElement('canvas');
+    cv.width=Math.max(1,Math.round(vp.width));cv.height=Math.max(1,Math.round(vp.height));
+    const ctx=cv.getContext('2d');
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);
+    await page.render({canvasContext:ctx,viewport:vp}).promise;
+    const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',cfg.calidad));
+    const jpg=new Uint8Array(await blob.arrayBuffer());
+    cv.width=cv.height=0;page.cleanup();
+    const img=await out.embedJpg(jpg);
+    const pg=out.addPage([v1.width,v1.height]);   // mismo tamano de pagina que el original
+    pg.drawImage(img,{x:0,y:0,width:v1.width,height:v1.height});
+  }
+  try{src.destroy();}catch(e){}
+  return await out.save({useObjectStreams:true,addDefaultPage:false});
+}
 async function doCompress(){
   if(compressFiles.length===0)return;
   const btn=document.getElementById('compress-btn');btn.disabled=true;btn.textContent='Procesando…';
   const {PDFDocument}=PDFLib;
   const level=document.getElementById('compress-level').value;
-  const opts={useObjectStreams:level!=='low',addDefaultPage:false};
   const prog=document.getElementById('compress-progress');
   const progBar=document.getElementById('compress-prog-bar');
   const progLabel=document.getElementById('compress-prog-label');
@@ -1270,26 +1306,41 @@ async function doCompress(){
   const resList=document.getElementById('compress-results-list');
   resList.style.display='flex';resList.innerHTML='';
   compressResultFiles=[];
+  let errores=0;
   for(let i=0;i<compressFiles.length;i++){
     const f=compressFiles[i];
-    progLabel.textContent='Comprimiendo '+(i+1)+'/'+compressFiles.length+': '+f.name;
+    const etiqueta='Comprimiendo '+(i+1)+'/'+compressFiles.length+': '+f.name;
+    progLabel.textContent=etiqueta;
     progBar.style.width=Math.round((i/compressFiles.length)*100)+'%';
     const bytes=await readFile(f);
-    const doc=await PDFDocument.load(bytes,{ignoreEncryption:true});
-    const out=await doc.save(opts);
-    const orig=bytes.length,comp=out.length;
+    const orig=bytes.length;
+    let out=bytes,nota='';
+    try{
+      const raster=await comprimirPdfRaster(bytes,level,(n,t)=>{
+        progLabel.textContent=etiqueta+' (pág. '+n+'/'+t+')';
+        progBar.style.width=Math.round(((i+(n-1)/t)/compressFiles.length)*100)+'%';
+      });
+      if(raster.length<orig*0.97){out=raster;nota=' · páginas convertidas a imagen';}
+      else{
+        // el raster no ayudo: se prueba al menos re-guardar (limpia objetos duplicados)
+        try{const d=await PDFDocument.load(bytes,{ignoreEncryption:true});const r2=await d.save({useObjectStreams:true,addDefaultPage:false});if(r2.length<orig*0.97)out=r2;}catch(e){}
+      }
+    }catch(e){
+      errores++;nota=' · no se pudo comprimir, se deja el original';
+    }
+    const comp=out.length;
     const pct=Math.round((1-comp/orig)*100);
     const base=f.name.replace(/\.pdf$/i,'').replace(/\s+/g,'-').slice(0,30);
     const name=base+'_COMPRIMIDO.pdf';
     compressResultFiles.push({data:out,name});
     const row=document.createElement('div');
     row.style.cssText='background:var(--green-light);border:1px solid #B6DEC9;border-radius:var(--radius);padding:10px 14px;font-size:12px;color:#155C39;display:flex;align-items:center;gap:8px';
-    row.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span><strong>'+f.name+'</strong> — '+fmtSize(orig)+' → '+fmtSize(comp)+' '+(pct>0?'(−'+pct+'%)':'(ya optimizado)')+'</span>';
+    row.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg><span><strong>'+f.name+'</strong> — '+fmtSize(orig)+' → '+fmtSize(comp)+' '+(pct>0?'(−'+pct+'%)':'(ya estaba optimizado, sin cambios)')+nota+'</span>';
     resList.appendChild(row);
   }
   progBar.style.width='100%';
   try{bakerMetrica('comprimir',compressFiles.length);}catch(e){}
-  progLabel.textContent='Listo — '+compressFiles.length+' archivo'+(compressFiles.length>1?'s':'')+' comprimido'+(compressFiles.length>1?'s':'');
+  progLabel.textContent='Listo — '+compressFiles.length+' archivo'+(compressFiles.length>1?'s':'')+' procesado'+(compressFiles.length>1?'s':'');
   const dlBtn=document.getElementById('compress-download');
   const dlLabel=document.getElementById('compress-download-label');
   dlLabel.textContent=compressFiles.length===1?'Descargar PDF comprimido':'Descargar ZIP con PDFs comprimidos';
