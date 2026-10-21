@@ -183,7 +183,8 @@ tr.sub td:first-child{padding-left:42px}
         <div><label class="f" for="rHasta">Hasta</label><input type="date" id="rHasta"></div>
       </div>
       <div style="margin-top:10px"><label class="f" for="rProy">Proyecto</label><select id="rProy"></select></div>
-      <div class="tool" style="margin:12px 0 0"><button class="btn red grow" id="btnRes">Ver resumen</button><button class="btn ghost" id="btnCsv" disabled>Descargar Excel (CSV)</button></div>
+      <div class="tool" style="margin:12px 0 0"><button class="btn red grow" id="btnRes">Ver resumen</button><button class="btn ghost" id="btnXlsx" disabled>Descargar Excel</button></div>
+      <div style="margin-top:8px"><button class="lnk" id="btnCsv" disabled>o descargar como CSV (una sola lista)</button></div>
     </div>
     <div id="resOut"></div>
   </section>
@@ -540,10 +541,10 @@ function armarResumen(){
   $('rProy').innerHTML = '<option value="">Todos mis proyectos</option>' + ctx.proyectos.map(p => `<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('');
 }
 $('btnRes').addEventListener('click', async () => {
-  $('resOut').innerHTML = '<div class="empty">Cargando…</div>'; $('btnCsv').disabled = true;
+  $('resOut').innerHTML = '<div class="empty">Cargando…</div>'; $('btnCsv').disabled = true; $('btnXlsx').disabled = true;
   try {
     const q = `desde=${$('rDesde').value}&hasta=${$('rHasta').value}` + ($('rProy').value ? `&proyecto=${encodeURIComponent($('rProy').value)}` : '');
-    ultimasFilas = (await api('GET', '/mo/registros?' + q)).filas; pintarResumen(); $('btnCsv').disabled = !ultimasFilas.length;
+    ultimasFilas = (await api('GET', '/mo/registros?' + q)).filas; pintarResumen(); $('btnCsv').disabled = $('btnXlsx').disabled = !ultimasFilas.length;
   } catch(e){ $('resOut').innerHTML = `<div class="banner err">${esc(e.message)}</div>`; }
 });
 function pintarResumen(){
@@ -593,12 +594,46 @@ $('resOut').addEventListener('click', ev => {
     ev.target.textContent = abrir ? 'Contraer todo' : 'Desplegar todo';
   }
 });
+// ── Informe: fecha + hora de registro, ordenado por obra ──
+const horaChile = iso => { if (!iso) return ['','']; const d = new Date(iso); if (isNaN(d)) return ['','']; const o = { timeZone:'America/Santiago' };
+  return [d.toLocaleDateString('es-CL', { ...o, day:'2-digit', month:'2-digit', year:'numeric' }).replace(/-/g, '/'), d.toLocaleTimeString('es-CL', { ...o, hour:'2-digit', minute:'2-digit', hour12:false })]; };
+const ESTADO_TXT = { completa:'Jornada completa', media:'Media jornada', ausente:'Ausente' };
+const CAB_INFORME = ['Fecha','Proyecto','Especialidad','Trabajador','Cargo','Estado','Actividad','Motivo (Otros)','Comentario','HD','Fecha de registro','Hora de registro','Registrado por'];
+function filasInforme(){
+  return [...ultimasFilas].sort((a,b) => a.proyecto.localeCompare(b.proyecto) || a.fecha.localeCompare(b.fecha) || a.especialidad.localeCompare(b.especialidad) || a.trabajador.localeCompare(b.trabajador))
+    .map(x => { const [fr, hr] = horaChile(x.registradoEn);
+      return [fmtFecha(x.fecha), x.proyecto, x.especialidad, x.trabajador, x.cargo, ESTADO_TXT[x.estado] || x.estado, x.actividad, x.motivo, x.comentario, x.hd, fr, hr, x.jefe]; });
+}
+function descargar(blob, nombre){ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
 $('btnCsv').addEventListener('click', () => {
-  const cab = ['Fecha','Proyecto','Especialidad','Trabajador','Cargo','Estado','Actividad','Motivo (Otros)','Comentario','HD','Registrado por'];
   const cel = v => { v = String(v ?? ''); return /[";\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; };
-  const lin = ultimasFilas.map(x => [fmtFecha(x.fecha),x.proyecto,x.especialidad,x.trabajador,x.cargo,x.estado==='completa'?'Jornada completa':x.estado==='media'?'Media jornada':'Ausente',x.actividad,x.motivo,x.comentario,String(x.hd).replace('.',','),x.jefe].map(cel).join(';'));
-  const blob = new Blob(['﻿' + [cab.join(';'), ...lin].join('\r\n')], { type:'text/csv;charset=utf-8' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `mano_obra_${$('rDesde').value}_${$('rHasta').value}.csv`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  const lin = filasInforme().map(r => r.map((v,i) => cel(i === 9 ? String(v).replace('.',',') : v)).join(';'));
+  descargar(new Blob(['\uFEFF' + [CAB_INFORME.join(';'), ...lin].join('\r\n')], { type:'text/csv;charset=utf-8' }), `mano_obra_${$('rDesde').value}_${$('rHasta').value}.csv`);
+});
+function cargarXlsx(){
+  if (window.XLSX) return Promise.resolve();
+  return new Promise((ok, mal) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'; s.onload = ok; s.onerror = () => mal(new Error('No se pudo cargar la librería de Excel. Revisa tu conexión.')); document.head.appendChild(s); });
+}
+// Un Excel con una pestaña por obra (así no hay que separar la lista a mano)
+$('btnXlsx').addEventListener('click', async () => {
+  const btn = $('btnXlsx'); btn.disabled = true; const txt = btn.textContent; btn.textContent = 'Preparando…';
+  try {
+    await cargarXlsx();
+    const filas = filasInforme(), libro = XLSX.utils.book_new(), usados = new Set();
+    const proyectos = [...new Set(filas.map(r => r[1]))];
+    proyectos.forEach(nombre => {
+      let hoja = nombre.replace(/[\\\/?*\[\]:]/g, ' ').trim().slice(0, 31) || 'Obra', n = 2;
+      while (usados.has(hoja.toLowerCase())) hoja = hoja.slice(0, 28) + ' ' + n++;
+      usados.add(hoja.toLowerCase());
+      const ws = XLSX.utils.aoa_to_sheet([CAB_INFORME, ...filas.filter(r => r[1] === nombre)]);
+      ws['!cols'] = [12,22,16,32,24,16,22,22,36,6,14,10,26].map(w => ({ wch:w }));
+      ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s:{ r:0, c:0 }, e:{ r:Math.max(1, filas.filter(r => r[1] === nombre).length), c:CAB_INFORME.length - 1 } }) };
+      ws['!freeze'] = { xSplit:0, ySplit:1 };
+      XLSX.utils.book_append_sheet(libro, ws, hoja);
+    });
+    XLSX.writeFile(libro, `mano_obra_${$('rDesde').value}_${$('rHasta').value}.xlsx`);
+  } catch(e){ toast(e.message, 5000); }
+  btn.textContent = txt; btn.disabled = !ultimasFilas.length;
 });
 
 // ───────── Administrar ─────────
