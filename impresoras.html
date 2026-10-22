@@ -341,8 +341,8 @@
 
 <script>
 // Enlace de descarga del Escaner Baker (el instalador pesa mas de 100 MB: no va en el repositorio).
-// Pega aqui el enlace de SharePoint con "&download=1" al final. Mientras este vacio, el boton aparece deshabilitado.
-const URL_ESCANER = '';
+// SharePoint del equipo de TI (Soporte TI - Informatica), con "&download=1". Para actualizar la version, reemplaza el .exe en SharePoint con el mismo nombre. Si queda vacio, el boton aparece deshabilitado.
+const URL_ESCANER = 'https://ibaker.sharepoint.com/:u:/s/SoporteTI-Informtica/IQBgAIPeXCf5RbxrntNExPVkAWT-tarZGXp_F9CCKwpEilo?e=tAuaeC&download=1';
 (function () {
     const a = document.getElementById('btn-escaner'), t = document.getElementById('btn-escaner-txt');
     if (URL_ESCANER) { a.href = URL_ESCANER; }
