@@ -98,6 +98,7 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
 .tag-presencial{background:rgba(192,57,43,0.08);color:var(--rojo);}
 .tag-otros{background:rgba(107,103,98,0.1);color:var(--txt-mid);}
 .tag-vacaciones{background:rgba(46,90,138,0.1);color:#2E5A8A;}
+.tag-medio_dia{background:rgba(122,90,166,0.12);color:#5B3F86;}
 .week-nav{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
 .week-nav button{background:white;border:1px solid var(--gris-2);border-radius:8px;padding:7px 12px;cursor:pointer;}
 .week-label{font-weight:600;font-size:0.9rem;}
@@ -110,6 +111,7 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
 .dot-presencial{background:var(--gris-3);}
 .dot-otros{background:var(--txt-mid);}
 .dot-vacaciones{background:#2E5A8A;}
+.dot-medio_dia{background:#7A5AA6;}
 .dot-sin_ruta{background:transparent;border:1.5px dashed var(--gris-3);box-sizing:border-box;}
 .seg-resumen{display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;margin-bottom:20px;}
 .seg-caja{background:white;border:1px solid var(--gris-2);border-radius:10px;padding:12px 18px;min-width:130px;}
@@ -160,6 +162,7 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
 .estac-leyenda{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:0.76rem;color:var(--txt-dim);align-items:center;}
 .estac-leyenda .dot-cuad{width:11px;height:11px;border-radius:3px;display:inline-block;margin-right:4px;vertical-align:middle;}
 </style>
+<script src="metricas.js" data-modulo="rutas-estacionamientos"></script>
 </head>
 <body>
 <nav>
@@ -288,12 +291,24 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
                             <option value="visita_obra">Visita a Obra</option>
                             <option value="presencial">Presencial</option>
                             <option value="vacaciones">Vacaciones</option>
+                            <option value="medio_dia">Ausencia medio día</option>
                             <option value="otros">Otros motivos</option>
                         </select>
                     </div>
                     <div class="form-group" id="exc-obra-wrap" style="display:none;">
                         <label class="form-label">Obra(s)</label>
                         <div id="exc-obra-chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+                    </div>
+                    <div class="form-group" id="exc-medio-wrap" style="display:none;">
+                        <label class="form-label">¿Qué mitad del día te ausentas?</label>
+                        <select class="form-select" id="exc-ampm">
+                            <option value="AM">Mañana (AM)</option>
+                            <option value="PM">Tarde (PM)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="exc-medio-just-wrap" style="display:none;">
+                        <label class="form-label">Justificación <span style="color:var(--rojo)">*</span></label>
+                        <input class="form-input" id="exc-medio-detalle" maxlength="120" placeholder="Ej. trámite médico, trámite personal">
                     </div>
                     <div class="form-group" id="exc-otros-wrap" style="display:none;">
                         <label class="form-label">¿Dónde estarás? (opcional)</label>
@@ -306,6 +321,18 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
             <div class="card">
                 <h3>Mis excepciones próximas</h3>
                 <div id="lista-excepciones"></div>
+            </div>
+
+            <div class="card" id="card-vacaciones">
+                <h3>Vacaciones</h3>
+                <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Registra hasta <strong>2 períodos</strong> de vacaciones. Tu equipo los verá en la pestaña del equipo y esos días tu estacionamiento queda disponible para otros.</p>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Desde</label><input class="form-input" type="date" id="vac-desde"></div>
+                    <div class="form-group"><label class="form-label">Hasta</label><input class="form-input" type="date" id="vac-hasta"></div>
+                    <button class="btn btn-primary btn-sm" id="vac-btn" onclick="guardarVacaciones()">Agregar período</button>
+                </div>
+                <div id="vac-limite" style="display:none;font-size:0.78rem;color:var(--txt-mid);margin-bottom:10px;">Ya tienes 2 períodos registrados. Quita uno para agregar otro.</div>
+                <div id="lista-vacaciones"></div>
             </div>
 
             <div class="card" id="aprobaciones-card" style="display:none;">
@@ -355,6 +382,10 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
             </table>
             <div style="margin-top:14px;font-size:0.78rem;color:var(--txt-dim);">
                 <span class="dot dot-remoto"></span> Remoto &nbsp;&nbsp; <span class="dot dot-visita_obra"></span> Visita a Obra &nbsp;&nbsp; <span class="dot dot-sin_ruta"></span> Sin ruta &nbsp;&nbsp; <span class="dot dot-presencial"></span> Presencial &nbsp;&nbsp; <span class="dot dot-vacaciones"></span> Vacaciones &nbsp;&nbsp; <span class="dot dot-otros"></span> Otros &nbsp;&nbsp; <span class="dot" style="background:#bbb;"></span> Feriado
+            </div>
+            <div class="card" style="margin-top:18px;">
+                <h3>Vacaciones del equipo</h3>
+                <div id="vacaciones-equipo"></div>
             </div>
         </div>
 
@@ -782,7 +813,7 @@ function liberacionAutoPorRuta(spot) {
     const diaHoy = diaSemanaDeHoy();
     if (!DIAS.includes(diaHoy)) return null; // fin de semana, no aplica
     const { estado } = estadoEnFecha(spot.duenoEmail, hoyISO(), diaHoy);
-    if (estado === 'presencial' || estado === 'feriado') return null; // feriado: nadie va a la oficina, no se ofrece
+    if (estado === 'presencial' || estado === 'medio_dia' || estado === 'feriado') return null; // feriado: nadie va a la oficina, no se ofrece
 
     return {
         id: null, estacionamientoId: spot.id, fechaInicio: hoyISO(), fechaFin: hoyISO(),
@@ -1105,7 +1136,7 @@ function estadoBloque(spot, fechaStr, bloque) {
     if (esFeriado(fechaStr)) return { estado: 'feriado' };
     if (fechaStr >= hoyISO() && DIAS.includes(dia)) {
         const { estado: estRuta } = estadoEnFecha(spot.duenoEmail, fechaStr, dia);
-        if (estRuta !== 'presencial') return { estado: 'auto', motivoAuto: estRuta };
+        if (estRuta !== 'presencial' && estRuta !== 'medio_dia') return { estado: 'auto', motivoAuto: estRuta };
     }
     return { estado: 'ocupado' };
 }
@@ -1727,6 +1758,8 @@ async function cargarDatos() {
         otrosPatron = new Map((miPatron.otros || []).map(item => [item.dia, item.detalle || '']));
         renderChipsPatron();
         renderExcepciones();
+        renderVacaciones();
+        renderVacacionesEquipo();
         renderSemana();
         await cargarPropuestas();
     } catch(e) {
@@ -1953,11 +1986,89 @@ function renderEstadoPropuesta() {
     el.textContent = miPendiente ? `⏳ Tienes una propuesta de ruta pendiente de aprobación (enviada ${new Date(miPendiente.creadoEn).toLocaleDateString('es-CL')}).` : '';
 }
 
+// ── Vacaciones: hasta 2 períodos por persona, visibles para todo el equipo ──
+const MAX_VAC = 2;
+const vacacionesDe = email => ((dataTeletrabajo.vacaciones || {})[email] || []);
+const enVacaciones = (email, fechaISO) => vacacionesDe(email).some(v => fechaISO >= v.desde && fechaISO <= v.hasta);
+const diasRango = (d, h) => Math.round((new Date(h + 'T00:00:00') - new Date(d + 'T00:00:00')) / 86400000) + 1;
+function misVacacionesVigentes() {
+    const hoy = hoyISO();
+    return vacacionesDe(emailActual).filter(v => v.hasta >= hoy).sort((a, b) => a.desde.localeCompare(b.desde));
+}
+async function guardarVacaciones() {
+    const desde = document.getElementById('vac-desde').value;
+    const hasta = document.getElementById('vac-hasta').value;
+    if (!desde || !hasta) { alert('Indica la fecha de inicio y la de término.'); return; }
+    if (desde > hasta) { alert('La fecha de inicio no puede ser posterior a la de término.'); return; }
+    if (hasta < hoyISO()) { alert('Ese período ya terminó.'); return; }
+    const vig = misVacacionesVigentes();
+    if (vig.length >= MAX_VAC) { alert('Ya tienes 2 períodos de vacaciones. Quita uno para agregar otro.'); return; }
+    if (vig.some(v => desde <= v.hasta && hasta >= v.desde)) { alert('Ese período se cruza con otro que ya registraste.'); return; }
+    try {
+        const res = await fetch(`${API}/teletrabajo/vacaciones`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ email: emailActual, nombre: nombreActual, desde, hasta })
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(j.error || 'Error al guardar');
+        dataTeletrabajo.vacaciones = dataTeletrabajo.vacaciones || {};
+        dataTeletrabajo.vacaciones[emailActual] = j.vacaciones || [...vacacionesDe(emailActual), { desde, hasta }];
+        document.getElementById('vac-desde').value = ''; document.getElementById('vac-hasta').value = '';
+        toast('Vacaciones registradas');
+        renderVacaciones(); renderVacacionesEquipo(); renderSemana();
+        try { render(); } catch(e) {}
+    } catch(e) { toast('Error: ' + e.message); }
+}
+async function borrarVacaciones(desde, hasta) {
+    try {
+        const res = await fetch(`${API}/teletrabajo/vacaciones?email=${encodeURIComponent(emailActual)}&desde=${desde}&hasta=${hasta}`, { method: 'DELETE' });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(j.error || 'Error al quitar');
+        dataTeletrabajo.vacaciones = dataTeletrabajo.vacaciones || {};
+        dataTeletrabajo.vacaciones[emailActual] = vacacionesDe(emailActual).filter(v => !(v.desde === desde && v.hasta === hasta));
+        toast('Período quitado');
+        renderVacaciones(); renderVacacionesEquipo(); renderSemana();
+        try { render(); } catch(e) {}
+    } catch(e) { toast('Error: ' + e.message); }
+}
+function renderVacaciones() {
+    const cont = document.getElementById('lista-vacaciones');
+    if (!cont) return;
+    const vig = misVacacionesVigentes();
+    document.getElementById('vac-limite').style.display = vig.length >= MAX_VAC ? 'block' : 'none';
+    document.getElementById('vac-btn').disabled = vig.length >= MAX_VAC;
+    cont.innerHTML = vig.length ? vig.map(v => `
+        <div class="excepcion-item">
+            <span>${fmt(v.desde)} al ${fmt(v.hasta)} <span class="tag tag-vacaciones">${diasRango(v.desde, v.hasta)} día${diasRango(v.desde, v.hasta) === 1 ? '' : 's'}</span></span>
+            <button class="btn btn-outline btn-sm" onclick="borrarVacaciones('${v.desde}','${v.hasta}')">Quitar</button>
+        </div>`).join('') : `<div class="empty">No tienes vacaciones registradas.</div>`;
+}
+function renderVacacionesEquipo() {
+    const cont = document.getElementById('vacaciones-equipo');
+    if (!cont) return;
+    const hoy = hoyISO();
+    const filas = [];
+    Object.entries(dataTeletrabajo.vacaciones || {}).forEach(([email, lista]) => (lista || []).forEach(v => {
+        if (v.hasta >= hoy) filas.push({ email, ...v });
+    }));
+    filas.sort((a, b) => a.desde.localeCompare(b.desde) || nombrePersona(a.email).localeCompare(nombrePersona(b.email)));
+    if (!filas.length) { cont.innerHTML = `<div class="empty">Nadie tiene vacaciones registradas por ahora.</div>`; return; }
+    cont.innerHTML = filas.map(f => {
+        const ahora = f.desde <= hoy && f.hasta >= hoy;
+        return `<div class="excepcion-item">
+            <span><strong>${escHtml(nombrePersona(f.email))}</strong>${f.email === emailActual ? ' (tú)' : ''} — ${fmt(f.desde)} al ${fmt(f.hasta)}
+            <span class="tag tag-vacaciones">${diasRango(f.desde, f.hasta)} día${diasRango(f.desde, f.hasta) === 1 ? '' : 's'}</span>${ahora ? ' <span class="tag tag-remoto">De vacaciones ahora</span>' : ''}</span>
+        </div>`;
+    }).join('');
+}
+
 let excObrasSeleccionadas = new Set();
 function toggleObraExcepcion() {
     const tipo = document.getElementById('exc-tipo').value;
     document.getElementById('exc-obra-wrap').style.display = tipo === 'visita_obra' ? 'block' : 'none';
     document.getElementById('exc-otros-wrap').style.display = tipo === 'otros' ? 'block' : 'none';
+    document.getElementById('exc-medio-wrap').style.display = tipo === 'medio_dia' ? 'block' : 'none';
+    document.getElementById('exc-medio-just-wrap').style.display = tipo === 'medio_dia' ? 'block' : 'none';
     if (tipo === 'visita_obra') {
         excObrasSeleccionadas = new Set();
         renderExcObraChips();
@@ -1978,21 +2089,25 @@ async function guardarExcepcion() {
     const fecha = document.getElementById('exc-fecha').value;
     const tipo = document.getElementById('exc-tipo').value;
     const obras = tipo === 'visita_obra' ? [...excObrasSeleccionadas] : undefined;
-    const detalle = tipo === 'otros' ? document.getElementById('exc-otros-detalle').value.trim() : undefined;
+    const ampm = tipo === 'medio_dia' ? document.getElementById('exc-ampm').value : undefined;
+    const detalle = tipo === 'otros' ? document.getElementById('exc-otros-detalle').value.trim()
+        : tipo === 'medio_dia' ? document.getElementById('exc-medio-detalle').value.trim() : undefined;
     if (!fecha) { alert('Elige una fecha'); return; }
     if (esFeriado(fecha)) { alert(`El ${fmt(fecha)} es feriado (${nombreFeriado(fecha)}): no necesita excepción.`); return; }
     if (tipo === 'remoto' && semanaConFeriado(fecha)) { alert('Esa semana tiene feriado: no se puede elegir un día remoto, es presencial toda la semana. Puedes registrar visita a obra u otros motivos.'); return; }
     if (tipo === 'visita_obra' && !obras.length) { alert('Selecciona al menos una obra'); return; }
+    if (tipo === 'medio_dia' && !detalle) { alert('Escribe una justificación breve para la ausencia de medio día'); return; }
     try {
         const res = await fetch(`${API}/teletrabajo/excepcion`, {
             method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ email: emailActual, fecha, tipo, obras, detalle })
+            body: JSON.stringify({ email: emailActual, fecha, tipo, obras, detalle, ampm })
         });
         if (!res.ok) throw new Error((await res.json()).error || 'Error al guardar');
         dataTeletrabajo.excepciones = dataTeletrabajo.excepciones.filter(e => !(e.email===emailActual && e.fecha===fecha));
-        dataTeletrabajo.excepciones.push({ email: emailActual, fecha, tipo, obras, detalle });
+        dataTeletrabajo.excepciones.push({ email: emailActual, fecha, tipo, obras, detalle, ampm });
         toast('Excepción agregada');
         document.getElementById('exc-otros-detalle').value = '';
+        document.getElementById('exc-medio-detalle').value = '';
         renderExcepciones();
         renderSemana();
     } catch(e) { toast('Error: ' + e.message); }
@@ -2017,6 +2132,7 @@ function renderExcepciones() {
         const etiqueta = e.tipo === 'visita_obra' ? (e.obras && e.obras.length ? e.obras.join(', ') : 'Visita a Obra')
             : e.tipo === 'otros' ? (e.detalle ? `Otros — ${e.detalle}` : 'Otros motivos')
             : e.tipo === 'vacaciones' ? 'Vacaciones'
+            : e.tipo === 'medio_dia' ? `Ausencia medio día (${e.ampm === 'PM' ? 'PM' : 'AM'})${e.detalle ? ' — ' + e.detalle : ''}`
             : e.tipo;
         return `
         <div class="excepcion-item">
@@ -2064,7 +2180,8 @@ function estadoEnFecha(email, fechaISO, diaSemana) {
 }
 function estadoBaseEnFecha(email, fechaISO, diaSemana) {
     const exc = dataTeletrabajo.excepciones.find(e => e.email === email && e.fecha === fechaISO);
-    if (exc) return { estado: exc.tipo, obras: exc.obras || [], detalle: exc.detalle || '' };
+    if (exc) return { estado: exc.tipo, obras: exc.obras || [], detalle: exc.detalle || '', ampm: exc.ampm || '' };
+    if (enVacaciones(email, fechaISO)) return { estado: 'vacaciones', obras: [], detalle: '' };   // período de vacaciones registrado
     const patron = patronEnFecha(email, fechaISO) || { teletrabajoDia: null, visitaObra: [], otros: [] };
     if (patron.teletrabajoDia === diaSemana) return { estado: 'remoto', obras: [], detalle: '' };
     const item = (patron.visitaObra || []).find(v => v.dia === diaSemana);
@@ -2076,7 +2193,7 @@ function estadoBaseEnFecha(email, fechaISO, diaSemana) {
 // Para la vista del equipo: si ese día no había ruta aprobada ni excepción, se dice "Sin ruta" en vez de suponer presencial.
 function estadoVistaEquipo(email, fechaISO, diaSemana) {
     if (esFeriado(fechaISO)) return { estado: 'feriado', obras: [], detalle: nombreFeriado(fechaISO) };
-    const hayExc = dataTeletrabajo.excepciones.some(e => e.email === email && e.fecha === fechaISO);
+    const hayExc = dataTeletrabajo.excepciones.some(e => e.email === email && e.fecha === fechaISO) || enVacaciones(email, fechaISO);
     if (!hayExc && !patronEnFecha(email, fechaISO)) return { estado: 'sin_ruta', obras: [], detalle: '' };
     return estadoEnFecha(email, fechaISO, diaSemana);
 }
@@ -2132,12 +2249,13 @@ function renderSemana() {
 
     document.getElementById('semana-body').innerHTML = personas.map(email => {
         const celdas = DIAS.map((dia,i) => {
-            const { estado, obras, detalle } = estadoVistaEquipo(email, fechas[i], dia);
+            const { estado, obras, detalle, ampm } = estadoVistaEquipo(email, fechas[i], dia);
             if (estado === 'feriado') return `<td class="td-feriado" title="${escHtml(detalle)}">Feriado</td>`;
             const label = estado === 'remoto' ? 'Remoto'
                 : estado === 'visita_obra' ? (obras.length ? obras.join(', ') : 'Visita a Obra')
                 : estado === 'otros' ? (detalle ? `Otros — ${detalle}` : 'Otros motivos')
                 : estado === 'vacaciones' ? 'Vacaciones'
+                : estado === 'medio_dia' ? `Medio día (${ampm === 'PM' ? 'PM' : 'AM'})${detalle ? ' — ' + detalle : ''}`
                 : estado === 'sin_ruta' ? 'Sin ruta'
                 : 'Presencial';
             return `<td><span class="dot dot-${estado}"></span> ${label}</td>`;
