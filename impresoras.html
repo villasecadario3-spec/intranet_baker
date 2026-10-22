@@ -92,7 +92,21 @@
         .btn-descargar svg{width:16px;height:16px;flex-shrink:0}
         .btn-size{margin-top:8px;font-size:0.72rem;color:var(--txt-dim);text-align:center}
  
+        /* Aviso de sede */
+        .aviso-sede{display:flex;gap:14px;align-items:flex-start;background:white;border:1px solid var(--gris-2);border-left:4px solid var(--rojo);border-radius:12px;padding:16px 20px;margin-bottom:22px}
+        .aviso-sede-ico{width:34px;height:34px;border-radius:9px;background:var(--rojo-light);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--rojo)}
+        .aviso-sede-ico svg{width:18px;height:18px}
+        .aviso-sede-titulo{font-size:0.9rem;font-weight:600;color:var(--txt);margin-bottom:3px}
+        .aviso-sede-desc{font-size:0.8rem;color:var(--txt-mid);line-height:1.55}
+        .sede-pill{display:inline-flex;align-items:center;gap:5px;margin-top:7px;padding:2px 9px;border-radius:100px;background:var(--rojo-light);color:var(--rojo);font-size:0.66rem;font-weight:600;letter-spacing:0.04em}
+        .sede-pill svg{width:11px;height:11px}
+        .seccion-titulo{font-family:'DM Mono',monospace;font-size:0.68rem;font-weight:500;letter-spacing:0.15em;text-transform:uppercase;color:var(--txt-dim);margin:38px 0 14px;display:flex;align-items:center;gap:10px}
+        .seccion-titulo::after{content:'';flex:1;height:1px;background:var(--gris-2)}
+        .app-card{max-width:calc(50% - 10px)}
+        .btn-descargar.deshabilitado{background:var(--gris-3);cursor:not-allowed;pointer-events:none}
+
         @media(max-width:768px){
+            .app-card{max-width:none}
             nav{padding:0 16px}.nav-title{display:none}
             .page-header{padding:28px 16px 24px}
             .main{padding:24px 16px 60px}
@@ -125,6 +139,14 @@
 </div>
  
 <div class="main">
+    <div class="aviso-sede">
+        <div class="aviso-sede-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+        <div>
+            <div class="aviso-sede-titulo">Impresoras de Casa Central</div>
+            <div class="aviso-sede-desc">Las 2 impresoras de esta p&aacute;gina (RICOH IM 430 y HP Smart Tank 530) est&aacute;n ubicadas en <strong>Casa Central</strong> y se conectan por el WiFi de esa oficina.</div>
+        </div>
+    </div>
+
     <div class="printers-grid">
  
         <!-- RICOH IM 430 -->
@@ -134,11 +156,12 @@
                 <div class="card-meta">
                     <div class="card-nombre">RICOH IM 430</div>
                     <div class="card-modelo">Impresora principal &middot; Blanco y negro</div>
+                    <div class="sede-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>Casa Central</div>
                 </div>
                 <div class="card-badge badge-bn">B&amp;N</div>
             </div>
             <div class="card-specs">
-                <div class="spec-row"><span class="spec-label">Ubicacion</span><span class="spec-val">Sala principal</span></div>
+                <div class="spec-row"><span class="spec-label">Ubicacion</span><span class="spec-val">Casa Central &middot; Sala principal</span></div>
                 <div class="spec-row"><span class="spec-label">Conexion</span><span class="spec-val ok">WiFi</span></div>
                 <div class="spec-row"><span class="spec-label">Formatos</span><span class="spec-val">Carta &middot; Oficio &middot; SERVIU</span></div>
                 <div class="spec-row"><span class="spec-label">Doble cara</span><span class="spec-val ok">Si (automatico)</span></div>
@@ -193,11 +216,12 @@
                 <div class="card-meta">
                     <div class="card-nombre">HP Smart Tank 530</div>
                     <div class="card-modelo">Impresora secundaria &middot; Color</div>
+                    <div class="sede-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>Casa Central</div>
                 </div>
                 <div class="card-badge badge-color">Color</div>
             </div>
             <div class="card-specs">
-                <div class="spec-row"><span class="spec-label">Ubicacion</span><span class="spec-val">Area administrativa</span></div>
+                <div class="spec-row"><span class="spec-label">Ubicacion</span><span class="spec-val">Casa Central &middot; Area administrativa</span></div>
                 <div class="spec-row"><span class="spec-label">Conexion</span><span class="spec-val ok">WiFi</span></div>
                 <div class="spec-row"><span class="spec-label">Formatos</span><span class="spec-val">Carta &middot; Oficio</span></div>
                 <div class="spec-row"><span class="spec-label">Doble cara</span><span class="spec-val">Manual</span></div>
@@ -253,7 +277,78 @@
         </div>
  
     </div>
+
+    <div class="seccion-titulo">Aplicaciones Baker</div>
+
+    <!-- ESCANER BAKER -->
+    <div class="printer-card app-card">
+        <div class="card-header">
+            <div class="card-icon clr">&#128196;</div>
+            <div class="card-meta">
+                <div class="card-nombre">Esc&aacute;ner Baker</div>
+                <div class="card-modelo">Aplicaci&oacute;n propia de Baker &middot; Windows</div>
+            </div>
+            <div class="card-badge badge-color">v1.2.0</div>
+        </div>
+        <div class="card-specs">
+            <div class="spec-row"><span class="spec-label">Para qu&eacute; sirve</span><span class="spec-val">Digitalizar documentos con el esc&aacute;ner</span></div>
+            <div class="spec-row"><span class="spec-label">Sistema</span><span class="spec-val">Windows</span></div>
+            <div class="spec-row"><span class="spec-label">Version</span><span class="spec-val ok">1.2.0</span></div>
+        </div>
+        <div class="card-steps">
+            <div class="steps-titulo">Pasos para instalar</div>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-left"><div class="step-n dl">1</div><div class="step-line"></div></div>
+                    <div class="step-body">
+                        <div class="step-title">Descarga el instalador</div>
+                        <div class="step-desc">Haz clic en el boton rojo de abajo. Se descargara el archivo <code>Escaner-Baker-Instalador</code> en tu carpeta de Descargas. Pesa cerca de 106 MB, puede tardar unos minutos.</div>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-left"><div class="step-n act">2</div><div class="step-line"></div></div>
+                    <div class="step-body">
+                        <div class="step-title">Ejecuta el instalador</div>
+                        <div class="step-desc"><strong style="color:var(--txt)">Doble clic</strong> sobre el archivo descargado. Si Windows pregunta, haz clic en <code>Si</code> o <code>Mas informacion</code> &rarr; <code>Ejecutar de todas formas</code>.</div>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-left"><div class="step-n act">3</div><div class="step-line"></div></div>
+                    <div class="step-body">
+                        <div class="step-title">Siguiente &rarr; Siguiente &rarr; Instalar</div>
+                        <div class="step-desc">Sigue el asistente con <code>Siguiente</code> hasta llegar al boton <code>Instalar</code>.</div>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-left"><div class="step-n ok">4</div></div>
+                    <div class="step-body">
+                        <div class="step-title">Abre Escaner Baker</div>
+                        <div class="step-desc">Al terminar, abre <code>Escaner Baker</code> desde el menu inicio o el acceso directo del escritorio.</div>
+                        <div class="step-tip"><strong>Si tienes dudas</strong> o algo no funciona, escribe a TI.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer">
+            <a class="btn-descargar" id="btn-escaner" href="#" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span id="btn-escaner-txt">Descargar Escaner Baker</span>
+            </a>
+            <div class="btn-size">Escaner-Baker-Instalador-1_2_0.exe &mdash; 106 MB &mdash; Version 1.2.0</div>
+        </div>
+    </div>
 </div>
- 
+
+<script>
+// Enlace de descarga del Escaner Baker (el instalador pesa mas de 100 MB: no va en el repositorio).
+// Pega aqui el enlace de SharePoint con "&download=1" al final. Mientras este vacio, el boton aparece deshabilitado.
+const URL_ESCANER = '';
+(function () {
+    const a = document.getElementById('btn-escaner'), t = document.getElementById('btn-escaner-txt');
+    if (URL_ESCANER) { a.href = URL_ESCANER; }
+    else { a.classList.add('deshabilitado'); a.removeAttribute('target'); t.textContent = 'Descarga disponible pronto'; }
+})();
+</script>
+
 </body>
 </html>
