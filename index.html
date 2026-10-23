@@ -949,7 +949,24 @@ init();
 
 // ── CONTROL DE VISIBILIDAD DE MÓDULOS ────────────────────────
 const ACCESOS_MODULOS = {
-    "rutas-estacionamientos.html": ["dvillaseca@ibaker.cl","jcumplido@ibaker.cl","kyepez@ibaker.cl"],
+    "rutas-estacionamientos.html": [
+        "dvillaseca@ibaker.cl", "jzamora@ibaker.cl", "tsanmartin@ibaker.cl",
+        "crivera@ibaker.cl", "jcumplido@ibaker.cl", "gilabaca@ibaker.cl",
+        "pjimenez@ibaker.cl", "jdiaz@ibaker.cl", "bmorales@ibaker.cl",
+        "parteaga@ibaker.cl", "pguajardo@ibaker.cl", "rsanchez@ibaker.cl",
+        "jjara@ibaker.cl", "bvaleria@ibaker.cl", "dcatalan@ibaker.cl",
+        "phenriquez@ibaker.cl", "dparedes@epbrotar.cl", "dponce@epbrotar.cl",
+        "nmoreno@epbrotar.cl", "rcid@ibaker.cl", "cgarces@ibaker.cl",
+        "scarreno@ibaker.cl", "ccampos@ibaker.cl", "mbello@ibaker.cl",
+        "bsilva@ibaker.cl", "bjara@ibaker.cl", "cespina@ibaker.cl",
+        "ebustamante@ibaker.cl", "cramos@ibaker.cl", "avasquez@ibaker.cl",
+        "kalarcon@ibaker.cl", "cquezada@ibaker.cl", "mramos@ibaker.cl",
+        "pmorales@ibaker.cl", "mmatamala@ibaker.cl", "pzuniga@ibaker.cl",
+        "adquisiciones@ibaker.cl", "adquisiciones2@ibaker.cl", "jessica@cmcromeral.cl",
+        "francisco@cmcromeral.cl", "mario@cmcromeral.cl", "roberto@cmcromeral.cl",
+        "pablo@ibaker.cl", "pablo@cmcromeral.cl", "amolina@ibaker.cl",
+        "alarrain@ibaker.cl", "kyepez@ibaker.cl"
+    ],
     "softland.html": [
         "dvillaseca@ibaker.cl","informatica@ibaker.cl","alarrain@ibaker.cl",
         "jcumplido@ibaker.cl","bsilva@ibaker.cl","ccampos@ibaker.cl",
@@ -989,12 +1006,6 @@ const ACCESOS_MODULOS = {
 };
 async function aplicarAccesos(email) {
     const correo = (email || '').toLowerCase();
-    // Rutas / Estacionamientos usa una lista dinámica (se administra desde
-    // dentro del propio módulo), no la lista fija de abajo.
-    try {
-        const lista = await fetch('https://api.ibaker.cl/acceso-beta/rutas-estacionamientos').then(r => r.json());
-        ACCESOS_MODULOS['rutas-estacionamientos.html'] = lista;
-    } catch(e) { console.warn('No se pudo cargar la lista de acceso beta:', e.message); }
     // Quienes usan una camioneta compartida también ven la tarjeta (entran solo a la pestaña Camionetas).
     try {
         const porCamioneta = await fetch('https://api.ibaker.cl/camionetas/accesos').then(r => r.json());
