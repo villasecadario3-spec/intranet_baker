@@ -614,6 +614,9 @@
   <div class="section-title">Costo Proyectado <span class="n">por centro de costo</span></div>
   <div class="resumen-card" id="resumenCard"></div>
 
+  <div class="section-title">Finiquitos reservados <span class="n" id="reservadosCount">0</span></div>
+  <div class="resumen-card" id="reservadosCard"></div>
+
   <div class="section-title">Dotación activa <span class="n" id="activeCount">0</span></div>
   <div class="roster">
     <div class="roster-inner">
@@ -716,6 +719,9 @@
   <div class="export-card">
     <div class="export-row">
       <p class="export-note">
+        <strong>Excel completo (toda la dotación):</strong> un .xlsx con todo lo que muestra esta página, sin filtros —
+        costo y finiquito por centro y mes, dotación por mes, el listado completo de personas (con su línea del año),
+        finiquitos reservados y descuentos. El costo de Personal Profesional sale oculto, igual que en pantalla.<br><br>
         <strong>Excel (ConsolidadoPersonal):</strong> genera un .xlsx con 3 pestañas — ConsolidadoPersonal (roster completo),
         Ingresos Nuevos, y Resumen Costo-Finiquito (por centro de costo).<br><br>
         <strong>CSV (permanencia manual):</strong> descarga solo los meses posteriores al último mes con costo real,
@@ -723,6 +729,7 @@
         <strong>JSON (costo y finiquito):</strong> el mismo resumen por centro de costo del widget de arriba, en formato JSON.
       </p>
       <div class="spacer"></div>
+      <button class="btn btn-primary" id="exportExcelTodoBtn">Descargar Excel completo (toda la dotación)</button>
       <button class="btn btn-ghost" id="exportExcelBtn">Descargar Excel (ConsolidadoPersonal)</button>
       <button class="btn btn-ghost" id="exportBtn">Descargar CSV (permanencia manual)</button>
       <button class="btn btn-ghost" id="exportJsonResumenBtn">Descargar JSON (costo y finiquito)</button>
@@ -751,6 +758,17 @@
         <option value="muerte">Fallecimiento</option>
         <option value="otro">Otro</option>
       </select>
+    </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label for="exitFiniquito">¿Quién paga el finiquito?</label>
+      <select id="exitFiniquito" style="width:100%;">
+        <option value="aqui">Se paga en esta obra (suma a los finiquitos)</option>
+        <option value="reservado">Reservado: la persona se fue a otra obra, lo paga otro centro</option>
+      </select>
+    </div>
+    <div class="field" id="exitFiniquitoNotaWrap" style="margin-bottom:10px;display:none;">
+      <label for="exitFiniquitoNota">Obra / centro que lo pagará (opcional)</label>
+      <input type="text" id="exitFiniquitoNota" placeholder="Ej: Mirador El Águila CG0186071" style="width:100%;">
     </div>
     <p style="font-size:11.5px;color:var(--steel);line-height:1.5;margin:0 0 16px;">
       Si la fecha ya pasó, queda como <strong>salida confirmada</strong> (la persona sale de la dotación activa).
@@ -1308,7 +1326,7 @@ let avisoAreaMostrado = false;
 // Lo hecho a mano nunca se pisa: finiquitos confirmados (con motivo), costos escritos a mano y
 // personas marcadas "Sigue" pese a una fecha de término.
 const tieneMotivo = x => x.motivo !== null && x.motivo !== undefined;
-const tieneTrabajoManual = x => tieneMotivo(x) || (x.costoManual !== null && x.costoManual !== undefined) || !!x.sigueDescartaFs;
+const tieneTrabajoManual = x => tieneMotivo(x) || (x.costoManual !== null && x.costoManual !== undefined) || !!x.sigueDescartaFs || x.finiquitoDestino === 'reservado';
 
 // El estado de término sigue al Excel: si BUK trae fecha de término la persona queda con finiquito
 // (sin motivo, porque BUK no lo informa); si BUK la quita, vuelve a quedar activa.
@@ -1922,6 +1940,12 @@ function fcRecortada(w){
   return fcEfectiva(w) !== w.fc;
 }
 
+// Finiquito "reservado": la persona se fue a otra obra, así que el finiquito lo paga otro
+// centro de gestión. Se sigue calculando (para verlo en el recuadro de reservados), pero NO
+// suma a los finiquitos de esta obra.
+const finReservado = w => !!w && w.status === 'finiquitado' && w.finiquitoDestino === 'reservado';
+function montoFiniquitoPagado(w){ return finReservado(w) ? null : montoFiniquito(w); }
+
 // Finiquito: =+((fs-fc)*1.25/30)*ultimoCostoReal/30  — same formula as planilla column O
 // Uses ultimo costo REAL (col L in planilla), NOT the projection max
 function montoFiniquito(w){
@@ -2271,7 +2295,7 @@ function computeResumenPorCentro(){
       if(cm !== null) bucket.costoEmpresa += cm;
     }
     if(w.status === 'finiquitado' && w.fs){
-      const mf = montoFiniquito(w);
+      const mf = montoFiniquitoPagado(w);
       if(mf !== null) bucket.finiquito += mf;
     }
   });
@@ -2388,7 +2412,7 @@ function computeMonthlyBreakdown(){
       const fsDate = new Date(w.fs + 'T00:00:00');
       const fsMonthIdx = ymToIdx(fsDate.getFullYear(), fsDate.getMonth()+1);
       if(fsMonthIdx >= 0 && fsMonthIdx < HORIZON){
-        const mf = montoFiniquito(w);
+        const mf = montoFiniquitoPagado(w);
         if(mf !== null) finiquitosByCC[w.cc][fsMonthIdx] += mf;
       }
     }
@@ -2778,6 +2802,51 @@ function attachToggleSubDotacionListeners(){
   });
 }
 
+function renderReservados(b){
+  const el = document.getElementById('reservadosCard');
+  const cnt = document.getElementById('reservadosCount');
+  if(!el) return;
+  b = b || computeMonthlyBreakdown();
+  const lista = workers.filter(w => finReservado(w) && enObra(w.cc) && pasaFiltrosDotacion(w))
+    .sort((a,c) => (a.fs||'').localeCompare(c.fs||''));
+  if(cnt) cnt.textContent = lista.length;
+  const pagado = b.totals.finiquitos.reduce((s,v)=>s+v,0);
+  const reservado = lista.reduce((s,w) => s + (montoFiniquito(w) || 0), 0);
+  const hayProf = lista.some(w => esCCProfesional(w.cc));
+  const caja = (titulo, valor, sub, color) => `<div style="flex:1;min-width:200px;border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#fff;">
+      <div style="font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--steel);">${titulo}</div>
+      <div style="font-size:20px;font-weight:700;color:${color||'var(--ink)'};margin:4px 0 2px;">${valor}</div>
+      <div style="font-size:11px;color:var(--steel);">${sub}</div></div>`;
+  const filas = lista.map(w => `<tr>
+      <td style="padding:6px 10px;border-top:1px solid var(--line);">${w.name}<div style="font-size:10.5px;color:var(--steel);">${w.rut||''}</div></td>
+      <td style="padding:6px 10px;border-top:1px solid var(--line);">${w.role||''}</td>
+      <td style="padding:6px 10px;border-top:1px solid var(--line);">${w.cc}</td>
+      <td style="padding:6px 10px;border-top:1px solid var(--line);">${w.fs||'—'}</td>
+      <td style="padding:6px 10px;border-top:1px solid var(--line);">${motivoLabel(w.motivo)}</td>
+      <td style="padding:6px 10px;border-top:1px solid var(--line);">${w.finiquitoNota ? String(w.finiquitoNota).replace(/</g,'&lt;') : '<span style="color:var(--steel);">sin indicar</span>'}</td>
+      <td style="padding:6px 10px;border-top:1px solid var(--line);text-align:right;font-weight:600;">${clpDe(w.cc, montoFiniquito(w))}</td>
+      <td style="padding:6px 10px;border-top:1px solid var(--line);"><button class="btn btn-ghost btn-sm" onclick="openExitModal('${w.id}')" style="font-size:10px;padding:1px 6px;">Editar</button></td>
+    </tr>`).join('');
+  el.innerHTML = `
+    <div style="padding:14px 16px 6px;font-size:12.5px;color:var(--steel);line-height:1.5;">
+      Si alguien se fue a otra obra, en <b>Editar</b> de su fila marca el finiquito como <b>Reservado</b>: ese monto
+      <b>no se suma</b> a los finiquitos de esta obra (lo paga otro centro de gestión) y queda guardado aquí.
+      Si se paga en esta obra, déjalo como «Se paga en esta obra».
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;padding:8px 16px 14px;">
+      ${caja('Finiquitos de esta obra', formatCLP(pagado), 'Es lo que suma a los totales de costo (año completo)')}
+      ${caja('Reservados (otro centro)', hayProf ? formatCLP(reservado)+' *' : formatCLP(reservado), `${lista.length} persona${lista.length!==1?'s':''} · descontados del total de arriba`, '#4F46E5')}
+      ${caja('Total según finiquito', formatCLP(pagado + reservado), 'Esta obra + reservados')}
+    </div>
+    ${lista.length ? `<div style="overflow-x:auto;padding:0 16px 16px;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+      <thead><tr style="text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--steel);">
+        <th style="padding:6px 10px;">Persona</th><th style="padding:6px 10px;">Cargo</th><th style="padding:6px 10px;">Centro</th><th style="padding:6px 10px;">Fecha salida</th><th style="padding:6px 10px;">Motivo</th><th style="padding:6px 10px;">Lo paga</th><th style="padding:6px 10px;text-align:right;">Monto reservado</th><th></th></tr></thead>
+      <tbody>${filas}
+        <tr><td colspan="6" style="padding:8px 10px;border-top:2px solid var(--line);font-weight:700;">Total reservado</td>
+        <td style="padding:8px 10px;border-top:2px solid var(--line);text-align:right;font-weight:700;">${formatCLP(reservado)}</td><td style="border-top:2px solid var(--line);"></td></tr>
+      </tbody></table></div>` : `<div class="empty" style="padding:0 16px 16px;font-size:12.5px;color:var(--steel);">No hay finiquitos reservados.</div>`}`;
+}
+
 function renderResumenWidget(){
   const el = document.getElementById('resumenCard');
   if(!el) return;
@@ -2789,6 +2858,7 @@ function renderResumenWidget(){
   el.innerHTML = renderCostoProyectadoTable(b.ccs, b, startIdx) + dotacionTable;
   attachToggleSubListeners();
   attachToggleSubDotacionListeners();
+  renderReservados(b);
 }
 
 function eliminarWorker(id){
@@ -2882,6 +2952,7 @@ function renderRoster(){
       <div style="font-size:12px;color:var(--steel);">${prev ? clpDe(w.cc, prevCosto) : '—'}</div>
       <div style="font-size:12.5px;color:var(--ink);">
         ${hasEnd ? clpDe(w.cc, montoFiniquito(w)) : '—'}
+        ${hasEnd && finReservado(w) ? `<div style="margin-top:3px;"><span style="background:#EEF2FF;color:#4F46E5;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;">RESERVADO</span> <span style="font-size:10.5px;color:var(--steel);">no suma a esta obra${w.finiquitoNota ? ' · paga: '+String(w.finiquitoNota).replace(/</g,'&lt;') : ''}</span></div>` : ''}
         ${hasEnd && finiquitoDetalle(w) ? `<div style="font-size:10.5px;color:var(--steel);margin-top:2px;">${finiquitoDetalle(w)}</div>` : ''}
       </div>
       <div>
@@ -2987,6 +3058,7 @@ function setSigue(id){
   w.status = 'activo';
   w.fs = null;
   w.motivo = null;
+  delete w.finiquitoDestino; delete w.finiquitoNota;
   renderRoster();
   renderExportPreview();
 }
@@ -2997,7 +3069,15 @@ function openExitModal(id){
   document.getElementById('exitModalName').textContent = w.name + ' — ' + (w.role||'');
   document.getElementById('exitDate').value = w.fs || '';
   document.getElementById('exitMotivo').value = w.motivo || 'renuncia';
+  document.getElementById('exitFiniquito').value = w.finiquitoDestino === 'reservado' ? 'reservado' : 'aqui';
+  document.getElementById('exitFiniquitoNota').value = w.finiquitoNota || '';
+  actualizarExitFiniquitoUI();
   document.getElementById('exitModal').classList.add('show');
+}
+
+function actualizarExitFiniquitoUI(){
+  const r = document.getElementById('exitFiniquito').value === 'reservado';
+  document.getElementById('exitFiniquitoNotaWrap').style.display = r ? '' : 'none';
 }
 
 function closeExitModal(){
@@ -3014,6 +3094,11 @@ function confirmExit(){
   w.fs = date;
   w.motivo = document.getElementById('exitMotivo').value;
   delete w.sigueDescartaFs;
+  if(document.getElementById('exitFiniquito').value === 'reservado'){
+    w.finiquitoDestino = 'reservado';
+    const nota = document.getElementById('exitFiniquitoNota').value.trim();
+    if(nota) w.finiquitoNota = nota; else delete w.finiquitoNota;
+  } else { delete w.finiquitoDestino; delete w.finiquitoNota; }
   closeExitModal();
   renderRoster();
   renderExportPreview();
@@ -3613,6 +3698,88 @@ function downloadExcelConsolidado(){
   toast('Excel descargado');
 }
 
+function downloadExcelCompleto(){
+  if(typeof XLSX === 'undefined'){ toast('No se pudo cargar la librería de Excel — revisa tu conexión e intenta de nuevo.'); return; }
+  // Es la dotación TOTAL: se quitan temporalmente los filtros de persona de la pantalla.
+  const g = { c:cargoFiltro, p:periodoFiltro, e:estadoOrigenFiltro, m:motivoFiltro, d:fechaSalidaDesdeFiltro, h:fechaSalidaHastaFiltro };
+  cargoFiltro=''; periodoFiltro=''; estadoOrigenFiltro=''; motivoFiltro=''; fechaSalidaDesdeFiltro=''; fechaSalidaHastaFiltro='';
+  try{
+    const b = computeMonthlyBreakdown();
+    const meses = MONTH_ABBR.slice();
+    const O = 'Oculto';
+    const mon = (cc, v) => esCCProfesional(cc) ? O : Math.round(v || 0);
+    const hoyTxt = new Date().toLocaleDateString('es-CL');
+
+    // 1) Costo proyectado por centro y mes
+    const h1 = ['Centro de costo','Cuenta','Concepto', ...meses, 'Total'];
+    const a1 = [[`Control de Dotación — ${OBRA.nombre}`],[`Generado ${hoyTxt}. Meses hasta ${MONTH_ABBR[meta.ultimoMesReal-1] || '—'} = costo real; posteriores = proyección.`],[],h1];
+    const sumRow = r => r.reduce((s,v)=>s+(v||0),0);
+    b.ccs.forEach(cc => {
+      const c = b.costoMensualByCC[cc], f = b.finiquitosByCC[cc];
+      const sub = c.map((v,i)=>v+f[i]);
+      [['Costo liquidación + finiquito',sub],['Costo liquidación',c],['Finiquito (pagado en esta obra)',f]].forEach(([n,r]) =>
+        a1.push([cc, cuentaNombre(cc), n, ...r.map(v=>mon(cc,v)), esCCProfesional(cc)?O:Math.round(sumRow(r))]));
+    });
+    const tc=b.totals.costoMensual, tf=b.totals.finiquitos;
+    a1.push([]);
+    [['TOTAL costo liquidación + finiquito',tc.map((v,i)=>v+tf[i])],['TOTAL costo liquidación',tc],['TOTAL finiquito (esta obra)',tf]].forEach(([n,r]) =>
+      a1.push(['TOTAL','',n, ...r.map(v=>Math.round(v||0)), Math.round(sumRow(r))]));
+
+    // 2) Dotación por centro y mes
+    const a2 = [['Centro de costo','Cuenta','Concepto', ...meses],];
+    b.ccs.forEach(cc => {
+      [['Dotación total',b.dotacionByCC[cc]],['Vigentes (Excel/ingresos)',b.vigentesByCC[cc]],['Proyectados',b.proyectadosByCC[cc]]].forEach(([n,r]) =>
+        a2.push([cc, cuentaNombre(cc), n, ...r.map(v=>v||0)]));
+    });
+    a2.push([]);
+    [['TOTAL dotación',b.totals.dotacion],['TOTAL vigentes',b.totals.vigentes],['TOTAL proyectados',b.totals.proyectados]].forEach(([n,r]) => a2.push(['TOTAL','',n, ...r.map(v=>v||0)]));
+
+    // 3) Personas
+    const h3 = ['Nombre','RUT','Cargo','Centro de costo','Cuenta','Origen','Fecha contrato','Costo mensual','Costo anterior','Estado','Fecha término','Motivo','Finiquito','Finiquito: quién paga','Lo paga (nota)','Última asistencia','Cargo anterior', ...meses.map(m=>'Vigente '+m)];
+    const a3 = [h3];
+    workers.filter(w => enObra(w.cc)).slice().sort((x,y)=> x.cc.localeCompare(y.cc) || x.name.localeCompare(y.name)).forEach(w => {
+      const hasEnd = w.status==='finiquitado' && w.fs;
+      const estado = !hasEnd ? 'Activo' : (isDeparted(w) ? 'Salida confirmada' : 'Término proyectado');
+      const prev = PREV_ROLES[`${w.rutlimpio}#${w.cc}#${w.role}`] || null;
+      const prevCosto = prev ? (prev.prevCosto || costoMensual({...w, role: prev.prevRole})) : null;
+      const ast = asistenciaPorRut[w.rutlimpio];
+      const st = computeMonthStates(w);
+      const money = v => (v==null || v==='') ? '' : (esCCProfesional(w.cc) ? O : Math.round(v));
+      a3.push([w.name, w.rut||'', w.role||'', w.cc, cuentaNombre(w.cc),
+        w.source==='excel'?'Excel (Buk)':(w.source==='ingreso'?'Ingreso':'Proyectado'),
+        w.fc||'', money(costoMensual(w)), money(prevCosto), estado, hasEnd?w.fs:'', hasEnd?motivoLabel(w.motivo):'',
+        hasEnd ? money(montoFiniquito(w)) : '', hasEnd ? (finReservado(w)?'Reservado (otro centro)':'Esta obra') : '', hasEnd && finReservado(w) ? (w.finiquitoNota||'') : '',
+        ast ? ast.ultima : 'Sin registro', prev ? prev.prevRole : '',
+        ...st.map(x => x==='before' ? 0 : 1)]);
+    });
+
+    // 4) Finiquitos reservados
+    const a4 = [['Nombre','RUT','Cargo','Centro de costo','Fecha salida','Motivo','Lo paga','Monto reservado']];
+    const res = workers.filter(w => finReservado(w) && enObra(w.cc));
+    res.forEach(w => a4.push([w.name, w.rut||'', w.role||'', w.cc, w.fs||'', motivoLabel(w.motivo), w.finiquitoNota||'', esCCProfesional(w.cc)?O:Math.round(montoFiniquito(w)||0)]));
+    a4.push([]); a4.push(['Total reservado','','','','','','', Math.round(res.reduce((s,w)=>s+(esCCProfesional(w.cc)?0:(montoFiniquito(w)||0)),0))]);
+    a4.push(['Total finiquitos de esta obra','','','','','','', Math.round(sumRow(tf))]);
+
+    // 5) Descuentos
+    const a5 = [['Centro de costo','Cargo','Mes','Monto descontado','Nota']];
+    descuentos.forEach(d => a5.push([d.cc, d.role||'', MONTH_ABBR[Number(d.mes)] || d.mes, Math.round(Number(d.monto)||0), d.nota||'']));
+
+    const book = XLSX.utils.book_new();
+    const add = (data, nombre, anchoPrim) => {
+      const sh = XLSX.utils.aoa_to_sheet(data);
+      sh['!cols'] = [{wch:anchoPrim||26},{wch:22},{wch:30}].concat(new Array(30).fill({wch:13}));
+      Object.keys(sh).forEach(k => { if(k[0]!=='!' && sh[k].t==='n') sh[k].z = '#,##0'; });
+      XLSX.utils.book_append_sheet(book, sh, nombre);
+    };
+    add(a1,'Costo proyectado'); add(a2,'Dotación por mes'); add(a3,'Personal',30); add(a4,'Finiquitos reservados',30); add(a5,'Descuentos');
+    const slug = (OBRA.nombre||'obra').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'_');
+    XLSX.writeFile(book, `dotacion_completa_${slug}_${new Date().toISOString().slice(0,10)}.xlsx`);
+    toast('Excel completo descargado');
+  } finally {
+    cargoFiltro=g.c; periodoFiltro=g.p; estadoOrigenFiltro=g.e; motivoFiltro=g.m; fechaSalidaDesdeFiltro=g.d; fechaSalidaHastaFiltro=g.h;
+  }
+}
+
 function downloadJSONResumen(){
   const projRows = buildProjectionRows();
   const blob = new Blob(
@@ -3947,6 +4114,12 @@ async function init(){
   document.getElementById('saveBtn').addEventListener('click', () => persist(true));
   document.getElementById('exportBtn').addEventListener('click', downloadCSV);
   document.getElementById('exportExcelBtn').addEventListener('click', downloadExcelConsolidado);
+  document.getElementById('exportExcelTodoBtn').addEventListener('click', downloadExcelCompleto);
+  document.getElementById('exitFiniquito').addEventListener('change', actualizarExitFiniquitoUI);
+  document.getElementById('exitMotivo').addEventListener('change', () => {
+    // Cambio de obra: lo normal es que el finiquito lo pague la obra de destino.
+    if(document.getElementById('exitMotivo').value === 'cambio_obra'){ document.getElementById('exitFiniquito').value = 'reservado'; actualizarExitFiniquitoUI(); }
+  });
   document.getElementById('exportJsonResumenBtn').addEventListener('click', downloadJSONResumen);
   document.getElementById('exitCancel').addEventListener('click', closeExitModal);
   document.getElementById('exitConfirm').addEventListener('click', confirmExit);
