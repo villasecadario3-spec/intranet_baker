@@ -1154,6 +1154,28 @@ async function sincronizarAsistenciaManual() {
   }
 }
 
+// La asistencia trae el código del RECINTO (ej. CG015), no el centro de gestión
+// completo de la nómina (ej. CG0156301). Se traduce a una cuenta real de la obra:
+// la que ya tiene costo para ese cargo; si no, MO directa / IMIV; si no, la primera.
+function ccsCandidatosAsistencia(raw){
+  raw = String(raw||'').trim();
+  let c = PP_LIST.filter(p => p.cc === raw);
+  if(!c.length) c = PP_LIST.filter(p => raw && (p.cc.startsWith(raw) || raw.startsWith(p.cc)));
+  if(!c.length) c = PP_LIST.slice();
+  return c;
+}
+function resolverCCAsistencia(raw, role){
+  const exacto = PP_LIST.find(p => p.cc === String(raw||'').trim());
+  if(exacto) return exacto.cc;
+  const cands = ccsCandidatosAsistencia(raw);
+  if(!cands.length) return String(raw||'').trim();
+  const rol = String(role||'').toLowerCase().trim();
+  const conCosto = cands.find(p => COSTOS.some(c => c.cc === p.cc && (c.role||'').toLowerCase().trim() === rol));
+  if(conCosto) return conCosto.cc;
+  const directa = cands.find(p => /mo directa|imiv/i.test(p.cuenta||''));
+  return (directa || cands[0]).cc;
+}
+
 async function cargarAsistenciaBUK() {
   // Conexión directa a la API de Asistencia de BUK — el servidor mantiene
   // estos datos ya calculados en memoria (se renuevan solos cada 15 minutos)
@@ -1213,7 +1235,7 @@ async function cargarAsistenciaBUK() {
     const lista = [...d.fechas].sort();
     const meses = [...new Set(lista.map(f => parseInt(f.slice(5,7),10)))].sort((a,b)=>a-b);
     return {
-      rutlimpio: d.rutlimpio, cc: d.cc, role: d.role, name: d.name,
+      rutlimpio: d.rutlimpio, cc: resolverCCAsistencia(d.cc, d.role), ccRecinto: d.cc, role: d.role, name: d.name,
       meses, primera_fecha: lista[0], ultima_fecha: lista[lista.length-1], dias: lista.length,
     };
   });
@@ -3293,7 +3315,7 @@ function renderSugerencias(){
         <div class="rut-sm">${a.rutlimpio}</div>
       </div>
       <div>${a.role}</div>
-      <div class="cc" style="font-size:12px;color:var(--steel);">${a.cc}</div>
+      <div><select id="sug-cc-${i}" data-idx="${i}" style="font-size:11.5px;padding:4px 6px;max-width:170px;">${ccsCandidatosAsistencia(a.ccRecinto).concat(PP_LIST.filter(p=>!ccsCandidatosAsistencia(a.ccRecinto).includes(p))).map(p=>`<option value="${p.cc}" ${p.cc===a.cc?'selected':''}>${p.cc} — ${p.cuenta}</option>`).join('')}</select></div>
       <div>${a.meses.map(m=>`<span class="mes-badge">${mesLabel(m)}</span>`).join(' ')}</div>
       <div style="font-size:12px;color:var(--steel);">${a.primera_fecha}</div>
       <div><input type="number" id="sug-costo-${i}" value="${costoSugerido}" placeholder="Costo empresa" style="width:120px;padding:5px 8px;"></div>
@@ -3314,7 +3336,16 @@ function renderSugerencias(){
       const a = ASISTENCIA_NUEVOS.find(x => `${x.rutlimpio}#${x.cc}#${x.role}` === btn.dataset.addSug);
       const inputCosto = document.getElementById(`sug-costo-${btn.dataset.idx}`);
       const costoManual = inputCosto && inputCosto.value !== '' && Number.isFinite(Number(inputCosto.value)) ? Math.round(Number(inputCosto.value)) : null;
-      if(a) addFromSugerencia(a, costoManual);
+      const selCC = document.getElementById(`sug-cc-${btn.dataset.idx}`);
+      if(a) addFromSugerencia({ ...a, cc: (selCC && selCC.value) || a.cc }, costoManual);
+    };
+  });
+  list.querySelectorAll('select[id^="sug-cc-"]').forEach(sel=>{
+    sel.onchange = () => {
+      const a = pending[sel.dataset.idx]; const inp = document.getElementById(`sug-costo-${sel.dataset.idx}`);
+      if(!a || !inp) return;
+      const f = COSTOS.find(c => c.cc === sel.value && (c.role||'').toLowerCase().trim() === (a.role||'').toLowerCase().trim());
+      inp.value = f ? Math.round(Number(f.amt)) : '';
     };
   });
 }
