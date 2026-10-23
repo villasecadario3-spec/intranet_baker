@@ -315,7 +315,7 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
 
             <div class="card" id="card-vacaciones">
                 <h3>Vacaciones</h3>
-                <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Registra hasta <strong>2 períodos</strong> de vacaciones. Tu equipo los verá en la pestaña del equipo y esos días tu estacionamiento queda disponible para otros.</p>
+                <p style="font-size:0.8rem;color:var(--txt-mid);margin-bottom:14px;">Registra hasta <strong>2 períodos</strong> de vacaciones. Tu equipo los verá en la pestaña del equipo y esos días tu estacionamiento queda disponible para otros. Las vacaciones que te aprueben en Buk aparecen solas, sin que tengas que registrarlas.</p>
                 <div class="form-row">
                     <div class="form-group"><label class="form-label">Desde</label><input class="form-input" type="date" id="vac-desde"></div>
                     <div class="form-group"><label class="form-label">Hasta</label><input class="form-input" type="date" id="vac-hasta"></div>
@@ -1974,7 +1974,7 @@ async function guardarVacaciones() {
     if (desde > hasta) { alert('La fecha de inicio no puede ser posterior a la de término.'); return; }
     if (hasta < hoyISO()) { alert('Ese período ya terminó.'); return; }
     const vig = misVacacionesVigentes();
-    if (vig.length >= MAX_VAC) { alert('Ya tienes 2 períodos de vacaciones. Quita uno para agregar otro.'); return; }
+    if (vig.filter(v => v.origen !== 'buk').length >= MAX_VAC) { alert('Ya tienes 2 períodos de vacaciones. Quita uno para agregar otro.'); return; }
     if (vig.some(v => desde <= v.hasta && hasta >= v.desde)) { alert('Ese período se cruza con otro que ya registraste.'); return; }
     try {
         const res = await fetch(`${API}/teletrabajo/vacaciones`, {
@@ -2007,12 +2007,13 @@ function renderVacaciones() {
     const cont = document.getElementById('lista-vacaciones');
     if (!cont) return;
     const vig = misVacacionesVigentes();
-    document.getElementById('vac-limite').style.display = vig.length >= MAX_VAC ? 'block' : 'none';
-    document.getElementById('vac-btn').disabled = vig.length >= MAX_VAC;
+    const manuales = vig.filter(v => v.origen !== 'buk').length;   // las de Buk no ocupan los 2 cupos
+    document.getElementById('vac-limite').style.display = manuales >= MAX_VAC ? 'block' : 'none';
+    document.getElementById('vac-btn').disabled = manuales >= MAX_VAC;
     cont.innerHTML = vig.length ? vig.map(v => `
         <div class="excepcion-item">
             <span>${fmt(v.desde)} al ${fmt(v.hasta)} <span class="tag tag-vacaciones">${diasRango(v.desde, v.hasta)} día${diasRango(v.desde, v.hasta) === 1 ? '' : 's'}</span></span>
-            <button class="btn btn-outline btn-sm" onclick="borrarVacaciones('${v.desde}','${v.hasta}')">Quitar</button>
+            ${v.origen === 'buk' ? '<span class="tag tag-remoto" title="Aprobadas en Buk (RR.HH.). Se actualizan solas.">Desde Buk</span>' : `<button class="btn btn-outline btn-sm" onclick="borrarVacaciones('${v.desde}','${v.hasta}')">Quitar</button>`}
         </div>`).join('') : `<div class="empty">No tienes vacaciones registradas.</div>`;
 }
 function renderVacacionesEquipo() {
@@ -2029,7 +2030,7 @@ function renderVacacionesEquipo() {
         const ahora = f.desde <= hoy && f.hasta >= hoy;
         return `<div class="excepcion-item">
             <span><strong>${escHtml(nombrePersona(f.email))}</strong>${f.email === emailActual ? ' (tú)' : ''} — ${fmt(f.desde)} al ${fmt(f.hasta)}
-            <span class="tag tag-vacaciones">${diasRango(f.desde, f.hasta)} día${diasRango(f.desde, f.hasta) === 1 ? '' : 's'}</span>${ahora ? ' <span class="tag tag-remoto">De vacaciones ahora</span>' : ''}</span>
+            <span class="tag tag-vacaciones">${diasRango(f.desde, f.hasta)} día${diasRango(f.desde, f.hasta) === 1 ? '' : 's'}</span>${ahora ? ' <span class="tag tag-remoto">De vacaciones ahora</span>' : ''}${f.origen === 'buk' ? ' <span class="tag" title="Aprobadas en Buk">Buk</span>' : ''}</span>
         </div>`;
     }).join('');
 }
