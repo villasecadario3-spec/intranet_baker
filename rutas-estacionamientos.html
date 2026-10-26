@@ -282,6 +282,7 @@ nav{background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px 
                             <option value="presencial">Presencial</option>
                             <option value="vacaciones">Vacaciones</option>
                             <option value="medio_dia">Ausencia medio día</option>
+                            <option value="oficina_brotar">Oficina BROTAR</option>
                             <option value="otros">Otros motivos</option>
                         </select>
                     </div>
@@ -823,6 +824,8 @@ async function reservarAuto(spotId, fechaStr) {
     } catch(e) { toast('Error: ' + e.message); }
 }
 
+const LUGAR_BROTAR = 'Oficina BROTAR';
+const etiquetaOtros = detalle => !detalle ? 'Otros motivos' : (detalle === LUGAR_BROTAR ? LUGAR_BROTAR : `Otros — ${detalle}`);
 const MOTIVO_AUTO_LABEL = { remoto: 'teletrabajo', visita_obra: 'visita a obra', vacaciones: 'vacaciones', otros: 'otros motivos' };
 
 function render() {
@@ -1704,6 +1707,8 @@ function renderFilasOtros() {
             <div style="margin:6px 0 4px 26px;width:calc(100% - 26px);">
                 <input class="form-input" style="font-size:0.8rem;" placeholder="¿Dónde estarás? (opcional)"
                     value="${detalle.replace(/"/g,'&quot;')}" onchange="otrosPatron.set('${dia}', this.value)">
+                <div class="dia-chip" style="display:inline-block;margin-top:6px;padding:5px 11px;font-size:0.74rem;${detalle===LUGAR_BROTAR?'background:var(--negro);color:#fff;border-color:var(--negro);':''}"
+                     onclick="otrosPatron.set('${dia}', '${LUGAR_BROTAR}'); renderFilasOtros()">Oficina BROTAR</div>
             </div>
             ` : ''}
         </div>`;
@@ -1947,7 +1952,7 @@ function resumenPatronTexto(p) {
     const partes = [];
     if (p.teletrabajoDia) partes.push(`Teletrabajo: ${DIA_LABEL_OBRA[p.teletrabajoDia]}`);
     (p.visitaObra||[]).forEach(v => partes.push(`Visita a obra ${DIA_LABEL_OBRA[v.dia]}: ${v.obras.join(', ')}`));
-    (p.otros||[]).forEach(o => partes.push(`Otros ${DIA_LABEL_OBRA[o.dia]}${o.detalle ? ': '+o.detalle : ''}`));
+    (p.otros||[]).forEach(o => partes.push(o.detalle === LUGAR_BROTAR ? `${LUGAR_BROTAR} ${DIA_LABEL_OBRA[o.dia]}` : `Otros ${DIA_LABEL_OBRA[o.dia]}${o.detalle ? ': '+o.detalle : ''}`));
     return partes.length ? partes.join(' · ') : 'Sin días marcados (presencial toda la semana)';
 }
 
@@ -2060,10 +2065,12 @@ function toggleExcObra(o) {
 
 async function guardarExcepcion() {
     const fecha = document.getElementById('exc-fecha').value;
-    const tipo = document.getElementById('exc-tipo').value;
+    let tipo = document.getElementById('exc-tipo').value;
+    const esBrotar = tipo === 'oficina_brotar';
+    if (esBrotar) tipo = 'otros';   // se guarda como "Otros motivos" con el lugar ya puesto
     const obras = tipo === 'visita_obra' ? [...excObrasSeleccionadas] : undefined;
     const ampm = tipo === 'medio_dia' ? document.getElementById('exc-ampm').value : undefined;
-    const detalle = tipo === 'otros' ? document.getElementById('exc-otros-detalle').value.trim()
+    const detalle = esBrotar ? LUGAR_BROTAR : tipo === 'otros' ? document.getElementById('exc-otros-detalle').value.trim()
         : tipo === 'medio_dia' ? document.getElementById('exc-medio-detalle').value.trim() : undefined;
     if (!fecha) { alert('Elige una fecha'); return; }
     if (esFeriado(fecha)) { alert(`El ${fmt(fecha)} es feriado (${nombreFeriado(fecha)}): no necesita excepción.`); return; }
@@ -2103,7 +2110,7 @@ function renderExcepciones() {
     if (!mias.length) { cont.innerHTML = `<div class="empty">No tienes excepciones próximas.</div>`; return; }
     cont.innerHTML = mias.map(e => {
         const etiqueta = e.tipo === 'visita_obra' ? (e.obras && e.obras.length ? e.obras.join(', ') : 'Visita a Obra')
-            : e.tipo === 'otros' ? (e.detalle ? `Otros — ${e.detalle}` : 'Otros motivos')
+            : e.tipo === 'otros' ? etiquetaOtros(e.detalle)
             : e.tipo === 'vacaciones' ? 'Vacaciones'
             : e.tipo === 'medio_dia' ? `Ausencia medio día (${e.ampm === 'PM' ? 'PM' : 'AM'})${e.detalle ? ' — ' + e.detalle : ''}`
             : e.tipo;
@@ -2226,7 +2233,7 @@ function renderSemana() {
             if (estado === 'feriado') return `<td class="td-feriado" title="${escHtml(detalle)}">Feriado</td>`;
             const label = estado === 'remoto' ? 'Remoto'
                 : estado === 'visita_obra' ? (obras.length ? obras.join(', ') : 'Visita a Obra')
-                : estado === 'otros' ? (detalle ? `Otros — ${detalle}` : 'Otros motivos')
+                : estado === 'otros' ? etiquetaOtros(detalle)
                 : estado === 'vacaciones' ? 'Vacaciones'
                 : estado === 'medio_dia' ? `Medio día (${ampm === 'PM' ? 'PM' : 'AM'})${detalle ? ' — ' + detalle : ''}`
                 : estado === 'sin_ruta' ? 'Sin ruta'
