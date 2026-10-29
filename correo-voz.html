@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Correo por voz">
+<title>Correo por voz — Baker</title>
+<link rel="manifest" href="manifest-voz.json">
+<link rel="icon" type="image/png" href="icon-mo-192.png">
+<link rel="apple-touch-icon" href="icon-mo-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+<style>
+:root{
+  --red:#FF002E; --red-dark:#C60023; --red-soft:#FCE9EB;
+  --obs:#050506; --iron:#24252b; --fog:#8b8d97;
+  --page:#F7F6F5; --surf:#FFFFFF; --bord:#E7E4E1; --ink:#111113; --mute:#6b6d75;
+  --ok:#1a7f4b; --ok-soft:#E6F4EC; --warn:#9a6700; --warn-soft:#FFF4D6;
+  --r:14px; --font:'Montserrat',system-ui,sans-serif;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--font);background:var(--page);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased;padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+header{position:sticky;top:0;z-index:50;background:var(--obs);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;gap:10px}
+header .tt{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;line-height:1.25;flex:1}
+header .tt small{display:block;color:var(--fog);font-weight:600;letter-spacing:.04em;text-transform:none;font-size:11px}
+.back{color:#fff;text-decoration:none;font-size:20px;line-height:1;padding:6px 8px 6px 0}
+.av{width:30px;height:30px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+main{max-width:720px;margin:0 auto;padding:14px}
+.card{background:var(--surf);border:1px solid var(--bord);border-radius:var(--r);padding:16px;margin-bottom:12px}
+.banner{border-radius:10px;padding:11px 13px;font-size:13px;font-weight:600;margin-bottom:12px;line-height:1.45}
+.banner.info{background:var(--warn-soft);color:var(--warn)}
+.banner.ok{background:var(--ok-soft);color:var(--ok)}
+.banner.err{background:var(--red-soft);color:var(--red-dark)}
+.btn{font:700 15px var(--font);border:0;border-radius:12px;padding:14px 16px;min-height:52px;background:var(--obs);color:#fff;cursor:pointer}
+.btn.red{background:var(--red)} .btn.ghost{background:#fff;color:var(--ink);border:1.5px solid var(--bord)}
+.btn:disabled{opacity:.4}
+.btn.big{width:100%;font-size:17px;min-height:64px}
+.estado{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);margin-bottom:10px}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--fog)}
+.dot.habla{background:var(--red);animation:pulso 1s infinite}
+.dot.escucha{background:var(--ok);animation:pulso .8s infinite}
+@keyframes pulso{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.5);opacity:.55}}
+.prog{font-size:13px;font-weight:700;color:var(--mute);margin-bottom:6px}
+.cat{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;border-radius:99px;margin-bottom:8px}
+.cat.importante{background:var(--red-soft);color:var(--red-dark)} .cat.informativo{background:#EEF2FF;color:#4F46E5}
+.cat.automatico{background:#EFEDEA;color:var(--mute)} .cat.pospuesto{background:var(--warn-soft);color:var(--warn)}
+.de{font-size:15px;font-weight:700;margin-bottom:2px}
+.asunto{font-size:17px;font-weight:800;line-height:1.3;margin-bottom:8px}
+.resumen{font-size:15px;line-height:1.5;color:var(--iron)}
+.oido{font-size:14px;color:var(--mute);min-height:20px;margin-top:10px;font-style:italic}
+.dicho{font-size:13px;color:var(--mute);margin-top:8px;line-height:1.45}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid .btn{min-height:60px;font-size:14.5px}
+.grid .full{grid-column:1/-1}
+.ajustes{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:13px;font-weight:600;color:var(--mute)}
+.ajustes input[type=range]{width:140px}
+details summary{font-size:13px;font-weight:700;color:var(--mute);cursor:pointer;padding:6px 0}
+details ul{font-size:13px;line-height:1.7;margin:6px 0 0 18px;color:var(--iron)}
+.oculto{display:none!important}
+.hist{font-size:12px;color:var(--mute);line-height:1.6;max-height:140px;overflow:auto}
+</style>
+</head>
+<body>
+<header>
+  <a class="back" href="index.html" aria-label="Volver">‹</a>
+  <div class="tt">Correo por voz<small>Gestiona tu bandeja con la voz</small></div>
+  <div class="av" id="avatar">…</div>
+</header>
+<main>
+  <div id="avisos"></div>
+
+  <div class="card" id="panel-inicio">
+    <div class="estado"><span class="dot" id="dot"></span><span id="estado-txt">Listo para comenzar</span></div>
+    <button class="btn red big" id="btn-comenzar">▶ Escuchar mi correo</button>
+    <p class="dicho" id="inicio-ayuda">Leo primero lo importante, resumido. Después de cada correo dime qué hacer: <b>siguiente</b>, <b>leído</b>, <b>importante</b>, <b>responder</b>, <b>después</b>, <b>archivar</b> o <b>léelo completo</b>.</p>
+  </div>
+
+  <div class="card oculto" id="panel-sesion">
+    <div class="estado"><span class="dot" id="dot2"></span><span id="estado-txt2">—</span></div>
+    <div class="prog" id="prog"></div>
+    <div id="correo-actual"></div>
+    <div class="oido" id="oido"></div>
+    <div class="dicho" id="dicho"></div>
+  </div>
+
+  <div class="card oculto" id="panel-botones">
+    <div class="grid">
+      <button class="btn ghost" data-cmd="siguiente">Siguiente</button>
+      <button class="btn ghost" data-cmd="leido">Leído</button>
+      <button class="btn ghost" data-cmd="importante">⚑ Importante</button>
+      <button class="btn ghost" data-cmd="responder">Responder</button>
+      <button class="btn ghost" data-cmd="despues">Para después</button>
+      <button class="btn ghost" data-cmd="archivar">Archivar</button>
+      <button class="btn ghost" data-cmd="completo">Léelo completo</button>
+      <button class="btn ghost" data-cmd="repetir">Repetir</button>
+      <button class="btn red full" data-cmd="pausa" id="btn-pausa">⏸ Pausar</button>
+    </div>
+  </div>
+
+  <div class="card oculto" id="panel-reanudar">
+    <button class="btn red big" id="btn-reanudar">▶ Continuar</button>
+  </div>
+
+  <div class="card">
+    <div class="ajustes">
+      <label>Velocidad de la voz <input type="range" id="vel" min="0.8" max="1.5" step="0.05" value="1.05"></label>
+      <button class="btn ghost" id="btn-probar" style="min-height:40px;padding:8px 12px;font-size:12px">Probar voz</button>
+    </div>
+    <details style="margin-top:10px"><summary>Comandos de voz</summary>
+      <ul>
+        <li><b>siguiente</b> — pasa al próximo correo</li>
+        <li><b>leído</b> — lo marca como leído y sigue</li>
+        <li><b>importante</b> — le pone bandera</li>
+        <li><b>responder</b> — dictas la respuesta; la repito y la guardo como borrador o la envío solo si lo confirmas</li>
+        <li><b>después</b> — lo deja para después (categoría «Para después»)</li>
+        <li><b>archivar</b> — lo manda a Archivo</li>
+        <li><b>léelo completo</b> — lee el correo entero</li>
+        <li><b>repetir</b>, <b>ayuda</b>, <b>pausa</b></li>
+      </ul>
+    </details>
+    <details style="margin-top:6px"><summary>Lo último que dijimos</summary><div class="hist" id="hist"></div></details>
+  </div>
+</main>
+
+<script>
+'use strict';
+// ═══════════════════════════════════════════════════════════
+// CONFIGURACIÓN
+// ═══════════════════════════════════════════════════════════
+const API = 'https://api.ibaker.cl';
+const CLIENT_ID = '9a56ab1c-d3c4-4460-9892-1d4da768ecfb';          // app de Entra ID (puede cambiarse por una propia del módulo)
+const TENANT = '87c9a653-b08e-42c9-92bc-260458dffc26';
+const GRAPH = 'https://graph.microsoft.com/v1.0';
+const SCOPES = ['User.Read', 'Mail.ReadWrite', 'Mail.Send'];
+// Fase piloto: solo estas personas ven y usan el módulo (el servidor también lo exige).
+const ACCESO_MODULO = ['dvillaseca@ibaker.cl'];
+const CATEGORIA_DESPUES = 'Para después';
+const MAX_CORREOS = 100;
+
+const msalInstance = new msal.PublicClientApplication({
+  auth: { clientId: CLIENT_ID, authority: 'https://login.microsoftonline.com/' + TENANT, redirectUri: window.location.origin + window.location.pathname },
+  cache: { cacheLocation: 'sessionStorage' }
+});
+let emailActual = '', nombreActual = '';
+const $ = id => document.getElementById(id);
+const esperar = ms => new Promise(r => setTimeout(r, ms));
+
+// ═══════════════════════════════════════════════════════════
+// TEXTO
+// ═══════════════════════════════════════════════════════════
+const norm = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9ñ\s]/g, ' ').replace(/\s+/g, ' ').trim();
+const escH = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function nombreLimpio(n) {
+  n = String(n || '').trim().replace(/^"|"$/g, '');
+  const m = n.match(/^([^,]+),\s*(.+)$/);           // "Apellido, Nombre" -> "Nombre Apellido"
+  return m ? (m[2] + ' ' + m[1]).trim() : n;
+}
+function recortar(t, n) { t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n).replace(/\s+\S*$/, '') + '…' : t; }
+function textoParaVoz(t) {                           // sin URLs, correos ni símbolos que suenan raro
+  return String(t || '').replace(/https?:\/\/\S+/g, ' enlace ').replace(/[\w.\-]+@[\w.\-]+/g, ' correo ')
+    .replace(/[_*#<>|~^=\[\]{}]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function limpiarCuerpo(t) {                          // corta el historial citado y las firmas largas
+  t = String(t || '').replace(/\r/g, '');
+  const corte = t.search(/\n\s*(De|From|Enviado( el)?|Sent|Para|El .{5,80} escribió|On .{5,80} wrote)\s*:/i);
+  if (corte > 40) t = t.slice(0, corte);
+  return t.replace(/\n{3,}/g, '\n\n').trim();
+}
+function dictadoATexto(t) {                          // «coma», «punto», «nueva línea»
+  let s = ' ' + String(t || '').trim() + ' ';
+  s = s.replace(/\s+(punto y aparte|punto aparte|nuevo párrafo|nuevo parrafo)\s+/gi, '.\n\n')
+       .replace(/\s+(nueva línea|nueva linea|salto de línea)\s+/gi, '\n')
+       .replace(/\s+coma(?=\s|$)/gi, ',').replace(/\s+punto(?=\s|$)/gi, '.')
+       .replace(/\s+(signo de interrogación|signo de interrogacion)(?=\s|$)/gi, '?');
+  s = s.replace(/\s+([,.?])/g, '$1').trim();
+  if (s) s = s[0].toUpperCase() + s.slice(1);
+  if (s && !/[.!?]$/.test(s)) s += '.';
+  return s;
+}
+
+// ═══════════════════════════════════════════════════════════
+// VOZ (motor del navegador; la interfaz permite cambiarlo después por Azure Speech)
+// ═══════════════════════════════════════════════════════════
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const tts = window.speechSynthesis;
+let velocidad = 1.05;
+let hablaId = 0, reconocedor = null, botonPendiente = null, resolverEntrada = null;
+
+function elegirVoz() {
+  const vs = (tts && tts.getVoices()) || [];
+  const pref = ['es-CL', 'es-MX', 'es-US', 'es-419', 'es-AR', 'es-ES'];
+  for (const p of pref) { const v = vs.find(x => (x.lang || '').replace('_', '-').toLowerCase() === p.toLowerCase()); if (v) return v; }
+  return vs.find(x => /^es/i.test(x.lang || '')) || null;
+}
+function trocear(texto, max) {
+  const frases = String(texto).split(/(?<=[.!?:;])\s+/), partes = []; let acc = '';
+  frases.forEach(f => {
+    if ((acc + ' ' + f).trim().length <= max) acc = (acc + ' ' + f).trim();
+    else { if (acc) partes.push(acc); acc = f; while (acc.length > max) { const i = acc.lastIndexOf(' ', max); partes.push(acc.slice(0, i > 0 ? i : max)); acc = acc.slice(i > 0 ? i : max).trim(); } }
+  });
+  if (acc) partes.push(acc);
+  return partes;
+}
+function cancelarHabla() { hablaId++; try { tts && tts.cancel(); } catch (e) {} }
+function hablar(texto) {
+  texto = String(texto || '').trim();
+  if (!texto) return Promise.resolve();
+  registrar('🔊 ' + texto);
+  $('dicho').textContent = texto.length > 220 ? texto.slice(0, 220) + '…' : texto;
+  if (!tts || botonPendiente) return Promise.resolve();
+  const miId = ++hablaId;
+  setEstado('habla', 'Hablando…');
+  const partes = trocear(textoParaVoz(texto), 200);
+  return new Promise(resolve => {
+    let i = 0;
+    const siguiente = () => {
+      if (miId !== hablaId || i >= partes.length) return resolve();
+      const u = new SpeechSynthesisUtterance(partes[i++]);
+      const v = elegirVoz(); if (v) u.voice = v;
+      u.lang = (v && v.lang) || 'es-CL'; u.rate = velocidad;
+      u.onend = siguiente; u.onerror = () => resolve();
+      try { tts.speak(u); } catch (e) { resolve(); }
+    };
+    siguiente();
+  });
+}
+function abortarEscucha() { try { reconocedor && reconocedor.abort(); } catch (e) {} reconocedor = null; }
+function escuchar(ms) {                                // devuelve el texto reconocido o ''
+  return new Promise(resolve => {
+    if (!SR) return setTimeout(() => resolve(''), ms);
+    const rec = new SR(); reconocedor = rec;
+    rec.lang = 'es-CL'; rec.interimResults = true; rec.maxAlternatives = 1; rec.continuous = false;
+    let final = '', parcial = '', cerrado = false;
+    const cerrar = () => { if (cerrado) return; cerrado = true; clearTimeout(t); if (reconocedor === rec) reconocedor = null; $('oido').textContent = ''; resolve((final || parcial).trim()); };
+    const t = setTimeout(() => { try { rec.stop(); } catch (e) {} setTimeout(cerrar, 700); }, ms);
+    rec.onresult = ev => {
+      parcial = '';
+      for (let i = ev.resultIndex; i < ev.results.length; i++) { const r = ev.results[i]; if (r.isFinal) final += ' ' + r[0].transcript; else parcial += ' ' + r[0].transcript; }
+      $('oido').textContent = '“' + (final + parcial).trim() + '”';
+    };
+    rec.onerror = ev => { if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') errorMicrofono = true; cerrar(); };
+    rec.onend = cerrar;
+    try { setEstado('escucha', 'Te escucho…'); rec.start(); } catch (e) { cerrar(); }
+  });
+}
+let errorMicrofono = false;
+
+// Una entrada puede venir de la voz o de un botón de la pantalla.
+function esperarEntrada(ms) {
+  if (botonPendiente) { const c = botonPendiente; botonPendiente = null; return Promise.resolve({ cmd: c, texto: '' }); }
+  return new Promise(resolve => {
+    resolverEntrada = c => { resolverEntrada = null; resolve({ cmd: c, texto: '' }); };
+    escuchar(ms).then(texto => {
+      if (resolverEntrada === null && botonPendiente) { const c = botonPendiente; botonPendiente = null; return resolve({ cmd: c, texto: '' }); }
+      resolverEntrada = null; resolve({ cmd: null, texto });
+    });
+  });
+}
+function presionarBoton(cmd) {
+  botonPendiente = cmd; cancelarHabla(); abortarEscucha();
+  if (resolverEntrada) { const r = resolverEntrada; botonPendiente = null; r(cmd); }
+}
+
+const CMDS = [
+  ['pausa', /\b(pausa|pausar|pausado|detener|detente|salir|terminar|basta|chao|para ahora)\b/],
+  ['ayuda', /\b(ayuda|comandos|opciones|que puedo)\b/],
+  ['importante', /\b(importante|bandera|destaca|destacar|anclar|ancla)\b/],
+  ['leido', /\b(leido|leida|marcalo|marcar|ya lo lei|visto)\b/],
+  ['responder', /\b(responder|responde|respondele|contestar|contesta|respuesta)\b/],
+  ['despues', /\b(despues|mas tarde|dejalo|dejar|luego|posponer|pospon|pospone)\b/],
+  ['archivar', /\b(archiva|archivar|archivalo|archivo)\b/],
+  ['completo', /\b(completo|entero|leelo|lee lo|lee todo|detalle|todo el correo)\b/],
+  ['repetir', /\b(repite|repetir|otra vez|de nuevo|repitelo)\b/],
+  ['siguiente', /\b(siguiente|proximo|sigue|seguir|pasa|pasalo|avanza|adelante|continuar|continua)\b/],
+];
+function parseCmd(texto) { const t = norm(texto); if (!t) return null; for (const [c, re] of CMDS) if (re.test(t)) return c; return null; }
+const esSi = t => /\b(si|claro|confirmo|confirmado|dale|ok|okey|correcto|exacto|afirmativo|enviala|envia|enviar)\b/.test(norm(t));
+const esNo = t => /\b(no|cancela|cancelar|espera|negativo|detente|olvidalo)\b/.test(norm(t));
+
+// ═══════════════════════════════════════════════════════════
+// MICROSOFT GRAPH
+// ═══════════════════════════════════════════════════════════
+async function token() {
+  const cuenta = msalInstance.getAllAccounts()[0];
+  try { return (await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuenta })).accessToken; }
+  catch (e) { return (await msalInstance.acquireTokenPopup({ scopes: SCOPES, account: cuenta })).accessToken; }
+}
+async function g(metodo, ruta, cuerpo, extra) {
+  const t = await token();
+  const r = await fetch(ruta.startsWith('http') ? ruta : GRAPH + ruta, {
+    method: metodo, headers: Object.assign({ Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, extra || {}),
+    body: cuerpo ? JSON.stringify(cuerpo) : undefined
+  });
+  if (!r.ok) { const txt = await r.text().catch(() => ''); throw new Error('Graph ' + r.status + ' ' + txt.slice(0, 160)); }
+  return r.status === 204 ? null : r.json().catch(() => null);
+}
+async function traerNoLeidos() {
+  const sel = 'id,subject,from,receivedDateTime,bodyPreview,importance,flag,categories,hasAttachments,isRead';
+  let url = GRAPH + '/me/mailFolders/inbox/messages?$filter=isRead eq false&$top=50&$select=' + sel;
+  const out = [];
+  for (let p = 0; p < 3 && url && out.length < MAX_CORREOS; p++) {
+    const j = await g('GET', url, null, { Prefer: 'outlook.body-content-type="text"' });
+    out.push(...(j.value || [])); url = j['@odata.nextLink'] || null;
+  }
+  out.sort((a, b) => String(b.receivedDateTime).localeCompare(String(a.receivedDateTime)));
+  return out.slice(0, MAX_CORREOS);
+}
+const marcarLeido = id => g('PATCH', '/me/messages/' + encodeURIComponent(id), { isRead: true });
+const ponerBandera = id => g('PATCH', '/me/messages/' + encodeURIComponent(id), { flag: { flagStatus: 'flagged' } });
+const archivar = id => g('POST', '/me/messages/' + encodeURIComponent(id) + '/move', { destinationId: 'archive' });
+async function dejarParaDespues(m) {
+  const cats = Array.from(new Set([...(m.categories || []), CATEGORIA_DESPUES]));
+  await g('PATCH', '/me/messages/' + encodeURIComponent(m.id), { categories: cats }); m.categories = cats;
+}
+async function cuerpoCompleto(id) {
+  const j = await g('GET', '/me/messages/' + encodeURIComponent(id) + '?$select=body', null, { Prefer: 'outlook.body-content-type="text"' });
+  return limpiarCuerpo((j && j.body && j.body.content) || '');
+}
+const guardarBorrador = (id, texto) => g('POST', '/me/messages/' + encodeURIComponent(id) + '/createReply', { comment: texto });
+const enviarRespuesta = (id, texto) => g('POST', '/me/messages/' + encodeURIComponent(id) + '/reply', { comment: texto });
+
+// ═══════════════════════════════════════════════════════════
+// CLASIFICACIÓN
+// ═══════════════════════════════════════════════════════════
+const AUTO_DE = /(no[-_.]?reply|noreply|do[-_.]?not[-_.]?reply|notificaci|newsletter|mailer|bounce|alerts?@|avisos?@|system|sistema@|boletin|marketing|info@|news@|updates?@|automat)/i;
+const AUTO_ASUNTO = /(newsletter|bolet[ií]n|notificaci[oó]n|recordatorio autom|no responder|unsubscribe|promoci[oó]n|oferta|resumen (diario|semanal)|your (receipt|order)|factura electr[oó]nica|confirmaci[oó]n de)/i;
+const ACCION = /(urgente|por favor|favor|solicito|solicitamos|aprobaci[oó]n|aprobar|autorizar|autorizaci[oó]n|necesito|requiero|plazo|vence|vencimiento|hoy|ma[nñ]ana|confirmar|confirma|revisar|responder|reuni[oó]n|firma|firmar)/i;
+function clasificarLocal(m) {
+  const de = ((m.from && m.from.emailAddress && m.from.emailAddress.address) || '') + ' ' + ((m.from && m.from.emailAddress && m.from.emailAddress.name) || '');
+  const asunto = m.subject || '', prev = m.bodyPreview || '';
+  if (AUTO_DE.test(de) || AUTO_ASUNTO.test(asunto)) return 'automatico';
+  if (m.importance === 'high' || (m.flag && m.flag.flagStatus === 'flagged') || ACCION.test(asunto + ' ' + prev.slice(0, 200)) || /\?/.test(prev.slice(0, 200))) return 'importante';
+  return 'informativo';
+}
+function resumenLocal(m) {
+  const prev = textoParaVoz(m.bodyPreview || '');
+  return prev ? recortar(prev, 170) : 'Sin texto en el cuerpo.';
+}
+async function analizar(correos) {
+  const base = correos.map(m => ({ m, categoria: clasificarLocal(m), resumen: resumenLocal(m), ia: false }));
+  try {
+    const t = await token();
+    const r = await fetch(API + '/correo-voz/analizar', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t },
+      body: JSON.stringify({ correos: correos.map(m => ({
+        id: m.id, de: nombreLimpio(m.from && m.from.emailAddress && m.from.emailAddress.name) + ' <' + ((m.from && m.from.emailAddress && m.from.emailAddress.address) || '') + '>',
+        asunto: m.subject || '', fragmento: (m.bodyPreview || '').slice(0, 400), importancia: m.importance || '',
+        conBandera: !!(m.flag && m.flag.flagStatus === 'flagged'), fecha: m.receivedDateTime || ''
+      })), contexto: 'Gerente que viaja entre obras. Son importantes los correos de jefatura, jefes de obra y los que piden una acción.' })
+    });
+    if (r.ok) {
+      const j = await r.json();
+      if (j.ia && j.items && j.items.length) {
+        const por = new Map(j.items.map(i => [i.id, i]));
+        base.forEach(b => { const i = por.get(b.m.id); if (i) { b.categoria = i.categoria; if (i.resumen) b.resumen = i.resumen; b.ia = true; } });
+        return { items: base, ia: true };
+      }
+      return { items: base, ia: false, motivo: j.motivo || '' };
+    }
+    return { items: base, ia: false, motivo: 'El servidor respondió ' + r.status };
+  } catch (e) { return { items: base, ia: false, motivo: e.message }; }
+}
+
+// ═══════════════════════════════════════════════════════════
+// SESIÓN
+// ═══════════════════════════════════════════════════════════
+let sesionId = 0;
+let S = null;                                         // { cola, idx, autos, estado }
+class Cancelado extends Error {}
+const vivo = id => { if (id !== sesionId) throw new Cancelado(); };
+
+function setEstado(tipo, txt) {
+  ['dot', 'dot2'].forEach(i => { $(i).className = 'dot ' + (tipo || ''); });
+  $('estado-txt').textContent = txt; $('estado-txt2').textContent = txt;
+}
+function registrar(t) { const h = $('hist'); h.innerHTML = '<div>' + escH(t) + '</div>' + h.innerHTML; }
+function aviso(clase, html) { $('avisos').innerHTML = html ? '<div class="banner ' + clase + '">' + html + '</div>' : ''; }
+function mostrarPaneles(modo) {
+  $('panel-inicio').classList.toggle('oculto', modo !== 'inicio');
+  $('panel-sesion').classList.toggle('oculto', modo === 'inicio');
+  $('panel-botones').classList.toggle('oculto', modo !== 'activa');
+  $('panel-reanudar').classList.toggle('oculto', modo !== 'pausada');
+}
+function mostrarCorreo(item, pos, total, etiqueta) {
+  const m = item.m, de = nombreLimpio(m.from && m.from.emailAddress && m.from.emailAddress.name) || (m.from && m.from.emailAddress && m.from.emailAddress.address) || 'Remitente desconocido';
+  $('prog').textContent = 'Correo ' + pos + ' de ' + total;
+  $('correo-actual').innerHTML = '<span class="cat ' + etiqueta + '">' + ({ importante: 'Importante', informativo: 'Informativo', automatico: 'Automático', pospuesto: 'Para después' }[etiqueta]) + '</span>' +
+    '<div class="de">' + escH(de) + '</div><div class="asunto">' + escH(m.subject || '(sin asunto)') + '</div><div class="resumen">' + escH(item.resumen) + '</div>';
+}
+function nombreCorto(m) { return nombreLimpio(m.from && m.from.emailAddress && m.from.emailAddress.name) || 'remitente desconocido'; }
+const plural = (n, s, p) => n + ' ' + (n === 1 ? s : p);
+
+async function comenzar() {
+  const miId = ++sesionId;
+  mostrarPaneles('activa'); aviso('', '');
+  setEstado('', 'Revisando tu bandeja…'); $('correo-actual').innerHTML = ''; $('prog').textContent = '';
+  try {
+    await hablar('Revisando tu bandeja de entrada.');
+    const crudos = await traerNoLeidos(); vivo(miId);
+    if (!crudos.length) { await hablar('No tienes correos sin leer. Buen viaje.'); terminar(); return; }
+    const { items, ia, motivo } = await analizar(crudos); vivo(miId);
+    if (!ia) aviso('info', 'Resumí con reglas simples porque la IA no estuvo disponible' + (motivo ? ' (' + escH(motivo) + ')' : '') + '.');
+    const pos = [], imp = [], inf = [], aut = [];
+    items.forEach(i => {
+      if ((i.m.categories || []).includes(CATEGORIA_DESPUES)) pos.push(i);
+      else if (i.categoria === 'importante') imp.push(i); else if (i.categoria === 'automatico') aut.push(i); else inf.push(i);
+    });
+    const cola = [...imp.map(i => ({ i, etiqueta: 'importante' })), ...inf.map(i => ({ i, etiqueta: 'informativo' })), ...pos.map(i => ({ i, etiqueta: 'pospuesto' }))];
+    S = { cola, idx: 0, autos: aut, intro: true };
+    const partes = [plural(imp.length, 'importante', 'importantes'), plural(inf.length, 'informativo', 'informativos'), plural(aut.length, 'automático', 'automáticos')];
+    let intro = 'Tienes ' + plural(crudos.length, 'correo sin leer', 'correos sin leer') + ': ' + partes.join(', ') + '.';
+    if (pos.length) intro += ' Además, ' + plural(pos.length, 'lo dejaste', 'los dejaste') + ' para después.';
+    intro += ' Empiezo por los importantes. Tras cada correo dime qué hago.';
+    await hablar(intro); vivo(miId);
+    await recorrer(miId);
+  } catch (e) { if (!(e instanceof Cancelado)) { console.error(e); aviso('err', 'Error: ' + escH(e.message)); setEstado('', 'Detenido'); await hablar('Tuve un problema: ' + e.message).catch(() => {}); } }
+}
+
+async function recorrer(miId) {
+  while (S && S.idx < S.cola.length) {
+    vivo(miId);
+    const { i, etiqueta } = S.cola[S.idx];
+    const r = await atender(miId, i, etiqueta, S.idx + 1, S.cola.length);
+    vivo(miId);
+    if (r === 'pausa') { pausar('Pausado en el correo ' + (S.idx + 1) + ' de ' + S.cola.length + '.'); return; }
+    S.idx++;
+  }
+  vivo(miId);
+  await gruposAutomaticos(miId);
+  vivo(miId);
+  await hablar('Terminé tu bandeja. Buen viaje.');
+  terminar();
+}
+
+async function atender(miId, item, etiqueta, pos, total) {
+  const m = item.m;
+  mostrarCorreo(item, pos, total, etiqueta);
+  const intro = 'Correo ' + pos + ' de ' + total + '. De ' + nombreCorto(m) + '. Asunto: ' + (m.subject || 'sin asunto') + '. ' + item.resumen;
+  await hablar(intro); vivo(miId);
+  let silencios = 0, confusos = 0, pidioCompleto = false;
+  for (;;) {
+    vivo(miId);
+    if (!botonPendiente) await hablar('¿Qué hago?'); vivo(miId);
+    const e = await esperarEntrada(8000); vivo(miId);
+    let cmd = e.cmd || parseCmd(e.texto);
+    if (!e.cmd && !e.texto) {
+      if (errorMicrofono) { await hablar('No puedo usar el micrófono. Revisa el permiso del navegador o usa los botones.'); errorMicrofono = false; return 'pausa'; }
+      if (++silencios >= 2) { await hablar('No te escucho, dejo la lectura en pausa.'); return 'pausa'; }
+      continue;
+    }
+    registrar('🎤 ' + (e.cmd ? '(botón) ' + e.cmd : e.texto));
+    if (!cmd) {
+      if (++confusos >= 3) { await hablar('Puedes decir: siguiente, leído, importante, responder, después, archivar o léelo completo.'); confusos = 0; }
+      else await hablar('No te entendí.');
+      continue;
+    }
+    silencios = 0; confusos = 0;
+    try {
+      switch (cmd) {
+        case 'siguiente': return 'siguiente';
+        case 'leido': await marcarLeido(m.id); await hablar('Marcado como leído.'); return 'siguiente';
+        case 'importante': await ponerBandera(m.id); await marcarLeido(m.id).catch(() => {}); await hablar('Le puse bandera.'); return 'siguiente';
+        case 'despues': await dejarParaDespues(m); await hablar('Lo dejo para después.'); return 'siguiente';
+        case 'archivar': await marcarLeido(m.id).catch(() => {}); await archivar(m.id); await hablar('Archivado.'); return 'siguiente';
+        case 'repetir': await hablar(intro); continue;
+        case 'ayuda': await hablar('Puedes decir: siguiente, leído, importante, responder, después, archivar, léelo completo, repetir o pausa.'); continue;
+        case 'pausa': return 'pausa';
+        case 'completo': {
+          const cuerpo = await cuerpoCompleto(m.id); vivo(miId);
+          if (!cuerpo) { await hablar('Este correo no tiene texto para leer.'); continue; }
+          const trozos = trocear(cuerpo.replace(/\n+/g, '. '), 600);
+          for (let k = 0; k < trozos.length; k++) {
+            await hablar(trozos[k]); vivo(miId);
+            if (botonPendiente) break;
+            if (k < trozos.length - 1) {
+              await hablar('¿Sigo leyendo?'); const r = await esperarEntrada(5000); vivo(miId);
+              const tr = norm(r.texto || '');
+              if (r.cmd) { botonPendiente = r.cmd; break; }
+              if (tr && (esSi(tr) || /\b(sigue|sigo|continua|continuar|seguir|mas)\b/.test(tr)) && !esNo(tr)) continue;   // sigue leyendo
+              const c2 = parseCmd(tr);
+              if (c2 && c2 !== 'completo') botonPendiente = c2;
+              break;                                                                       // cualquier otra cosa: deja de leer
+            }
+          }
+          if (!botonPendiente) await hablar('Fin del correo.');
+          pidioCompleto = true; continue;
+        }
+        case 'responder': {
+          const r = await flujoRespuesta(miId, m); vivo(miId);
+          if (r === 'hecho') return 'siguiente';
+          continue;
+        }
+      }
+    } catch (err) { if (err instanceof Cancelado) throw err; console.error(err); await hablar('No pude hacerlo. ' + (/403|401/.test(err.message) ? 'Falta el permiso de correo.' : 'Hubo un error con el correo.')); }
+  }
+}
+
+async function flujoRespuesta(miId, m) {
+  let texto = '';
+  for (;;) {
+    vivo(miId);
+    await hablar(texto ? 'Dime la nueva respuesta.' : 'Dime tu respuesta. Cuando termines, haz una pausa.'); vivo(miId);
+    const dictado = await escuchar(20000); vivo(miId);
+    if (!dictado) { await hablar('No escuché nada. Cancelo la respuesta.'); return 'cancelado'; }
+    texto = dictadoATexto(dictado); registrar('🎤 (dictado) ' + dictado);
+    for (;;) {
+      await hablar('Tu respuesta es: ' + texto + ' ¿La guardo como borrador, la envío, o la repito?'); vivo(miId);
+      const e = await esperarEntrada(9000); vivo(miId);
+      const t = norm(e.texto || '');
+      if (!t) { await hablar('No te escuché. No envié nada; cancelo la respuesta.'); return 'cancelado'; }
+      registrar('🎤 ' + e.texto);
+      if (/\b(cancela|cancelar|descarta|olvidalo)\b/.test(t)) { await hablar('Respuesta cancelada.'); return 'cancelado'; }
+      if (/\b(repite|repetir|otra vez|de nuevo|cambia|cambiar|corrige)\b/.test(t)) break;                // vuelve a dictar
+      if (/\b(lee|leela|escucha)\b/.test(t)) continue;
+      if (/\b(guarda|guardar|guardala|borrador)\b/.test(t)) {
+        await guardarBorrador(m.id, texto); vivo(miId); await marcarLeido(m.id).catch(() => {});
+        await hablar('Guardé la respuesta como borrador.'); return 'hecho';
+      }
+      if (/\b(envia|enviar|enviala|manda|mandar|mandala)\b/.test(t)) {
+        await hablar('Confirmo: envío esta respuesta a ' + nombreCorto(m) + '. ¿Sí o no?'); vivo(miId);
+        const c = await esperarEntrada(7000); vivo(miId);
+        if (c.texto && esSi(c.texto) && !esNo(c.texto)) {
+          await enviarRespuesta(m.id, texto); vivo(miId); await marcarLeido(m.id).catch(() => {});
+          await hablar('Respuesta enviada.'); return 'hecho';
+        }
+        await hablar('No la envié.'); continue;
+      }
+      await hablar('Di guardar, enviar, repetir o cancelar.');
+    }
+  }
+}
+
+async function gruposAutomaticos(miId) {
+  if (!S || !S.autos.length) return;
+  const n = S.autos.length;
+  $('prog').textContent = 'Automáticos'; $('correo-actual').innerHTML = '<span class="cat automatico">Automáticos</span><div class="asunto">' + plural(n, 'correo automático', 'correos automáticos') + '</div><div class="resumen">Notificaciones y boletines.</div>';
+  await hablar('Quedan ' + plural(n, 'correo automático', 'correos automáticos') + ', notificaciones y boletines. ¿Los marco como leídos? Puedes decir sí, no, o léelos.'); vivo(miId);
+  for (let intento = 0; intento < 2; intento++) {
+    const e = await esperarEntrada(8000); vivo(miId);
+    const t = norm(e.texto || '');
+    if (/\b(lee|leelos|lista)\b/.test(t)) {
+      const lista = S.autos.slice(0, 8).map(a => nombreCorto(a.m) + ': ' + (a.m.subject || 'sin asunto')).join('. ');
+      await hablar(lista + (n > 8 ? '. Y ' + (n - 8) + ' más.' : '')); vivo(miId);
+      await hablar('¿Los marco como leídos?'); intento = -1; continue;
+    }
+    if (t && esSi(t) && !esNo(t)) {
+      let hechos = 0; const lote = S.autos.slice();
+      for (let k = 0; k < lote.length; k += 5) { await Promise.all(lote.slice(k, k + 5).map(a => marcarLeido(a.m.id).then(() => hechos++).catch(() => {}))); vivo(miId); }
+      await hablar('Marqué ' + plural(hechos, 'correo', 'correos') + ' como leídos.'); return;
+    }
+    if (t && esNo(t)) { await hablar('Los dejo como están.'); return; }
+  }
+}
+
+function pausar(msg) {
+  sesionId++; cancelarHabla(); abortarEscucha(); botonPendiente = null; resolverEntrada = null;
+  if (S) { S.estadoPausa = true; }
+  setEstado('', msg || 'En pausa'); mostrarPaneles('pausada');
+  $('btn-reanudar').textContent = S ? '▶ Continuar en el correo ' + Math.min(S.idx + 1, S.cola.length) + ' de ' + S.cola.length : '▶ Continuar';
+}
+async function reanudar() {
+  if (!S) return comenzar();
+  const miId = ++sesionId; mostrarPaneles('activa'); S.estadoPausa = false;
+  try {
+    await hablar('Retomo en el correo ' + Math.min(S.idx + 1, S.cola.length) + ' de ' + S.cola.length + '.'); vivo(miId);
+    await recorrer(miId);
+  } catch (e) { if (!(e instanceof Cancelado)) { console.error(e); aviso('err', 'Error: ' + escH(e.message)); } }
+}
+function terminar() { sesionId++; cancelarHabla(); S = null; setEstado('', 'Listo para comenzar'); mostrarPaneles('inicio'); $('oido').textContent = ''; }
+
+// Llamadas, cambio de app o pantalla bloqueada: se pausa y se retoma donde iba.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { if (S && !S.estadoPausa && !$('panel-sesion').classList.contains('oculto')) pausar('Pausado en el correo ' + (S.idx + 1) + ' de ' + S.cola.length + '.'); }
+  else if (S && S.estadoPausa) setTimeout(() => { if (S && S.estadoPausa && !document.hidden) reanudar(); }, 1200);
+});
+if ('mediaSession' in navigator) {
+  try {
+    navigator.mediaSession.setActionHandler('pause', () => presionarBoton('pausa'));
+    navigator.mediaSession.setActionHandler('nexttrack', () => presionarBoton('siguiente'));
+    navigator.mediaSession.setActionHandler('play', () => { if (S && S.estadoPausa) reanudar(); });
+  } catch (e) {}
+}
+
+// ═══════════════════════════════════════════════════════════
+// ARRANQUE
+// ═══════════════════════════════════════════════════════════
+document.querySelectorAll('[data-cmd]').forEach(b => b.addEventListener('click', () => {
+  const c = b.dataset.cmd; if (c === 'pausa' && S) { pausar('Pausado en el correo ' + (S.idx + 1) + ' de ' + S.cola.length + '.'); return; }
+  presionarBoton(c);
+}));
+$('btn-comenzar').addEventListener('click', comenzar);
+$('btn-reanudar').addEventListener('click', reanudar);
+$('vel').addEventListener('input', e => { velocidad = parseFloat(e.target.value); try { localStorage.setItem('cv_vel', velocidad); } catch (x) {} });
+$('btn-probar').addEventListener('click', () => hablar('Hola. Así sonará la lectura de tus correos.'));
+try { const v = parseFloat(localStorage.getItem('cv_vel')); if (v >= 0.8 && v <= 1.5) { velocidad = v; $('vel').value = v; } } catch (x) {}
+if (tts && tts.onvoiceschanged !== undefined) tts.onvoiceschanged = () => {};
+
+async function initAuth() {
+  try {
+    await msalInstance.initialize();
+    await msalInstance.handleRedirectPromise().catch(() => {});
+    const cuentas = msalInstance.getAllAccounts();
+    if (!cuentas.length) { await msalInstance.loginRedirect({ scopes: SCOPES }); return; }
+    emailActual = cuentas[0].username.toLowerCase(); nombreActual = cuentas[0].name || emailActual;
+    $('avatar').textContent = (nombreActual.split(/\s+/).map(p => p[0]).join('').slice(0, 2) || '?').toUpperCase();
+    if (!ACCESO_MODULO.includes(emailActual)) { window.location.href = 'index.html'; return; }
+    if (!SR) aviso('err', 'Este navegador no permite reconocimiento de voz. Puedes usar los botones; para hablar usa Chrome (Android) o Safari (iPhone).');
+    else if (!tts) aviso('err', 'Este navegador no puede leer en voz alta.');
+  } catch (e) { console.error(e); window.location.href = 'index.html'; }
+}
+initAuth();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw-voz.js').catch(() => {});
+</script>
+</body>
+</html>
