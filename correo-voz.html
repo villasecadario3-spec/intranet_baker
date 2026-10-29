@@ -117,6 +117,8 @@ details ul{font-size:13px;line-height:1.7;margin:6px 0 0 18px;color:var(--iron)}
       <button class="btn ghost" id="btn-probar" style="min-height:40px;padding:8px 12px;font-size:12px">Probar voz</button>
     </div>
     <div class="dicho" id="voz-info"></div>
+    <button class="btn ghost" id="btn-diag" style="min-height:40px;padding:8px 12px;font-size:12px;margin-top:10px">🔧 Diagnóstico de voz</button>
+    <pre id="diag" class="oculto" style="margin-top:10px;font-size:11.5px;line-height:1.5;white-space:pre-wrap;background:#F1EFEC;border-radius:10px;padding:10px;color:var(--ink)"></pre>
     <details style="margin-top:10px"><summary>Comandos de voz</summary>
       <ul>
         <li><b>siguiente</b> — pasa al próximo correo</li>
@@ -617,9 +619,58 @@ document.querySelectorAll('[data-cmd]').forEach(b => b.addEventListener('click',
   const c = b.dataset.cmd; if (c === 'pausa' && S) { pausar('Pausado en el correo ' + (S.idx + 1) + ' de ' + S.cola.length + '.'); return; }
   presionarBoton(c);
 }));
+/* Audio por canal de "medios": suena aunque el iPhone esté en silencio */
+let audioMedios = null;
+function activarAudioMedios() {
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+  try {
+    if (!audioMedios) {
+      const n = 8000, b = new Uint8Array(44 + n), dv = new DataView(b.buffer);
+      const w = (o, t) => { for (let i = 0; i < t.length; i++) b[o + i] = t.charCodeAt(i); };
+      w(0, 'RIFF'); dv.setUint32(4, 36 + n, true); w(8, 'WAVEfmt '); dv.setUint32(16, 16, true);
+      dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, 8000, true);
+      dv.setUint32(28, 8000, true); dv.setUint16(32, 1, true); dv.setUint16(34, 8, true);
+      w(36, 'data'); dv.setUint32(40, n, true); b.fill(128, 44);
+      audioMedios = new Audio(URL.createObjectURL(new Blob([b], { type: 'audio/wav' })));
+      audioMedios.loop = true; audioMedios.setAttribute('playsinline', '');
+    }
+    if (audioMedios.paused) { const pr = audioMedios.play(); if (pr && pr.catch) pr.catch(() => {}); }
+  } catch (e) {}
+}
+['click', 'touchend'].forEach(ev => document.addEventListener(ev, activarAudioMedios, { capture: true }));
 $('btn-comenzar').addEventListener('click', comenzar);
 $('btn-reanudar').addEventListener('click', reanudar);
 $('vel').addEventListener('input', e => { velocidad = parseFloat(e.target.value); try { localStorage.setItem('cv_vel', velocidad); } catch (x) {} });
+$('btn-diag').addEventListener('click', async () => {
+  const out = $('diag'); out.classList.remove('oculto'); const L = [];
+  const pinta = () => { out.textContent = L.join('\n'); };
+  const add = t => { L.push(t); pinta(); };
+  add('Página segura (https): ' + (window.isSecureContext ? 'sí' : 'NO'));
+  add('Navegador: ' + navigator.userAgent.replace(/\s+/g, ' ').slice(0, 120));
+  add('Modo app instalada: ' + (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone ? 'sí' : 'no'));
+  add('Lectura en voz (speechSynthesis): ' + (tts ? 'disponible' : 'NO DISPONIBLE'));
+  add('Reconocimiento de voz: ' + (SR ? 'disponible' : 'NO DISPONIBLE'));
+  if (tts) {
+    const vs = tts.getVoices() || [];
+    add('Voces instaladas: ' + vs.length + ' (en español: ' + vs.filter(v => /^es/i.test(v.lang)).map(v => v.name + ' ' + v.lang).slice(0, 4).join(', ') + ')');
+    add('Estado: ' + (tts.speaking ? 'hablando ' : '') + (tts.paused ? 'PAUSADO ' : '') + (tts.pending ? 'en cola' : 'libre'));
+    await new Promise(res => {
+      const t0 = Date.now(); const u = new SpeechSynthesisUtterance('Hola, probando la voz.'); refsHabla.add(u);
+      const v = elegirVoz(); if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'es-MX';
+      u.volume = 1; u.rate = 1;
+      u.onstart = () => add('→ la voz EMPEZÓ a sonar (' + (Date.now() - t0) + ' ms)');
+      u.onend = () => { add('→ la voz TERMINÓ (' + (Date.now() - t0) + ' ms)'); res(); };
+      u.onerror = ev => { add('→ ERROR de voz: ' + (ev && ev.error)); res(); };
+      setTimeout(() => { add('→ (sin respuesta a los 6 s)'); res(); }, 6000);
+      try { if (tts.paused) tts.resume(); tts.speak(u); add('Probando: debería oírse «Hola, probando la voz».'); } catch (e) { add('→ excepción: ' + e.message); res(); }
+    });
+  }
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    try { const st = await navigator.mediaDevices.getUserMedia({ audio: true }); st.getTracks().forEach(x => x.stop()); add('Micrófono: permitido ✔'); }
+    catch (e) { add('Micrófono: ' + (e.name || 'error') + ' — ' + (e.message || '')); }
+  } else add('Micrófono: el navegador no expone getUserMedia');
+  add('Listo. Si «empezó» y «terminó» pero no se oyó nada: revisa volumen e interruptor de silencio.');
+});
 $('btn-probar').addEventListener('click', () => hablar('Hola. Así sonará la lectura de tus correos.'));
 try { const v = parseFloat(localStorage.getItem('cv_vel')); if (v >= 0.8 && v <= 1.5) { velocidad = v; $('vel').value = v; } } catch (x) {}
 function mostrarInfoVoz() {
