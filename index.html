@@ -676,6 +676,14 @@
                 <div class="mod-desc">Escucha tu bandeja de entrada y gestiónala con la voz mientras viajas.</div>
                 <div class="mod-link">Acceder <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
             </a>
+            <a class="mod-card" href="panel-obras/index.html" data-modulo="panel-obras/index.html" data-nombre="Panel de Control de Obras">
+                <div class="mod-top">
+                    <div class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="0.5"/><rect x="12" y="8" width="3" height="10" rx="0.5"/><rect x="17" y="5" width="3" height="13" rx="0.5"/></svg></div>
+                </div>
+                <div class="mod-nombre">Panel de Control de Obras</div>
+                <div class="mod-desc">Control de costos y estimación a término (EAT) de las obras.</div>
+                <div class="mod-link">Acceder <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+            </a>
             <a class="mod-card" href="control-bodega.html" data-modulo="control-bodega.html" data-nombre="Control de Bodega">
                 <div class="mod-top">
                     <div class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V21H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg></div>
@@ -958,6 +966,7 @@ init();
 // ── CONTROL DE VISIBILIDAD DE MÓDULOS ────────────────────────
 const ACCESOS_MODULOS = {
     "correo-voz.html": ["dvillaseca@ibaker.cl", "jdiaz@ibaker.cl", "jcumplido@ibaker.cl", "alarrain@ibaker.cl"],
+    "panel-obras/index.html": ["jcumplido@ibaker.cl"],
     "rutas-estacionamientos.html": [
         "dvillaseca@ibaker.cl", "jzamora@ibaker.cl", "tsanmartin@ibaker.cl",
         "crivera@ibaker.cl", "jcumplido@ibaker.cl", "gilabaca@ibaker.cl",
@@ -1041,6 +1050,13 @@ async function aplicarAccesos(email) {
         if (r.ok) ACCESOS_MODULOS['registro-mo.html'] = [correo];
         else if (r.status === 403) ACCESOS_MODULOS['registro-mo.html'] = [];
     } catch(e) { console.warn('No se pudo consultar el acceso a Registro de Mano de Obra:', e.message); }
+    // Panel de Control de Obras: la tarjeta aparece si el servicio del Panel reconoce a la persona en su lista de usuarios
+    // (la administra el Administrador del Panel). Si no responde, queda la lista fija.
+    try {
+        const t = await msalInstance.acquireTokenSilent({ scopes: ['User.Read'], account: msalInstance.getAllAccounts()[0] });
+        const r = await fetch('https://api.ibaker.cl/panel-obras/me', { headers: { Authorization: 'Bearer ' + t.accessToken } });
+        if (r.ok) { const me = await r.json(); ACCESOS_MODULOS['panel-obras/index.html'] = (me.obras === '*' || (Array.isArray(me.obras) && me.obras.length)) ? [correo] : []; }
+    } catch(e) { console.warn('No se pudo consultar el acceso al Panel de Control de Obras:', e.message); }
     document.querySelectorAll('[data-modulo]').forEach(card => {
         const modulo = card.getAttribute('data-modulo');
         const lista  = ACCESOS_MODULOS[modulo];
