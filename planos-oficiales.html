@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planos oficiales — Baker</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+    <style>
+        :root {
+            --rojo:#C0392B;--negro:#111010;--negro-3:#242220;--borde-dark:#2E2C2A;
+            --crema:#F8F6F3;--gris-1:#F0EDE9;--gris-2:#E2DED9;--gris-3:#B5B0AA;
+            --txt:#1C1A18;--txt-mid:#6B6762;--txt-dim:#A09C97;
+            --verde:#27ae60;--azul:#2e86c1;--amarillo:#f39c12;
+        }
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'DM Sans',sans-serif;background:var(--crema);color:var(--txt);min-height:100vh}
+
+        nav{position:sticky;top:0;z-index:100;background:rgba(17,16,16,0.95);backdrop-filter:blur(24px);border-bottom:1px solid var(--borde-dark);height:60px;display:flex;align-items:center;padding:0 48px;gap:16px}
+        .nav-logo{text-decoration:none}.nav-logo img{height:26px;background:white;border-radius:6px;padding:4px 10px;display:block}
+        .nav-sep{width:1px;height:18px;background:var(--borde-dark)}
+        .nav-back{display:flex;align-items:center;gap:6px;color:var(--gris-3);text-decoration:none;font-size:0.78rem;font-weight:500;transition:color 0.2s}
+        .nav-back:hover{color:white}.nav-back svg{width:14px;height:14px}
+        .nav-title{font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--gris-3);letter-spacing:0.1em;text-transform:uppercase}
+        .nav-spacer{flex:1}
+        .user-chip{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;background:var(--negro-3);border:1px solid var(--borde-dark);border-radius:100px}
+        .user-av{width:26px;height:26px;border-radius:50%;background:var(--rojo);display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:white}
+        .user-nm{font-size:0.78rem;font-weight:500;color:white;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+        .page-header{background:var(--negro);padding:36px 48px 32px;border-bottom:1px solid var(--borde-dark);position:relative;overflow:hidden}
+        .page-header::before{content:'';position:absolute;inset:0;background-image:linear-gradient(var(--borde-dark) 1px,transparent 1px),linear-gradient(90deg,var(--borde-dark) 1px,transparent 1px);background-size:40px 40px;opacity:0.3}
+        .page-header::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 50% 100% at 0% 50%,rgba(192,57,43,0.08) 0%,transparent 70%)}
+        .page-header-inner{position:relative;z-index:2;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+        .page-eyebrow{font-size:0.65rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--rojo);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+        .page-eyebrow::before{content:'';width:16px;height:1px;background:var(--rojo)}
+        .page-header h1{font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:700;color:white;letter-spacing:-0.02em;line-height:1.1}
+        .page-header h1 em{font-style:italic;color:var(--rojo)}
+        .page-header-sub{font-size:0.82rem;color:#6b6762;margin-top:8px}
+        .btn-subir{display:flex;align-items:center;gap:7px;padding:9px 18px;background:var(--rojo);color:white;border:none;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:0.85rem;font-weight:600;cursor:pointer;transition:background 0.2s;white-space:nowrap}
+        .btn-subir:hover{background:#a93226}
+        .btn-subir svg{width:14px;height:14px}
+
+        .main{padding:32px 48px 80px;max-width:900px}
+
+        /* ── TABS ────────────────────────────── */
+        .tabs{display:flex;gap:4px;margin-bottom:24px;border-bottom:1px solid var(--gris-2);padding-bottom:0}
+        .tab{padding:9px 18px;font-size:0.84rem;font-weight:500;color:var(--txt-mid);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s}
+        .tab:hover{color:var(--txt)}
+        .tab.activo{color:var(--rojo);border-bottom-color:var(--rojo);font-weight:600}
+        .tab-panel{display:none}.tab-panel.activo{display:block}
+
+        /* ── BÚSQUEDA ────────────────────────── */
+        .search-wrap{position:relative;margin-bottom:20px}
+        .search-wrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--txt-dim)}
+        .search-input{width:100%;padding:10px 14px 10px 38px;border:1px solid var(--gris-2);border-radius:10px;background:white;color:var(--txt);font-family:'DM Sans',sans-serif;font-size:0.88rem;transition:border-color 0.2s}
+        .search-input:focus{outline:none;border-color:var(--rojo)}
+        .search-input::placeholder{color:var(--txt-dim)}
+
+        /* ── DOCUMENTOS ──────────────────────── */
+        .doc-list{display:flex;flex-direction:column;gap:10px}
+        .doc-card{background:white;border:1px solid var(--gris-2);border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:16px;transition:all 0.15s}
+        .doc-card:hover{border-color:var(--rojo);box-shadow:0 4px 16px rgba(192,57,43,0.08)}
+        .doc-icon{width:42px;height:42px;border-radius:8px;background:rgba(192,57,43,0.08);border:1px solid rgba(192,57,43,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .doc-icon svg{width:20px;height:20px;color:var(--rojo)}
+        .doc-info{flex:1;min-width:0}
+        .doc-nombre{font-size:0.9rem;font-weight:600;color:var(--txt)}
+        .doc-meta{font-size:0.74rem;color:var(--txt-dim);margin-top:3px}
+        .doc-acciones{display:flex;gap:8px;flex-shrink:0}
+        .btn-doc{display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.8rem;font-weight:500;cursor:pointer;text-decoration:none;transition:all 0.15s;border:1px solid}
+        .btn-ver{background:var(--rojo);border-color:var(--rojo);color:white}
+        .btn-ver:hover{background:#a93226;border-color:#a93226}
+        .btn-dl{background:white;border-color:var(--gris-2);color:var(--txt-mid)}
+        .btn-dl:hover{border-color:var(--gris-3);color:var(--txt)}
+
+        /* ── Carpetas ────────────────────────── */
+        .carpetas-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+        .carpeta-card{background:white;border:1px solid var(--gris-2);border-radius:14px;padding:20px;cursor:pointer;transition:all 0.15s;display:flex;flex-direction:column;gap:10px}
+        .carpeta-card:hover{border-color:var(--rojo);box-shadow:0 6px 20px rgba(192,57,43,0.1);transform:translateY(-1px)}
+        .carpeta-icon{width:44px;height:44px;border-radius:10px;background:rgba(192,57,43,0.08);border:1px solid rgba(192,57,43,0.15);display:flex;align-items:center;justify-content:center}
+        .carpeta-icon svg{width:22px;height:22px;color:var(--rojo)}
+        .carpeta-nombre{font-size:0.92rem;font-weight:700;color:var(--txt)}
+        .carpeta-count{font-size:0.74rem;color:var(--txt-dim)}
+        .breadcrumb{display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:0.82rem}
+        .breadcrumb a{color:var(--txt-mid);text-decoration:none;cursor:pointer}
+        .breadcrumb a:hover{color:var(--rojo)}
+        .breadcrumb .actual{color:var(--txt);font-weight:600}
+        .breadcrumb .sep{color:var(--txt-dim)}
+        .carpeta-badge{display:inline-block;padding:2px 9px;border-radius:100px;font-size:0.68rem;font-weight:600;background:rgba(192,57,43,0.08);color:var(--rojo);margin-top:4px}
+
+        /* ── Subida masiva ───────────────────── */
+        .archivos-lista{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+        .archivo-item{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--crema);border-radius:7px;font-size:0.78rem;color:var(--txt)}
+        .archivo-item svg{width:14px;height:14px;color:var(--verde);flex-shrink:0}
+        .archivo-item .nombre-archivo{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .archivo-item .peso{color:var(--txt-dim);flex-shrink:0}
+        .btn-doc svg{width:13px;height:13px}
+
+        /* ── PENDIENTES ──────────────────────── */
+        .pend-card{background:white;border:1px solid var(--gris-2);border-radius:12px;padding:16px 20px;margin-bottom:10px;display:flex;gap:14px;align-items:flex-start}
+        .pend-check{margin-top:3px;width:16px;height:16px;accent-color:var(--rojo);cursor:pointer;flex-shrink:0}
+        .pend-body{flex:1;min-width:0}
+        .pend-bulk-bar{display:flex;align-items:center;justify-content:space-between;background:white;border:1px solid var(--gris-2);border-radius:12px;padding:12px 18px;margin-bottom:14px}
+        .pend-check-todos{display:flex;align-items:center;gap:9px;font-size:0.84rem;color:var(--txt-mid);cursor:pointer;user-select:none}
+        .pend-check-todos input{width:16px;height:16px;accent-color:var(--rojo);cursor:pointer}
+        .btn-aprobar-masivo{padding:9px 18px;background:var(--verde);color:white;border:none;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:0.85rem;font-weight:600;cursor:pointer;transition:all 0.15s}
+        .btn-aprobar-masivo:hover:not(:disabled){background:#1e8449}
+        .btn-aprobar-masivo:disabled{opacity:0.4;cursor:not-allowed}
+        .pend-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+        .pend-nombre{font-size:0.9rem;font-weight:600;color:var(--txt)}
+        .pend-meta{font-size:0.76rem;color:var(--txt-dim);margin-top:3px}
+        .pend-badge{padding:3px 10px;border-radius:100px;font-size:0.68rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase}
+        .pend-badge.pendiente{background:rgba(243,156,18,0.1);color:var(--amarillo);border:1px solid rgba(243,156,18,0.25)}
+        .pend-badge.aprobado{background:rgba(39,174,96,0.1);color:var(--verde);border:1px solid rgba(39,174,96,0.2)}
+        .pend-badge.rechazado{background:rgba(192,57,43,0.08);color:var(--rojo);border:1px solid rgba(192,57,43,0.2)}
+        .pend-acciones{display:flex;gap:8px}
+        .btn-aprobar{padding:7px 14px;background:var(--verde);color:white;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer;transition:background 0.15s}
+        .btn-aprobar:hover{background:#1e8449}
+        .btn-preview{padding:7px 14px;background:white;color:var(--azul);border:1px solid rgba(46,134,193,0.3);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer;transition:all 0.15s}
+        .btn-preview:hover{background:rgba(46,134,193,0.06)}
+        .btn-rechazar{padding:7px 14px;background:white;color:var(--rojo);border:1px solid rgba(192,57,43,0.3);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer;transition:all 0.15s}
+        .btn-rechazar:hover{background:rgba(192,57,43,0.06)}
+
+        /* ── MODAL SUBIR ─────────────────────── */
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;padding:20px}
+        .modal-overlay.visible{display:flex}
+        .modal{background:white;border-radius:16px;padding:28px;width:100%;max-width:500px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.15)}
+        .modal-titulo{font-family:'Playfair Display',serif;font-size:1.2rem;margin-bottom:20px;color:var(--txt)}
+        .modal-form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+        .modal-label{font-size:0.72rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--txt-mid)}
+        .modal-input,.modal-textarea{padding:9px 12px;border:1px solid var(--gris-2);border-radius:8px;background:var(--crema);color:var(--txt);font-family:'DM Sans',sans-serif;font-size:0.88rem;width:100%;transition:border-color 0.2s}
+        .modal-input:focus,.modal-textarea:focus{outline:none;border-color:var(--rojo);background:white}
+        .modal-textarea{min-height:70px;resize:vertical}
+        .drop-zone{border:2px dashed var(--gris-2);border-radius:10px;padding:24px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--crema)}
+        .drop-zone:hover,.drop-zone.dragover{border-color:var(--rojo);background:#fdf2f2}
+        .drop-zone-txt{font-size:0.84rem;color:var(--txt-dim)}
+        .drop-zone-txt strong{color:var(--rojo)}
+        .archivo-sel{font-size:0.8rem;color:var(--verde);margin-top:8px;font-weight:500}
+        .modal-btns{display:flex;gap:10px;margin-top:20px}
+        .btn-enviar-modal{flex:1;padding:11px;background:var(--rojo);color:white;border:none;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;transition:background 0.2s}
+        .btn-enviar-modal:hover:not(:disabled){background:#a93226}
+        .btn-enviar-modal:disabled{opacity:0.5;cursor:not-allowed}
+        .btn-cancelar-modal{padding:11px 20px;background:white;border:1px solid var(--gris-2);border-radius:9px;font-family:'DM Sans',sans-serif;font-size:0.9rem;color:var(--txt-mid);cursor:pointer}
+        .spinner-sm{width:14px;height:14px;border:2px solid rgba(255,255,255,0.4);border-top-color:white;border-radius:50%;animation:spin 0.7s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
+        @keyframes spin{to{transform:rotate(360deg)}}
+
+        .empty{display:flex;flex-direction:column;align-items:center;padding:50px 20px;text-align:center;gap:10px;color:var(--txt-dim)}
+        .empty svg{width:32px;height:32px;opacity:0.4}
+
+        /* ── TOAST ───────────────────────────── */
+        .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:11px 18px;border-radius:10px;font-size:0.82rem;font-weight:500;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.12);white-space:nowrap;display:flex;align-items:center;gap:8px}
+        .toast.ok{background:#1a4a2a;border:1px solid rgba(39,174,96,0.3);color:#5dde90}
+        .toast.err{background:#2a1a18;border:1px solid rgba(192,57,43,0.3);color:#ff8070}
+
+        @media(max-width:768px){nav{padding:0 16px}.nav-title{display:none}.page-header{padding:24px 16px 20px}.main{padding:20px 16px 60px}.doc-card{flex-wrap:wrap}.doc-acciones{width:100%}.btn-doc{flex:1;justify-content:center}}
+    
+        /* ── Planos oficiales (SharePoint) ── */
+        .main{max-width:1000px}
+        .fila{background:white;border:1px solid var(--gris-2);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:14px;margin-bottom:8px;transition:border-color .15s}
+        .fila:hover{border-color:var(--rojo)}
+        .fila.carpeta{cursor:pointer}
+        .fila-ic{width:36px;height:36px;border-radius:9px;background:var(--gris-1);display:flex;align-items:center;justify-content:center;flex:none;color:var(--txt-mid)}
+        .fila-ic svg{width:18px;height:18px}
+        .fila.carpeta .fila-ic{background:rgba(192,57,43,0.08);color:var(--rojo)}
+        .fila-info{flex:1;min-width:0}
+        .fila-nombre{font-size:0.9rem;font-weight:600;overflow-wrap:anywhere}
+        .fila-meta{font-size:0.74rem;color:var(--txt-dim);margin-top:2px}
+        .etq{display:inline-block;font-size:0.64rem;font-weight:700;letter-spacing:.04em;border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:middle}
+        .etq.sello{background:#1a7a4a;color:#fff}.etq.cad{background:#2e86c1;color:#fff}.etq.dwg{background:#555;color:#fff}
+        .fila-acc{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+        .barra{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+        .barra .search-wrap{flex:1;min-width:220px;margin-bottom:0}
+        .aviso{border:1px solid #e0a800;background:rgba(224,168,0,.1);border-radius:12px;padding:16px 18px;margin-bottom:16px;font-size:0.86rem;line-height:1.55}
+        .aviso.err{border-color:#c0392b;background:rgba(192,57,43,.08)}
+        .aviso b{display:block;margin-bottom:4px}
+        .ruta-in{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+        .ruta-in input{flex:1;min-width:220px;padding:9px 12px;border:1px solid var(--gris-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.85rem}
+        .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+        .chip{border:1px solid var(--gris-2);background:white;border-radius:100px;padding:5px 12px;font-size:0.76rem;cursor:pointer}
+        .chip:hover{border-color:var(--rojo)}
+        .visor-fondo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;align-items:center;justify-content:center;padding:16px}
+        .visor-fondo.visible{display:flex}
+        .visor{background:white;border-radius:14px;width:100%;max-width:1100px;height:90vh;display:flex;flex-direction:column;overflow:hidden}
+        .visor-top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;border-bottom:1px solid var(--gris-2);font-size:0.86rem;font-weight:600}
+        .visor iframe{flex:1;border:0;width:100%}
+        .btn-doc.prim{background:var(--rojo);color:#fff;border-color:var(--rojo)}
+        .cargando{padding:40px;text-align:center;color:var(--txt-dim);font-size:0.86rem}
+        .solo-lectura{font-size:0.74rem;color:var(--txt-dim);margin-top:14px}
+</style>
+<script src="metricas.js" data-modulo="procedimientos"></script>
+</head>
+<body>
+
+<nav>
+    <a class="nav-logo" href="index.html">
+        <img src="LOGO_BAKER.png" alt="Baker" onerror="this.outerHTML='<span style=&quot;font-family:serif;font-weight:900;color:white;font-size:1rem&quot;>BAKER</span>'">
+    </a>
+    <div class="nav-sep"></div>
+    <a class="nav-back" href="procedimientos.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        Procedimientos
+    </a>
+    <div class="nav-sep"></div>
+    <div class="nav-title">Planos oficiales</div>
+    <div class="nav-spacer"></div>
+    <div id="auth-area"></div>
+</nav>
+
+<div class="page-header">
+    <div class="page-header-inner">
+        <div>
+            <div class="page-eyebrow">Obras · SharePoint</div>
+            <h1>Planos <em>oficiales</em></h1>
+            <div class="page-header-sub">Los mismos archivos, el mismo orden y los mismos permisos que la carpeta 1_OFICIALES de SharePoint.</div>
+        </div>
+    </div>
+</div>
+
+<div class="main">
+    <div class="breadcrumb" id="migas"></div>
+    <div class="barra" id="barra" style="display:none;">
+        <div class="search-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input class="search-input" id="filtro" type="text" placeholder="Filtrar esta carpeta…" oninput="renderLista()">
+        </div>
+        <button class="btn-doc btn-dl" onclick="buscarEnBiblioteca()" title="Busca por nombre en todo lo que tu usuario puede ver">🔎 Buscar en toda la biblioteca</button>
+    </div>
+    <div id="aviso"></div>
+    <div id="lista"><div class="cargando">Conectando con SharePoint…</div></div>
+    <div class="solo-lectura">Solo lectura. Si no ves una carpeta, es porque tu usuario no tiene acceso en SharePoint: los permisos se piden allá, no en la intranet.</div>
+</div>
+
+<div class="visor-fondo" id="visor-fondo" onclick="if(event.target===this)cerrarVisor()">
+    <div class="visor">
+        <div class="visor-top"><span id="visor-titulo"></span><button class="btn-doc btn-dl" onclick="cerrarVisor()">✕ Cerrar</button></div>
+        <iframe id="visor-iframe" title="Vista previa" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
+    </div>
+</div>
+
+<script>
+const API = 'https://api.ibaker.cl';
+// Dónde está la carpeta oficial en SharePoint
+const SITE_HOST = 'ibaker.sharepoint.com';
+const SITE_RUTA = '/sites/Proyectos';
+const BIBLIOTECA = '1_OFICIALES';
+const GRAPH = 'https://graph.microsoft.com/v1.0';
+const SCOPES = ['Sites.Read.All'];   // lectura con los permisos de cada persona; la intranet no guarda ni cambia nada
+
+const msalInstance = new msal.PublicClientApplication({
+    auth: { clientId: '9a56ab1c-d3c4-4460-9892-1d4da768ecfb', authority: 'https://login.microsoftonline.com/87c9a653-b08e-42c9-92bc-260458dffc26', redirectUri: window.location.origin },
+    cache: { cacheLocation: 'sessionStorage' }
+});
+let emailActual = '', nombreActual = '', driveId = null, rutaActual = [], itemsActuales = [], modoBusqueda = null;
+
+const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function toast(msg, tipo) { const t = document.createElement('div'); t.className = 'toast ' + (tipo || 'ok'); t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 4500); }
+
+// ── Microsoft Graph ──
+async function token() {
+    const cuenta = msalInstance.getAllAccounts()[0];
+    try { return (await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuenta })).accessToken; }
+    catch (e) { return (await msalInstance.acquireTokenPopup({ scopes: SCOPES, account: cuenta })).accessToken; }
+}
+async function graph(urlOPath, opciones) {
+    const url = urlOPath.startsWith('http') ? urlOPath : GRAPH + urlOPath;
+    const r = await fetch(url, { ...(opciones || {}), headers: { Authorization: 'Bearer ' + (await token()), 'Content-Type': 'application/json' } });
+    if (r.status === 204) return null;
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { const e = new Error((j.error && j.error.message) || ('Error ' + r.status)); e.status = r.status; e.codigo = (j.error && j.error.code) || ''; throw e; }
+    return j;
+}
+async function resolverBiblioteca() {
+    if (driveId) return driveId;
+    try { driveId = sessionStorage.getItem('planos-drive-id'); } catch (e) {}
+    if (driveId) return driveId;
+    const r = await graph(`/sites/${SITE_HOST}:${SITE_RUTA}:/drives?$select=id,name,webUrl`);
+    const norm = s => String(s || '').toLowerCase();
+    const d = r.value.find(x => norm(x.name) === norm(BIBLIOTECA)) || r.value.find(x => norm(decodeURIComponent(x.webUrl || '')).endsWith('/' + norm(BIBLIOTECA)));
+    if (!d) { const e = new Error('No se encontró la biblioteca «' + BIBLIOTECA + '». Bibliotecas visibles: ' + r.value.map(x => x.name).join(', ')); e.codigo = 'biblioteca'; throw e; }
+    driveId = d.id;
+    try { sessionStorage.setItem('planos-drive-id', driveId); } catch (e) {}
+    return driveId;
+}
+const rutaApi = segs => segs.length ? `/drives/${driveId}/root:/${segs.map(encodeURIComponent).join('/')}:` : `/drives/${driveId}/root`;
+const CAMPOS = '$select=id,name,size,folder,file,lastModifiedDateTime,lastModifiedBy,webUrl,parentReference';
+async function listar(segs) {
+    let url = rutaApi(segs) + `/children?$top=200&${CAMPOS}`, items = [];
+    while (url) { const r = await graph(url); items = items.concat(r.value || []); url = r['@odata.nextLink']; }
+    return items;
+}
+// El mismo orden que SharePoint: carpetas primero y nombres en orden natural (01, 02, … 10).
+const cmp = new Intl.Collator('es', { numeric: true, sensitivity: 'base' });
+function ordenar(items) { return items.slice().sort((a, b) => (!!b.folder - !!a.folder) || cmp.compare(a.name, b.name)); }
+
+// ── Navegación (la ruta va en la dirección: #/Comuna/Proyecto) ──
+function segmentosDeHash() { const h = decodeURIComponent(location.hash.replace(/^#\/?/, '')); return h ? h.split('/').filter(Boolean) : []; }
+function irA(segs) { location.hash = '#/' + segs.map(encodeURIComponent).join('/'); }
+window.addEventListener('hashchange', () => cargarRuta());
+
+function migas(segs) {
+    const partes = [`<a onclick="irA([])">${esc(BIBLIOTECA)}</a>`];
+    segs.forEach((s, i) => partes.push(i === segs.length - 1 ? `<span class="actual">${esc(s)}</span>` : `<a onclick="irA(${esc(JSON.stringify(segs.slice(0, i + 1)).replace(/"/g, "&quot;"))})">${esc(s)}</a>`));
+    document.getElementById('migas').innerHTML = partes.join('<span class="sep">/</span>');
+}
+function iconoDe(it) {
+    if (it.folder) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>';
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+}
+const ext = n => ((String(n).match(/\.([^.]+)$/) || [])[1] || '').toLowerCase();
+const PREVISUALIZABLES = ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt'];
+const tam = b => b == null ? '' : b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(1) + ' MB';
+const fechaC = iso => iso ? new Date(iso).toLocaleDateString('es-CL') : '';
+function etiquetaCarpeta(n) {
+    const u = n.toUpperCase();
+    if (/^0?1[_ ]?APROBADOS/.test(u)) return '<span class="etq sello">CON TIMBRE</span>';
+    if (/^0?2[_ ]?ARCHIVOS CAD/.test(u)) return '<span class="etq cad">CAD</span>';
+    return '';
+}
+function rutaDeItem(it) {
+    // "/drives/xx/root:/Comuna/Proyecto" -> ['Comuna','Proyecto'] (carpeta que contiene al elemento)
+    const p = it.parentReference && it.parentReference.path || '';
+    const i = p.indexOf('root:');
+    return i < 0 ? [] : p.slice(i + 5).split('/').filter(Boolean).map(decodeURIComponent);
+}
+
+function renderLista() {
+    const cont = document.getElementById('lista');
+    const q = (document.getElementById('filtro').value || '').toLowerCase();
+    let items = modoBusqueda ? itemsActuales : ordenar(itemsActuales);
+    if (q && !modoBusqueda) items = items.filter(i => i.name.toLowerCase().includes(q));
+    if (!items.length) { cont.innerHTML = `<div class="empty"><div>${modoBusqueda ? 'La búsqueda no encontró nada que tu usuario pueda ver.' : (q ? 'Ninguna coincide con el filtro.' : 'Esta carpeta está vacía.')}</div></div>`; return; }
+    cont.innerHTML = items.map((it, k) => {
+        const idx = itemsActuales.indexOf(it);
+        const donde = modoBusqueda ? `<div class="fila-meta">📁 ${esc([BIBLIOTECA].concat(rutaDeItem(it)).join(' / '))}</div>` : '';
+        if (it.folder) return `<div class="fila carpeta" onclick="abrirItem(${idx})"><div class="fila-ic">${iconoDe(it)}</div><div class="fila-info"><div class="fila-nombre">${esc(it.name)}${etiquetaCarpeta(it.name)}</div>${donde}<div class="fila-meta">${it.folder.childCount != null ? it.folder.childCount + ' elemento(s) · ' : ''}${fechaC(it.lastModifiedDateTime)}</div></div></div>`;
+        const e = ext(it.name), puedeVer = PREVISUALIZABLES.includes(e), esDwg = e === 'dwg';
+        const quien = it.lastModifiedBy && it.lastModifiedBy.user ? ' · ' + esc(it.lastModifiedBy.user.displayName) : '';
+        return `<div class="fila"><div class="fila-ic">${iconoDe(it)}</div><div class="fila-info"><div class="fila-nombre">${esc(it.name)}${esDwg ? '<span class="etq dwg">DWG</span>' : ''}</div>${donde}<div class="fila-meta">${tam(it.size)} · Modificado ${fechaC(it.lastModifiedDateTime)}${quien}</div></div>
+            <div class="fila-acc">${puedeVer ? `<button class="btn-doc btn-ver" onclick="verItem(${idx})">Ver</button>` : ''}<button class="btn-doc btn-dl" onclick="descargarItem(${idx})">Descargar</button><a class="btn-doc btn-dl" href="${esc(it.webUrl)}" target="_blank" rel="noopener">Abrir en SharePoint</a></div></div>`;
+    }).join('');
+}
+function abrirItem(i) {
+    const it = itemsActuales[i]; if (!it) return;
+    if (it.folder) irA(modoBusqueda ? rutaDeItem(it).concat(it.name) : rutaActual.concat(it.name));
+}
+
+// ── Carga de una carpeta ──
+const AVISO = document.getElementById('aviso');
+function recordarRuta(segs) {
+    if (!segs.length) return;
+    try {
+        const k = 'planos-recientes-' + emailActual, l = JSON.parse(localStorage.getItem(k) || '[]').filter(x => x !== segs.join('/'));
+        l.unshift(segs.join('/')); localStorage.setItem(k, JSON.stringify(l.slice(0, 8)));
+    } catch (e) {}
+}
+function recientes() { try { return JSON.parse(localStorage.getItem('planos-recientes-' + emailActual) || '[]'); } catch (e) { return []; } }
+function panelAccesoLimitado(titulo, detalle) {
+    const rec = recientes();
+    AVISO.innerHTML = `<div class="aviso"><b>${esc(titulo)}</b>${detalle}
+        <div class="ruta-in"><input id="ruta-manual" type="text" placeholder="Comuna/Proyecto (ej.: Melipilla/Portal Oriente)" onkeydown="if(event.key==='Enter')irARutaManual()"><button class="btn-doc prim" onclick="irARutaManual()">Ir a la carpeta</button><button class="btn-doc btn-dl" onclick="buscarEnBiblioteca()">🔎 Buscar por nombre</button></div>
+        ${rec.length ? `<div class="chips">${rec.map(r => `<span class="chip" onclick="irA(${esc(JSON.stringify(r.split('/')).replace(/"/g, '&quot;'))})">📁 ${esc(r)}</span>`).join('')}</div>` : ''}</div>`;
+}
+function irARutaManual() { const v = (document.getElementById('ruta-manual').value || '').trim().replace(/^[\/]+|[\/]+$/g, ''); if (v) irA(v.split('/').map(s => s.trim()).filter(Boolean)); }
+
+async function cargarRuta() {
+    modoBusqueda = null; AVISO.innerHTML = '';
+    const segs = segmentosDeHash(); rutaActual = segs; migas(segs);
+    document.getElementById('lista').innerHTML = '<div class="cargando">Cargando…</div>';
+    document.getElementById('barra').style.display = 'none';
+    document.getElementById('filtro').value = '';
+    try {
+        await resolverBiblioteca();
+        itemsActuales = await listar(segs);
+        document.getElementById('barra').style.display = 'flex';
+        if (segs.length) recordarRuta(segs);
+        renderLista();
+    } catch (e) { mostrarError(e, segs); }
+}
+function mostrarError(e, segs) {
+    const lista = document.getElementById('lista'); lista.innerHTML = '';
+    document.getElementById('barra').style.display = 'flex';
+    const sinAcceso = e.status === 403 || e.codigo === 'accessDenied';
+    if (sinAcceso || e.status === 404 || e.codigo === 'itemNotFound') {
+        if (!segs.length) panelAccesoLimitado('No tienes acceso a la lista general de la biblioteca', '<br>Es normal si tu acceso es solo a la carpeta de tu proyecto. Ingresa la ruta de tu carpeta (Comuna/Proyecto), busca por nombre, o usa una de tus carpetas recientes.');
+        else panelAccesoLimitado(sinAcceso ? 'No tienes acceso a esta carpeta' : 'No se encontró esa carpeta', `<br>${esc(segs.join(' / '))}<br>${sinAcceso ? 'SharePoint no te da permiso sobre ella. Si la necesitas, pídela a quien administra los permisos de la carpeta.' : 'Revisa que la ruta esté escrita igual que en SharePoint (mayúsculas, guiones y espacios).'}`);
+        return;
+    }
+    if (e.codigo === 'biblioteca') { AVISO.innerHTML = `<div class="aviso err"><b>No se encontró la biblioteca</b>${esc(e.message)}<br>Avisa a TI.</div>`; return; }
+    if (/consent|AADSTS65001|AADSTS90094|Authorization_RequestDenied|interaction_required/i.test(e.message + ' ' + e.codigo + ' ' + (e.errorCode || ''))) {
+        AVISO.innerHTML = `<div class="aviso err"><b>Falta autorizar el acceso a SharePoint</b>La intranet todavía no tiene el permiso de lectura de SharePoint en Microsoft 365 (Sites.Read.All). Avisa a TI para que lo autorice.</div>`; return;
+    }
+    AVISO.innerHTML = `<div class="aviso err"><b>No se pudo leer SharePoint</b>${esc(e.message)}</div>`;
+}
+
+// ── Búsqueda (SharePoint ya muestra solo lo que tu usuario puede ver) ──
+async function buscarEnBiblioteca() {
+    const q = prompt('Buscar por nombre en 1_OFICIALES (solo verás lo que tu usuario puede ver):', '');
+    if (!q || !q.trim()) return;
+    AVISO.innerHTML = ''; document.getElementById('lista').innerHTML = '<div class="cargando">Buscando…</div>';
+    try {
+        await resolverBiblioteca();
+        const r = await graph(`/drives/${driveId}/root/search(q='${q.trim().replace(/'/g, "''")}')?$top=60&${CAMPOS}`);
+        modoBusqueda = q.trim(); itemsActuales = r.value || [];
+        document.getElementById('migas').innerHTML = `<a onclick="irA([])">${esc(BIBLIOTECA)}</a><span class="sep">/</span><span class="actual">Búsqueda: «${esc(q.trim())}»</span>`;
+        document.getElementById('barra').style.display = 'flex';
+        renderLista();
+    } catch (e) { mostrarError(e, rutaActual); }
+}
+
+// ── Ver / descargar ──
+function registrar(it, tipo) {
+    fetch(API + '/docs/registrar-acceso', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ carpeta: 'SharePoint · ' + [BIBLIOTECA].concat(rutaDeItem(it)).join(' / '), archivo: it.name, email: emailActual, nombre: nombreActual, tipo }) }).catch(() => {});
+}
+async function verItem(i) {
+    const it = itemsActuales[i]; if (!it) return;
+    try {
+        const r = await graph(`/drives/${driveId}/items/${encodeURIComponent(it.id)}/preview`, { method: 'POST', body: '{}' });
+        if (!r || !r.getUrl) throw new Error('SharePoint no entregó vista previa');
+        document.getElementById('visor-titulo').textContent = it.name;
+        document.getElementById('visor-iframe').src = r.getUrl;
+        document.getElementById('visor-fondo').classList.add('visible');
+        registrar(it, 'ver');
+    } catch (e) { toast('No se pudo abrir la vista previa: ' + e.message + '. Prueba «Abrir en SharePoint».', 'err'); }
+}
+function cerrarVisor() { document.getElementById('visor-fondo').classList.remove('visible'); document.getElementById('visor-iframe').src = 'about:blank'; }
+async function descargarItem(i) {
+    const it = itemsActuales[i]; if (!it) return;
+    try {
+        const r = await graph(`/drives/${driveId}/items/${encodeURIComponent(it.id)}`);
+        const url = r && r['@microsoft.graph.downloadUrl'];
+        if (!url) throw new Error('SharePoint no entregó el enlace de descarga');
+        registrar(it, 'descargar');
+        const a = document.createElement('a'); a.href = url; a.download = it.name; document.body.appendChild(a); a.click(); a.remove();
+    } catch (e) { toast('No se pudo descargar: ' + e.message, 'err'); }
+}
+
+// ── Inicio ──
+async function iniciar() {
+    try {
+        await msalInstance.initialize();
+        const cuentas = msalInstance.getAllAccounts();
+        if (!cuentas.length) { window.location.href = 'index.html'; return; }
+        emailActual = cuentas[0].username.toLowerCase(); nombreActual = cuentas[0].name || cuentas[0].username;
+        const ini = nombreActual.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
+        document.getElementById('auth-area').innerHTML = `<div class="user-chip"><div class="user-av">${esc(ini)}</div><span class="user-nm">${esc(nombreActual.split(' ').slice(0, 2).join(' '))}</span></div>`;
+        await cargarRuta();
+    } catch (e) { console.error(e); window.location.href = 'index.html'; }
+}
+iniciar();
+</script>
+</body>
+</html>
