@@ -157,7 +157,7 @@ tr.proy td{background:var(--obs);color:#fff;font-weight:800;font-size:12px;lette
 
 <div id="app" class="hide">
 <nav class="tabs" id="tabs">
-  <button data-t="reg" class="on">Registrar</button>
+  <button data-t="reg" id="tabReg" class="on">Registrar</button>
   <button data-t="res" id="tabRes">Resumen</button>
   <button data-t="adm" id="tabAdm" class="hide">Administrar</button>
 </nav>
@@ -272,6 +272,7 @@ async function arrancarApp(){
   $('tabRes').classList.toggle('hide', !ctx.puedeConsultar && ctx.rol !== 'jefe');
   $('tabAdm').classList.toggle('hide', !ctx.puedeAdministrar);
   armarSelectoresRegistro(); armarResumen(); procesarCola();
+  if (ctx.rol === 'consulta') { $('tabReg').classList.add('hide'); $('tabRes').click(); }   // administradores de obra: solo ven el Resumen y descargan el Excel
 }
 function actualizarRed(){ const on = navigator.onLine; $('net').textContent = on ? 'En línea' : 'Sin conexión'; $('net').classList.toggle('off', !on); if (on && ctx) procesarCola(); }
 
@@ -389,7 +390,7 @@ async function cargarDia(){
   }
   if (origenCopiado) html += `<div class="banner info">Se copió la cuadrilla del <b>${fmtFecha(origenCopiado)}</b> (especialidad y actividad de cada uno). Revisa, mueve a quien cambió y presiona <b>Confirmar y guardar</b>.</div>`;
   if (soloLectura && puedeRegistrarAqui()) html += '<div class="banner err">Este día ya no se puede modificar.</div>';
-  if (!puedeRegistrarAqui()) html += '<div class="banner info">Solo lectura: tu usuario puede ver pero no registrar. Usa la pestaña Resumen para ver los registros.</div>';
+  if (!puedeRegistrarAqui()) html += ctx.rol === 'admin' ? '<div class="banner info">Eres <b>administrador</b> del módulo: ves todos los registros y administras trabajadores, actividades y accesos (pestañas Resumen y Administrar). El registro diario lo hacen los jefes de terreno.</div>' : '<div class="banner info">Solo lectura. Usa la pestaña Resumen para ver los registros.</div>';
   const sinAct = espsEditables().filter(e => !e.actividades.length).map(e => e.nombre);
   if (sinAct.length) html += `<div class="banner err">Estas especialidades aún no tienen actividades configuradas: ${esc(sinAct.join(', '))}. Pide a TI que las agregue.</div>`;
   $('estadoReg').innerHTML = html;
@@ -929,7 +930,12 @@ function pintarAccesosAdm(p){
       <p class="help">Pueden administrar trabajadores, actividades y accesos. TI (dvillaseca@ibaker.cl) siempre tiene acceso.</p>
       ${lista(cfgAdmin.admins, 'qa2')}
       <div class="addbox"><label class="f" for="aEmail">Correo</label><input type="text" id="aEmail" inputmode="email" autocapitalize="off" placeholder="nombre@ibaker.cl">
-        <button class="btn red" id="btnAddAdm" style="width:100%;margin-top:12px">Agregar administrador</button></div></div>`;
+        <button class="btn red" id="btnAddAdm" style="width:100%;margin-top:12px">Agregar administrador</button></div></div>
+    ${cfgAdmin.fijos ? `<div class="card"><h3>Accesos fijos del sistema</h3>
+      <p class="help">Vienen definidos en el código del servidor: no hay que agregarlos ni se pueden quitar desde aquí. Solo los administradores ven esta lista.</p>
+      <div class="acc"><div><b>Administradores del módulo</b><br><span>${cfgAdmin.fijos.admins.map(esc).join('<br>')}</span></div></div>
+      <div class="acc"><div><b>Jefes de terreno</b><br><span>${cfgAdmin.fijos.jefes.map(j => esc(j.email) + ' · ' + esc(nomP(j.proyecto))).join('<br>') || '—'}</span></div></div>
+      <div class="acc"><div><b>Administradores de obra (ven el Resumen y descargan el Excel de su proyecto)</b><br><span>${cfgAdmin.fijos.observadores.map(o => esc(o.email) + ' · ' + esc(nomP(o.proyecto))).join('<br>') || '—'}</span></div></div></div>` : ''}`;
   const chips = () => { const pr = cfgAdmin.proyectos.find(x => x.id === $('jProy').value);
     $('jEsp').innerHTML = `<label class="chip"><input type="checkbox" id="jTodas" checked> Todas</label>` + pr.especialidades.map(e => `<label class="chip"><input type="checkbox" class="jE" value="${esc(e.id)}" disabled> ${esc(e.nombre)}</label>`).join('');
     $('jTodas').onchange = () => document.querySelectorAll('#jEsp .jE').forEach(c => { c.disabled = $('jTodas').checked; if ($('jTodas').checked) c.checked = false; }); };
