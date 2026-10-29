@@ -59,9 +59,9 @@ select:focus,input:focus,textarea:focus{outline:none;border-color:var(--red)}
 .w{background:var(--surf);border:1.5px solid var(--bord);border-radius:var(--r);padding:13px;margin-bottom:10px}
 .w.nuevo{border-color:var(--red);box-shadow:0 0 0 3px var(--red-soft)}
 .w.falta{border-color:#e6b800}
-.w .top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+.w .top{margin-bottom:9px}
 .w .nm{font-weight:700;font-size:15px}
-.w .cg{font-size:11px;font-weight:600;color:var(--mute);background:var(--page);border:1px solid var(--bord);border-radius:99px;padding:2px 9px}
+.w .cg{display:block;font-size:12px;font-weight:600;color:var(--mute);margin-top:2px}
 .w .nv{font-size:10px;font-weight:800;color:#fff;background:var(--red);border-radius:99px;padding:2px 8px;letter-spacing:.04em}
 .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:9px}
 .seg button{font:700 12px var(--font);padding:10px 2px;min-height:44px;border:1.5px solid var(--bord);border-radius:10px;background:#fff;color:var(--mute)}
@@ -133,7 +133,11 @@ tr.gr td:first-child{font-weight:600}
 tr.sub td{font-size:13px;color:var(--ink);background:var(--page);border-top:1px dashed var(--bord)}
 tr.sub td:first-child{padding-left:42px}
 .npers{font-size:11px;font-weight:600;color:var(--mute);margin-left:4px}
-.cg2{font-size:11px;font-weight:600;color:var(--mute);background:#fff;border:1px solid var(--bord);border-radius:99px;padding:1px 8px;margin-left:4px}
+.cg2{display:block;font-size:12px;font-weight:600;color:var(--mute);margin-top:1px}
+.turno{font-size:11px;font-weight:800;letter-spacing:.06em;color:#fff;background:var(--obs);border-radius:99px;padding:2px 9px;display:inline-block;margin-bottom:6px}
+.fchips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}.fchips button{font:700 12px var(--font);padding:8px 12px;min-height:38px;border:1.5px solid var(--bord);border-radius:99px;background:#fff;color:var(--mute)}.fchips button.on{background:var(--obs);border-color:var(--obs);color:#fff}
+tr.proy td{background:var(--obs);color:#fff;font-weight:800;font-size:12px;letter-spacing:.05em;text-transform:uppercase}
+.mmodal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:80;display:flex;align-items:flex-end;justify-content:center;padding:12px}.mmodal>div{background:#fff;border-radius:16px;padding:16px;width:100%;max-width:520px}.mmodal h3{margin:0 0 6px;font-size:16px}.mmodal p{margin:0 0 10px;font-size:13px;color:var(--mute)}.mmodal textarea{width:100%;min-height:84px;font:inherit;font-size:15px;border:1.5px solid var(--bord);border-radius:10px;padding:10px;box-sizing:border-box}.mmodal .err{color:var(--red);font-size:12px;min-height:16px;margin:4px 0}.mmodal .bt{display:flex;gap:8px;margin-top:6px}
 </style>
 </head>
 <body>
@@ -212,7 +216,7 @@ let sel = { proy:null, fecha:null };
 let lineas = {};       // trabajadorId -> { esp, estado, partes:[{actividad,motivo,comentario}] }  (solo quienes están en la cuadrilla de hoy)
 let ocupados = {};     // trabajadores ya tomados por otra especialidad ese día
 let origenCopiado = null, guardadoInfo = null, soloLectura = false;
-let ultimasFilas = [];
+let ultimasFilas = [], ultimasEdiciones = [], snapGuardado = null;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -235,7 +239,7 @@ async function api(metodo, ruta, cuerpo){
   const t = await token();
   const r = await fetch(API + ruta, { method:metodo, headers:{ 'Authorization':'Bearer '+t, 'Content-Type':'application/json' }, body: cuerpo ? JSON.stringify(cuerpo) : undefined });
   let j = {}; try { j = await r.json(); } catch(e){}
-  if (!r.ok) { const err = new Error(j.error || ('Error ' + r.status)); err.status = r.status; throw err; }
+  if (!r.ok) { const err = new Error(j.error || ('Error ' + r.status)); err.status = r.status; err.codigo = j.codigo; throw err; }
   return j;
 }
 async function iniciar(){
@@ -306,11 +310,14 @@ $('selProy').addEventListener('change', cambioContexto);
 $('inFecha').addEventListener('change', cambioContexto);
 
 const claveDia = () => `dia|${sel.proy}|${sel.fecha}`;
-const parteVacia = () => ({ actividad:'', motivo:'', comentario:'' });
+const parteVacia = esp => ({ actividad:'', motivo:'', comentario:'', ...(esp ? { esp } : {}) });
 const parteOtros = () => ({ actividad:OTROS, motivo:'', comentario:'' });
 const lineaNueva = esp => ({ esp, estado:'completa', partes:[parteVacia()] });
 let nombres = {};      // trabajadorId -> { nombre, cargo } (incluye gente dada de baja que ya estaba en el registro)
 
+const espDe = (l, i) => (l.estado === 'completa' && l.partes.length === 2 && l.partes[i] && l.partes[i].esp) ? l.partes[i].esp : l.esp;
+const dividida = l => l.estado === 'completa' && l.partes.length === 2;     // jornada separada en AM y PM (cada una con su especialidad y actividad)
+const sinEspParte = l => { l.partes.forEach(x => { delete x.esp; }); };
 // Normaliza una línea recibida del servidor (registros antiguos de media jornada traían una sola parte)
 function lineaDesdeServidor(l, esp){
   let partes = (l.partes || []).map(x => ({ actividad:x.actividad, motivo:x.motivo||'', comentario:x.comentario||'' }));
@@ -318,14 +325,24 @@ function lineaDesdeServidor(l, esp){
     if (partes.length === 1) partes.push(parteOtros());
     if (partes.length === 2 && partes[1].actividad !== OTROS) partes[1] = parteOtros();
   }
+  if (l.estado === 'completa' && partes.length === 2) partes.forEach(x => { x.esp = esp; });
   return { esp, estado:l.estado, partes };
 }
 function lineasDeRegistros(regs, soloActivos){
-  const out = {}, p = proyActual();
+  const out = {}, mitades = {}, p = proyActual();
   (regs || []).forEach(r => (r.lineas || []).forEach(l => {
     if (soloActivos && !p.trabajadores.some(t => t.id === l.trabajadorId)) return;
+    if (l.mitad) {   // la jornada de esta persona está repartida: ½ día AM en una especialidad y ½ día PM en otra
+      const pt = (l.partes || [])[0] || {};
+      (mitades[l.trabajadorId] = mitades[l.trabajadorId] || {})[l.mitad] = { actividad:pt.actividad || '', motivo:pt.motivo || '', comentario:pt.comentario || '', esp:r.especialidad };
+      return;
+    }
     out[l.trabajadorId] = lineaDesdeServidor(l, r.especialidad);
   }));
+  Object.entries(mitades).forEach(([tid, m]) => {
+    const am = m.AM || parteVacia(''), pm = m.PM || parteVacia('');
+    out[tid] = { esp: am.esp || '', estado:'completa', partes:[am, pm] };
+  });
   return out;
 }
 
@@ -361,16 +378,18 @@ async function cargarDia(){
     });
     if (Object.keys(lineas).length) origenCopiado = previo.fecha;
   }
+  if (!soloLectura) p.trabajadores.forEach(t => { if (!lineas[t.id] && !ocupados[t.id]) lineas[t.id] = { esp:'', estado:'completa', partes:[parteVacia()] }; });   // todos deben quedar asignados (o ausentes)
+  snapGuardado = guardadoInfo ? JSON.stringify(armarPayload().registros) : null;
   let html = '';
   if (sinRed) html += '<div class="banner info">Sin conexión: puedes registrar igual. Se enviará solo cuando vuelva la señal.</div>';
   if (pend) html += '<div class="banner info">Este día tiene un registro <b>pendiente de enviar</b>. Se enviará cuando haya señal.</div>';
   if (guardadoInfo) {
     const cuando = guardadoInfo.actualizadoEn ? new Date(guardadoInfo.actualizadoEn).toLocaleString('es-CL', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false }) : '';
-    html += `<div class="banner ok">Registro guardado${cuando ? ' el ' + esc(cuando) : ''}.${soloLectura ? '' : ' Puedes corregirlo.'}</div>`;
+    html += `<div class="banner ok">Registro guardado${cuando ? ' el ' + esc(cuando) : ''}.${soloLectura ? '' : ' Puedes corregirlo (al guardar un cambio se te pedirá el motivo).'}</div>`;
   }
   if (origenCopiado) html += `<div class="banner info">Se copió la cuadrilla del <b>${fmtFecha(origenCopiado)}</b> (especialidad y actividad de cada uno). Revisa, mueve a quien cambió y presiona <b>Confirmar y guardar</b>.</div>`;
   if (soloLectura && puedeRegistrarAqui()) html += '<div class="banner err">Este día ya no se puede modificar.</div>';
-  if (!puedeRegistrarAqui()) html += '<div class="banner info">Solo lectura. Usa la pestaña Resumen para ver los registros.</div>';
+  if (!puedeRegistrarAqui()) html += '<div class="banner info">Solo lectura: tu usuario puede ver pero no registrar. Usa la pestaña Resumen para ver los registros.</div>';
   const sinAct = espsEditables().filter(e => !e.actividades.length).map(e => e.nombre);
   if (sinAct.length) html += `<div class="banner err">Estas especialidades aún no tienen actividades configuradas: ${esc(sinAct.join(', '))}. Pide a TI que las agregue.</div>`;
   $('estadoReg').innerHTML = html;
@@ -388,36 +407,41 @@ function otrosHtml(tid, i, pt, ph){
 function parteHtml(tid, i, pt, l, e){
   const media = l.estado === 'media', n = l.partes.length;
   if (media && i === 1) return `<div class="parte"><div class="hdl">Otros · ½ día restante</div>${otrosHtml(tid, i, pt, '¿Qué hizo en el medio día restante? (obligatorio)')}</div>`;
+  if (dividida(l)) {   // AM / PM: cada mitad con su propia especialidad y actividad
+    const ep = espPorId(espDe(l, i));
+    return `<div class="parte"><span class="turno">${i === 0 ? 'AM' : 'PM'} · ½ día</span>
+      ${ep && !ep.puedeRegistrar ? `<div class="lock">🔒 ${esc(ep.nombre)}</div>` : `<select data-pesp="${esc(tid)}|${i}" ${soloLectura?'disabled':''}>${opcionesEsp(espDe(l, i))}</select>`}
+      ${ep ? `<select data-act="${esc(tid)}|${i}" style="margin-top:6px" ${soloLectura?'disabled':''}>${opcionesActividad(ep, pt.actividad)}</select>` : ''}
+      ${ep && pt.actividad === OTROS ? otrosHtml(tid, i, pt, 'Comentario (obligatorio). Ej: llovió, no se pudo excavar') : ''}
+    </div>`;
+  }
   return `<div class="parte">
-    ${media ? '<div class="hdl">Actividad · ½ día</div>' : (n>1 ? `<div class="hdl">Actividad ${i+1} (½ día)</div>` : '')}
+    ${media ? '<div class="hdl">Actividad · ½ día</div>' : ''}
     <select data-act="${esc(tid)}|${i}" ${soloLectura?'disabled':''}>${opcionesActividad(e, pt.actividad)}</select>
     ${pt.actividad === OTROS ? otrosHtml(tid, i, pt, 'Comentario (obligatorio). Ej: llovió, no se pudo excavar') : ''}
   </div>`;
 }
 function lineaCompleta(l){
-  if (!l.esp) return false;
-  if (l.estado === 'ausente') return true;
-  return l.partes.every(pt => pt.actividad && (pt.actividad !== OTROS || (pt.motivo && pt.comentario.trim())));
+  if (l.estado === 'ausente') return !!l.esp;
+  return l.partes.every((pt, i) => { const e = espPorId(espDe(l, i)); return !!e && pt.actividad && (pt.actividad !== OTROS || (pt.motivo && pt.comentario.trim())); });
 }
 function opcionesEsp(sel_){
   return `<option value="">Elegir especialidad…</option>` + espsEditables().map(e => `<option value="${esc(e.id)}" ${e.id===sel_?'selected':''}>${esc(e.nombre)}</option>`).join('');
 }
 function tarjeta(tid){
-  const l = lineas[tid], n = nombres[tid] || { nombre:tid, cargo:'' }, e = espPorId(l.esp), falta = !lineaCompleta(l);
-  const dividido = l.estado === 'completa' && l.partes.length === 2;
-  const puedeEsp = soloLectura ? false : true;
+  const l = lineas[tid], n = nombres[tid] || { nombre:tid, cargo:'' }, e = espPorId(l.esp), falta = !lineaCompleta(l), div = dividida(l);
+  const puedeEsp = !soloLectura;
   return `<div class="w ${falta?'falta':''}" data-w="${esc(tid)}">
     <div class="top"><span class="nm">${esc(n.nombre)}</span><span class="cg">${esc(n.cargo || 'Sin cargo')}</span></div>
-    <label class="f" style="margin-top:0">Especialidad</label>
-    ${e && !e.puedeRegistrar ? `<div class="lock">🔒 ${esc(e.nombre)}</div>` : `<select data-esp="${esc(tid)}" ${puedeEsp?'':'disabled'}>${opcionesEsp(l.esp)}</select>`}
+    ${div ? '' : `<label class="f" style="margin-top:0">Especialidad</label>
+    ${e && !e.puedeRegistrar ? `<div class="lock">🔒 ${esc(e.nombre)}</div>` : `<select data-esp="${esc(tid)}" ${puedeEsp?'':'disabled'}>${opcionesEsp(l.esp)}</select>`}`}
     <div class="seg">
       <button data-est="completa" class="${l.estado==='completa'?'on':''}" ${soloLectura?'disabled':''}>Jornada completa</button>
       <button data-est="media" class="${l.estado==='media'?'on':''}" ${soloLectura?'disabled':''}>Media jornada</button>
       <button data-est="ausente" class="${l.estado==='ausente'?'on aus':''}" ${soloLectura?'disabled':''}>Ausente</button>
     </div>
-    ${l.estado==='ausente' || !e ? '' : l.partes.map((pt,i) => parteHtml(tid,i,pt,l,e)).join('')}
-    ${l.estado==='completa' && !soloLectura && e ? `<button class="lnk" data-div="${esc(tid)}">${dividido?'Quitar división (1 sola actividad)':'Dividir el día en 2 actividades'}</button>` : ''}
-    ${soloLectura ? '' : `<button class="lnk lib" data-lib="${esc(tid)}">Sacar de la cuadrilla de hoy</button>`}
+    ${l.estado==='ausente' || (!e && !div) ? '' : l.partes.map((pt,i) => parteHtml(tid,i,pt,l,e)).join('')}
+    ${l.estado==='completa' && !soloLectura ? `<button class="lnk" data-div="${esc(tid)}">${div?'Quitar separación (todo el día igual)':'Separar jornada en AM y PM (otra especialidad o actividad)'}</button>` : ''}
   </div>`;
 }
 function pintar(){
@@ -425,20 +449,16 @@ function pintar(){
   if (!p.trabajadores.length) { $('lista').innerHTML = '<div class="empty">Este proyecto no tiene trabajadores cargados todavía.</div>'; actualizarResumenVivo(); return; }
   const claimed = Object.keys(lineas);
   const sinEsp = claimed.filter(t => !lineas[t].esp);
-  const libres = p.trabajadores.filter(t => !lineas[t.id] && !ocupados[t.id]);
   const bloq = p.trabajadores.filter(t => !lineas[t.id] && ocupados[t.id]);
   const idxAct = t => { const l = lineas[t], e = espPorId(l.esp); const a = l.estado === 'ausente' ? 9998 : (e ? e.actividades.indexOf(l.partes[0].actividad) : -1); return a < 0 ? 9999 : a; };
   const ordenNombre = (a, b) => (nombres[a].nombre || '').localeCompare(nombres[b].nombre || '');
   let h = '';
-  if (!claimed.length && !soloLectura) h += '<div class="empty">Aún no hay nadie asignado hoy.<br>Reparte a tu gente en las especialidades usando la lista de abajo.</div>';
-  if (sinEsp.length) h += `<div class="grp pend"><h4>Sin especialidad <span>${sinEsp.length}</span></h4>${sinEsp.map(t => tarjeta(t)).join('')}</div>`;
+  if (sinEsp.length && !soloLectura) h += '<p class="hint" style="margin:0 2px 10px">Elige la <b>especialidad</b> de cada persona (o márcala <b>Ausente</b>). Hay que dejar a todos asignados para guardar.</p>';
+  if (sinEsp.length) h += `<div class="grp pend"><h4>Sin especialidad <span>${sinEsp.length}</span></h4>${sinEsp.sort(ordenNombre).map(t => tarjeta(t)).join('')}</div>`;
   p.especialidades.forEach(e => {
     const ids = claimed.filter(t => lineas[t].esp === e.id).sort((a, b) => idxAct(a) - idxAct(b) || ordenNombre(a, b));
     if (ids.length) h += `<div class="grp"><h4>${esc(e.nombre)} <span>${ids.length}</span></h4>${ids.map(t => tarjeta(t)).join('')}</div>`;
   });
-  if (libres.length && !soloLectura) h += `<div class="grp disp"><h4>Por asignar <span>${libres.length}</span></h4>
-    <p class="hint" style="margin:0 2px 8px">Elige la especialidad de cada persona para sumarla a tu cuadrilla de hoy.</p>
-    ${libres.map(t => `<div class="dsp"><div><b>${esc(t.nombre)}</b><small>${esc(t.cargo || 'Sin cargo')}</small></div><select data-asig="${esc(t.id)}" class="asig">${opcionesEsp('')}</select></div>`).join('')}</div>`;
   if (bloq.length) h += `<div class="grp bloq"><h4>Registrados por otra persona <span>${bloq.length}</span></h4>
     ${bloq.map(t => `<div class="dsp"><div><b>${esc(t.nombre)}</b><small>${esc(t.cargo || 'Sin cargo')}</small></div><span class="lock">🔒 ${esc(ocupados[t.id].nombre)}</span></div>`).join('')}
     <p class="hint">Ya están en una especialidad que tú no administras ese día.</p></div>`;
@@ -448,9 +468,9 @@ function pintar(){
 $('lista').addEventListener('click', ev => {
   if (soloLectura) return;
   const w = ev.target.closest('[data-w]'); if (!w) return; const tid = w.dataset.w, l = lineas[tid];
-  if (ev.target.closest('[data-lib]')){ delete lineas[tid]; pintar(); return; }
   const b = ev.target.closest('[data-est]');
   if (b){
+    if (dividida(l)) { l.esp = l.partes[0].esp || l.esp; sinEspParte(l); l.partes = [l.partes[0]]; }
     l.estado = b.dataset.est; l.copiado = false;
     if (l.estado === 'ausente') l.partes = [];
     else if (l.estado === 'media') { const a = l.partes[0] && l.partes[0].actividad !== OTROS ? l.partes[0] : parteVacia(); l.partes = [a, (l.partes[1] && l.partes[1].actividad === OTROS) ? l.partes[1] : parteOtros()]; }
@@ -458,19 +478,25 @@ $('lista').addEventListener('click', ev => {
     pintar(); return;
   }
   if (ev.target.closest('[data-div]')){
-    l.partes = l.partes.length === 2 ? [l.partes[0]] : [l.partes[0], parteVacia()]; pintar();
+    if (dividida(l)) { l.esp = l.partes[0].esp || l.esp; sinEspParte(l); l.partes = [l.partes[0]]; }
+    else { const a = l.partes[0]; a.esp = l.esp; l.partes = [a, parteVacia(l.esp)]; }
+    l.copiado = false; pintar();
   }
 });
 $('lista').addEventListener('change', ev => {
   const t = ev.target;
-  if (t.dataset.asig){                                   // asignar a la cuadrilla con su especialidad
-    if (!t.value) return; lineas[t.dataset.asig] = lineaNueva(t.value); pintar(); return;
-  }
   const w = t.closest('[data-w]'); if (!w) return; const l = lineas[w.dataset.w];
   if (t.dataset.esp !== undefined){                      // mover a otra especialidad
     l.esp = t.value; l.copiado = false;
     const e = espPorId(l.esp);                           // las actividades son de cada especialidad: se reeligen
     l.partes = l.partes.map(pt => (pt.actividad === OTROS || (e && e.actividades.includes(pt.actividad))) ? pt : parteVacia());
+    pintar(); return;
+  }
+  if (t.dataset.pesp !== undefined){                     // especialidad de la mitad AM o PM
+    const i = +t.dataset.pesp.split('|')[1], pt = l.partes[i]; pt.esp = t.value; l.copiado = false;
+    if (i === 0) l.esp = t.value;
+    const e = espPorId(t.value);
+    if (pt.actividad !== OTROS && !(e && e.actividades.includes(pt.actividad))) { pt.actividad = ''; }
     pintar(); return;
   }
   if (t.dataset.act){ const [,i] = t.dataset.act.split('|'); l.partes[+i].actividad = t.value; l.copiado = false; if (t.value !== OTROS){ l.partes[+i].motivo=''; l.partes[+i].comentario=''; } pintar(); }
@@ -490,8 +516,7 @@ function actualizarResumenVivo(){
     const l = lineas[tid];
     if (!lineaCompleta(l)) { ok = false; sinAsignar++; }
     if (l.estado === 'ausente') { aus++; return; }
-    const e = espPorId(l.esp);
-    l.partes.forEach(pt => { if (!pt.actividad || !e) return; const hd = hdDeLinea(l) / l.partes.length;
+    l.partes.forEach((pt, i) => { const e = espPorId(espDe(l, i)); if (!pt.actividad || !e) return; const hd = hdDeLinea(l) / l.partes.length;
       const k = pt.actividad === OTROS ? 'Otros (no se pudo trabajar)' : `${e.nombre} · ${pt.actividad}`;
       const o = porAct[k] || (porAct[k] = { n:0, hd:0 }); o.n++; o.hd += hd; tot += hd; });
   });
@@ -510,21 +535,50 @@ function actualizarResumenVivo(){
 }
 
 // Se envían TODAS las especialidades que este usuario administra (las que quedaron sin gente van vacías: así se liberan).
+// Una jornada separada en AM y PM con especialidades distintas se guarda como dos mitades, cada una en su especialidad.
 function armarPayload(){
-  return { proyecto: sel.proy, fecha: sel.fecha,
-    registros: espsEditables().map(e => ({ especialidad: e.id,
-      lineas: Object.keys(lineas).filter(tid => lineas[tid].esp === e.id).map(tid => { const l = lineas[tid]; return { trabajadorId:tid, estado:l.estado,
-        partes: l.estado==='ausente' ? [] : l.partes.map(x => ({ actividad:x.actividad, motivo: x.actividad===OTROS?x.motivo:'', comentario: x.actividad===OTROS?x.comentario.trim():'' })) }; }) })) };
+  const reg = {}; espsEditables().forEach(e => { reg[e.id] = []; });
+  const parte = x => ({ actividad:x.actividad, motivo: x.actividad===OTROS?x.motivo:'', comentario: x.actividad===OTROS?x.comentario.trim():'' });
+  Object.keys(lineas).forEach(tid => {
+    const l = lineas[tid];
+    if (dividida(l) && espDe(l,0) !== espDe(l,1)) {
+      [['AM',0],['PM',1]].forEach(([m,i]) => { const e = espDe(l,i); if (reg[e]) reg[e].push({ trabajadorId:tid, estado:'completa', mitad:m, partes:[parte(l.partes[i])] }); });
+    } else {
+      const e = dividida(l) ? espDe(l,0) : l.esp;
+      if (reg[e]) reg[e].push({ trabajadorId:tid, estado:l.estado, partes: l.estado==='ausente' ? [] : l.partes.map(parte) });
+    }
+  });
+  return { proyecto: sel.proy, fecha: sel.fecha, registros: Object.entries(reg).map(([especialidad, ls]) => ({ especialidad, lineas: ls })) };
 }
-$('btnGuardar').addEventListener('click', async () => {
-  const payload = armarPayload(); $('btnGuardar').disabled = true; $('btnGuardar').textContent = 'Guardando…';
+// Ventana para pedir el motivo cuando se edita un día que ya estaba guardado
+function pedirMotivo(){
+  return new Promise(ok => {
+    const m = document.createElement('div'); m.className = 'mmodal';
+    m.innerHTML = `<div><h3>¿Por qué editas este registro?</h3><p>El día ya estaba guardado. El cambio se aplica, pero queda el historial anterior y tu motivo.</p>
+      <textarea id="mmTxt" maxlength="300" placeholder="Ej: se sumó una cuadrilla en la tarde / me equivoqué de actividad"></textarea><div class="err" id="mmErr"></div>
+      <div class="bt"><button class="btn ghost" id="mmNo">Cancelar</button><button class="btn red grow" id="mmSi">Guardar edición</button></div></div>`;
+    document.body.appendChild(m); const t = m.querySelector('#mmTxt'); setTimeout(() => t.focus(), 50);
+    m.querySelector('#mmNo').onclick = () => { m.remove(); ok(null); };
+    m.querySelector('#mmSi').onclick = () => { const v = t.value.trim(); if (v.length < 5) { m.querySelector('#mmErr').textContent = 'Escribe el motivo (mínimo 5 letras).'; return; } m.remove(); ok(v); };
+  });
+}
+async function enviarDia(payload){
+  $('btnGuardar').disabled = true; $('btnGuardar').textContent = 'Guardando…';
   try {
     const r = await api('POST', '/mo/dia', payload);
     quitarDeCola(claveDia()); toast(`Guardado ✔  ${fmtHd(r.hdTotal)} hombre-día`); await cargarDia();
   } catch(e){
+    if (e.codigo === 'motivo-edicion') { const mo = await pedirMotivo(); if (mo) { payload.motivo = mo; return enviarDia(payload); } actualizarResumenVivo(); return; }
     if (e.status) { toast(e.message, 5000); actualizarResumenVivo(); }   // el servidor lo rechazó: no se encola
     else { encolar(claveDia(), payload); toast('Sin señal: queda pendiente de enviar', 4500); await cargarDia(); mostrarCola(); }
   }
+}
+$('btnGuardar').addEventListener('click', async () => {
+  const payload = armarPayload();
+  if (guardadoInfo && snapGuardado !== null && JSON.stringify(payload.registros) !== snapGuardado) {
+    const mo = await pedirMotivo(); if (!mo) return; payload.motivo = mo;
+  }
+  await enviarDia(payload);
 });
 
 // ───────── Cola sin conexión ─────────
@@ -559,45 +613,58 @@ function armarResumen(){
   $('rHasta').value = ctx.hoy; $('rDesde').value = lunesDe(ctx.hoy);
   $('rProy').innerHTML = '<option value="">Todos mis proyectos</option>' + ctx.proyectos.map(p => `<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('');
 }
+let resFiltro = 'todo';
 $('btnRes').addEventListener('click', async () => {
   $('resOut').innerHTML = '<div class="empty">Cargando…</div>'; $('btnCsv').disabled = true; $('btnXlsx').disabled = true;
   try {
     const q = `desde=${$('rDesde').value}&hasta=${$('rHasta').value}` + ($('rProy').value ? `&proyecto=${encodeURIComponent($('rProy').value)}` : '');
-    ultimasFilas = (await api('GET', '/mo/registros?' + q)).filas; pintarResumen(); $('btnCsv').disabled = $('btnXlsx').disabled = !ultimasFilas.length;
+    const d = await api('GET', '/mo/registros?' + q); ultimasFilas = d.filas; ultimasEdiciones = d.ediciones || [];
+    pintarResumen(); $('btnCsv').disabled = $('btnXlsx').disabled = !ultimasFilas.length;
   } catch(e){ $('resOut').innerHTML = `<div class="banner err">${esc(e.message)}</div>`; }
 });
 function pintarResumen(){
   const f = ultimasFilas; if (!f.length){ $('resOut').innerHTML = '<div class="empty">No hay registros en ese período.</div>'; return; }
   const sum = (arr, fn) => arr.reduce((s,x) => s + fn(x), 0);
-  const prod = f.filter(x => x.actividad && x.actividad !== OTROS), otros = f.filter(x => x.actividad === OTROS), aus = f.filter(x => x.estado === 'ausente');
-  const dias = new Set(f.map(x => x.fecha)).size;
-  const agrupa = (arr, key) => { const m = {}; arr.forEach(x => { const k = key(x); const o = m[k] || (m[k] = { hd:0, n:0 }); o.hd += x.hd; o.n++; }); return Object.entries(m); };
+  const tipo = x => x.estado === 'ausente' ? 'aus' : (x.actividad === OTROS ? 'otros' : 'trab');
+  const prod = f.filter(x => tipo(x) === 'trab'), otros = f.filter(x => tipo(x) === 'otros'), aus = f.filter(x => tipo(x) === 'aus');
+  const dias = new Set(f.map(x => x.fecha)).size, multiDia = dias > 1;
+  const proyectos = [...new Set(f.map(x => x.proyecto))].sort((a,b) => a.localeCompare(b)), variosProy = proyectos.length > 1;
+  const visibles = resFiltro === 'todo' ? f : f.filter(x => tipo(x) === resFiltro);
+  const chip = (k, t, n) => `<button data-f="${k}" class="${resFiltro === k ? 'on' : ''}">${t} (${n})</button>`;
   let h = `<div class="kpis"><div class="kpi"><b>${fmtHd(sum(f,x=>x.hd))}</b><span>HD totales</span></div><div class="kpi"><b>${fmtHd(sum(prod,x=>x.hd))}</b><span>HD en partidas</span></div><div class="kpi"><b>${fmtHd(sum(otros,x=>x.hd))}</b><span>HD en “Otros”</span></div></div>`;
-  // Por actividad, con desglose desplegable de las personas (+ / −)
+  h += `<div class="fchips">${chip('todo','Todos',new Set(f.map(x=>x.trabajador+x.fecha)).size)}${chip('trab','Trabajaron',new Set(prod.map(x=>x.trabajador+x.fecha)).size)}${chip('otros','Otros',new Set(otros.map(x=>x.trabajador+x.fecha)).size)}${chip('aus','Ausentes',aus.length)}</div>`;
+  // Grupos: actividad (sin el nombre del proyecto; si hay varios proyectos se separan con un encabezado), luego “Otros” y “Ausentes”
   const grupos = {};
-  prod.forEach(x => {
-    const k = `${x.proyecto} · ${x.especialidad} · ${x.actividad}`;
-    const g = grupos[k] || (grupos[k] = { hd:0, personas:{} });
+  visibles.forEach(x => {
+    const t = tipo(x), etiqueta = t === 'aus' ? 'Ausentes' : (t === 'otros' ? `${x.especialidad} · Otros (no se pudo trabajar)` : `${x.especialidad} · ${x.actividad}`);
+    const k = `${x.proyecto}\u0001${t === 'trab' ? 0 : (t === 'otros' ? 1 : 2)}\u0001${etiqueta}`;
+    const g = grupos[k] || (grupos[k] = { proyecto:x.proyecto, etiqueta, hd:0, personas:{} });
     g.hd += x.hd;
     const pk = x.trabajador + '|' + x.cargo, pe = g.personas[pk] || (g.personas[pk] = { nombre:x.trabajador, cargo:x.cargo, hd:0, dias:new Set() });
     pe.hd += x.hd; pe.dias.add(x.fecha);
   });
   const claves = Object.keys(grupos).sort((a,b) => a.localeCompare(b));
-  const multiDia = dias > 1;
-  h += `<div class="sum"><h4>Por actividad <button class="lnk" id="btnExpTodo" style="float:right;text-transform:none;letter-spacing:0;font-size:12px">Desplegar todo</button></h4><div class="scroll-x"><table id="tblAct"><thead><tr><th>Proyecto · Especialidad · Actividad</th><th class="n">HD</th></tr></thead><tbody>` +
-    claves.map((k,i) => {
-      const g = grupos[k], pers = Object.values(g.personas).sort((a,b) => a.nombre.localeCompare(b.nombre));
-      return `<tr class="gr"><td><button class="tg" data-tg="${i}" aria-expanded="false" aria-label="Ver personas">+</button>${esc(k)} <span class="npers">${pers.length} ${pers.length === 1 ? 'persona' : 'personas'}</span></td><td class="n">${fmtHd(g.hd)}</td></tr>` +
-        pers.map(pe => `<tr class="sub hide" data-g="${i}"><td>${esc(pe.nombre)} <span class="cg2">${esc(pe.cargo || 'Sin cargo')}</span>${multiDia ? ` <span class="npers">${pe.dias.size} ${pe.dias.size === 1 ? 'día' : 'días'}</span>` : ''}</td><td class="n">${fmtHd(pe.hd)}</td></tr>`).join('');
-    }).join('') + `<tr class="tot"><td>Total en partidas</td><td class="n">${fmtHd(sum(prod,x=>x.hd))}</td></tr></tbody></table></div></div>`;
-    agrupa(prod, x => `${x.proyecto} · ${x.especialidad} · ${x.actividad}`).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,o]) => `<tr><td>${esc(k)}</td><td class="n">${fmtHd(o.hd)}</td></tr>`).join('') + `<tr class="tot"><td>Total en partidas</td><td class="n">${fmtHd(sum(prod,x=>x.hd))}</td></tr></tbody></table></div></div>`;
-  if (otros.length) h += `<div class="sum"><h4>“Otros”: no se pudo trabajar</h4><div class="scroll-x"><table><thead><tr><th>Fecha</th><th>Motivo / comentario</th><th class="n">HD</th></tr></thead><tbody>` +
+  let ult = null, filasTabla = '';
+  claves.forEach((k,i) => {
+    const g = grupos[k], pers = Object.values(g.personas).sort((a,b) => a.nombre.localeCompare(b.nombre));
+    if (variosProy && g.proyecto !== ult) { filasTabla += `<tr class="proy"><td colspan="2">${esc(g.proyecto)}</td></tr>`; ult = g.proyecto; }
+    filasTabla += `<tr class="gr"><td><button class="tg" data-tg="${i}" aria-expanded="false" aria-label="Ver personas">+</button>${esc(g.etiqueta)} <span class="npers">${pers.length} ${pers.length === 1 ? 'persona' : 'personas'}</span></td><td class="n">${fmtHd(g.hd)}</td></tr>` +
+      pers.map(pe => `<tr class="sub hide" data-g="${i}"><td>${esc(pe.nombre)}<span class="cg2">${esc(pe.cargo || 'Sin cargo')}${multiDia ? ` · ${pe.dias.size} ${pe.dias.size === 1 ? 'día' : 'días'}` : ''}</span></td><td class="n">${fmtHd(pe.hd)}</td></tr>`).join('');
+  });
+  const titulo = { todo:'Por actividad', trab:'Quienes trabajaron', otros:'Quienes quedaron en “Otros”', aus:'Ausentes' }[resFiltro];
+  h += `<div class="sum"><h4>${titulo} <button class="lnk" id="btnExpTodo" style="float:right;text-transform:none;letter-spacing:0;font-size:12px">Desplegar todo</button></h4><div class="scroll-x"><table id="tblAct"><thead><tr><th>${variosProy ? 'Especialidad · Actividad' : 'Especialidad · Actividad'}</th><th class="n">HD</th></tr></thead><tbody>` +
+    filasTabla + `<tr class="tot"><td>Total</td><td class="n">${fmtHd(sum(visibles,x=>x.hd))}</td></tr></tbody></table></div></div>`;
+  if (otros.length && (resFiltro === 'todo' || resFiltro === 'otros')) h += `<div class="sum"><h4>“Otros”: no se pudo trabajar</h4><div class="scroll-x"><table><thead><tr><th>Fecha</th><th>Motivo / comentario</th><th class="n">HD</th></tr></thead><tbody>` +
     otros.map(x => `<tr><td>${fmtFecha(x.fecha)}</td><td><b>${esc(x.motivo)}</b> · ${esc(x.trabajador)}<br><span style="color:var(--mute)">${esc(x.comentario)}</span></td><td class="n">${fmtHd(x.hd)}</td></tr>`).join('') + `</tbody></table></div></div>`;
-  h += `<div class="sum"><h4>Por día</h4><table><thead><tr><th>Fecha</th><th class="n">HD</th><th class="n">Ausentes</th></tr></thead><tbody>` +
+  if (resFiltro === 'todo') h += `<div class="sum"><h4>Por día</h4><table><thead><tr><th>Fecha</th><th class="n">HD</th><th class="n">Ausentes</th></tr></thead><tbody>` +
     [...new Set(f.map(x=>x.fecha))].sort().map(d => `<tr><td>${fmtFecha(d)}</td><td class="n">${fmtHd(sum(f.filter(x=>x.fecha===d),x=>x.hd))}</td><td class="n">${aus.filter(x=>x.fecha===d).length}</td></tr>`).join('') + `</tbody></table></div>`;
+  if (ultimasEdiciones.length && resFiltro === 'todo') h += `<div class="sum"><h4>Ediciones durante la jornada (${ultimasEdiciones.length})</h4><div class="scroll-x"><table><thead><tr><th>Edición</th></tr></thead><tbody>` +
+    ultimasEdiciones.map(x => `<tr><td><b>${fmtFecha(x.fecha)}</b> · ${esc(x.especialidad)} · ${esc(x.por)} · ${esc(horaChile(x.en).join(' '))}<br><span style="color:var(--mute)">Motivo: ${esc(x.motivo)}</span><br>${x.cambios.map(esc).join('<br>')}</td></tr>`).join('') + `</tbody></table></div></div>`;
   $('resOut').innerHTML = h;
 }
 $('resOut').addEventListener('click', ev => {
+  const fb = ev.target.closest('[data-f]');
+  if (fb) { resFiltro = fb.dataset.f; pintarResumen(); return; }
   const b = ev.target.closest('[data-tg]');
   if (b) {
     const abrir = b.getAttribute('aria-expanded') !== 'true';
@@ -617,41 +684,49 @@ $('resOut').addEventListener('click', ev => {
 const horaChile = iso => { if (!iso) return ['','']; const d = new Date(iso); if (isNaN(d)) return ['','']; const o = { timeZone:'America/Santiago' };
   return [d.toLocaleDateString('es-CL', { ...o, day:'2-digit', month:'2-digit', year:'numeric' }).replace(/-/g, '/'), d.toLocaleTimeString('es-CL', { ...o, hour:'2-digit', minute:'2-digit', hour12:false })]; };
 const ESTADO_TXT = { completa:'Jornada completa', media:'Media jornada', ausente:'Ausente' };
-const CAB_INFORME = ['Fecha','Proyecto','Especialidad','Trabajador','Cargo','Estado','Actividad','Motivo (Otros)','Comentario','HD','Hora de registro','Registrado por'];
+const CAB_INFORME = ['Fecha','Proyecto','Especialidad','Trabajador','RUT','Cargo','Estado','Turno','Actividad','Motivo (Otros)','Comentario','HD','Hora de registro','Registrado por','Editado'];
+const COL_HD = CAB_INFORME.indexOf('HD');
+const CAB_EDICIONES = ['Fecha de la jornada','Proyecto','Especialidad','Editado por','Fecha y hora de la edición','Motivo de la edición','Qué cambió'];
 function filasInforme(){
-  return [...ultimasFilas].sort((a,b) => a.proyecto.localeCompare(b.proyecto) || a.fecha.localeCompare(b.fecha) || a.especialidad.localeCompare(b.especialidad) || a.trabajador.localeCompare(b.trabajador))
+  return [...ultimasFilas].sort((a,b) => a.proyecto.localeCompare(b.proyecto) || a.fecha.localeCompare(b.fecha) || a.especialidad.localeCompare(b.especialidad) || a.trabajador.localeCompare(b.trabajador) || (a.mitad || '').localeCompare(b.mitad || ''))
     .map(x => { const [fr, hr] = horaChile(x.registradoEn);
       // la fecha ya está en la columna A; si se registró OTRO día (corrección posterior), se avisa junto a la hora
       const [dd, mm, aa] = fr.split('/'), otroDia = fr && `${aa}-${mm}-${dd}` !== x.fecha;
-      return [fmtFecha(x.fecha), x.proyecto, x.especialidad, x.trabajador, x.cargo, ESTADO_TXT[x.estado] || x.estado, x.actividad, x.motivo, x.comentario, x.hd, hr ? (otroDia ? `${hr} (registrado el ${dd}/${mm})` : hr) : '', x.jefe]; });
+      return [fmtFecha(x.fecha), x.proyecto, x.especialidad, x.trabajador, x.rut || '', x.cargo, ESTADO_TXT[x.estado] || x.estado, x.mitad || '', x.actividad, x.motivo, x.comentario, x.hd, hr ? (otroDia ? `${hr} (registrado el ${dd}/${mm})` : hr) : '', x.jefe, x.editado ? 'Sí (ver hoja Ediciones)' : '']; });
 }
+const filasEdiciones = proy => ultimasEdiciones.filter(x => !proy || x.proyecto === proy).map(x => { const [fr, hr] = horaChile(x.en); return [fmtFecha(x.fecha), x.proyecto, x.especialidad, x.por, `${fr} ${hr}`, x.motivo, x.cambios.join('\n')]; });
 function descargar(blob, nombre){ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
 $('btnCsv').addEventListener('click', () => {
   const cel = v => { v = String(v ?? ''); return /[";\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; };
-  const lin = filasInforme().map(r => r.map((v,i) => cel(i === 9 ? String(v).replace('.',',') : v)).join(';'));
-  descargar(new Blob(['\uFEFF' + [CAB_INFORME.join(';'), ...lin].join('\r\n')], { type:'text/csv;charset=utf-8' }), `mano_obra_${$('rDesde').value}_${$('rHasta').value}.csv`);
+  const lin = filasInforme().map(r => r.map((v,i) => cel(i === COL_HD ? String(v).replace('.',',') : v)).join(';'));
+  descargar(new Blob(['﻿' + [CAB_INFORME.join(';'), ...lin].join('\r\n')], { type:'text/csv;charset=utf-8' }), `mano_obra_${$('rDesde').value}_${$('rHasta').value}.csv`);
 });
 function cargarXlsx(){
   if (window.XLSX) return Promise.resolve();
   return new Promise((ok, mal) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'; s.onload = ok; s.onerror = () => mal(new Error('No se pudo cargar la librería de Excel. Revisa tu conexión.')); document.head.appendChild(s); });
 }
-// Un Excel con una pestaña por obra (así no hay que separar la lista a mano)
+// Un Excel con una pestaña por obra (así no hay que separar la lista a mano) y una hoja con las ediciones
 $('btnXlsx').addEventListener('click', async () => {
   const btn = $('btnXlsx'); btn.disabled = true; const txt = btn.textContent; btn.textContent = 'Preparando…';
   try {
     await cargarXlsx();
     const filas = filasInforme(), libro = XLSX.utils.book_new(), usados = new Set();
+    const nombreHoja = base => { let hoja = base.replace(/[\\\/?*\[\]:]/g, ' ').trim().slice(0, 31) || 'Obra', n = 2; while (usados.has(hoja.toLowerCase())) hoja = hoja.slice(0, 28) + ' ' + n++; usados.add(hoja.toLowerCase()); return hoja; };
     const proyectos = [...new Set(filas.map(r => r[1]))];
     proyectos.forEach(nombre => {
-      let hoja = nombre.replace(/[\\\/?*\[\]:]/g, ' ').trim().slice(0, 31) || 'Obra', n = 2;
-      while (usados.has(hoja.toLowerCase())) hoja = hoja.slice(0, 28) + ' ' + n++;
-      usados.add(hoja.toLowerCase());
-      const ws = XLSX.utils.aoa_to_sheet([CAB_INFORME, ...filas.filter(r => r[1] === nombre)]);
-      ws['!cols'] = [12,22,16,32,24,16,22,22,36,6,26,26].map(w => ({ wch:w }));
-      ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s:{ r:0, c:0 }, e:{ r:Math.max(1, filas.filter(r => r[1] === nombre).length), c:CAB_INFORME.length - 1 } }) };
+      const propias = filas.filter(r => r[1] === nombre);
+      const ws = XLSX.utils.aoa_to_sheet([CAB_INFORME, ...propias]);
+      ws['!cols'] = [12,22,16,32,14,24,16,7,22,22,36,6,26,26,22].map(w => ({ wch:w }));
+      ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s:{ r:0, c:0 }, e:{ r:Math.max(1, propias.length), c:CAB_INFORME.length - 1 } }) };
       ws['!freeze'] = { xSplit:0, ySplit:1 };
-      XLSX.utils.book_append_sheet(libro, ws, hoja);
+      XLSX.utils.book_append_sheet(libro, ws, nombreHoja(nombre));
     });
+    if (ultimasEdiciones.length) {
+      const ed = filasEdiciones(''), ws = XLSX.utils.aoa_to_sheet([CAB_EDICIONES, ...ed]);
+      ws['!cols'] = [14,22,16,28,20,40,80].map(w => ({ wch:w }));
+      ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s:{ r:0, c:0 }, e:{ r:Math.max(1, ed.length), c:CAB_EDICIONES.length - 1 } }) };
+      XLSX.utils.book_append_sheet(libro, ws, nombreHoja('Ediciones'));
+    }
     XLSX.writeFile(libro, `mano_obra_${$('rDesde').value}_${$('rHasta').value}.xlsx`);
   } catch(e){ toast(e.message, 5000); }
   btn.textContent = txt; btn.disabled = !ultimasFilas.length;
