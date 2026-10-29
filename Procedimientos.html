@@ -440,7 +440,8 @@ const CARPETAS = [
 // Dentro de cada una, un documento es GENERAL (queda suelto) o aplica a una o más obras.
 const CARPETA_OBRAS = 'Obras';
 const OBRAS_CONSTRUCCION = ['Mirador El Águila', 'Mirador El Pino', 'Portal Los Maitenes', 'Portal Oriente Melipilla', 'Portal El Abra'];
-const SUBCARPETAS_OBRAS = ['Planos / Detalles Constructivos', 'Procedimientos'];
+const SUBCARPETAS_OBRAS = ['Procedimientos'];
+const SUBCARPETA_PLANOS_ANTIGUA = 'Planos / Detalles Constructivos'; // los planos viven ahora en Planos Oficiales
 // Flujo fijo de firmas en Obras (lo hace cumplir el servidor, esto solo lo muestra).
 const FIRMANTE_REVISOR = 'jdiaz@ibaker.cl';
 const NOMBRE_REVISOR = 'Jorge Diaz';
@@ -1009,7 +1010,7 @@ function hijosDelNivel() {
 // Obras quedan también los antiguos que no pertenecen a ninguna carpeta nueva.
 function docsDelNivel() {
     if (carpetaActual !== CARPETA_OBRAS) return docsGithub;
-    if (!subcarpetaActual) return docsGithub.filter(d => !SUBCARPETAS_OBRAS.includes(d.subcarpeta));
+    if (!subcarpetaActual) return docsGithub.filter(d => !SUBCARPETAS_OBRAS.includes(d.subcarpeta) && d.subcarpeta !== SUBCARPETA_PLANOS_ANTIGUA);
     if (!obraActual) return docsGithub.filter(d => d.subcarpeta === subcarpetaActual && !d.grupoObras);   // generales
     return docsGithub.filter(d => d.subcarpeta === subcarpetaActual && obrasDeDoc(d).includes(obraActual));
 }
@@ -1034,8 +1035,8 @@ function htmlTarjetasHijos(nombres, tipo) {
             <div class="carpeta-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 13a5 5 0 007.07 0l3-3a5 5 0 00-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 00-7.07 0l-3 3a5 5 0 007.07 7.07l1.5-1.5"/></svg>
             </div>
-            <div class="carpeta-nombre">Planos oficiales (SharePoint)</div>
-            <div class="carpeta-count">Carpeta 1_OFICIALES · con tus permisos</div>
+            <div class="carpeta-nombre">Planos Oficiales</div>
+            <div class="carpeta-count">Según tus permisos de proyecto</div>
         </div>` : ''}</div>`;
 }
 
