@@ -116,6 +116,7 @@ details ul{font-size:13px;line-height:1.7;margin:6px 0 0 18px;color:var(--iron)}
       <label>Velocidad de la voz <input type="range" id="vel" min="0.8" max="1.5" step="0.05" value="1.05"></label>
       <button class="btn ghost" id="btn-probar" style="min-height:40px;padding:8px 12px;font-size:12px">Probar voz</button>
     </div>
+    <div class="dicho" id="voz-info"></div>
     <details style="margin-top:10px"><summary>Comandos de voz</summary>
       <ul>
         <li><b>siguiente</b> — pasa al próximo correo</li>
@@ -213,6 +214,7 @@ function trocear(texto, max) {
   return partes;
 }
 function cancelarHabla() { hablaId++; try { tts && tts.cancel(); } catch (e) {} }
+const refsHabla = new Set();                         // Safari descarta (y nunca termina) las frases que nadie referencia
 function hablar(texto) {
   texto = String(texto || '').trim();
   if (!texto) return Promise.resolve();
@@ -226,11 +228,27 @@ function hablar(texto) {
     let i = 0;
     const siguiente = () => {
       if (miId !== hablaId || i >= partes.length) return resolve();
-      const u = new SpeechSynthesisUtterance(partes[i++]);
-      const v = elegirVoz(); if (v) u.voice = v;
-      u.lang = (v && v.lang) || 'es-CL'; u.rate = velocidad;
-      u.onend = siguiente; u.onerror = () => resolve();
-      try { tts.speak(u); } catch (e) { resolve(); }
+      const frase = partes[i++];
+      const u = new SpeechSynthesisUtterance(frase);
+      const v = elegirVoz();
+      if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'es-MX';   // sin voz identificada: español genérico (iPhone no trae es-CL en todas las versiones)
+      u.rate = velocidad; u.volume = 1;
+      refsHabla.add(u);
+      let listo = false;
+      const fin = () => { if (listo) return; listo = true; clearTimeout(vigia); refsHabla.delete(u); siguiente(); };
+      // Si el navegador nunca avisa que terminó (pasa en Safari y a veces en Chrome), se sigue igual.
+      const vigia = setTimeout(fin, Math.max(4000, frase.length * 110 / velocidad));
+      u.onend = fin;
+      u.onerror = ev => {
+        const motivo = ev && ev.error;
+        if (motivo && motivo !== 'canceled' && motivo !== 'interrupted') {
+          registrar('⚠ voz: ' + motivo);
+          if (motivo === 'not-allowed') aviso('err', 'El navegador bloqueó el audio. Toca «Probar voz» una vez y vuelve a intentar.');
+        }
+        if (motivo === 'canceled' || motivo === 'interrupted') { listo = true; clearTimeout(vigia); refsHabla.delete(u); return resolve(); }
+        fin();
+      };
+      try { if (tts.paused) tts.resume(); tts.speak(u); } catch (e) { fin(); }
     };
     siguiente();
   });
@@ -604,7 +622,13 @@ $('btn-reanudar').addEventListener('click', reanudar);
 $('vel').addEventListener('input', e => { velocidad = parseFloat(e.target.value); try { localStorage.setItem('cv_vel', velocidad); } catch (x) {} });
 $('btn-probar').addEventListener('click', () => hablar('Hola. Así sonará la lectura de tus correos.'));
 try { const v = parseFloat(localStorage.getItem('cv_vel')); if (v >= 0.8 && v <= 1.5) { velocidad = v; $('vel').value = v; } } catch (x) {}
-if (tts && tts.onvoiceschanged !== undefined) tts.onvoiceschanged = () => {};
+function mostrarInfoVoz() {
+  const v = elegirVoz(), n = ((tts && tts.getVoices()) || []).length;
+  $('voz-info').textContent = !tts ? 'Este navegador no puede leer en voz alta.'
+    : v ? 'Voz: ' + v.name + ' (' + v.lang + ')' : (n ? 'No hay voces en español instaladas; usaré la voz por defecto.' : 'Voces aún no disponibles; si no escuchas nada, toca «Probar voz».');
+}
+if (tts && tts.onvoiceschanged !== undefined) tts.onvoiceschanged = mostrarInfoVoz;
+mostrarInfoVoz(); setTimeout(mostrarInfoVoz, 1500);
 
 async function initAuth() {
   try {
