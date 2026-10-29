@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="author" content="Creado por: Javier Cumplido, octubre 2026">
+<title>Panel de Control de Obras</title>
+<!-- Panel de Control de Obras v3.0 · piloto de pruebas · Gerencia de Control de Gestión y TI · Uso exclusivo de Inmobiliaria Baker.
+     Este archivo solo abre el Panel: el código y los datos van cifrados en panel.js. -->
+<style>
+  :root { --brand: #ff002e; --ink: #1a1a1a; --muted: #666; --bg: #f4f4f4; --card: #fff; }
+  @media (prefers-color-scheme: dark) { :root { --ink: #eee; --muted: #aaa; --bg: #161616; --card: #222; } }
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg); color: var(--ink); font-family: Montserrat, system-ui, sans-serif; -webkit-user-select: none; user-select: none; }
+  main { width: 100%; max-width: 440px; background: var(--card); border-radius: 10px; border-top: 4px solid var(--brand); padding: 24px; box-shadow: 0 8px 30px rgba(0,0,0,.12); box-sizing: border-box; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { font-size: 13px; color: var(--muted); margin: 0; }
+  .pie { font-size: 11.5px; color: var(--muted); margin: 16px 0 0; line-height: 1.4; }
+</style>
+</head>
+<body>
+<main id="caja">
+  <h1>Panel de Control de Obras</h1>
+  <p class="sub" id="estado">Abriendo…</p>
+  <p class="pie">Uso exclusivo de Inmobiliaria Baker. El código y los datos son confidenciales: prohibida su copia o entrega a terceros.</p>
+</main>
+<script src="panel.js"></script>
+<script>
+(function () {
+  var HASTA = "9999-12-31", RUTA_PRUEBA = false, K = "foBDK01NgFde26LX6nRjgcyDMddn6tPJ8j0x/i42la8ea0mpqATUNPWfudACYmo4Ol6R29IS6mPmc2+VAYPPUg==";
+  var caja = document.getElementById("caja");
+  function cerrar(t, x) { caja.innerHTML = "<h1>" + t + "</h1><p class='sub'>" + x + "</p><p class='pie'>Panel de Control de Obras · Gerencia de Control de Gestión · Uso exclusivo de Inmobiliaria Baker.</p>"; }
+  var u = decodeURIComponent(location.href).toLowerCase();
+  var rutaOk = (location.protocol === "file:" && u.indexOf("inmobiliaria baker") >= 0) || /^https:\/\/([\w-]+\.)*(ibaker|intranetbaker)\.cl\//.test(u) || (RUTA_PRUEBA && /^http:\/\/localhost:\d+\//.test(u));
+  if (new Date().toISOString().slice(0, 10) > HASTA) return cerrar("El piloto terminó", "Esta versión de prueba fue válida hasta el 30-11-2026. Pide la versión vigente a la Gerencia de Control de Gestión.");
+  if (!rutaOk) return cerrar("Ubicación no autorizada", "El Panel solo se abre desde la carpeta de Inmobiliaria Baker en SharePoint (sincronizada con OneDrive) o desde la intranet.");
+  if (!window.PANEL_PAQUETE) return cerrar("Falta el archivo del Panel", "No se encontró panel.js junto a esta página. Vuelve a sincronizar la carpeta del Panel.");
+  if (!window.crypto || !crypto.subtle) return cerrar("Navegador no compatible", "Abre el Panel con Chrome o Edge actualizados.");
+  var P = window.PANEL_PAQUETE, b64 = function (s) { var b = atob(s), a = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; };
+  /* AES-256-CBC + HMAC-SHA256 (encrypt-then-MAC) with this build's key: a damaged or swapped panel.js fails the MAC */
+  (async function () {
+    try {
+      var k = b64(K), iv = b64(P.iv), c = b64(P.c), msg = new Uint8Array(iv.length + c.length); msg.set(iv); msg.set(c, iv.length);
+      var mk = await crypto.subtle.importKey("raw", k.slice(32), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+      if (!(await crypto.subtle.verify("HMAC", mk, b64(P.m), msg))) return cerrar("Archivos desactualizados", "index.html y panel.js no son de la misma versión. Vuelve a sincronizar la carpeta del Panel.");
+      var ek = await crypto.subtle.importKey("raw", k.slice(0, 32), "AES-CBC", false, ["decrypt"]);
+      var html = new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-CBC", iv: iv }, ek, c));
+      /* replace this page only once it finished loading: while the parser is still active, document.open() does nothing and write() would append the Panel to the shell */
+      if (document.readyState !== "complete") await new Promise(function (ok) { window.addEventListener("load", ok, { once: true }); });
+      document.open(); document.write(html); document.close();
+    } catch (e) { cerrar("No se pudo abrir el Panel", "Vuelve a sincronizar la carpeta del Panel o avisa a la Gerencia de Control de Gestión."); }
+  })();
+})();
+</script>
+</body>
+</html>
