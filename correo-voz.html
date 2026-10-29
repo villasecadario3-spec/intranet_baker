@@ -62,10 +62,15 @@ main{max-width:720px;margin:0 auto;padding:14px}
 details summary{font-size:13px;font-weight:700;color:var(--mute);cursor:pointer;padding:6px 0}
 details ul{font-size:13px;line-height:1.7;margin:6px 0 0 18px;color:var(--iron)}
 .oculto{display:none!important}
+#cargando{position:fixed;inset:0;z-index:100;background:var(--page);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center}
+#cargando .spin{width:34px;height:34px;border:4px solid var(--bord);border-top-color:var(--red);border-radius:50%;animation:gira 1s linear infinite}
+@keyframes gira{to{transform:rotate(360deg)}}
+#cargando p{font-size:14px;font-weight:600;color:var(--mute);line-height:1.5}
 .hist{font-size:12px;color:var(--mute);line-height:1.6;max-height:140px;overflow:auto}
 </style>
 </head>
 <body>
+<div id="cargando"><div class="spin"></div><p id="cargando-txt">Iniciando sesión…</p></div>
 <header>
   <a class="back" href="index.html" aria-label="Volver">‹</a>
   <div class="tt">Correo por voz<small>Gestiona tu bandeja con la voz</small></div>
@@ -144,7 +149,8 @@ const MAX_CORREOS = 100;
 
 const msalInstance = new msal.PublicClientApplication({
   auth: { clientId: CLIENT_ID, authority: 'https://login.microsoftonline.com/' + TENANT, redirectUri: window.location.origin + window.location.pathname },
-  cache: { cacheLocation: 'sessionStorage' }
+  // localStorage: la app instalada en el teléfono se cierra y se vuelve a abrir; con sessionStorage pedía iniciar sesión cada vez.
+  cache: { cacheLocation: 'localStorage' }
 });
 let emailActual = '', nombreActual = '';
 const $ = id => document.getElementById(id);
@@ -605,14 +611,20 @@ async function initAuth() {
     await msalInstance.initialize();
     await msalInstance.handleRedirectPromise().catch(() => {});
     const cuentas = msalInstance.getAllAccounts();
-    if (!cuentas.length) { await msalInstance.loginRedirect({ scopes: SCOPES }); return; }
+    if (!cuentas.length) { $('cargando-txt').textContent = 'Abriendo el inicio de sesión de Microsoft…'; await msalInstance.loginRedirect({ scopes: SCOPES }); return; }
+    msalInstance.setActiveAccount(cuentas[0]);
     emailActual = cuentas[0].username.toLowerCase(); nombreActual = cuentas[0].name || emailActual;
     $('avatar').textContent = (nombreActual.split(/\s+/).map(p => p[0]).join('').slice(0, 2) || '?').toUpperCase();
     if (!ACCESO_MODULO.includes(emailActual)) { window.location.href = 'index.html'; return; }
+    $('cargando').classList.add('oculto');
     if (!SR) aviso('err', 'Este navegador no permite reconocimiento de voz. Puedes usar los botones; para hablar usa Chrome (Android) o Safari (iPhone).');
     else if (!tts) aviso('err', 'Este navegador no puede leer en voz alta.');
-  } catch (e) { console.error(e); window.location.href = 'index.html'; }
+  } catch (e) {
+    console.error(e);
+    $('cargando').innerHTML = '<p>No pude iniciar sesión.<br><small>' + escH(e.message || e) + '</small></p><button class="btn red" onclick="location.reload()">Reintentar</button>';
+  }
 }
+setTimeout(() => { const c = $('cargando'); if (c && !c.classList.contains('oculto')) $('cargando-txt').innerHTML = 'Esto está tardando más de lo normal.<br>Si no avanza, cierra la app y ábrela de nuevo.'; }, 12000);
 initAuth();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw-voz.js').catch(() => {});
 </script>
