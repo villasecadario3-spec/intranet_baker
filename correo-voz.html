@@ -404,7 +404,7 @@ async function comenzar() {
     const crudos = await traerNoLeidos(); vivo(miId);
     if (!crudos.length) { await hablar('No tienes correos sin leer. Buen viaje.'); terminar(); return; }
     const { items, ia, motivo } = await analizar(crudos); vivo(miId);
-    if (!ia) aviso('info', 'Resumí con reglas simples porque la IA no estuvo disponible' + (motivo ? ' (' + escH(motivo) + ')' : '') + '.');
+    if (!ia && !/ANTHROPIC_API_KEY/.test(motivo || '')) aviso('info', 'Resumí con reglas simples porque la IA no estuvo disponible' + (motivo ? ' (' + escH(motivo) + ')' : '') + '.');
     const pos = [], imp = [], inf = [], aut = [];
     items.forEach(i => {
       if ((i.m.categories || []).includes(CATEGORIA_DESPUES)) pos.push(i);
