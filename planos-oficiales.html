@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Planos oficiales — Baker</title>
+    <title>Planos Oficiales — Baker</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -203,7 +203,7 @@
         Procedimientos
     </a>
     <div class="nav-sep"></div>
-    <div class="nav-title">Planos oficiales</div>
+    <div class="nav-title">Planos Oficiales</div>
     <div class="nav-spacer"></div>
     <div id="auth-area"></div>
 </nav>
@@ -211,9 +211,9 @@
 <div class="page-header">
     <div class="page-header-inner">
         <div>
-            <div class="page-eyebrow">Obras · SharePoint</div>
-            <h1>Planos <em>oficiales</em></h1>
-            <div class="page-header-sub">Los mismos archivos, el mismo orden y los mismos permisos que la carpeta 1_OFICIALES de SharePoint.</div>
+            <div class="page-eyebrow">Obras</div>
+            <h1>Planos <em>Oficiales</em></h1>
+            <div class="page-header-sub">Los planos oficiales de cada proyecto, según los permisos de tu carpeta.</div>
         </div>
     </div>
 </div>
@@ -228,8 +228,8 @@
         <button class="btn-doc btn-dl" onclick="buscarEnBiblioteca()" title="Busca por nombre en todo lo que tu usuario puede ver">🔎 Buscar en toda la biblioteca</button>
     </div>
     <div id="aviso"></div>
-    <div id="lista"><div class="cargando">Conectando con SharePoint…</div></div>
-    <div class="solo-lectura">Solo lectura. Si no ves una carpeta, es porque tu usuario no tiene acceso en SharePoint: los permisos se piden allá, no en la intranet.</div>
+    <div id="lista"><div class="cargando">Cargando…</div></div>
+    <div class="solo-lectura">Solo lectura. Si no ves una carpeta, es porque tu usuario no tiene acceso a ella: los permisos se piden a quien administra la carpeta del proyecto.</div>
 </div>
 
 <div class="visor-fondo" id="visor-fondo" onclick="if(event.target===this)cerrarVisor()">
@@ -338,7 +338,7 @@ function renderLista() {
         const e = ext(it.name), puedeVer = PREVISUALIZABLES.includes(e), esDwg = e === 'dwg';
         const quien = it.lastModifiedBy && it.lastModifiedBy.user ? ' · ' + esc(it.lastModifiedBy.user.displayName) : '';
         return `<div class="fila"><div class="fila-ic">${iconoDe(it)}</div><div class="fila-info"><div class="fila-nombre">${esc(it.name)}${esDwg ? '<span class="etq dwg">DWG</span>' : ''}</div>${donde}<div class="fila-meta">${tam(it.size)} · Modificado ${fechaC(it.lastModifiedDateTime)}${quien}</div></div>
-            <div class="fila-acc">${puedeVer ? `<button class="btn-doc btn-ver" onclick="verItem(${idx})">Ver</button>` : ''}<button class="btn-doc btn-dl" onclick="descargarItem(${idx})">Descargar</button><a class="btn-doc btn-dl" href="${esc(it.webUrl)}" target="_blank" rel="noopener">Abrir en SharePoint</a></div></div>`;
+            <div class="fila-acc">${puedeVer ? `<button class="btn-doc btn-ver" onclick="verItem(${idx})">Ver</button>` : ''}<button class="btn-doc btn-dl" onclick="descargarItem(${idx})">Descargar</button><a class="btn-doc btn-dl" href="${esc(it.webUrl)}" target="_blank" rel="noopener">Abrir original</a></div></div>`;
     }).join('');
 }
 function abrirItem(i) {
@@ -384,14 +384,14 @@ function mostrarError(e, segs) {
     const sinAcceso = e.status === 403 || e.codigo === 'accessDenied';
     if (sinAcceso || e.status === 404 || e.codigo === 'itemNotFound') {
         if (!segs.length) panelAccesoLimitado('No tienes acceso a la lista general de la biblioteca', '<br>Es normal si tu acceso es solo a la carpeta de tu proyecto. Ingresa la ruta de tu carpeta (Comuna/Proyecto), busca por nombre, o usa una de tus carpetas recientes.');
-        else panelAccesoLimitado(sinAcceso ? 'No tienes acceso a esta carpeta' : 'No se encontró esa carpeta', `<br>${esc(segs.join(' / '))}<br>${sinAcceso ? 'SharePoint no te da permiso sobre ella. Si la necesitas, pídela a quien administra los permisos de la carpeta.' : 'Revisa que la ruta esté escrita igual que en SharePoint (mayúsculas, guiones y espacios).'}`);
+        else panelAccesoLimitado(sinAcceso ? 'No tienes acceso a esta carpeta' : 'No se encontró esa carpeta', `<br>${esc(segs.join(' / '))}<br>${sinAcceso ? 'No tienes permiso sobre ella. Si la necesitas, pídela a quien administra los permisos de la carpeta.' : 'Revisa que la ruta esté escrita igual que el nombre de la carpeta (mayúsculas, guiones y espacios).'}`);
         return;
     }
     if (e.codigo === 'biblioteca') { AVISO.innerHTML = `<div class="aviso err"><b>No se encontró la biblioteca</b>${esc(e.message)}<br>Avisa a TI.</div>`; return; }
     if (/consent|AADSTS65001|AADSTS90094|Authorization_RequestDenied|interaction_required/i.test(e.message + ' ' + e.codigo + ' ' + (e.errorCode || ''))) {
-        AVISO.innerHTML = `<div class="aviso err"><b>Falta autorizar el acceso a SharePoint</b>La intranet todavía no tiene el permiso de lectura de SharePoint en Microsoft 365 (Sites.Read.All). Avisa a TI para que lo autorice.</div>`; return;
+        AVISO.innerHTML = `<div class="aviso err"><b>Falta autorizar el acceso a los planos</b>La intranet todavía no tiene el permiso de lectura de planos en Microsoft 365 (Sites.Read.All). Avisa a TI para que lo autorice.</div>`; return;
     }
-    AVISO.innerHTML = `<div class="aviso err"><b>No se pudo leer SharePoint</b>${esc(e.message)}</div>`;
+    AVISO.innerHTML = `<div class="aviso err"><b>No se pudo leer los planos</b>${esc(e.message)}</div>`;
 }
 
 // ── Búsqueda (SharePoint ya muestra solo lo que tu usuario puede ver) ──
@@ -412,18 +412,18 @@ async function buscarEnBiblioteca() {
 // ── Ver / descargar ──
 function registrar(it, tipo) {
     fetch(API + '/docs/registrar-acceso', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ carpeta: 'SharePoint · ' + [BIBLIOTECA].concat(rutaDeItem(it)).join(' / '), archivo: it.name, email: emailActual, nombre: nombreActual, tipo }) }).catch(() => {});
+        body: JSON.stringify({ carpeta: 'Planos Oficiales · ' + [BIBLIOTECA].concat(rutaDeItem(it)).join(' / '), archivo: it.name, email: emailActual, nombre: nombreActual, tipo }) }).catch(() => {});
 }
 async function verItem(i) {
     const it = itemsActuales[i]; if (!it) return;
     try {
         const r = await graph(`/drives/${driveId}/items/${encodeURIComponent(it.id)}/preview`, { method: 'POST', body: '{}' });
-        if (!r || !r.getUrl) throw new Error('SharePoint no entregó vista previa');
+        if (!r || !r.getUrl) throw new Error('No hay vista previa disponible');
         document.getElementById('visor-titulo').textContent = it.name;
         document.getElementById('visor-iframe').src = r.getUrl;
         document.getElementById('visor-fondo').classList.add('visible');
         registrar(it, 'ver');
-    } catch (e) { toast('No se pudo abrir la vista previa: ' + e.message + '. Prueba «Abrir en SharePoint».', 'err'); }
+    } catch (e) { toast('No se pudo abrir la vista previa: ' + e.message + '. Prueba «Abrir original».', 'err'); }
 }
 function cerrarVisor() { document.getElementById('visor-fondo').classList.remove('visible'); document.getElementById('visor-iframe').src = 'about:blank'; }
 async function descargarItem(i) {
@@ -431,7 +431,7 @@ async function descargarItem(i) {
     try {
         const r = await graph(`/drives/${driveId}/items/${encodeURIComponent(it.id)}`);
         const url = r && r['@microsoft.graph.downloadUrl'];
-        if (!url) throw new Error('SharePoint no entregó el enlace de descarga');
+        if (!url) throw new Error('No se obtuvo el enlace de descarga');
         registrar(it, 'descargar');
         const a = document.createElement('a'); a.href = url; a.download = it.name; document.body.appendChild(a); a.click(); a.remove();
     } catch (e) { toast('No se pudo descargar: ' + e.message, 'err'); }
