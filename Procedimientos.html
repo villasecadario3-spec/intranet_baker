@@ -192,6 +192,9 @@
 
 <div class="main">
 
+    <!-- Aviso: documentos de obra por revisar (acuse de recibo) -->
+    <div id="banner-acuse" style="display:none;margin-bottom:16px;"></div>
+
     <!-- TABS -->
     <div class="tabs" id="tabs-wrap">
         <div class="tab activo" onclick="cambiarTab('publicados')">Publicados</div>
@@ -205,6 +208,10 @@
             <input class="search-input" id="search" type="text" placeholder="Buscar carpetas…" oninput="filtrar()">
         </div>
         <div class="breadcrumb" id="breadcrumb" style="display:none"></div>
+        <div id="barra-gestion-obras" style="display:none;margin-bottom:12px;gap:8px;flex-wrap:wrap;">
+            <button class="btn-doc btn-dl" onclick="abrirDestinatarios()">👥 Destinatarios por obra</button>
+            <button class="btn-doc btn-dl" id="btn-recordatorios" onclick="enviarRecordatorios()">🔔 Recordatorios</button>
+        </div>
         <div id="filtro-obra-wrap" style="display:none;margin-bottom:12px;">
             <select class="modal-input" id="filtro-obra" style="max-width:260px;" onchange="cambiarFiltroObra(this.value)">
                 <option value="">Todas las obras</option>
@@ -276,6 +283,40 @@
     </div>
 </div>
 
+<!-- MODAL DESTINATARIOS POR OBRA -->
+<div class="modal-overlay" id="modal-destinatarios">
+    <div class="modal" style="max-width:560px;">
+        <div class="modal-titulo">Destinatarios por obra</div>
+        <p style="font-size:0.82rem;color:var(--txt-mid,#666);margin-bottom:12px;">Personas de cada obra que reciben el aviso cuando se publica una versión nueva y deben marcar «Visto».</p>
+        <div class="modal-form-group">
+            <label class="modal-label">Obra</label>
+            <select class="modal-input" id="dest-obra" onchange="cargarDestinatariosObra()"></select>
+        </div>
+        <div class="modal-form-group">
+            <label class="modal-label">Correos (separados por coma, espacio o salto de línea)</label>
+            <textarea class="modal-textarea" id="dest-correos" style="min-height:140px;" placeholder="persona1@ibaker.cl, persona2@ibaker.cl"></textarea>
+            <div id="dest-cuenta" style="font-size:0.74rem;color:var(--txt-dim,#999);margin-top:4px;"></div>
+        </div>
+        <div class="modal-btns">
+            <button class="btn-cancelar-modal" onclick="cerrarDestinatarios()">Cerrar</button>
+            <button class="btn-enviar-modal" id="btn-guardar-dest" onclick="guardarDestinatarios()">Guardar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CHECKLIST DE LECTURA -->
+<div class="modal-overlay" id="modal-checklist">
+    <div class="modal" style="max-width:560px;">
+        <div class="modal-titulo">Checklist de lectura</div>
+        <p id="check-titulo" style="font-size:0.85rem;color:var(--txt-mid,#666);margin-bottom:12px;"></p>
+        <div id="check-cuerpo" style="max-height:340px;overflow-y:auto;"></div>
+        <div class="modal-btns">
+            <button class="btn-cancelar-modal" onclick="cerrarChecklist()">Cerrar</button>
+            <button class="btn-enviar-modal" id="btn-check-reenviar" onclick="reenviarPendientesChecklist()" style="display:none;">🔔 Reenviar a los pendientes</button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL SUBIR DOCUMENTO -->
 <div class="modal-overlay" id="modal-overlay">
     <div class="modal">
@@ -288,7 +329,7 @@
         </div>
         <div class="modal-form-group" id="grupo-subcarpeta" style="display:none;">
             <label class="modal-label">Carpeta dentro de Obras *</label>
-            <select class="modal-input" id="m-subcarpeta">
+            <select class="modal-input" id="m-subcarpeta" onchange="cambiarSubcarpetaModal()">
                 <option value="">Selecciona la carpeta…</option>
             </select>
             <label class="modal-label" style="margin-top:10px;">¿Aplica a obras específicas? *</label>
@@ -301,6 +342,11 @@
                 <div id="m-obras-aplica-chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
                 <div id="m-admins-obras" style="margin-top:12px;"></div>
             </div>
+        </div>
+        <div class="modal-form-group" id="grupo-resumen" style="display:none;">
+            <label class="modal-label">Resumen de cambios de esta versión *</label>
+            <textarea class="modal-textarea" id="m-resumen" placeholder="Ej: Se modificó la cota del muro del eje B (ver nube y viñeta en el plano)."></textarea>
+            <div style="font-size:0.72rem;color:var(--txt-dim,#999);margin-top:4px;">Es solo una ayuda memoria: el plano oficial siempre prima. Deja en el plano las nubes y una viñeta con fecha y descripción del cambio.</div>
         </div>
         <div class="modal-form-group" id="grupo-area" style="display:none;">
             <label class="modal-label">Área *</label>
@@ -326,7 +372,7 @@
                 ¿Necesita firmantes?
             </label>
             <div id="m-flujo-estandar" style="display:none;margin-bottom:12px;">
-                <label class="modal-label">Flujo de firmas (fijo)</label>
+                <label class="modal-label">Flujo de publicación</label>
                 <div id="m-flujo-lista" style="font-size:0.8rem;line-height:1.7;"></div>
             </div>
             <div id="grupo-firmantes" style="display:none;margin-top:10px;">
@@ -474,6 +520,7 @@ async function initAuth() {
             }
             poblarSelectorCarpetas();
             renderCarpetas();
+            cargarMisPendientes();
             await cargarAreas();
         } else {
             window.location.href = 'index.html';
@@ -502,25 +549,29 @@ function renderObrasAplicaModal() {
     document.getElementById('m-obras-aplica-chips').innerHTML = OBRAS_CONSTRUCCION.map(o => `
         <div class="dia-chip" style="padding:6px 12px;font-size:0.76rem;border:1px solid var(--gris-2,#ddd);border-radius:100px;cursor:pointer;${obrasAplicaModal.has(o) ? 'background:var(--negro,#111);color:#fff;border-color:var(--negro,#111);' : ''}"
              onclick="toggleObraAplica('${escAttr(o)}')">${o}</div>`).join('');
-    const sel = OBRAS_CONSTRUCCION.filter(o => obrasAplicaModal.has(o));
-    document.getElementById('m-admins-obras').innerHTML = sel.length ? `
-        <label class="modal-label">Administrador de cada obra *</label>
-        ${sel.map(o => `<div style="margin-bottom:6px;"><input class="modal-input" type="email" placeholder="Correo del administrador de ${o}" value="${attrHtml(adminsObraModal[o] || '')}" oninput="cambiarAdminObra('${escAttr(o)}', this.value)"></div>`).join('')}
-        <div style="font-size:0.72rem;color:var(--txt-dim,#999);">Firman después de jdiaz. Los ingresas al subir el documento y después no se pueden cambiar.</div>` : '';
+    document.getElementById('m-admins-obras').innerHTML = '';   // acuerdo de gerencia: ya no firman los administradores de obra
 }
 
 // Describe el flujo de firmas según lo elegido.
 function actualizarFlujoModal() {
     const cont = document.getElementById('m-flujo-lista');
-    const aplica = aplicaObrasModal();
-    const primero = `<div>1. ${NOMBRE_REVISOR} (${FIRMANTE_REVISOR})</div>`;
     const gris = t => `<div style="color:var(--txt-dim,#999);">${t}</div>`;
-    if (aplica === null) { cont.innerHTML = gris('Indica si aplica a obras específicas para ver quiénes firman.'); return; }
-    if (!aplica) { cont.innerHTML = primero + gris('Es general: no firma nadie más.'); return; }
-    const sel = OBRAS_CONSTRUCCION.filter(o => obrasAplicaModal.has(o));
-    if (!sel.length) { cont.innerHTML = primero + gris('2. Elige las obras para ver a sus administradores.'); return; }
-    cont.innerHTML = primero + `<div>2. Administrador de cada obra (en cualquier orden entre ellos):</div>` +
-        sel.map(o => `<div style="padding-left:16px;">· ${o}: ${(adminsObraModal[o] || '').trim() || 'correo por ingresar'}</div>`).join('');
+    if (esPlanosModal()) {
+        cont.innerHTML = '<div>Sin firmas: el plano se publica apenas lo envías.</div>' +
+            gris('Las personas de cada obra reciben un correo y marcan «Visto» (acuse de recibo). Si no lo hacen, reciben recordatorios.');
+        return;
+    }
+    cont.innerHTML = `<div>Firma: ${NOMBRE_REVISOR} (${FIRMANTE_REVISOR})</div>` +
+        gris('Cuando queda vigente, las personas de cada obra reciben un correo y marcan «Visto».');
+}
+const SUBCARPETA_PLANOS = 'Planos / Detalles Constructivos';
+function esPlanosModal() { return document.getElementById('m-subcarpeta').value === SUBCARPETA_PLANOS; }
+function cambiarSubcarpetaModal() {
+    const esObras = tipoSubidaActual === 'procedimiento' && document.getElementById('m-carpeta').value === CARPETA_OBRAS;
+    document.getElementById('grupo-resumen').style.display = (esObras && esPlanosModal()) ? '' : 'none';
+    if (esObras) document.getElementById('m-requiere-firma').checked = !esPlanosModal();   // Planos: sin firmas
+    toggleFirmantesUI();
+    actualizarFlujoModal();
 }
 
 // En la carpeta Obras se elige la carpeta (Planos / Procedimientos) y si aplica a
@@ -549,9 +600,10 @@ function actualizarSubcarpetasModal() {
     const grupoObras = document.getElementById('grupo-obras');
     if (grupoObras) grupoObras.style.display = (tipoSubidaActual === 'procedimiento' && !esObras) ? '' : 'none';
     const chk = document.getElementById('m-requiere-firma');
-    if (esObras) chk.checked = true;
+    if (esObras) chk.checked = !esPlanosModal();
     else if (flujoObrasForzado) chk.checked = false;
     flujoObrasForzado = esObras;
+    document.getElementById('grupo-resumen').style.display = (esObras && esPlanosModal()) ? '' : 'none';
     toggleFirmantesUI();
     actualizarFlujoModal();
 }
@@ -570,6 +622,7 @@ function poblarSelectorCarpetas() {
 
 // ── DOCUMENTOS PUBLICADOS: navegación por carpetas ─────────────
 function renderCarpetas() {
+    document.getElementById('barra-gestion-obras').style.display = 'none';
     document.getElementById('breadcrumb').style.display = 'none';
     document.getElementById('search').placeholder = 'Buscar carpetas…';
     const query = document.getElementById('search').value.toLowerCase();
@@ -787,15 +840,19 @@ function agruparVersiones(docs) {
         lista.sort(compararVersiones);
         const nombreBase = baseSinVersion(lista[0].archivoNombre);
         lista.forEach((d, i) => { d.version = i + 1; d.nombreMostrado = lista.length > 1 ? nombreBase : d.nombre; });
-        let idx = lista.length - 1;
-        for (let i = lista.length - 1; i >= 0; i--) { if (versionValida(lista[i])) { idx = i; break; } }
-        return {
-            nombreBase,
-            actual: lista[idx],
-            enFirma: lista.slice(idx + 1),
-            anteriores: lista.slice(0, idx).reverse(),
-            total: lista.length,
-        };
+        // Vigente: la más nueva con sus firmas completas que no esté marcada "no vigente";
+        // si alguien marcó una "vigente" a mano, manda la más nueva de esas.
+        const cand = [], estadoDe = d => (d.meta && d.meta.estadoVersion) || '';
+        lista.forEach((d, i) => { if (versionValida(d) && estadoDe(d) !== 'no_vigente') cand.push(i); });
+        const manual = cand.filter(i => estadoDe(lista[i]) === 'vigente');
+        let idx;
+        if (cand.length) idx = (manual.length ? manual : cand).slice(-1)[0];
+        else if (lista.some(versionValida)) idx = -1;          // todas marcadas "no vigente"
+        else idx = lista.length - 1;                           // ninguna lista todavía (todas esperan firmas)
+        const actual = idx >= 0 ? lista[idx] : null;
+        const enFirma = lista.filter((d, i) => i > idx && !versionValida(d));
+        const anteriores = lista.filter(d => d !== actual && !enFirma.includes(d)).reverse();   // más nueva primero
+        return { nombreBase, actual, ref: actual || anteriores[0] || enFirma[0], enFirma, anteriores, total: lista.length };
     });
     grupos.sort((a, b) => a.nombreBase.localeCompare(b.nombreBase));
     return grupos;
@@ -841,6 +898,14 @@ function htmlTarjetaDoc(doc, etiquetaVersion) {
             </div>`;
     }
     const etiqueta = etiquetaVersion ? `<div class="doc-meta" style="font-weight:600;color:var(--verde,#1a7a4a);">${etiquetaVersion}</div>` : '';
+    const enObras = carpetaActual === CARPETA_OBRAS && meta && meta.id;
+    const resumenHtml = (enObras && meta.resumenCambios) ? `<div class="doc-meta" title="Ayuda memoria: el plano oficial siempre prima" style="white-space:pre-line;">📝 Cambios: ${escCorreo(meta.resumenCambios)}</div>` : '';
+    const debeVisto = enObras && pendientesAcuse.has(meta.id);
+    const botonVisto = debeVisto ? `<button class="btn-doc btn-ver" style="background:#1a7a4a;color:#fff;border-color:#1a7a4a;" onclick="marcarVisto('${meta.id}')" title="Confirma que revisaste esta versión">✔ Marcar como visto</button>` : '';
+    const gestor = enObras && esGestorObras(doc.subcarpeta);
+    const botonesGestion = gestor ? `
+                <button class="btn-doc btn-dl" onclick="abrirChecklist('${meta.id}')" title="Quién ya la vio">📋 Lectura</button>
+                ${versionValida(doc) ? `<button class="btn-doc btn-dl" onclick="cambiarVigencia('${meta.id}', 'no_vigente')" title="Marcar esta versión como no vigente">⛔ No vigente</button>` : ''}` : '';
     return `
         <div class="doc-card">
             <div class="doc-icon">${ICONO_DOC}</div>
@@ -849,9 +914,11 @@ function htmlTarjetaDoc(doc, etiquetaVersion) {
                 <div class="doc-meta">${doc.tipo}${doc.fecha ? ' · ' + doc.fecha : ''}</div>
                 ${etiqueta}
                 ${obrasTxt}
+                ${resumenHtml}
                 ${firmaHtml}
             </div>
             <div class="doc-acciones">
+                ${botonVisto}
                 ${esPdf ? `
                 <button class="btn-doc btn-ver" onclick="verDocumento('${url}', '${archivoClave}', '${claveAcc}')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -861,6 +928,7 @@ function htmlTarjetaDoc(doc, etiquetaVersion) {
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     Descargar
                 </a>
+                ${botonesGestion}
                 ${SUBIDORES_PROCEDIMIENTOS.includes(emailActual) ? `
                 <button class="btn-doc btn-dl" onclick="verHistorialAcceso('${claveAcc}', '${archivoClave}')" title="Ver quién lo vio o descargó">
                     📊
@@ -869,36 +937,58 @@ function htmlTarjetaDoc(doc, etiquetaVersion) {
         </div>`;
 }
 
-// Versión reemplazada: visible y con fecha, pero sin botones y no seleccionable.
+// Versión que ya no rige: se puede consultar (para saber qué regía en una fecha), pero va marcada "NO VIGENTE".
 function htmlVersionAnterior(d, reemplazadaEl) {
     const subida = d.meta && d.meta.fechaAprobacion ? fechaCorta(d.meta.fechaAprobacion) : 'fecha no registrada';
-    const reemplazo = reemplazadaEl ? ` · Reemplazada el ${fechaCorta(reemplazadaEl)}` : '';
+    const reemplazo = reemplazadaEl ? ` · Reemplazada el ${fechaCorta(reemplazadaEl)}` : ((d.meta && d.meta.estadoVersion === 'no_vigente') ? ' · Marcada como no vigente' : '');
+    const url = d.githubUrl || d.archivo, esPdf = d.tipo.toLowerCase() === 'pdf';
+    const claveAcc = escAttr(claveAccesoDe(d)), archivoClave = escAttr(d.nombre + '.' + d.tipo);
+    const meta = d.meta, enObras = carpetaActual === CARPETA_OBRAS && meta && meta.id;
+    const restituir = (enObras && versionValida(d) && esGestorObras(d.subcarpeta))
+        ? `<button class="btn-doc btn-dl" onclick="cambiarVigencia('${meta.id}', 'vigente')" title="Volver a dejar esta versión como la vigente">↩ Marcar vigente</button>` : '';
+    const resumen = (enObras && meta.resumenCambios) ? `<div class="doc-meta" style="white-space:pre-line;">📝 ${escCorreo(meta.resumenCambios)}</div>` : '';
     return `
-        <div class="doc-card doc-obsoleta" aria-disabled="true"
-             style="opacity:.55;background:#f3f3f3;pointer-events:none;user-select:none;-webkit-user-select:none;margin-left:28px;padding-top:8px;padding-bottom:8px;">
-            <div class="doc-icon" style="filter:grayscale(1);">${ICONO_DOC}</div>
+        <div class="doc-card doc-obsoleta" style="background:#f6f6f6;margin-left:28px;padding-top:8px;padding-bottom:8px;">
+            <div class="doc-icon" style="filter:grayscale(1);opacity:.6;">${ICONO_DOC}</div>
             <div class="doc-info">
-                <div class="doc-nombre" style="font-size:0.84rem;">${d.nombreMostrado || d.nombre}
-                    <span style="font-size:0.68rem;font-weight:600;color:#777;margin-left:6px;">Versión ${d.version} · no vigente</span>
+                <div class="doc-nombre" style="font-size:0.84rem;color:#666;">${d.nombreMostrado || d.nombre}
+                    <span style="font-size:0.66rem;font-weight:700;color:#fff;background:#b3261e;border-radius:4px;padding:1px 6px;margin-left:6px;">NO VIGENTE</span>
+                    <span style="font-size:0.68rem;font-weight:600;color:#777;margin-left:4px;">Versión ${d.version}</span>
                 </div>
                 <div class="doc-meta">Subida el ${subida}${reemplazo}</div>
+                ${resumen}
+            </div>
+            <div class="doc-acciones">
+                ${esPdf ? `<button class="btn-doc btn-ver" onclick="verDocumento('${url}', '${archivoClave}', '${claveAcc}')">Ver</button>` : ''}
+                <a class="btn-doc btn-dl" href="${url}" download onclick="if(!confirm('Esta versión ya NO está vigente. ¿Descargarla de todos modos?')) return false; registrarAcceso('${claveAcc}', '${archivoClave}', 'descargar')">Descargar</a>
+                ${restituir}
             </div>
         </div>`;
 }
 
+const VERSIONES_VISIBLES = 2;   // además de la vigente se muestran las 2 anteriores; el resto queda en "historial completo"
 function htmlGrupo(g) {
     let html = '';
+    const vig = g.actual ? g.actual.version : null;
     g.enFirma.forEach(d => {
-        html += htmlTarjetaDoc(d, `Versión ${d.version} — en proceso de firma (sigue rigiendo la versión ${g.actual.version})`);
+        html += htmlTarjetaDoc(d, `Versión ${d.version} — en proceso de firma` + (vig ? ` (sigue rigiendo la versión ${vig})` : ''));
     });
-    let etiquetaActual = '';
-    if (g.total > 1) {
-        const desde = fechaVigencia(g.actual);
-        etiquetaActual = `Versión ${g.actual.version} · vigente${desde ? ' desde ' + fechaCorta(desde) : ''}`;
+    if (g.actual) {
+        let etiquetaActual = '';
+        if (g.total > 1) {
+            const desde = fechaVigencia(g.actual);
+            etiquetaActual = `Versión ${g.actual.version} · VIGENTE${desde ? ' desde ' + fechaCorta(desde) : ''}`;
+        }
+        html += htmlTarjetaDoc(g.actual, etiquetaActual);
+    } else if (g.anteriores.length) {
+        html += `<div class="doc-meta" style="color:#b3261e;font-weight:600;margin:4px 0 6px;">⚠ ${escCorreo(g.nombreBase)}: no hay una versión vigente (todas están marcadas como no vigentes).</div>`;
     }
-    html += htmlTarjetaDoc(g.actual, etiquetaActual);
-    const fechaReemplazo = fechaVigencia(g.actual);
-    g.anteriores.forEach(d => { html += htmlVersionAnterior(d, fechaReemplazo); });
+    const fechaReemplazo = g.actual ? fechaVigencia(g.actual) : null;
+    g.anteriores.slice(0, VERSIONES_VISIBLES).forEach(d => { html += htmlVersionAnterior(d, g.actual && d.version < g.actual.version ? fechaReemplazo : null); });
+    const resto = g.anteriores.slice(VERSIONES_VISIBLES);
+    if (resto.length) {
+        html += `<details style="margin:4px 0 0 28px;"><summary style="cursor:pointer;font-size:0.76rem;font-weight:600;color:var(--txt-mid,#666);">Ver historial completo (${resto.length} versión${resto.length === 1 ? '' : 'es'} más)</summary>${resto.map(d => htmlVersionAnterior(d, g.actual && d.version < g.actual.version ? fechaReemplazo : null)).join('')}</details>`;
+    }
     return `<div class="doc-grupo" style="margin-bottom:10px;">${html}</div>`;
 }
 
@@ -943,6 +1033,7 @@ function htmlTarjetasHijos(nombres, tipo) {
 }
 
 function renderDocs() {
+    actualizarBarraGestion();
     const query = document.getElementById('search').value.toLowerCase();
     const lista = document.getElementById('doc-list');
     const { tipo, nombres } = hijosDelNivel();
@@ -954,7 +1045,7 @@ function renderDocs() {
 
     let grupos = agruparVersiones(docsDelNivel());
     if (query) grupos = grupos.filter(g => g.nombreBase.toLowerCase().includes(query));
-    if (filtroObraPublicados) grupos = grupos.filter(g => (g.actual.meta?.obras || []).includes(filtroObraPublicados));
+    if (filtroObraPublicados) grupos = grupos.filter(g => (g.ref.meta?.obras || []).includes(filtroObraPublicados));
 
     if (!grupos.length) {
         lista.innerHTML = htmlHijos || `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div>No hay documentos en esta carpeta todavía</div></div>`;
@@ -1124,6 +1215,7 @@ async function aprobarUno(id) {
     if (!res.ok) throw new Error(data.error || 'Error desconocido');
     console.log('[Aprobar] respuesta del servidor:', data);
     if (data.notificar) enviarAvisoFirma(data.notificar);
+    if (data.avisoVersion) enviarAvisoVersion(data.avisoVersion);
     return data;
 }
 
@@ -1518,6 +1610,7 @@ function cerrarModal() {
     document.getElementById('m-area').value = '';
     document.getElementById('m-nombre').value = '';
     document.getElementById('m-desc').value = '';
+    document.getElementById('m-resumen').value = '';
     document.getElementById('archivos-lista').style.display = 'none';
     document.getElementById('archivos-lista').innerHTML = '';
     document.getElementById('grupo-nombre').style.display = '';
@@ -1599,15 +1692,12 @@ async function enviarDocumento() {
     const subcarpeta = esObras ? document.getElementById('m-subcarpeta').value : '';
     const aplica = esObras ? aplicaObrasModal() : null;
     const obrasDoc = (esObras && aplica) ? OBRAS_CONSTRUCCION.filter(o => obrasAplicaModal.has(o)) : [];
-    const adminsObra = {};
+    const resumenCambios = esObras ? document.getElementById('m-resumen').value.trim() : '';
     if (esObras && !subcarpeta) { alert('Selecciona la carpeta dentro de Obras'); return; }
     if (esObras && aplica === null) { alert('Indica si el documento aplica a obras específicas'); return; }
     if (esObras && aplica && !obrasDoc.length) { alert('Selecciona para qué obras aplica el documento'); return; }
-    for (const o of obrasDoc) {
-        const e = (adminsObraModal[o] || '').trim().toLowerCase();
-        if (!correoAdminValido(e)) { alert(`Ingresa el correo corporativo del administrador de ${o}`); return; }
-        adminsObra[o] = e;
-    }
+    const esPlano = esObras && subcarpeta === SUBCARPETA_PLANOS;
+    if (esPlano && resumenCambios.length < 5) { alert('Escribe el resumen de cambios de esta versión del plano'); return; }
     if (archivosSeleccionados.length === 0) { alert('Selecciona uno o más archivos'); return; }
 
     const esMasivo = archivosSeleccionados.length > 1;
@@ -1620,7 +1710,7 @@ async function enviarDocumento() {
     btn.disabled = true;
 
     try {
-        let enviados = 0;
+        let enviados = 0, publicadosDirecto = 0;
         for (const a of archivosSeleccionados) {
             enviados++;
             if (esMasivo) btn.innerHTML = `<span class="spinner-sm"></span> Enviando ${enviados} de ${archivosSeleccionados.length}…`;
@@ -1631,7 +1721,7 @@ async function enviarDocumento() {
                 : document.getElementById('m-nombre').value.trim();
             const desc = esMasivo ? '' : document.getElementById('m-desc').value.trim();
 
-            const requiereFirma = esObras ? true : document.getElementById('m-requiere-firma').checked;
+            const requiereFirma = esObras ? !esPlano : document.getElementById('m-requiere-firma').checked;
             const firmantesRequeridos = (requiereFirma && !esObras) ? [...firmantesSeleccionadosModal] : [];
             if (requiereFirma && !esObras && !firmantesRequeridos.length) { alert('Selecciona al menos un firmante'); btn.disabled = false; return; }
             const firmaPagina = document.getElementById('m-firma-pagina').value;
@@ -1648,7 +1738,7 @@ async function enviarDocumento() {
                     carpeta: esComunicacion ? undefined : carpeta,
                     subcarpeta: subcarpeta || undefined,
                     aplicaObras: esObras ? aplica : undefined,
-                    adminsObra: (esObras && aplica) ? adminsObra : undefined,
+                    resumenCambios: esPlano ? resumenCambios : undefined,
                     area: esComunicacion ? area : undefined,
                     obras: esComunicacion ? undefined : (esObras ? obrasDoc : [...obrasSeleccionadasModal]),
                     requiereFirma: esComunicacion ? false : requiereFirma,
@@ -1659,13 +1749,22 @@ async function enviarDocumento() {
                     subidoPor: emailActual
                 })
             });
-            if (!res.ok) throw new Error(`Error al enviar "${a.nombreOriginal}"`);
+            const dataSubida = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(dataSubida.error || `Error al enviar "${a.nombreOriginal}"`);
+            // Planos: quien los sube los publica directo (sin aprobación de administradores).
+            if (esPlano && dataSubida.id) {
+                try { await aprobarUno(dataSubida.id); publicadosDirecto++; }
+                catch (e) { console.warn('No se pudo publicar directo:', e.message); mostrarToast('Se envió, pero quedó pendiente de TI: ' + e.message, 'err'); }
+            }
         }
         cerrarModal();
         mostrarToast(
-            esMasivo ? `${enviados} documentos enviados — quedarán visibles al ser aprobados por TI` : 'Documento enviado — quedará visible una vez aprobado por TI',
+            publicadosDirecto ? (publicadosDirecto === 1 ? 'Plano publicado — se avisó a las personas de la obra' : `${publicadosDirecto} planos publicados — se avisó a las personas de la obra`)
+                : esMasivo ? `${enviados} documentos enviados — quedarán visibles al ser aprobados por TI` : 'Documento enviado — quedará visible una vez aprobado por TI',
             'ok'
         );
+        if (carpetaActual) abrirCarpeta(carpetaActual, subcarpetaActual, obraActual);
+        cargarMisPendientes();
         if (APROBADORES.includes(emailActual)) cargarPendientes();
     } catch(e) {
         mostrarToast('Error al enviar: ' + e.message, 'err');
@@ -1720,9 +1819,217 @@ async function firmarDocumento(id) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Error al firmar');
         if (data.notificar) enviarAvisoFirma(data.notificar);
+        if (data.avisoVersion) enviarAvisoVersion(data.avisoVersion);
         mostrarToast(data.estadoFirma === 'vigente' ? 'Firmado — el documento ya quedó vigente' : 'Firma registrada', 'ok');
         if (carpetaActual) abrirCarpeta(carpetaActual, subcarpetaActual, obraActual);
     } catch(e) { mostrarToast('Error: ' + e.message, 'err'); }
+}
+
+
+// ═══ Obras: acuse de recibo, vigencia, destinatarios y recordatorios ═══
+let pendientesAcuse = new Set();      // ids de versiones vigentes que yo todavía no marqué como vistas
+let listaMisPendientes = [];
+function esGestorObras(subcarpeta) {
+    if (APROBADORES.includes(emailActual)) return true;
+    if (subcarpeta) return (SUBIDORES_CARPETAS_OBRAS[subcarpeta] || []).includes(emailActual);
+    return Object.values(SUBIDORES_CARPETAS_OBRAS).some(l => l.includes(emailActual));
+}
+async function authH() {
+    const t = await tokenCorreo(['User.Read']);
+    if (!t) throw new Error('No se pudo validar tu sesión de Microsoft');
+    return { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' };
+}
+async function apiObras(metodo, ruta, cuerpo) {
+    const r = await fetch(API + ruta, { method: metodo, headers: await authH(), body: cuerpo ? JSON.stringify(cuerpo) : undefined });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || ('Error ' + r.status));
+    return data;
+}
+
+// Correo (sale por informatica@ibaker.cl si tienes permiso; si no, desde tu cuenta). Los destinatarios van en copia oculta.
+async function enviarCorreoAviso(destinatarios, asunto, html) {
+    const message = { subject: asunto, body: { contentType: 'HTML', content: html }, bccRecipients: destinatarios.map(a => ({ emailAddress: { address: a } })) };
+    const enviar = async (url, token) => {
+        const r = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message, saveToSentItems: false }) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+    };
+    let sinBuzon = false; try { sinBuzon = sessionStorage.getItem('sinBuzonAvisos') === '1'; } catch (e) {}
+    if (!sinBuzon) {
+        const tShared = await tokenCorreo(['Mail.Send.Shared']);
+        if (tShared) { try { await enviar(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(BUZON_AVISOS)}/sendMail`, tShared); return true; } catch (e) { console.warn('No se pudo enviar desde ' + BUZON_AVISOS + ':', e.message); } }
+        try { sessionStorage.setItem('sinBuzonAvisos', '1'); } catch (e) {}
+    }
+    const t = await tokenCorreo(['Mail.Send']);
+    if (!t) throw new Error('permiso de correo no concedido');
+    await enviar('https://graph.microsoft.com/v1.0/me/sendMail', t);
+    return true;
+}
+function plantillaCorreo(parrafos, boton) {
+    const link = window.location.origin + '/procedimientos.html';
+    return `<div style="font-family:Arial,sans-serif;color:#1C1A18;">${parrafos}
+        <p style="margin:20px 0;"><a href="${link}" style="background:#1a7a4a;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold;display:inline-block;">${boton}</a></p>
+        <p style="font-size:0.85rem;color:#6B6762;">Aviso automático de la Intranet Baker. Trabaja siempre con la versión vigente.</p></div>`;
+}
+async function enviarAvisoVersion(a) {
+    if (!a || !a.destinatarios || !a.destinatarios.length) return;
+    const que = a.subcarpeta === SUBCARPETA_PLANOS ? 'plano' : 'documento';
+    const obras = (a.obras || []).join(', ');
+    const html = plantillaCorreo(
+        `<p>Hola,</p><p>Se publicó una <b>nueva versión (v${a.version})</b> del ${que} <b>${escCorreo(a.documento)}</b>${obras ? ' de <b>' + escCorreo(obras) + '</b>' : ''}.</p>` +
+        (a.resumen ? `<p><b>Resumen de cambios</b> (ayuda memoria; el ${que} oficial siempre prima):<br>${escCorreo(a.resumen).replace(/\n/g, '<br>')}</p>` : '') +
+        `<p>Ingresa a la intranet, ábrelo y marca <b>Visto</b>. Si no lo haces, recibirás un recordatorio.</p>`, 'Ir a revisar');
+    try { await enviarCorreoAviso(a.destinatarios, `Nueva versión: ${a.documento}${obras ? ' (' + obras + ')' : ''}`, html); mostrarToast('Aviso enviado a ' + a.destinatarios.length + ' persona(s) de la obra', 'ok'); }
+    catch (e) { console.warn('Error enviando aviso de versión:', e.message); mostrarToast('Quedó publicado, pero no se pudo enviar el aviso por correo: avísales tú', 'err'); }
+}
+
+// ── Mis pendientes (acuse de recibo) ──
+async function cargarMisPendientes() {
+    try {
+        listaMisPendientes = await apiObras('GET', '/docs/mis-pendientes');
+        pendientesAcuse = new Set(listaMisPendientes.map(x => x.id));
+    } catch (e) { listaMisPendientes = []; pendientesAcuse = new Set(); console.warn('Pendientes de lectura:', e.message); }
+    renderBannerAcuse();
+    if (carpetaActual) renderDocs();
+}
+function renderBannerAcuse() {
+    const b = document.getElementById('banner-acuse');
+    if (!listaMisPendientes.length) { b.style.display = 'none'; b.innerHTML = ''; return; }
+    b.style.display = 'block';
+    b.innerHTML = `<div style="border:1px solid #e0a800;background:rgba(224,168,0,.1);border-radius:12px;padding:14px 18px;">
+        <div style="font-weight:700;margin-bottom:8px;">📌 Tienes ${listaMisPendientes.length} documento${listaMisPendientes.length === 1 ? '' : 's'} de tu obra por revisar</div>
+        ${listaMisPendientes.map(x => `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:6px 0;border-top:1px solid rgba(0,0,0,.08);font-size:0.84rem;">
+            <div><b>${escCorreo(x.nombre)}</b> · v${x.version} · ${escCorreo(x.obras.join(', '))}${x.resumen ? `<div style="color:#666;font-size:0.78rem;white-space:pre-line;">📝 ${escCorreo(x.resumen)}</div>` : ''}</div>
+            <div style="display:flex;gap:6px;"><button class="btn-doc btn-ver" onclick="irADocumento('${x.id}')">Abrir carpeta</button><button class="btn-doc btn-ver" style="background:#1a7a4a;color:#fff;border-color:#1a7a4a;" onclick="marcarVisto('${x.id}')">✔ Marcar como visto</button></div></div>`).join('')}
+    </div>`;
+}
+function irADocumento(id) {
+    const x = listaMisPendientes.find(y => y.id === id); if (!x) return;
+    cambiarTab('publicados');
+    abrirCarpeta(CARPETA_OBRAS, x.subcarpeta, (x.obras || [])[0] || null);
+}
+async function marcarVisto(id) {
+    try {
+        await apiObras('POST', '/docs/acuse', { id, nombre: nombreActual });
+        mostrarToast('Quedó registrado como visto', 'ok');
+        await cargarMisPendientes();
+    } catch (e) { mostrarToast('No se pudo registrar: ' + e.message, 'err'); }
+}
+
+// ── Vigente / no vigente ──
+async function cambiarVigencia(id, estado) {
+    const pregunta = estado === 'vigente' ? '¿Dejar ESTA versión como la vigente? Las demás quedarán como no vigentes y se avisará de nuevo a las personas de la obra.'
+        : '¿Marcar esta versión como NO vigente? Seguirá consultable en el historial.';
+    if (!confirm(pregunta)) return;
+    const motivo = prompt('Motivo (opcional, queda en el historial):', '') || '';
+    try {
+        const data = await apiObras('POST', '/docs/vigencia', { id, estado, motivo });
+        if (data.avisoVersion) enviarAvisoVersion(data.avisoVersion);
+        mostrarToast(estado === 'vigente' ? 'Versión marcada como vigente' : 'Versión marcada como no vigente', 'ok');
+        if (carpetaActual) await abrirCarpeta(carpetaActual, subcarpetaActual, obraActual);
+        cargarMisPendientes();
+    } catch (e) { mostrarToast('No se pudo cambiar: ' + e.message, 'err'); }
+}
+
+// ── Checklist de lectura ──
+let checklistActual = null;
+async function abrirChecklist(id) {
+    try {
+        const d = await apiObras('GET', '/docs/acuse/' + encodeURIComponent(id));
+        checklistActual = d;
+        document.getElementById('check-titulo').textContent = d.nombre + (d.obras.length ? ' · ' + d.obras.join(', ') : '');
+        const fila = (e, ok, detalle) => `<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 12px;border-bottom:1px solid var(--gris-1,#eee);font-size:0.82rem;">
+            <span>${ok ? '✅' : '⏳'} ${escCorreo(e.nombre || e.email)}${e.nombre ? ` <span style="color:var(--txt-dim,#999);">(${escCorreo(e.email)})</span>` : ''}</span><span style="color:var(--txt-dim,#999);white-space:nowrap;">${detalle}</span></div>`;
+        const f = iso => new Date(iso).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' });
+        const vistos = d.destinatarios.filter(x => x.visto).length;
+        document.getElementById('check-cuerpo').innerHTML = d.destinatarios.length
+            ? `<div style="font-weight:700;font-size:0.82rem;margin-bottom:6px;">${vistos} de ${d.destinatarios.length} lo marcaron como visto</div>` +
+              d.destinatarios.map(x => fila(x, !!x.visto, x.visto ? 'Visto ' + f(x.visto) : (x.ultimoRecordatorio ? 'Pendiente · recordatorio ' + f(x.ultimoRecordatorio) : 'Pendiente'))).join('') +
+              (d.otros.length ? `<div style="font-size:0.74rem;color:var(--txt-dim,#999);margin:10px 0 4px;">Otros que también lo marcaron</div>` + d.otros.map(x => fila(x, true, 'Visto ' + f(x.visto))).join('') : '')
+            : `<div class="empty">Esta obra no tiene destinatarios definidos. Agrégalos en «Destinatarios por obra».</div>`;
+        document.getElementById('btn-check-reenviar').style.display = d.destinatarios.some(x => !x.visto) ? '' : 'none';
+        document.getElementById('modal-checklist').classList.add('visible');
+    } catch (e) { mostrarToast('Error: ' + e.message, 'err'); }
+}
+function cerrarChecklist() { document.getElementById('modal-checklist').classList.remove('visible'); }
+async function reenviarPendientesChecklist() {
+    const d = checklistActual; if (!d) return;
+    const dest = d.destinatarios.filter(x => !x.visto).map(x => x.email);
+    if (!dest.length) return;
+    if (!confirm(`¿Enviar recordatorio a ${dest.length} persona(s) que aún no lo marcan como visto?`)) return;
+    try {
+        await enviarCorreoAviso(dest, `Recordatorio: revisa ${d.nombre}`, plantillaCorreo(
+            `<p>Hola,</p><p>Aún no has marcado como visto <b>${escCorreo(d.nombre)}</b>${d.obras.length ? ' (' + escCorreo(d.obras.join(', ')) + ')' : ''}.</p><p>Ingresa a la intranet, ábrelo y marca <b>Visto</b>.</p>`, 'Ir a revisar'));
+        await apiObras('POST', '/docs/recordatorios/enviado', { items: dest.map(e => ({ id: d.id, dest: e })) });
+        mostrarToast('Recordatorio enviado a ' + dest.length + ' persona(s)', 'ok');
+        abrirChecklist(d.id);
+    } catch (e) { mostrarToast('No se pudo enviar: ' + e.message, 'err'); }
+}
+
+// ── Destinatarios por obra ──
+let destinatariosCache = {};
+async function abrirDestinatarios() {
+    try {
+        const d = await apiObras('GET', '/docs/obras/destinatarios');
+        destinatariosCache = d.destinatarios || {};
+        const sel = document.getElementById('dest-obra');
+        sel.innerHTML = d.obras.map(o => `<option value="${escAttr(o)}">${o}</option>`).join('');
+        cargarDestinatariosObra();
+        document.getElementById('modal-destinatarios').classList.add('visible');
+    } catch (e) { mostrarToast('Error: ' + e.message, 'err'); }
+}
+function cargarDestinatariosObra() {
+    const o = document.getElementById('dest-obra').value, l = destinatariosCache[o] || [];
+    document.getElementById('dest-correos').value = l.join('\n');
+    document.getElementById('dest-cuenta').textContent = l.length + ' destinatario(s) en esta obra';
+}
+function cerrarDestinatarios() { document.getElementById('modal-destinatarios').classList.remove('visible'); }
+async function guardarDestinatarios() {
+    const obra = document.getElementById('dest-obra').value, texto = document.getElementById('dest-correos').value;
+    const btn = document.getElementById('btn-guardar-dest'); btn.disabled = true;
+    try {
+        const d = await apiObras('PUT', '/docs/obras/destinatarios', { obra, correos: texto });
+        destinatariosCache[obra] = d.correos;
+        document.getElementById('dest-correos').value = d.correos.join('\n');
+        document.getElementById('dest-cuenta').textContent = d.correos.length + ' destinatario(s) en esta obra';
+        mostrarToast('Destinatarios guardados', 'ok');
+    } catch (e) { mostrarToast('No se pudo guardar: ' + e.message, 'err'); }
+    btn.disabled = false;
+}
+
+// ── Recordatorios (los envía quien gestiona; el servidor también puede enviarlos solo, si se configura) ──
+async function actualizarBarraGestion() {
+    const barra = document.getElementById('barra-gestion-obras');
+    const mostrar = carpetaActual === CARPETA_OBRAS && esGestorObras();
+    barra.style.display = mostrar ? 'flex' : 'none';
+    if (!mostrar) return;
+    try {
+        const r = await apiObras('GET', '/docs/recordatorios');
+        const n = new Set(r.pendientes.map(x => x.dest)).size;
+        document.getElementById('btn-recordatorios').textContent = n ? `🔔 Enviar recordatorios (${n} persona${n === 1 ? '' : 's'})` : '🔔 Recordatorios (ninguno vencido)';
+        document.getElementById('btn-recordatorios').title = `Plazo: ${r.dias} día(s) sin marcar «Visto».` + (r.automatico ? ' El servidor también los envía solo.' : '');
+    } catch (e) { /* sin permiso o sin red: la barra queda como está */ }
+}
+async function enviarRecordatorios() {
+    try {
+        const r = await apiObras('GET', '/docs/recordatorios');
+        if (!r.pendientes.length) { mostrarToast('No hay recordatorios vencidos (plazo ' + r.dias + ' día(s))', 'ok'); return; }
+        const porPersona = {};
+        r.pendientes.forEach(x => { (porPersona[x.dest] = porPersona[x.dest] || []).push(x); });
+        const personas = Object.keys(porPersona);
+        if (!confirm(`Se enviará un recordatorio a ${personas.length} persona(s) que no han marcado «Visto». ¿Continuar?`)) return;
+        let ok = 0;
+        for (const dest of personas) {
+            const docs = porPersona[dest];
+            const lista = docs.map(d => `<li><b>${escCorreo(d.nombre)}</b> (${escCorreo(d.subcarpeta)}${d.obras.length ? ' · ' + escCorreo(d.obras.join(', ')) : ''}, versión ${d.version})</li>`).join('');
+            try {
+                await enviarCorreoAviso([dest], 'Recordatorio: tienes documentos de obra por revisar', plantillaCorreo(`<p>Hola,</p><p>Tienes ${docs.length === 1 ? 'un documento' : docs.length + ' documentos'} de tu obra por revisar:</p><ul>${lista}</ul><p>Ábrelo y marca <b>Visto</b>.</p>`, 'Ir a revisar'));
+                await apiObras('POST', '/docs/recordatorios/enviado', { items: docs.map(d => ({ id: d.id, dest })) });
+                ok++;
+            } catch (e) { console.warn('Recordatorio a', dest, e.message); }
+        }
+        mostrarToast(`Recordatorios enviados: ${ok} de ${personas.length}`, ok === personas.length ? 'ok' : 'err');
+        actualizarBarraGestion();
+    } catch (e) { mostrarToast('Error: ' + e.message, 'err'); }
 }
 
 function mostrarToast(msg, tipo) {
