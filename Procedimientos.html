@@ -466,8 +466,8 @@ const OBRAS_ACTIVAS_PROC = OBRAS_CONSTRUCCION.slice();
 const SUBIDORES_PROCEDIMIENTOS = ['dvillaseca@ibaker.cl', 'jcumplido@ibaker.cl', 'phenriquez@ibaker.cl'];
 // Carpetas de Obras: solo su responsable puede subir (el servidor también lo exige).
 const SUBIDORES_CARPETAS_OBRAS = {
-    'Planos / Detalles Constructivos': ['mmatamala@ibaker.cl'],
-    'Procedimientos': ['phenriquez@ibaker.cl'],
+    'Planos / Detalles Constructivos': ['mmatamala@ibaker.cl', 'dvillaseca@ibaker.cl'],   // dvillaseca: TEMPORAL, para pruebas (quitar al terminar)
+    'Procedimientos': ['phenriquez@ibaker.cl', 'dvillaseca@ibaker.cl'],                   // dvillaseca: TEMPORAL, para pruebas (quitar al terminar)
 };
 function subcarpetasObrasPermitidas() { return Object.keys(SUBIDORES_CARPETAS_OBRAS).filter(c => SUBIDORES_CARPETAS_OBRAS[c].includes(emailActual)); }
 function puedeSubirAlgo() { return SUBIDORES_PROCEDIMIENTOS.includes(emailActual) || subcarpetasObrasPermitidas().length > 0; }
@@ -1029,7 +1029,14 @@ function htmlTarjetasHijos(nombres, tipo) {
             <div class="carpeta-nombre">${n}</div>
             <div class="carpeta-count">${cant === 1 ? '1 documento' : cant + ' documentos'}</div>
         </div>`;
-    }).join('')}</div>`;
+    }).join('')}${tipo === 'carpeta' ? `
+        <div class="carpeta-card" onclick="window.location.href='planos-oficiales.html'" style="border-style:dashed;">
+            <div class="carpeta-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 13a5 5 0 007.07 0l3-3a5 5 0 00-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 00-7.07 0l-3 3a5 5 0 007.07 7.07l1.5-1.5"/></svg>
+            </div>
+            <div class="carpeta-nombre">Planos oficiales (SharePoint)</div>
+            <div class="carpeta-count">Carpeta 1_OFICIALES · con tus permisos</div>
+        </div>` : ''}</div>`;
 }
 
 function renderDocs() {
