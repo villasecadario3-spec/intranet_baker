@@ -2532,13 +2532,13 @@ function infCargarNomina(file) {
         + (et.length > 1 ? '<option value="TODAS">Todas las etapas (un Word por etapa, en un ZIP)</option>' : '');
       $inf('infPaso2').style.display = '';
       infPrellenar();
-      infAviso('Nómina leída: ' + et.map(k => 'Etapa ' + k.slice(1) + ' (' + infNomina[k].filas.length + ' familias)').join(' · '), 'ok');
+      infAviso('Nómina leída: ' + et.map(k => 'Etapa ' + k.slice(1) + ' (' + infNomina[k].filas.length + ' familias)').join(' · ') + (excelBase64 ? '' : '. ⚠ Falta subir arriba el Excel de respuestas (el mismo de las fichas).'), excelBase64 ? 'ok' : 'err');
       infActualizarBoton();
     } catch (err) { infAviso('No se pudo leer la nómina: ' + infEsc(err.message), 'err'); }
   };
   rd.readAsArrayBuffer(file);
 }
-function infActualizarBoton() { $inf('infGenerar').disabled = !(infNomina && excelBase64); $inf('infPrevia').disabled = $inf('infGenerar').disabled; }
+function infActualizarBoton() { $inf('infGenerar').disabled = !infNomina; $inf('infPrevia').disabled = !infNomina; }
 function infPrellenar() {
   const nombre = infN((document.getElementById('cfgProyecto') || {}).value || '');
   const k = Object.keys(INF_PROYECTOS).find(x => nombre.includes(x));
@@ -2587,6 +2587,7 @@ function infCalcularEtapa(R, clave) {
 function infEtapasElegidas() { const v = $inf('infEtapa').value; return v === 'TODAS' ? Object.keys(infNomina).sort() : [v]; }
 
 function infPrevia() {
+  if (!excelBase64) { infAviso('Primero sube arriba el Excel de respuestas (el mismo de las fichas).', 'err'); return; }
   try {
     const R = infLeerRespuestas(); let html = '';
     infEtapasElegidas().forEach(k => {
