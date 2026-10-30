@@ -286,6 +286,77 @@
     Descargar ZIP con todas las fichas
   </button>
 
+
+  <div class="card" id="cardInforme">
+    <div class="card-header">
+      <div class="card-header-icon" style="background:#FAEEDA;"><svg viewBox="0 0 24 24" style="stroke:#854F0B;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg></div>
+      <h2>Informe ejecutivo del grupo postulante (por etapa)</h2>
+    </div>
+    <div class="card-body">
+      <p style="font-size:0.85rem;color:var(--txt-dim);margin:0 0 14px;line-height:1.5;">Usa el Excel de respuestas que ya subiste arriba y la nómina de familias del proyecto. Cruza por RUT las familias de cada etapa y arma el informe Word (Plan de Acompañamiento Social) con todas las tablas calculadas.</p>
+      <div class="field field-full"><label>Nómina del proyecto <span style="font-weight:400;color:var(--txt-dim)">(Excel con las hojas «Nómina E1», «Nómina E2»…)</span></label>
+        <input type="file" id="infNominaFile" accept=".xlsx,.xls">
+        <div id="infNominaNombre" style="font-size:0.78rem;color:var(--txt-dim);margin-top:4px;"></div>
+      </div>
+      <div id="infPaso2" style="display:none;margin-top:14px;">
+        <div class="config-grid">
+          <div class="field field-full"><label>Etapa a informar</label><select id="infEtapa"></select></div>
+          <div class="field field-full"><label><input type="checkbox" id="infExcluirBajas"> Excluir las familias que figuran con «Solicita baja» en la nómina</label></div>
+        </div>
+        <details style="margin-top:12px;" open>
+          <summary style="cursor:pointer;font-weight:600;font-size:0.88rem;margin-bottom:10px;">Datos del proyecto (se completan solos si el proyecto es conocido)</summary>
+          <div class="config-grid">
+            <div class="field"><label>Tipología</label><select id="infTipologia"><option value="CNT" selected>CNT</option><option value="MP">MP</option><option value="">Sin marcar (omite sección VII)</option></select></div>
+            <div class="field"><label>Código proyecto</label><input type="text" id="infCodigo"></div>
+            <div class="field field-full"><label>Nombre del proyecto</label><input type="text" id="infNombreProy" placeholder="Ej: Hacienda San Martín, Rengo"></div>
+            <div class="field field-full"><label>Nombre comité / grupo organizado</label><input type="text" id="infComite"></div>
+            <div class="field"><label>Región</label><input type="text" id="infRegion"></div>
+            <div class="field"><label>Provincia</label><input type="text" id="infProvincia"></div>
+            <div class="field"><label>Comuna</label><input type="text" id="infComuna"></div>
+            <div class="field"><label>Código grupo(s)</label><input type="text" id="infCodGrupo"></div>
+            <div class="field"><label>Viviendas adultos mayores</label><input type="text" id="infAdultos"></div>
+            <div class="field"><label>Hogares con núcleos secundarios <span style="font-weight:400;color:var(--txt-dim)">(a mano)</span></label><input type="text" id="infNucleos"></div>
+          </div>
+        </details>
+        <details style="margin-top:12px;">
+          <summary style="cursor:pointer;font-weight:600;font-size:0.88rem;margin-bottom:10px;">Entidad patrocinante y profesional social</summary>
+          <div class="config-grid">
+            <div class="field field-full"><label>Razón social</label><input type="text" id="infEntRazon"></div>
+            <div class="field"><label>RUT</label><input type="text" id="infEntRut"></div>
+            <div class="field"><label>Representante legal</label><input type="text" id="infEntRep"></div>
+            <div class="field field-full"><label>Dirección</label><input type="text" id="infEntDir"></div>
+            <div class="field"><label>Teléfono</label><input type="text" id="infEntFono"></div>
+            <div class="field"><label>Correo</label><input type="text" id="infEntCorreo"></div>
+            <div class="field"><label>Profesional: nombre</label><input type="text" id="infProfNombre"></div>
+            <div class="field"><label>RUN</label><input type="text" id="infProfRun"></div>
+            <div class="field"><label>Profesión</label><input type="text" id="infProfProfesion"></div>
+            <div class="field"><label>Teléfono</label><input type="text" id="infProfFono"></div>
+            <div class="field field-full"><label>Dirección</label><input type="text" id="infProfDir"></div>
+            <div class="field field-full"><label>Correo</label><input type="text" id="infProfCorreo"></div>
+          </div>
+        </details>
+        <details style="margin-top:12px;">
+          <summary style="cursor:pointer;font-weight:600;font-size:0.88rem;margin-bottom:10px;">Directiva del grupo</summary>
+          <div class="field field-full"><label>Una persona por línea: Nombre | Cargo | Dirección | Teléfono | Correo</label>
+            <textarea id="infDirectiva" rows="5" style="width:100%;font-family:inherit;font-size:0.82rem;padding:8px;border:1px solid var(--border,#ddd);border-radius:8px;"></textarea></div>
+        </details>
+      </div>
+      <div class="actions" style="margin-top:16px;">
+        <button class="btn btn-secondary" id="infPrevia" disabled>Revisar antes de generar</button>
+        <button class="btn btn-primary" id="infGenerar" disabled>Generar informe Word</button>
+      </div>
+      <div id="infMsg" class="inf-msg"></div>
+    </div>
+  </div>
+<style>
+  .inf-msg{margin-top:12px;font-size:0.84rem;line-height:1.5;}
+  .inf-msg ul{margin:6px 0 0 18px;padding:0;} .inf-msg li{margin-bottom:4px;}
+  .inf-msg.ok{color:#2e6b14;} .inf-msg.err{color:#a32d2d;} .inf-msg.info{background:#f6f4ef;border-radius:10px;padding:10px 14px;}
+  #cardInforme input[type=text],#cardInforme select{width:100%;}
+  #cardInforme input[type=checkbox]{width:16px;height:16px;padding:0;margin:0 8px 0 0;vertical-align:middle;display:inline-block;}
+  #cardInforme label:has(input[type=checkbox]){text-transform:none;letter-spacing:0;font-size:0.84rem;display:flex;align-items:center;}
+</style>
+
 </main>
 <script>
 // ── LISTA BLANCA ──────────────────────────────────────────────
@@ -557,8 +628,8 @@ function buildZipStore(files) {
       ...u32(data.length),
       ...u32(data.length),
       ...u16(nameBytes.length),
-      0x00,0x00,0x00,0x00,0x00,0x00,
-      0x00,0x00,0x00,0x00,
+      0x00,0x00,0x00,0x00,0x00,0x00,   // extra, comentario, disco
+      0x00,0x00,0x00,0x00,0x00,0x00,   // attrs internos (2) y externos (4)
       ...u32(offset),
       ...nameBytes,
     ]);
@@ -1947,6 +2018,621 @@ function normStr(s) {
   return (s||'').trim().normalize('NFD').replace(/[̀-ͯ]/g,'')
     .replace(/[^a-zA-Z0-9 ]/g,'').trim().replace(/ +/g,'_');
 }
+// ═══════════════════════════════════════════════════════════════════
+//  INFORME EJECUTIVO · DIAGNÓSTICO GRUPO POSTULANTE (por etapa)
+//  Cruza las respuestas del formulario con la nómina de cada etapa
+//  (por RUT) y arma las tablas del informe que pide el SERVIU.
+// ═══════════════════════════════════════════════════════════════════
+
+// Datos fijos de la Entidad Patrocinante y del profesional (se pueden editar en pantalla).
+const INF_DEFECTO = {
+  entidad: { razon: 'Entidad Patrocinante Rio Nef SpA o BROTAR', rut: '78.172.778-4', rep: 'Carlos Garcés Bisquertt',
+    dir: 'Manuel Rodríguez 241, Oficina A - Rengo', fono: '+56 9 9969 3839', correo: 'cgarces@ibaker.cl' },
+  profesional: { nombre: 'Dangela Paredes Araneda', run: '18.111.525-4', profesion: 'Trabajadora Social',
+    dir: 'José Domingo Cañas 961, depto 503, Ñuñoa', fono: '+56 9 8392 8396', correo: 'dparedes@epbrotar.cl' },
+};
+// Datos de proyectos conocidos (tomados del informe entregado al SERVIU). Los demás se completan en pantalla.
+const INF_PROYECTOS = {
+  'hacienda san martin': { codigo: '197194', nombreProyecto: 'Hacienda San Martín, Rengo', comite: 'Comité Pro Vivienda Riberas de Malambo',
+    region: 'Libertador Bernardo Ohiggins', provincia: 'Cachapoal', comuna: 'Rengo', tipologia: 'CNT',
+    directiva: [
+      { nombre: 'Eleonora Francesca Belen Molina Pucci', cargo: 'Presidente', dir: 'Rinconada de Malambo S/N', fono: '9 5401 4130', correo: 'Eleonora.francesca.belen@outlook.com' },
+      { nombre: 'Angelica Denisse Diaz Montecinos', cargo: 'Secretario', dir: 'Rinconada de Malambo S/N', fono: '9 4116 4448', correo: 'angelica.denisse.dm@gmail.com' },
+      { nombre: 'Ayleen Soledad Bravo Diaz', cargo: 'Tesorero', dir: 'Rinconada de Malambo S/N', fono: '9 5448 9925', correo: 'Ayleen.bravo.diaz@hotmail.com' },
+    ] },
+};
+
+const INF_ATRIB = ['Con espacios suficientes','Con buena iluminación','Con buena ventilación','Segura','Sólida','Una bonita fachada','Con jardín',
+  'Cercanía con servicios básicos','Un bonito barrio','Una vivienda ampliable','El equipamiento urbano del barrio (plazas, juegos, etc.)'];
+const INF_EQUIP = ['Áreas verdes adicionales','Plaza Activa (Máquinas de ejercicio)','Contenedores de basura diferenciado por tipo de desecho',
+  'Huertos Urbanos','Multicancha','Ciclo vías','Estacionamientos de Bicicletas','Escenario o anfiteatro','Estacionamientos de Automóviles',
+  'Juegos infantiles','Juegos de mesa','Luminarias','Mesa de ping-pong','Sala multiuso','Canil'];
+// [área, tema, etiquetas que suma en la planilla]
+const INF_TEMAS = [
+  ['Vivienda y Barrio','Ampliación de la vivienda',['Ampliación de la vivienda']],
+  ['','Cuidado del medio ambiente y reciclaje',['Cuidado del medio ambiente y reciclaje']],
+  ['','Cuidado y mantención de la vivienda',['Cuidado y mantención de la vivienda']],
+  ['','Mejoramiento de la vivienda y el entorno',['Mejoramiento de la vivienda y el entorno']],
+  ['Seguridad ante situaciones de emergencia','Recomendaciones para enfrentar situaciones de emergencia y catástrofes naturales',['Recomendaciones para enfrentar situaciones de emergencia y catástrofes naturales','Recomendaciones para emergencias y catástrofes naturales']],
+  ['','Recomendaciones para la seguridad en el hogar',['Recomendaciones para la seguridad en el hogar']],
+  ['Seguridad Ciudadana','Organización vecinal para la seguridad en el barrio',['Organización vecinal para la seguridad en el barrio']],
+  ['','Red Institucional que aborda temas de seguridad',['Red Institucional que aborda temas de seguridad']],
+  ['Salud','Alcoholismo y/o drogadicción',['Alcoholismo y/o drogadicción']],
+  ['','Alimentación saludable',['Alimentación saludable']],
+  ['','Red asistencial de salud en el territorio',['Red asistencial de salud en el territorio']],
+  ['','Salud mental',['Salud mental']],
+  ['','Sexualidad y salud reproductiva',['Sexualidad y salud reproductiva']],
+  ['','Tipos de previsión en salud (FONASA – ISAPRE)',['Tipos de previsión en salud (FONASA – ISAPRE)','Tipos de previsión en salud']],
+  ['Educación y Cultura','Formación y Capacitación Laboral',['Formación y Capacitación Laboral']],
+  ['','Nivelación de Estudios',['Nivelación de Estudios']],
+  ['','Oferta cultural existente en el territorio',['Oferta cultural existente en el territorio']],
+  ['','Organización vecinal para el desarrollo cultural',['Organización vecinal para el desarrollo cultural']],
+  ['','Pueblos originarios, e Inmigrantes',['Pueblos originarios','Personas Inmigrantes','Pueblos originarios, e Inmigrantes']],
+  ['Familia','Divorcio y separaciones de hecho',['Divorcio y separaciones de hecho','Divorcio y separaciones de  hecho']],
+  ['','Ley de herencia',['Ley de herencia']],
+  ['','Patrimonio reservado de la mujer casada (art. 150 código civil).',['Patrimonio reservado de la mujer casada (art. 150 código civil).','Patrimonio reservado de la mujer casada']],
+  ['','Pensión alimenticia',['Pensión alimenticia']],
+  ['','Violencia intrafamiliar',['Violencia intrafamiliar']],
+  ['Participación Comunitaria','Capacitación en elaboración de proyectos',['Capacitación en elaboración de proyectos']],
+  ['','Convivencia vecinal',['Convivencia vecinal']],
+  ['','Ley de copropiedad y comité de administración',['Ley de copropiedad y comité de administración']],
+  ['','Roles y funciones directiva y tipos de liderazgo',['Roles y funciones directiva y tipos de liderazgo']],
+  ['','Tipos de organización y su legislación',['Tipos de organización y su legislación']],
+  ['Adulto mayor','Características de esta etapa de vida',['Características de esta etapa de vida']],
+  ['','Recomendaciones para un envejecimiento activo',['Recomendaciones para un envejecimiento activo']],
+  ['','Recomendaciones para familias que asumen cuidados de adulto mayor no Valente',['Recomendaciones para familias que asumen cuidados de adulto mayor no Valente','Recomendaciones para familias que asumen cuidados de adulto mayor no valente']],
+  ['','Red social especializada en Adulto Mayor',['Red social especializada en Adulto Mayor']],
+  ['Mujeres','Fortalecimiento de liderazgo',['Fortalecimiento de liderazgo']],
+  ['','Violencia hacia la mujer',['Violencia hacia la mujer']],
+];
+const INF_PUEBLOS = [['Aymara','aymara'],['Quechua','quechua'],['Licanantay o Atacameño','atacame|licanantay|likanantay|lickanantay'],['Colla','colla'],
+  ['Rapanui','rapanui|pascuense'],['Mapuche','mapuche'],['Yagán','yagan'],['Kawesqar','kawesqar|kaweskar|alacalufe'],['Diaguita','diaguita']];
+
+// ── utilidades ───────────────────────────────────────────────
+function infN(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+function infRut(s) { return String(s == null ? '' : s).replace(/[^0-9kK]/g, '').toUpperCase(); }
+function infSi(v) { const n = infN(v); return n === 'si' || n === 'x' || n.startsWith('si '); }
+function infSexo(g) { const n = infN(g); if (n.startsWith('f')) return 'M'; if (n.startsWith('m')) return 'H'; return 'O'; }
+function infNum(v) {
+  const n = infN(v);
+  if (!n) return null;
+  const pal = { un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6 };
+  const m = n.match(/\d+(?:[.,]\d+)?/);
+  if (m) return parseFloat(m[0].replace(',', '.'));
+  const w = n.split(' ').find(x => pal[x]);
+  return w ? pal[w] : null;
+}
+function infProm(a) { return a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0; }
+function infFmt(n) { return (Math.round(n * 10) / 10).toString().replace('.', ','); }
+function infFechaNum(v) {
+  if (typeof v === 'number') return v;
+  if (/^\d+(\.\d+)?$/.test(String(v).trim())) return parseFloat(v);
+  const t = Date.parse(v); return isNaN(t) ? null : t;
+}
+// lista separada por comas (respeta paréntesis) → textos normalizados
+function infLista(raw) {
+  const out = []; let d = 0, cur = '';
+  for (const ch of String(raw || '')) {
+    if (ch === '(') d++; if (ch === ')') d = Math.max(0, d - 1);
+    if (ch === ',' && d === 0) { out.push(cur); cur = ''; } else cur += ch;
+  }
+  out.push(cur);
+  return out.map(infN).filter(Boolean);
+}
+function infMarca(items, etiquetas) {
+  return etiquetas.some(e => { const k = infN(e); return items.some(it => it === k || it.startsWith(k)); });
+}
+
+// ── categorías ───────────────────────────────────────────────
+function infEstudios(v) {
+  const n = infN(v);
+  if (!n) return null;
+  if (n.includes('sin estudio') || n.includes('basica incompleta') || n.includes('basica inc')) return 0;
+  if (n.includes('basica')) return 1;
+  if (n.includes('media incompleta') || n.includes('media inc')) return 2;
+  if (n.includes('media')) return 3;
+  if (n.includes('tecnic') || n.includes('profesional') || n.includes('cft') || n.includes('ip ')) return 4;
+  if (n.includes('univers')) return 5;
+  return null;
+}
+function infLaboral(v) {
+  const n = infN(v);
+  if (!n) return null;
+  if (n.includes('independiente')) return 1;
+  if (n.includes('dependiente')) return 0;
+  if (n.includes('cesante')) return 2;
+  if (n.includes('jubilad') || n.includes('pensionad')) return 3;
+  if (n.includes('hogar') || n.includes('duena') || n.includes('dueño')) return 4;
+  if (n.includes('estudiante')) return 5;
+  return null;
+}
+function infPueblo(v) {
+  const n = infN(v);
+  if (!n) return -1;
+  const i = INF_PUEBLOS.findIndex(p => new RegExp(p[1]).test(n));
+  return i;
+}
+function infExtranjero(nac) { const n = infN(nac); return !!n && !n.startsWith('chile'); }
+
+// ── nómina por etapa ─────────────────────────────────────────
+// Devuelve { E1: {nombreHoja, filas:[…]}, E2: … } con cada familia de la nómina.
+function infLeerNomina(wb) {
+  const out = {};
+  wb.SheetNames.forEach(nombre => {
+    const m = infN(nombre).match(/^nomina\s*e\s*(\d+)$/) || infN(nombre).match(/^nomina\s*etapa\s*(\d+)$/);
+    if (!m) return;
+    const data = XLSX.utils.sheet_to_json(wb.Sheets[nombre], { header: 1, defval: '' });
+    if (!data.length) return;
+    const H = data[0].map(h => infN(h));
+    const ix = (re) => H.findIndex(h => re.test(h));
+    const c = { rut: H.indexOf('rut'), df: ix(/^df$/), ap1: ix(/^ap pat/), ap2: ix(/^ap mat/), nom: ix(/^nombres?$/),
+      disc: ix(/^discapacidad a postular/), fam: H.indexOf('familia'), baja: ix(/^solicita baja/) };
+    if (c.rut < 0) return;
+    const filas = [];
+    data.slice(1).forEach((r, i) => {
+      const rutN = String(r[c.rut] == null ? '' : r[c.rut]).trim();
+      if (!rutN || !/\d/.test(rutN)) return;
+      const cuerpo = infRut(rutN);
+      const dv = c.df >= 0 ? infRut(r[c.df]) : '';
+      filas.push({
+        fila: i + 2, cuerpo, dv, clave: cuerpo + dv,
+        nombre: [r[c.nom], r[c.ap1], r[c.ap2]].map(x => String(x || '').trim()).filter(Boolean).join(' ') || ('RUT ' + cuerpo + '-' + dv),
+        disc: c.disc >= 0 ? String(r[c.disc] || '').trim() : '',
+        familia: c.fam >= 0 ? String(r[c.fam] || '').trim() : '',
+        baja: c.baja >= 0 && infSi(r[c.baja]),
+      });
+    });
+    out['E' + m[1]] = { hoja: nombre, filas };
+  });
+  return out;
+}
+
+// ── cruce nómina ↔ respuestas ────────────────────────────────
+// rows = filas canónicas de respuestas (mismo formato que usan las fichas)
+function infCruzar(rows, filasNomina) {
+  const porClave = new Map(), porCuerpo = new Map();
+  rows.forEach((r, idx) => {
+    const k = infRut(r[4]); if (!k) return;
+    const ts = infFechaNum(r[0]);
+    const reg = { r, idx, ts };
+    const mejor = (a, b) => (!a ? b : ((b.ts != null && a.ts != null ? b.ts >= a.ts : b.idx > a.idx) ? b : a));
+    porClave.set(k, mejor(porClave.get(k), reg));
+    const cu = k.slice(0, -1);
+    if (!porCuerpo.has(cu)) porCuerpo.set(cu, new Set());
+    porCuerpo.get(cu).add(k);
+  });
+  const usadas = new Set(), cruzadas = [], sinFicha = [], dvDistinto = [];
+  filasNomina.forEach(f => {
+    let hit = porClave.get(f.clave);
+    if (!hit) {
+      const alt = porCuerpo.get(f.cuerpo);
+      if (alt && alt.size === 1) { const k = [...alt][0]; hit = porClave.get(k); dvDistinto.push({ nombre: f.nombre, rutNomina: f.clave, rutFicha: k }); }
+    }
+    if (!hit) { sinFicha.push(f); return; }
+    if (usadas.has(hit.idx)) return;
+    usadas.add(hit.idx); cruzadas.push({ nom: f, row: hit.r });
+  });
+  return { cruzadas, sinFicha, dvDistinto };
+}
+
+// ── personas de una fila canónica (postulante + integrantes) ──
+function infPersonas(row) {
+  const get = (c) => String(row[c] == null ? '' : row[c]).trim();
+  const mk = (b, gen, post) => ({
+    post, nombre: get(b === 0 ? 1 : b), genero: get(gen), edad: infNum(get(b + 7)), estudios: get(b + 9), laboral: get(b + 10),
+    indig: infSi(get(b + 11)) || !!get(b + 13), pueblo: get(b + 13), nac: get(b + 14),
+    enf: infSi(get(b + 16)), disc: infSi(get(b + 18)), valech: infSi(get(b + 22)),
+  });
+  const out = [mk(0, 6, true)];
+  [24, 48, 72, 96, 120, 144].forEach(b => {
+    if (!get(b) && !get(b + 1)) return;
+    out.push(mk(b, b + 5, false));
+  });
+  return out;
+}
+
+// ── cálculo de todas las tablas ──────────────────────────────
+function infCalcular(cruzadas, COLS, headerRow, nominaFilas) {
+  const avisos = [];
+  const z = (n) => new Array(n).fill(0);
+  const par = () => ({ H: 0, M: 0 });
+  const S = {
+    nFichas: cruzadas.length, nNomina: nominaFilas.length,
+    sexo: par(), otrosSexo: 0,
+    edad: { H: z(5), M: z(5) },
+    fam45: { H: z(3), M: z(3) },
+    estud: { H: z(6), M: z(6) }, labor: { H: z(6), M: z(6) },
+    carP: { H: z(5), M: z(5) }, carF: { H: z(5), M: z(5) },
+    pueP: INF_PUEBLOS.map(() => par()), pueF: INF_PUEBLOS.map(() => par()),
+    sitHab: { propietario: par(), allegado: par(), arrendatario: par(), calle: par(), campamento: par(), otros: par() },
+    tipoViv: { casa: 0, depto: 0, mediagua: 0, choza: 0, otros: 0 },
+    agua: { dentro: 0, fuera: 0, no: 0, otra: 0 },
+    excretas: { wc: 0, letrina: 0, no: 0, otra: 0 },
+    calefont: { si: 0, no: 0 },
+    allegamiento: { sin: 0 },
+    prom: { dorm: 0, camas: 0, integrantes: 0, hacinadas: 0, umbral: 2.5 },
+    conviv: [0, 1, 2, 3, 4].map(() => ({ si: 0, no: 0 })),
+    atrib: INF_ATRIB.map(() => 0), atribOtros: [], equip: INF_EQUIP.map(() => 0), equipOtros: [],
+    temas: INF_TEMAS.map(() => 0), temasOtros: [],
+    otrosTxt: { sitHab: [], tipoViv: [], agua: [], excretas: [], pueblos: [] },
+  };
+  const H = headerRow.map(infN);
+  const colOtros = (re) => H.findIndex(h => re.test(h));
+  const cOA = colOtros(/^otros: \(cuales/), cOE = colOtros(/^otros\. .?cual/), cOT = colOtros(/^otros: indique/);
+  const g = (r, c) => (c == null || c < 0) ? '' : String(r[c] == null ? '' : r[c]).trim();
+  const sinCat = {};
+  const nota = (k, v) => { if (v) (sinCat[k] = sinCat[k] || new Set()).add(v); };
+  const dorm = [], camas = [], integ = [];
+  let hacinadas = 0, dormOut = 0;
+
+  cruzadas.forEach(({ row }) => {
+    const pers = infPersonas(row), post = pers[0], mem = pers.slice(1);
+    const sx = infSexo(post.genero);
+    if (sx === 'O') { S.otrosSexo++; }
+    const k = sx === 'H' ? 'H' : 'M';          // sin género claro se cuenta como mujer y se avisa
+    if (sx === 'O') nota('Postulantes sin género claro (contados como mujer)', post.genero || '(vacío)');
+    S.sexo[k]++;
+    // edad
+    if (post.edad != null) {
+      const e = post.edad, i = e < 29 ? 0 : e < 39.999 ? 1 : e < 49.999 ? 2 : e < 59.999 ? 3 : 4;
+      S.edad[k][i]++;
+      if (e < 18) nota('Postulantes menores de 18 años (contados en 18-28)', String(e));
+    } else nota('Postulantes sin edad', '');
+    const est = infEstudios(post.estudios); if (est != null) S.estud[k][est]++; else nota('Estudios no reconocidos', post.estudios);
+    const lab = infLaboral(post.laboral); if (lab != null) S.labor[k][lab]++; else nota('Situación laboral no reconocida', post.laboral);
+    const car = (o, p, k2, pue) => {
+      if (p.indig) { o[k2][0]++; const pi = infPueblo(p.pueblo); if (pi >= 0) pue[pi][k2]++; else { nota('Pueblo indígena no reconocido', p.pueblo || '(sin pueblo)'); } }
+      if (infExtranjero(p.nac)) o[k2][1]++;
+      if (p.enf) o[k2][2]++; if (p.disc) o[k2][3]++; if (p.valech) o[k2][4]++;
+    };
+    car(S.carP, post, k, S.pueP);
+    // grupo familiar (sin postulante)
+    mem.forEach(m => {
+      const kk = infSexo(m.genero) === 'H' ? 'H' : 'M';
+      if (infSexo(m.genero) === 'O') nota('Integrantes sin género claro (contados como mujer)', m.genero || '(vacío)');
+      if (m.edad != null) { if (m.edad <= 11.999) S.fam45[kk][0]++; else if (m.edad <= 18.999) S.fam45[kk][1]++; else if (m.edad >= 60) S.fam45[kk][2]++; }
+      car(S.carF, m, kk, S.pueF);
+    });
+    integ.push(mem.length);
+    // vivienda
+    const sh = infN(g(row, COLS.sitHab));
+    const sc = sh.includes('propietar') ? 'propietario' : (sh.includes('allegad') || sh.startsWith('vivo con') || sh.includes('familiar')) ? 'allegado'
+      : sh.includes('arrendat') ? 'arrendatario' : sh.includes('calle') ? 'calle' : sh.includes('campamento') ? 'campamento' : 'otros';
+    S.sitHab[sc][k]++; if (sc === 'otros') S.otrosTxt.sitHab.push(g(row, COLS.sitHab) || '(vacío)');
+    if (sc !== 'allegado') S.allegamiento.sin++;
+    const tv = infN(g(row, COLS.tipoViv));
+    const tc = tv.includes('departamento') ? 'depto' : tv.includes('mediagua') ? 'mediagua' : tv.includes('choza') ? 'choza' : tv.startsWith('casa') ? 'casa' : 'otros';
+    S.tipoViv[tc]++; if (tc === 'otros') S.otrosTxt.tipoViv.push(g(row, COLS.tipoViv) || '(vacío)');
+    const ag = infN(g(row, COLS.sistAgua));
+    const ac = ag.includes('dentro') ? 'dentro' : ag.includes('fuera') ? 'fuera' : (ag.includes('no tiene') || ag.includes('acarrea')) ? 'no' : 'otra';
+    S.agua[ac]++; if (ac === 'otra') S.otrosTxt.agua.push(g(row, COLS.sistAgua) || '(vacío)');
+    const ex = infN(g(row, COLS.servHig));
+    const ec = (ex.includes('fosa') || ex.includes('foza') || ex.includes('sin alcantarillado')) ? 'otra' : ex.includes('alcantarillado') ? 'wc'
+      : (ex.includes('letrina') || ex.includes('pozo negro')) ? 'letrina' : ex.includes('no posee') ? 'no' : 'otra';
+    S.excretas[ec]++; if (ec === 'otra') S.otrosTxt.excretas.push(g(row, COLS.servHig) || '(vacío)');
+    if (infSi(g(row, COLS.calefont))) S.calefont.si++; else S.calefont.no++;
+    const nd = infNum(g(row, COLS.dormitorios)), nc = infNum(g(row, COLS.camas));
+    if (nd != null && nd > 0 && nd <= 10) { dorm.push(nd); if ((1 + mem.length) / nd >= S.prom.umbral) hacinadas++; } else if (nd != null) { dormOut++; nota('N° de dormitorios fuera de rango (ignorado)', String(g(row, COLS.dormitorios))); } else nota('Familias sin N° de dormitorios', '');
+    if (nc != null && nc > 0 && nc <= 15) camas.push(nc);
+    // convivencia
+    for (let i = 0; i < 5; i++) { const v = infN(g(row, COLS.conviv[i])); if (v === 'si') S.conviv[i].si++; else if (v === 'no') S.conviv[i].no++; }
+    // listas de preferencias
+    const lA = infLista(g(row, COLS.atribRaw)), lE = infLista(g(row, COLS.equipRaw)), lT = infLista(g(row, COLS.temasRaw));
+    INF_ATRIB.forEach((l, i) => { if (infMarca(lA, [l])) S.atrib[i]++; });
+    INF_EQUIP.forEach((l, i) => { if (infMarca(lE, [l])) S.equip[i]++; });
+    INF_TEMAS.forEach((t, i) => { if (infMarca(lT, t[2])) S.temas[i]++; });
+    const ot = (c, arr) => { const v = g(row, c); if (v && !/^(no|n\/a|-|\.|ninguno|ninguna)$/i.test(v)) arr.push(v); };
+    ot(cOA, S.atribOtros); ot(cOE, S.equipOtros); ot(cOT, S.temasOtros);
+  });
+  S.prom.dorm = infProm(dorm); S.prom.camas = infProm(camas); S.prom.integrantes = infProm(integ); S.prom.hacinadas = hacinadas;
+  // viviendas especiales y número de familias según la nómina
+  const nf = nominaFilas;
+  S.viv = {
+    mr80: nf.filter(f => /^80\s*uf/i.test(f.disc)).length, sens20: nf.filter(f => /^20\s*uf/i.test(f.disc)).length,
+    neuro50: nf.filter(f => /^50\s*uf/i.test(f.disc)).length, extensos: nf.filter(f => /numer/i.test(infN(f.familia))).length,
+  };
+  S.bajas = nf.filter(f => f.baja).length;
+  // revisar: clasificaciones dudosas
+  Object.entries(sinCat).forEach(([k, v]) => avisos.push(k + (v.size ? ': ' + [...v].slice(0, 6).join(' · ') : '')));
+  if (S.otrosTxt.sitHab.length) avisos.push('Situación habitacional distinta de las opciones (' + S.otrosTxt.sitHab.length + '): ' + [...new Set(S.otrosTxt.sitHab)].slice(0, 6).join(' · '));
+  if (S.nFichas && (S.nFichas !== S.nNomina)) avisos.push('La nómina tiene ' + S.nNomina + ' familias y se encontraron ' + S.nFichas + ' fichas.');
+  S.avisos = avisos;
+  return S;
+}
+
+// ── Documento Word ───────────────────────────────────────────
+// p: parámetros del proyecto; S: estadísticas; logo: bytes del logo SERVIU
+function infConstruirDoc(p, S, logo) {
+  const { Document, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType, AlignmentType, VerticalAlign, Footer, Header, ImageRun } = docx;
+  const W = 10080, F = 'Calibri';
+  const BD = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
+  const BDS = { top: BD, bottom: BD, left: BD, right: BD };
+  const run = (t, o = {}) => new TextRun({ text: String(t == null ? '' : t), bold: !!o.b, italics: !!o.i, underline: o.u ? {} : undefined, size: o.s || 20, font: F });
+  const para = (t, o = {}) => new Paragraph({ alignment: o.al || AlignmentType.LEFT, spacing: { before: o.before == null ? 0 : o.before, after: o.after == null ? 0 : o.after }, keepNext: !!o.keep, children: Array.isArray(t) ? t : [run(t, o)] });
+  const cellX = (c, w) => {
+    const o = typeof c === 'object' && c !== null ? c : { t: c };
+    const lines = String(o.t == null ? '' : o.t).split('\n');
+    return new TableCell({
+      width: { size: w, type: WidthType.DXA }, borders: BDS, columnSpan: o.span || 1, rowSpan: o.rspan || undefined, verticalAlign: VerticalAlign.CENTER,
+      shading: o.shade ? { fill: o.shade, type: ShadingType.CLEAR } : undefined, margins: { top: 40, bottom: 40, left: 80, right: 80 },
+      children: lines.map(l => new Paragraph({ alignment: o.al || AlignmentType.LEFT, children: [run(l, { b: o.b, s: o.s || 18 })] })),
+    });
+  };
+  const tabla = (widths, rows) => new Table({
+    width: { size: widths.reduce((a, b) => a + b, 0), type: WidthType.DXA }, columnWidths: widths,
+    rows: rows.map(r => {
+      let col = 0;
+      return new TableRow({ cantSplit: true, children: r.map(c => {
+        const o = typeof c === 'object' && c !== null ? c : { t: c };
+        const span = o.span || 1; const w = widths.slice(col, col + span).reduce((a, b) => a + b, 0); col += span;
+        return cellX(c, w);
+      }) });
+    }),
+  });
+  const G = 'D9D9D9', CEN = AlignmentType.CENTER;
+  const h = (t, o = {}) => ({ t, b: true, shade: G, al: CEN, ...o });
+  const n = (v) => ({ t: v === 0 || v === '' || v == null ? (v === 0 ? '0' : '') : String(v), al: CEN });
+  const blank0 = (v) => ({ t: v ? String(v) : '', al: CEN });
+  const tit = (t) => para(t, { b: true, s: 20, before: 240, after: 100, keep: true });
+  const sub = (t) => para(t, { s: 18, b: true, before: 180, after: 80, keep: true });
+  const sep = () => para('', { before: 60 });
+  const kv = (rows, w1 = 3600) => tabla([w1, W - w1], rows.map(r => [{ t: r[0], b: true, shade: r[2] ? null : undefined }, { t: r[1] }]));
+  const cuerpo = [];
+  const add = (...x) => x.forEach(e => cuerpo.push(e));
+  const suma = (a) => a.reduce((x, y) => x + y, 0);
+  const matriz = (cols, d, extraTotal = true) => {   // d: {H:[..],M:[..]}
+    const rows = [[h(''), ...cols.map(c => h(c)), ...(extraTotal ? [h('Total')] : [])]];
+    const f = (lab, arr) => [{ t: lab }, ...arr.map(v => n(v)), ...(extraTotal ? [n(suma(arr))] : [])];
+    rows.push(f('Hombres', d.H)); rows.push(f('Mujeres', d.M));
+    rows.push([{ t: 'Total', al: AlignmentType.RIGHT }, ...d.H.map((v, i) => n(v + d.M[i])), ...(extraTotal ? [n(suma(d.H) + suma(d.M))] : [])]);
+    const cw = Math.floor((W - 1500) / (cols.length + (extraTotal ? 1 : 0)));
+    return tabla([1500, ...new Array(cols.length + (extraTotal ? 1 : 0)).fill(cw)], rows);
+  };
+  const tot = (S.sexo.H + S.sexo.M);
+
+  // I
+  const tip = (p.tipologia || '').toUpperCase();
+  const marca = (c) => (tip === c ? '☒ ' : '☐ ') + c;
+  add(para('INFORME EJECUTIVO DIAGNÓSTICO GRUPO POSTULANTE', { b: true, s: 22, al: CEN, before: 120 }), para('D.S. N 49 (V. Y U.) DE 2011', { b: true, s: 22, al: CEN }));
+  add(tit('I.- ANTECEDENTES DEL PROYECTO'));
+  add(kv([
+    ['Tipología de Proyecto (*) encierre en un círculo la tipología que corresponda', marca('CNT') + '          ' + marca('MP')],
+    ['Código Proyecto (solo si corresponde)', p.codigo || ''],
+    ['Nombre Entidad Patrocinante', p.entidad.razon], ['Región', p.region], ['Provincia', p.provincia], ['Comuna', p.comuna],
+    ['Nombre del proyecto', p.nombreProyecto], ['Nombre Comité Postulante/Grupo organizado', p.comite],
+    ['N° de Familias Postulantes', p.nFamilias],
+    ['Código Grupo(s) (solo si corresponde)', p.codGrupo || ''],
+    ['N° de viviendas para personas con discapacidad con movilidad reducida (80 uf)', p.viv.mr80],
+    ['N° de viviendas para personas con discapacidad sensorial, física u otra (20 UF)', p.viv.sens20],
+    ['N° de viviendas para personas con neurodivergencias (50 UF)', p.viv.neuro50],
+    ['N° de viviendas para grupos familiares extensos', p.viv.extensos],
+    ['N° de viviendas para personas adultas mayores (en caso que corresponda)', p.viv.adultos || ''],
+  ]));
+  add(para('(*) CNT: Construcción en Nuevos Terrenos; MP: Megaproyecto.', { s: 14, before: 60 }));
+  add(tit('II.- IDENTIFICACIÓN ENTIDAD PATROCINANTE'));
+  add(kv([['Razón Social', p.entidad.razon], ['RUT', p.entidad.rut], ['Representante Legal', p.entidad.rep], ['Dirección', p.entidad.dir], ['Teléfono', p.entidad.fono], ['Correo Electrónico', p.entidad.correo]], 2400));
+  add(tit('III.- IDENTIFICACIÓN PROFESIONAL SOCIAL, RESPONSABLE DE LA EJECUCIÓN DEL PLAN DE ACOMPAÑAMIENTO SOCIAL (Profesional responsable no podrá atender más de 320 familias según Resolución N°1875 de fecha 20 de marzo de 2015)'));
+  add(kv([['Nombre', p.prof.nombre], ['RUN', p.prof.run], ['Profesión', p.prof.profesion], ['Debe adjuntar Copia certificado de Título y Curriculum Vitae', ''],
+    ['N° Familias a cargo (completar sobre línea destacada)', 'DS49___ DS10___ DS255___ DS27___ TOTAL:___'],
+    ['Dirección', p.prof.dir], ['Teléfono', p.prof.fono], ['Correo electrónico', p.prof.correo]], 4200));
+  add(tit('IV.- DIRECTIVA DEL GRUPO POSTULANTE Y/O REPRESENTANTES GRUPO POSTULANTE'));
+  add(tabla([2800, 1400, 2000, 1400, 2480], [[h('Nombre'), h('Cargo'), h('Dirección'), h('Teléfono'), h('Correo Electrónico')],
+    ...(p.directiva.length ? p.directiva : [{ nombre: '', cargo: '', dir: '', fono: '', correo: '' }]).map(d => [d.nombre, d.cargo, d.dir, d.fono, d.correo])]));
+
+  // V
+  add(tit('V.- ANTECEDENTES SOCIALES DE LAS PERSONAS POSTULANTES'));
+  add(para('Información sobre las personas postulantes al subsidio (en cada ítem, completar el N° total de personas)', { s: 18, after: 80 }));
+  add(sub('1.- N° Personas Postulantes por Sexo'));
+  add(tabla([3000, 1600], [['Hombres', n(S.sexo.H)], ['Mujeres', n(S.sexo.M)], [{ t: 'Total', b: true, al: AlignmentType.RIGHT }, n(tot)]]));
+  add(sub('2.- N° Personas Postulantes por diversidad sexo genérica'));
+  add(tabla([3000, 1600], [['Masculino', n(S.sexo.H)], ['Femenino', n(S.sexo.M)], ['otros', n(0)], [{ t: 'total', b: true, al: AlignmentType.RIGHT }, n(tot)]]));
+  add(sub('3.- Personas postulantes por rango de edad y sexo'));
+  add(matriz(['18-28', '29-39', '40-49', '50-59', '60 y más'], S.edad));
+  add(sub('4.- Identificación del grupo familiar de niños, niñas, adolescentes y adultos mayores (no considerar postulante)'));
+  add(matriz(['0 - 11', '12-18', '60 y más'], S.fam45));
+  add(sub('5.- Nivel Estudios de las personas postulantes por sexo'));
+  add(matriz(['Básica Incompleta y sin Estudios', 'Básica Completa', 'Media Incompleta', 'Media Completa', 'Técnico Profesional', 'Universitaria'], S.estud));
+  add(sub('6.- Situación Laboral de las personas postulantes por sexo'));
+  add(matriz(['Dependiente', 'Independiente', 'Cesante', 'Jubilado Pensionado', 'Trabajo dentro del Hogar', 'Estudiante'], S.labor));
+  const CAR = ['Ascendencia Indígena', 'Persona Extranjera', 'Enfermedad catastrófica', 'Discapacidad', 'VALECH'];
+  add(sub('7.- Características relevantes de las personas postulantes (indicar cantidad de personas, según sexo)'));
+  add(matriz(CAR, S.carP));
+  const pueblos = (d) => {
+    const rows = [[h('', { span: 1 }), h('N° de Hombres'), h('N° de Mujeres'), h('N° Total')]];
+    INF_PUEBLOS.forEach((pu, i) => rows.push([pu[0], blank0(d[i].H), blank0(d[i].M), blank0(d[i].H + d[i].M)]));
+    const th = suma(d.map(x => x.H)), tm = suma(d.map(x => x.M));
+    rows.push([{ t: 'TOTAL', b: true, al: AlignmentType.RIGHT }, n(th), n(tm), n(th + tm)]);
+    return tabla([3400, 1500, 1500, 1500], rows);
+  };
+  add(sub('7.1.- En caso que se presenten personas postulantes Ascendencia Indígena, identifique a qué pueblos indígenas corresponden:'));
+  add(pueblos(S.pueP));
+  add(sub('8.- Características relevantes del grupo familiar (indicar cantidad de personas, según sexo), sin considerar postulante.'));
+  add(matriz(CAR, S.carF));
+  add(sub('8.1.- En caso que se presenten integrantes del grupo familiar con Ascendencia Indígena, identifique a qué pueblos indígenas corresponden:'));
+  add(pueblos(S.pueF));
+
+  // VI
+  add(tit('VI.- SITUACIÓN HABITACIONAL ACTUAL DEL GRUPO POSTULANTE. INDIQUE LAS SIGUIENTES CARACTERÍSTICAS'));
+  add(sub('1.- Situación Habitacional de las personas postulantes'));
+  const sh = S.sitHab, shR = [['Propietario/a', sh.propietario], ['Allegado/a', sh.allegado], ['Arrendatario/a', sh.arrendatario], ['Situación de calle', sh.calle], ['En Campamento', sh.campamento]];
+  if (sh.otros.H + sh.otros.M) shR.push(['Otros (revisar)', sh.otros]);
+  add(tabla([3400, 1500, 1500, 1500], [[h(''), h('N° de Hombres'), h('N° de Mujeres'), h('N° Total')],
+    ...shR.map(([l, d]) => [l, blank0(d.H), blank0(d.M), blank0(d.H + d.M)]), [{ t: 'Total', b: true, al: AlignmentType.RIGHT }, n(suma(shR.map(x => x[1].H))), n(suma(shR.map(x => x[1].M))), n(suma(shR.map(x => x[1].H + x[1].M)))]]));
+  const lista = (titulo, filas, cab = 'N° total de familias') => {
+    add(sub(titulo));
+    add(tabla([5200, 2200], [[h(''), h(cab)], ...filas.map(f => [f[0], blank0(f[1])]), [{ t: 'TOTAL', b: true, al: AlignmentType.RIGHT }, n(suma(filas.map(f => f[1])))]]));
+  };
+  const tv = S.tipoViv; lista('2.- Tipo de vivienda actual de la familia postulante', [['Casa', tv.casa], ['Departamento', tv.depto], ['Mediagua', tv.mediagua], ['Choza', tv.choza], ['Otros', tv.otros]]);
+  const ag = S.agua; lista('3.- Tipo de sistema de Agua', [['Con llave de agua dentro de la vivienda', ag.dentro], ['Con llave de agua fuera de vivienda', ag.fuera], ['No tiene o la acarrea', ag.no], ['Otra:', ag.otra]]);
+  const ex = S.excretas; lista('4.- Tipo de Sistema de Eliminación de Excretas', [['WC conectado al alcantarillado', ex.wc], ['Letrina o Pozo negro', ex.letrina], ['No Posee Servicio Higiénico', ex.no], ['Otra', ex.otra]]);
+  lista('5.- Tenencia de Calefont', [['Posee Calefont', S.calefont.si], ['No Posee Calefont', S.calefont.no]]);
+  add(sub('6.- Modalidades de Allegamiento'));
+  add(tabla([5200, 2200], [[h(''), h('N° de familias')], ['Sin Allegamiento', n(S.allegamiento.sin)], ['Hogares con Núcleos Secundarios', { t: p.nucleos || '', al: CEN }],
+    [{ t: 'TOTAL', b: true, al: AlignmentType.RIGHT }, n(S.allegamiento.sin + (parseInt(p.nucleos, 10) || 0))]]));
+  add(sub('7.- Indicar la información solicitada y calcular el Nivel de Hacinamiento'));
+  add(tabla([5200, 2200], [['Promedio de Dormitorios', { t: infFmt(S.prom.dorm), al: CEN }], ['Promedio de Camas por grupo familiar', { t: infFmt(S.prom.camas), al: CEN }],
+    ['Promedio de Integrantes del Grupo Familiar', { t: infFmt(S.prom.integrantes), al: CEN }], ['Indicar Presencia de Hacinamiento (N° de familias que presentan hacinamiento)', n(S.prom.hacinadas)]]));
+  add(sub('8.- Identificar los aspectos de la Convivencia Comunitaria del grupo postulante. Cómo resuelven sus conflictos, cumplimiento de las reglas vecinales, interés de compartir con la comunidad, las organizaciones comunitarias existentes y aspectos sobre la cooperación frente a los problemas y conflictos. Indicar la frecuencia de las categorías (N° de veces que la opción fue marcada)'));
+  const CV = ['Los problemas los solucionamos conversando y llegando a acuerdos.', 'La mayor parte de las personas del barrio cumplimos las reglas que acordamos.', 'Es de mi interés conocer y compartir con las personas del barrio.', 'Existen varias organizaciones comunitarias en el barrio.', 'Las personas del barrio siempre están dispuestas a colaborar si alguien tiene problemas.'];
+  add(tabla([7000, 1000, 1000], [[h(''), h('SI'), h('NO')], ...CV.map((t, i) => [t, n(S.conviv[i].si), n(S.conviv[i].no)])]));
+
+  // VII y VIII (VII solo CNT/MP)
+  const frec = (titulo, cab, etiquetas, cuentas, otrosTxt) => {
+    add(sub(titulo));
+    const rows = [[h(''), h(cab)], ...etiquetas.map((e, i) => [e, n(cuentas[i])]),
+      ['Otros: ' + (otrosTxt.length ? [...new Set(otrosTxt)].slice(0, 4).join(' / ') : '(completar)'), n(otrosTxt.length)],
+      [{ t: 'Total', b: true, al: AlignmentType.RIGHT }, n(suma(cuentas) + otrosTxt.length)]];
+    add(tabla([7400, 2000], rows));
+  };
+  if (tip === 'CNT' || tip === 'MP') {
+    add(tit('VII.- DE LA VIVIENDA Y DEL EQUIPAMIENTO COMUNITARIO DEL PROYECTO HABITACIONAL (SOLO APLICA CNT – MP)'));
+    frec('1.- Señale los atributos más valorados de la futura vivienda y barrio:', 'FRECUENCIA (N° de veces que la opción fue marcada)', INF_ATRIB, S.atrib, S.atribOtros);
+    frec('2.- Señale las preferencias de Equipamiento Comunitario Adicional del grupo postulante', 'FRECUENCIA (N° de veces que la opción fue marcada)', INF_EQUIP, S.equip, S.equipOtros);
+  }
+  add(tit('VIII.- NECESIDADES E INTERESES DEL GRUPO POSTULANTE'));
+  add(sub('1.- Indicar con una X los tres temas de mayor interés para el grupo postulante.'));
+  const grupos = []; INF_TEMAS.forEach((t, i) => { if (t[0]) grupos.push({ area: t[0], ini: i, n: 0 }); grupos[grupos.length - 1].n++; });
+  const rowsT = [[h('Áreas'), h('Temas'), h('FRECUENCIA (N° de veces que la opción fue marcada)')]];
+  INF_TEMAS.forEach((t, i) => {
+    const g0 = grupos.find(g => g.ini === i);
+    rowsT.push(g0 ? [{ t: g0.area, rspan: g0.n, b: true }, t[1], n(S.temas[i])] : [t[1], n(S.temas[i])]);
+  });
+  rowsT.push([{ t: 'Otros: ' + (S.temasOtros.length ? [...new Set(S.temasOtros)].slice(0, 4).join(' / ') : 'indique cuál(es)'), span: 2 }, n(S.temasOtros.length)]);
+  rowsT.push([{ t: 'TOTAL', b: true, al: AlignmentType.RIGHT, span: 2 }, n(suma(S.temas) + S.temasOtros.length)]);
+  add(tabla([2300, 5700, 1400], rowsT));
+  add(para('', { before: 600 }), para('_____________________________________________', { s: 20 }), para('Nombre y Firma Profesional Responsable de PAS – EP', { s: 20, b: true }),
+    para(p.prof.nombre, { s: 20 }), para('RUN: ' + p.prof.run, { s: 20 }), para('', { before: 200 }), para('TIMBRE EP', { s: 20, b: true }));
+
+  const logoTipo = logo && logo[0] === 0xFF ? 'jpg' : 'png';
+  const header = new Header({ children: [new Paragraph({ children: [new ImageRun({ data: logo, type: logoTipo, transformation: { width: 100, height: 70 } }), run('   PLAN ACOMPAÑAMIENTO SOCIAL', { s: 16 })] })] });
+  const footer = new Footer({ children: [new Paragraph({ children: [new TextRun({ text: 'Formato 2026 SERVIU REGION OHIGGINS Res. Ex 685 del 05.05.2026', size: 16, font: F })] })] });
+  return new Document({
+    creator: 'Intranet Baker', title: 'Informe Ejecutivo Diagnóstico Grupo Postulante',
+    sections: [{ properties: { page: { size: { width: 12240, height: 18720 }, margin: { top: 1300, right: 1080, bottom: 1000, left: 1080 } } }, headers: { default: header }, footers: { default: footer }, children: cuerpo }],
+  });
+}
+
+// ═══ Informe ejecutivo: pantalla ═══════════════════════════════
+let infNomina = null;      // resultado de infLeerNomina
+const $inf = id => document.getElementById(id);
+function infAviso(msg, tipo) { const el = $inf('infMsg'); el.className = 'inf-msg ' + (tipo || ''); el.innerHTML = msg || ''; }
+function infEsc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+function infCargarNomina(file) {
+  if (!file) return;
+  const rd = new FileReader();
+  rd.onload = e => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      infNomina = infLeerNomina(wb);
+      const et = Object.keys(infNomina).sort();
+      if (!et.length) { infNomina = null; infAviso('No encontré hojas llamadas «Nómina E1», «Nómina E2»… en ese archivo.', 'err'); $inf('infGenerar').disabled = true; return; }
+      $inf('infNominaNombre').textContent = file.name;
+      $inf('infEtapa').innerHTML = et.map(k => `<option value="${k}">Etapa ${k.slice(1)} · hoja «${infEsc(infNomina[k].hoja)}» · ${infNomina[k].filas.length} familias</option>`).join('')
+        + (et.length > 1 ? '<option value="TODAS">Todas las etapas (un Word por etapa, en un ZIP)</option>' : '');
+      $inf('infPaso2').style.display = '';
+      infPrellenar();
+      infAviso('Nómina leída: ' + et.map(k => 'Etapa ' + k.slice(1) + ' (' + infNomina[k].filas.length + ' familias)').join(' · '), 'ok');
+      infActualizarBoton();
+    } catch (err) { infAviso('No se pudo leer la nómina: ' + infEsc(err.message), 'err'); }
+  };
+  rd.readAsArrayBuffer(file);
+}
+function infActualizarBoton() { $inf('infGenerar').disabled = !(infNomina && excelBase64); $inf('infPrevia').disabled = $inf('infGenerar').disabled; }
+function infPrellenar() {
+  const nombre = infN((document.getElementById('cfgProyecto') || {}).value || '');
+  const k = Object.keys(INF_PROYECTOS).find(x => nombre.includes(x));
+  const pr = k ? INF_PROYECTOS[k] : {};
+  const set = (id, v) => { if (v != null && v !== '' && !$inf(id).value) $inf(id).value = v; };
+  set('infCodigo', pr.codigo); set('infNombreProy', pr.nombreProyecto); set('infComite', pr.comite);
+  set('infRegion', pr.region || ((document.getElementById('cfgRegion') || {}).value === "O'HIGGINS" ? "Libertador Bernardo Ohiggins" : ''));
+  set('infProvincia', pr.provincia || (document.getElementById('cfgProvincia') || {}).value);
+  set('infComuna', pr.comuna || (document.getElementById('cfgComuna') || {}).value);
+  if (pr.tipologia) $inf('infTipologia').value = pr.tipologia;
+  if (pr.directiva && !$inf('infDirectiva').value) $inf('infDirectiva').value = pr.directiva.map(d => [d.nombre, d.cargo, d.dir, d.fono, d.correo].join(' | ')).join('\n');
+  const e = INF_DEFECTO.entidad, f = INF_DEFECTO.profesional;
+  set('infEntRazon', e.razon); set('infEntRut', e.rut); set('infEntRep', e.rep); set('infEntDir', e.dir); set('infEntFono', e.fono); set('infEntCorreo', e.correo);
+  set('infProfNombre', f.nombre); set('infProfRun', f.run); set('infProfProfesion', f.profesion); set('infProfDir', f.dir); set('infProfFono', f.fono); set('infProfCorreo', f.correo);
+}
+function infLeerRespuestas() {
+  const excelBuf = Uint8Array.from(atob(excelBase64), c => c.charCodeAt(0));
+  const wb = XLSX.read(excelBuf, { type: 'array' });
+  const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+  let headerRow = data[0] || [];
+  let trimmed = data.slice(1).map(r => r.map(v => v === null || v === undefined ? '' : String(v).trim()));
+  if (detectLayoutB(headerRow)) { const ad = adaptLayoutB(headerRow, trimmed); headerRow = ad.header; trimmed = ad.rows; }
+  const COLS = resolveColumns(headerRow);
+  const rows = trimmed.filter(r => (r[1] || '').trim() !== '' || (r[2] || '').trim() !== '' || (r[4] || '').trim() !== '');
+  return { headerRow, rows, COLS };
+}
+function infParams(clave, S) {
+  const v = id => $inf(id).value.trim();
+  const dir = v('infDirectiva').split('\n').map(l => l.trim()).filter(Boolean).map(l => { const a = l.split('|').map(x => x.trim()); return { nombre: a[0] || '', cargo: a[1] || '', dir: a[2] || '', fono: a[3] || '', correo: a[4] || '' }; });
+  const nf = infNomina[clave].filas.filter(f => !($inf('infExcluirBajas').checked && f.baja)).length;
+  return {
+    tipologia: v('infTipologia'), codigo: v('infCodigo'), codGrupo: v('infCodGrupo'), region: v('infRegion'), provincia: v('infProvincia'), comuna: v('infComuna'),
+    nombreProyecto: v('infNombreProy'), comite: v('infComite'), nFamilias: nf + ' familias · Etapa ' + clave.slice(1),
+    viv: { mr80: S.viv.mr80, sens20: S.viv.sens20, neuro50: S.viv.neuro50, extensos: S.viv.extensos, adultos: v('infAdultos') }, nucleos: v('infNucleos'),
+    entidad: { razon: v('infEntRazon'), rut: v('infEntRut'), rep: v('infEntRep'), dir: v('infEntDir'), fono: v('infEntFono'), correo: v('infEntCorreo') },
+    prof: { nombre: v('infProfNombre'), run: v('infProfRun'), profesion: v('infProfProfesion'), dir: v('infProfDir'), fono: v('infProfFono'), correo: v('infProfCorreo') },
+    directiva: dir,
+  };
+}
+function infCalcularEtapa(R, clave) {
+  const filasN = infNomina[clave].filas.filter(f => !($inf('infExcluirBajas').checked && f.baja));
+  const c = infCruzar(R.rows, filasN);
+  const S = infCalcular(c.cruzadas, R.COLS, R.headerRow, filasN);
+  return { c, S };
+}
+function infEtapasElegidas() { const v = $inf('infEtapa').value; return v === 'TODAS' ? Object.keys(infNomina).sort() : [v]; }
+
+function infPrevia() {
+  try {
+    const R = infLeerRespuestas(); let html = '';
+    infEtapasElegidas().forEach(k => {
+      const { c, S } = infCalcularEtapa(R, k);
+      const lis = [];
+      lis.push(`<b>Etapa ${k.slice(1)}</b>: ${S.nNomina} familias en la nómina · ${S.nFichas} con ficha (${S.sexo.H} hombres, ${S.sexo.M} mujeres).`);
+      if (c.sinFicha.length) lis.push('⚠ Sin ficha en las respuestas (' + c.sinFicha.length + '): ' + c.sinFicha.map(f => infEsc(f.nombre)).join(', ') + '.');
+      if (c.dvDistinto.length) lis.push('⚠ Dígito verificador distinto entre nómina y ficha (se cruzó igual): ' + c.dvDistinto.map(d => infEsc(d.nombre) + ' (' + d.rutNomina + ' / ' + d.rutFicha + ')').join(', ') + '.');
+      if (S.bajas && !$inf('infExcluirBajas').checked) lis.push('ℹ ' + S.bajas + ' familias de la nómina tienen «Solicita baja». Están incluidas; marca la casilla para excluirlas.');
+      S.avisos.filter(a => !a.startsWith('La nómina tiene')).forEach(a => lis.push('⚠ ' + infEsc(a)));
+      lis.push(`Viviendas según la nómina: 80 UF = ${S.viv.mr80}, 20 UF = ${S.viv.sens20}, 50 UF = ${S.viv.neuro50}, familias numerosas = ${S.viv.extensos}.`);
+      lis.push(`Hacinamiento (≥ 2,5 personas por dormitorio): ${S.prom.hacinadas} familias. Promedios: ${infFmt(S.prom.dorm)} dormitorios · ${infFmt(S.prom.camas)} camas · ${infFmt(S.prom.integrantes)} integrantes (sin postulante).`);
+      html += '<ul>' + lis.map(x => '<li>' + x + '</li>').join('') + '</ul>';
+    });
+    infAviso(html, 'info');
+  } catch (err) { console.error(err); infAviso('No se pudo calcular: ' + infEsc(err.message), 'err'); }
+}
+async function infGenerar() {
+  if (!excelBase64) { infAviso('Primero sube el Excel de respuestas arriba (el mismo de las fichas).', 'err'); return; }
+  $inf('infGenerar').disabled = true; infAviso('Generando informe…', 'info');
+  try {
+    const R = infLeerRespuestas();
+    const logo = Uint8Array.from(atob(SERVIU_B64_DATA), c => c.charCodeAt(0));
+    const archivos = [];
+    const proy = (infN($inf('infNombreProy').value || 'Proyecto').replace(/[^a-z0-9 ]/g, ' ').trim().replace(/\s+/g, '_') || 'Proyecto').replace(/(^|_)([a-z])/g, (m, x, c) => x + c.toUpperCase());
+    for (const k of infEtapasElegidas()) {
+      const { S } = infCalcularEtapa(R, k);
+      const doc = infConstruirDoc(infParams(k, S), S, logo);
+      const blob = await Packer.toBlob(doc);
+      archivos.push({ name: `Informe_Ejecutivo_${proy}_Etapa_${k.slice(1)}.docx`, data: new Uint8Array(await blob.arrayBuffer()) });
+    }
+    let out, nombre;
+    if (archivos.length === 1) { out = new Blob([archivos[0].data], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }); nombre = archivos[0].name; }
+    else { out = new Blob([buildZipStore(archivos)], { type: 'application/zip' }); nombre = `Informes_Ejecutivos_${proy}.zip`; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(out); a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+    try { bakerMetrica('informes_ejecutivos', archivos.length); } catch (e) {}
+    infAviso('✓ Listo: ' + archivos.map(f => infEsc(f.name)).join(', ') + '. Revisa los puntos marcados con ⚠ en «Revisar antes de generar» y completa a mano lo que quede en blanco.', 'ok');
+  } catch (err) { console.error(err); infAviso('Error al generar el informe: ' + infEsc(err.message), 'err'); }
+  finally { infActualizarBoton(); }
+}
+$inf('infNominaFile').addEventListener('change', e => infCargarNomina(e.target.files[0]));
+$inf('infPrevia').addEventListener('click', infPrevia);
+$inf('infGenerar').addEventListener('click', infGenerar);
+setInterval(() => { if (infNomina) infActualizarBoton(); }, 1500);
+
 </script>
 </body>
 </html>
