@@ -457,7 +457,7 @@ function pintar(){
   if (sinEsp.length && !soloLectura) h += '<p class="hint" style="margin:0 2px 10px">Elige la <b>especialidad</b> de cada persona (o márcala <b>Ausente</b>). Hay que dejar a todos asignados para guardar.</p>';
   if (sinEsp.length) h += `<div class="grp pend"><h4>Sin especialidad <span>${sinEsp.length}</span></h4>${sinEsp.sort(ordenNombre).map(t => tarjeta(t)).join('')}</div>`;
   p.especialidades.forEach(e => {
-    const ids = claimed.filter(t => lineas[t].esp === e.id).sort((a, b) => idxAct(a) - idxAct(b) || ordenNombre(a, b));
+    const ids = claimed.filter(t => lineas[t].esp === e.id).sort(ordenNombre);   // orden fijo por nombre: la tarjeta no salta de lugar al cambiarle el estado o la actividad
     if (ids.length) h += `<div class="grp"><h4>${esc(e.nombre)} <span>${ids.length}</span></h4>${ids.map(t => tarjeta(t)).join('')}</div>`;
   });
   if (bloq.length) h += `<div class="grp bloq"><h4>Registrados por otra persona <span>${bloq.length}</span></h4>
@@ -465,6 +465,14 @@ function pintar(){
     <p class="hint">Ya están en una especialidad que tú no administras ese día.</p></div>`;
   $('lista').innerHTML = h;
   actualizarResumenVivo();
+}
+// Repinta sin mover la pantalla: la tarjeta tocada queda en el mismo lugar de la pantalla donde estaba.
+function pintarAncla(tid){
+  const buscar = () => document.querySelector('[data-w="' + (window.CSS && CSS.escape ? CSS.escape(tid) : tid) + '"]');
+  const antes = buscar(), y = antes ? antes.getBoundingClientRect().top : null;
+  pintar();
+  const ahora = buscar();
+  if (ahora && y !== null) window.scrollBy(0, ahora.getBoundingClientRect().top - y);
 }
 $('lista').addEventListener('click', ev => {
   if (soloLectura) return;
@@ -476,31 +484,31 @@ $('lista').addEventListener('click', ev => {
     if (l.estado === 'ausente') l.partes = [];
     else if (l.estado === 'media') { const a = l.partes[0] && l.partes[0].actividad !== OTROS ? l.partes[0] : parteVacia(); l.partes = [a, (l.partes[1] && l.partes[1].actividad === OTROS) ? l.partes[1] : parteOtros()]; }
     else l.partes = l.partes.length ? [l.partes[0]] : [parteVacia()];
-    pintar(); return;
+    pintarAncla(tid); return;
   }
   if (ev.target.closest('[data-div]')){
     if (dividida(l)) { l.esp = l.partes[0].esp || l.esp; sinEspParte(l); l.partes = [l.partes[0]]; }
     else { const a = l.partes[0]; a.esp = l.esp; l.partes = [a, parteVacia(l.esp)]; }
-    l.copiado = false; pintar();
+    l.copiado = false; pintarAncla(tid);
   }
 });
 $('lista').addEventListener('change', ev => {
   const t = ev.target;
-  const w = t.closest('[data-w]'); if (!w) return; const l = lineas[w.dataset.w];
+  const w = t.closest('[data-w]'); if (!w) return; const tid = w.dataset.w, l = lineas[tid];
   if (t.dataset.esp !== undefined){                      // mover a otra especialidad
     l.esp = t.value; l.copiado = false;
     const e = espPorId(l.esp);                           // las actividades son de cada especialidad: se reeligen
     l.partes = l.partes.map(pt => (pt.actividad === OTROS || (e && e.actividades.includes(pt.actividad))) ? pt : parteVacia());
-    pintar(); return;
+    pintarAncla(tid); return;
   }
   if (t.dataset.pesp !== undefined){                     // especialidad de la mitad AM o PM
     const i = +t.dataset.pesp.split('|')[1], pt = l.partes[i]; pt.esp = t.value; l.copiado = false;
     if (i === 0) l.esp = t.value;
     const e = espPorId(t.value);
     if (pt.actividad !== OTROS && !(e && e.actividades.includes(pt.actividad))) { pt.actividad = ''; }
-    pintar(); return;
+    pintarAncla(tid); return;
   }
-  if (t.dataset.act){ const [,i] = t.dataset.act.split('|'); l.partes[+i].actividad = t.value; l.copiado = false; if (t.value !== OTROS){ l.partes[+i].motivo=''; l.partes[+i].comentario=''; } pintar(); }
+  if (t.dataset.act){ const [,i] = t.dataset.act.split('|'); l.partes[+i].actividad = t.value; l.copiado = false; if (t.value !== OTROS){ l.partes[+i].motivo=''; l.partes[+i].comentario=''; } pintarAncla(tid); }
   else if (t.dataset.mot){ const [,i] = t.dataset.mot.split('|'); l.partes[+i].motivo = t.value; actualizarResumenVivo(); }
 });
 $('lista').addEventListener('input', ev => {
