@@ -891,6 +891,7 @@ function logout() {
     usuarioActual = null;
     actualizarUI();
 }
+let accesosEnCurso = null;
 function actualizarUI() {
     const blocker    = document.getElementById('login-blocker');
     const area       = document.getElementById('auth-area');
@@ -911,7 +912,7 @@ function actualizarUI() {
         bienvenida.classList.add('visible');
         checkAccesoDenegado();
         const email = usuarioActual.username.toLowerCase();
-        aplicarAccesos(email);
+        accesosEnCurso = aplicarAccesos(email);
     } else {
         blocker.classList.add('visible');
         bienvenida.classList.remove('visible');
@@ -958,6 +959,11 @@ async function init() {
     await intentarLoginSilencioso();
     if (barra) barra.style.width = '100%';
     actualizarUI();
+    // Hasta que no estén listos los accesos de la persona, la pantalla de carga sigue visible
+    // (así nunca se ven tarjetas de más). Si ya hay un resultado guardado no se espera nada; si no, máximo 4 s.
+    if (accesosEnCurso && !accesosEnCurso.cache) {
+        await Promise.race([accesosEnCurso.listo, new Promise(r => setTimeout(r, 4000))]);
+    }
     await new Promise(r => setTimeout(r, 150));
     document.getElementById('loading').classList.add('oculto');
 }
@@ -1023,41 +1029,55 @@ const ACCESOS_MODULOS = {
         "dvillaseca@ibaker.cl","jcumplido@ibaker.cl","phenriquez@ibaker.cl","dcatalan@ibaker.cl"
     ]
 };
-async function aplicarAccesos(email) {
-    const correo = (email || '').toLowerCase();
-    // Quienes usan una camioneta compartida también ven la tarjeta (entran solo a la pestaña Camionetas).
+// Accesos que decide el servidor. Se consultan TODOS a la vez (antes eran uno tras otro) y el
+// último resultado de cada persona queda guardado en este navegador: la siguiente vez la página
+// ya pinta las tarjetas correctas al instante y el servidor solo confirma por detrás.
+const MODULOS_DINAMICOS = ['rutas-estacionamientos.html', 'dotacion.html', 'registro-mo.html', 'panel-obras/index.html'];
+const claveCacheAccesos = correo => 'baker-accesos-v1:' + correo;
+function leerCacheAccesos(correo) {
+    try { const c = JSON.parse(localStorage.getItem(claveCacheAccesos(correo)) || 'null'); return c && typeof c === 'object' ? c : null; } catch (e) { return null; }
+}
+function guardarCacheAccesos(correo) {
     try {
-        const porCamioneta = await fetch('https://api.ibaker.cl/camionetas/accesos').then(r => r.json());
+        const c = {}; MODULOS_DINAMICOS.forEach(m => { c[m] = ACCESOS_MODULOS[m]; });
+        localStorage.setItem(claveCacheAccesos(correo), JSON.stringify(c));
+    } catch (e) {}
+}
+async function tokenGraph() {
+    const t = await msalInstance.acquireTokenSilent({ scopes: ['User.Read'], account: msalInstance.getAllAccounts()[0] });
+    return t.accessToken;
+}
+async function consultarAccesosServidor(correo) {
+    let token = null;
+    try { token = await tokenGraph(); } catch (e) {}
+    const H = token ? { Authorization: 'Bearer ' + token } : {};
+    const [cam, dot, mo, panel] = await Promise.all([
+        fetch('https://api.ibaker.cl/camionetas/accesos').then(r => r.json()).catch(e => { console.warn('No se pudo cargar la lista de camionetas:', e.message); return null; }),
+        // Control de Dotación: aparece si la persona tiene acceso a al menos una obra (lo decide el servidor).
+        fetch('https://api.ibaker.cl/dotacion/obras?email=' + encodeURIComponent(correo), { headers: H }).then(r => r.ok ? r.json() : null).catch(e => { console.warn('No se pudo consultar el acceso a Control de Dotación:', e.message); return null; }),
+        // Registro de Mano de Obra: jefe de terreno, consulta o administrador (se administra desde el propio módulo).
+        token ? fetch('https://api.ibaker.cl/mo/contexto', { headers: H }).then(r => r.ok ? 'si' : (r.status === 403 ? 'no' : null)).catch(e => { console.warn('No se pudo consultar el acceso a Registro de Mano de Obra:', e.message); return null; }) : null,
+        // Panel de Control de Obras: aparece si el servicio lo reconoce en su lista de usuarios.
+        token ? fetch('https://api.ibaker.cl/panel-obras/me', { headers: H }).then(r => r.ok ? r.json() : null).catch(e => { console.warn('No se pudo consultar el acceso al Panel de Control de Obras:', e.message); return null; }) : null,
+    ]);
+    if (Array.isArray(cam)) {
         const actual = ACCESOS_MODULOS['rutas-estacionamientos.html'] || [];
-        ACCESOS_MODULOS['rutas-estacionamientos.html'] = [...new Set([...actual, ...porCamioneta.map(e => String(e).toLowerCase())])];
-    } catch(e) { console.warn('No se pudo cargar la lista de camionetas:', e.message); }
-    // Control de Dotación: la tarjeta aparece si la persona tiene acceso a al menos una obra
-    // (lo decide el servidor), en vez de una lista fija de correos. Si el servidor no responde,
-    // queda la lista fija de abajo.
-    try {
-        const headers = {};
-        try {
-            const t = await msalInstance.acquireTokenSilent({ scopes: ['User.Read'], account: msalInstance.getAllAccounts()[0] });
-            headers.Authorization = 'Bearer ' + t.accessToken;
-        } catch(e) {}
-        const r = await fetch('https://api.ibaker.cl/dotacion/obras?email=' + encodeURIComponent(correo), { headers });
-        if (r.ok) ACCESOS_MODULOS['dotacion.html'] = (await r.json()).length ? [correo] : [];
-    } catch(e) { console.warn('No se pudo consultar el acceso a Control de Dotación:', e.message); }
-    // Registro de Mano de Obra: la tarjeta aparece si el servidor reconoce a la persona como jefe de terreno,
-    // consulta o administrador (se administra desde el propio módulo). Si no responde, queda la lista fija.
-    try {
-        const t = await msalInstance.acquireTokenSilent({ scopes: ['User.Read'], account: msalInstance.getAllAccounts()[0] });
-        const r = await fetch('https://api.ibaker.cl/mo/contexto', { headers: { Authorization: 'Bearer ' + t.accessToken } });
-        if (r.ok) ACCESOS_MODULOS['registro-mo.html'] = [correo];
-        else if (r.status === 403) ACCESOS_MODULOS['registro-mo.html'] = [];
-    } catch(e) { console.warn('No se pudo consultar el acceso a Registro de Mano de Obra:', e.message); }
-    // Panel de Control de Obras: la tarjeta aparece si el servicio del Panel reconoce a la persona en su lista de usuarios
-    // (la administra el Administrador del Panel). Si no responde, queda la lista fija.
-    try {
-        const t = await msalInstance.acquireTokenSilent({ scopes: ['User.Read'], account: msalInstance.getAllAccounts()[0] });
-        const r = await fetch('https://api.ibaker.cl/panel-obras/me', { headers: { Authorization: 'Bearer ' + t.accessToken } });
-        if (r.ok) { const me = await r.json(); ACCESOS_MODULOS['panel-obras/index.html'] = (me.obras === '*' || (Array.isArray(me.obras) && me.obras.length)) ? [correo] : []; }
-    } catch(e) { console.warn('No se pudo consultar el acceso al Panel de Control de Obras:', e.message); }
+        ACCESOS_MODULOS['rutas-estacionamientos.html'] = [...new Set([...actual, ...cam.map(e => String(e).toLowerCase())])];
+    }
+    if (Array.isArray(dot)) ACCESOS_MODULOS['dotacion.html'] = dot.length ? [correo] : [];
+    if (mo === 'si') ACCESOS_MODULOS['registro-mo.html'] = [correo]; else if (mo === 'no') ACCESOS_MODULOS['registro-mo.html'] = [];
+    if (panel) ACCESOS_MODULOS['panel-obras/index.html'] = (panel.obras === '*' || (Array.isArray(panel.obras) && panel.obras.length)) ? [correo] : [];
+}
+// Devuelve { cache: true/false, listo: Promise }. Si ya hay un resultado guardado, pinta al instante.
+function aplicarAccesos(email) {
+    const correo = (email || '').toLowerCase();
+    const guardado = leerCacheAccesos(correo);
+    if (guardado) MODULOS_DINAMICOS.forEach(m => { if (Array.isArray(guardado[m])) ACCESOS_MODULOS[m] = guardado[m]; });
+    pintarAccesos(correo);           // lista fija (+ último resultado guardado): sin esperar a la red
+    const listo = consultarAccesosServidor(correo).then(() => { pintarAccesos(correo); guardarCacheAccesos(correo); }).catch(e => console.warn('Accesos:', e.message));
+    return { cache: !!guardado, listo };
+}
+function pintarAccesos(correo) {
     document.querySelectorAll('[data-modulo]').forEach(card => {
         const modulo = card.getAttribute('data-modulo');
         const lista  = ACCESOS_MODULOS[modulo];
@@ -1078,6 +1098,7 @@ async function aplicarAccesos(email) {
         sec.style.display = algunoVisible ? '' : 'none';
     });
 }
+
 
 // ── BÚSQUEDA DE MÓDULOS (barra de nav) ───────────────────────
 const todasLasTarjetas = () => document.querySelectorAll('.mod-card');
