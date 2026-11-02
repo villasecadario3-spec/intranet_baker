@@ -345,7 +345,7 @@ function renderLista() {
         const e = ext(it.name), puedeVer = PREVISUALIZABLES.includes(e), esDwg = e === 'dwg';
         const quien = it.lastModifiedBy && it.lastModifiedBy.user ? ' · ' + esc(it.lastModifiedBy.user.displayName) : '';
         return `<div class="fila"><div class="fila-ic">${iconoDe(it)}</div><div class="fila-info"><div class="fila-nombre">${esc(it.name)}${esDwg ? '<span class="etq dwg">DWG</span>' : ''}</div>${donde}<div class="fila-meta">${tam(it.size)} · Modificado ${fechaC(it.lastModifiedDateTime)}${quien}</div></div>
-            <div class="fila-acc">${puedeVer ? `<button class="btn-doc btn-ver" onclick="verItem(${idx})">Ver</button>` : ''}<button class="btn-doc btn-dl" onclick="descargarItem(${idx})">Descargar</button>${esDwg ? '<span class="fila-meta" style="align-self:center">Vista en línea próximamente</span>' : `<a class="btn-doc btn-dl" href="${esc(it.webUrl)}" target="_blank" rel="noopener">Abrir original</a>`}</div></div>`;
+            <div class="fila-acc">${puedeVer ? `<button class="btn-doc btn-ver" onclick="verItem(${idx})">Ver</button>` : ''}<button class="btn-doc btn-dl" onclick="descargarItem(${idx})">Descargar</button>${esDwg ? `<button class="btn-doc btn-ver" onclick="abrirEnAutocadWeb(${idx})" title="Abre el plano en AutoCAD web (requiere licencia de AutoCAD): se ve y se mide en el navegador, sin descargarlo">🅰 Ver en AutoCAD web</button>` : `<a class="btn-doc btn-dl" href="${esc(it.webUrl)}" target="_blank" rel="noopener">Abrir original</a>`}</div></div>`;
     }).join('');
 }
 function abrirItem(i) {
@@ -450,6 +450,22 @@ async function descargarItem(i) {
 
 // ── Inicio ──
 
+
+// ── Ver el plano en AutoCAD web ──
+// AutoCAD web (incluido en las licencias de AutoCAD / AutoCAD LT) abre archivos guardados en OneDrive y SharePoint
+// siempre que la dirección sea la estándar *.sharepoint.com, como la nuestra. No hay un enlace documentado que abra
+// un archivo concreto, así que se abre la aplicación y se indica la ruta exacta para elegirlo en «Abrir dibujo».
+function abrirEnAutocadWeb(idx) {
+    const it = itemsActuales[idx];
+    const segs = modoBusqueda ? rutaDeItem(it) : rutaActual;
+    const ruta = ['Proyectos', BIBLIOTECA].concat(segs).join(' › ');
+    window.open('https://web.autocad.com/', '_blank', 'noopener');
+    AVISO.innerHTML = `<div style="background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.35);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;line-height:1.6">
+        <b>Abriendo AutoCAD web</b> (pestaña nueva). Inicia sesión con tu cuenta Autodesk y elige <b>Abrir dibujo</b> → <b>OneDrive</b> → <b>Bibliotecas compartidas</b>:<br>
+        <span style="display:inline-block;margin:6px 0;padding:6px 10px;background:rgba(255,255,255,.06);border-radius:6px"><b>${esc(ruta)}</b> › <b>${esc(it.name)}</b></span><br>
+        <span style="opacity:.8">Se ve y se mide en el navegador, sin descargar ni instalar nada. Si la biblioteca no aparece en el selector, avísale a TI.</span>
+        <a onclick="AVISO.innerHTML=''" style="float:right;cursor:pointer;opacity:.7">cerrar</a></div>`;
+}
 // Sincroniza la biblioteca con OneDrive (mismo efecto que el botón «Sincronizar» de SharePoint): queda en el Explorador de archivos,
 // se actualiza sola cuando se publica un plano nuevo y los DWG se abren con AutoCAD desde ahí, sin descargarlos.
 
