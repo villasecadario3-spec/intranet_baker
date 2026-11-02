@@ -226,6 +226,7 @@
             <input class="search-input" id="filtro" type="text" placeholder="Filtrar esta carpeta…" oninput="renderLista()">
         </div>
         <button class="btn-doc btn-dl" onclick="buscarEnBiblioteca()" title="Busca por nombre en todo lo que tu usuario puede ver">🔎 Buscar en toda la biblioteca</button>
+        <button class="btn-doc btn-dl" id="btnSync" onclick="sincronizarConMiPc()" title="Deja la biblioteca en el Explorador de archivos de tu computador, siempre actualizada, para abrir los planos con AutoCAD sin descargarlos">🔄 Sincronizar con mi PC</button>
     </div>
     <div id="aviso"></div>
     <div id="lista"><div class="cargando">Cargando…</div></div>
@@ -338,7 +339,7 @@ function renderLista() {
         const e = ext(it.name), puedeVer = PREVISUALIZABLES.includes(e), esDwg = e === 'dwg';
         const quien = it.lastModifiedBy && it.lastModifiedBy.user ? ' · ' + esc(it.lastModifiedBy.user.displayName) : '';
         return `<div class="fila"><div class="fila-ic">${iconoDe(it)}</div><div class="fila-info"><div class="fila-nombre">${esc(it.name)}${esDwg ? '<span class="etq dwg">DWG</span>' : ''}</div>${donde}<div class="fila-meta">${tam(it.size)} · Modificado ${fechaC(it.lastModifiedDateTime)}${quien}</div></div>
-            <div class="fila-acc">${puedeVer ? `<button class="btn-doc btn-ver" onclick="verItem(${idx})">Ver</button>` : ''}<button class="btn-doc btn-dl" onclick="descargarItem(${idx})">Descargar</button><a class="btn-doc btn-dl" href="${esc(it.webUrl)}" target="_blank" rel="noopener">Abrir original</a></div></div>`;
+            <div class="fila-acc">${puedeVer ? `<button class="btn-doc btn-ver" onclick="verItem(${idx})">Ver</button>` : ''}<button class="btn-doc btn-dl" onclick="descargarItem(${idx})">Descargar</button>${esDwg ? '<span class="fila-meta" style="align-self:center">Vista en línea próximamente</span>' : `<a class="btn-doc btn-dl" href="${esc(it.webUrl)}" target="_blank" rel="noopener">Abrir original</a>`}</div></div>`;
     }).join('');
 }
 function abrirItem(i) {
@@ -438,6 +439,39 @@ async function descargarItem(i) {
 }
 
 // ── Inicio ──
+
+// Sincroniza la biblioteca con OneDrive (mismo efecto que el botón «Sincronizar» de SharePoint): queda en el Explorador de archivos,
+// se actualiza sola cuando se publica un plano nuevo y los DWG se abren con AutoCAD desde ahí, sin descargarlos.
+async function sincronizarConMiPc() {
+    const btn = document.getElementById('btnSync'); btn.disabled = true;
+    try {
+        await resolverBiblioteca();
+        const [sitio, unidad] = await Promise.all([
+            graph(`/sites/${SITE_HOST}:${SITE_RUTA}?$select=id,webUrl,displayName`),
+            graph(`/drives/${driveId}?$select=id,name,webUrl&$expand=list($select=id,displayName)`),
+        ]);
+        const partes = String(sitio.id).split(',');               // «dominio,idColeccion,idSitio»
+        if (partes.length < 3 || !unidad.list) throw new Error('No se pudieron obtener los datos de la biblioteca.');
+        const llave = g => encodeURIComponent('{' + g + '}');
+        const url = 'odopen://sync/?siteId=' + llave(partes[1]) + '&webId=' + llave(partes[2]) + '&listId=' + llave(unidad.list.id) +
+            '&userEmail=' + encodeURIComponent(emailActual) + '&webUrl=' + encodeURIComponent(unidad.webUrl) +
+            '&listTitle=' + encodeURIComponent(unidad.list.displayName || unidad.name) + '&webTitle=' + encodeURIComponent(sitio.displayName || 'Proyectos') + '&listTemplateTypeId=101&scope=OPENLIST';
+        window.location.href = url;
+        mostrarAyudaSync(unidad.webUrl);
+    } catch (e) {
+        console.error(e);
+        toast('No se pudo preparar la sincronización: ' + e.message, 'err');
+    } finally { btn.disabled = false; }
+}
+function mostrarAyudaSync(webUrl) {
+    document.getElementById('aviso').innerHTML = `<div class="aviso-sync" style="background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.35);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;line-height:1.5">
+        <b>Sincronizando con tu PC</b><br>
+        1. Si el navegador pregunta «¿Abrir OneDrive?», acepta (marca «permitir siempre»).<br>
+        2. Cuando OneDrive termine, la carpeta aparece en tu <b>Explorador de archivos</b>. Abre el plano desde ahí con doble clic: se abre en AutoCAD y siempre es la versión vigente.<br>
+        3. Clic derecho sobre la carpeta → <b>«Mantener siempre en este dispositivo»</b>, para que AutoCAD no tenga que descargar el plano al abrirlo.<br>
+        <span style="opacity:.8">¿No pasó nada? Entra a <a href="${esc(webUrl)}" target="_blank" rel="noopener">la biblioteca en SharePoint</a> y aprieta <b>Sincronizar</b> en la barra superior.</span>
+        <a onclick="document.getElementById('aviso').innerHTML=''" style="float:right;cursor:pointer;opacity:.7">cerrar</a></div>`;
+}
 async function iniciar() {
     try {
         await msalInstance.initialize();
