@@ -27,7 +27,7 @@
 <script src="panel.js"></script>
 <script>
 (function () {
-  var HASTA = "9999-12-31", RUTA_PRUEBA = false, K = "wJPj0Qrtfl2GwspJaY4JPSGyke2mAKPPKuTZK8LGGwjkSDHA7jrPyEDzc5Ly1CW0NmOvWwIqM7+jG3eeNcJN1Q==";
+  var HASTA = "9999-12-31", RUTA_PRUEBA = false, K = "83jqoI43fBPZgxljvFQiqNhHDw1nIJ6cDDc8B4zj+TrGGtHGO4SHB66njusmNMRXViTKdfGpfDZ/S0Gv/ejo9Q==";
   var caja = document.getElementById("caja");
   function cerrar(t, x) { caja.innerHTML = "<h1>" + t + "</h1><p class='sub'>" + x + "</p><p class='pie'>Panel de Control de Obras · Gerencia de Control de Gestión · Uso exclusivo de Inmobiliaria Baker.</p>"; }
   var u = decodeURIComponent(location.href).toLowerCase();
@@ -36,17 +36,21 @@
   if (!rutaOk) return cerrar("Ubicación no autorizada", "El Panel solo se abre desde la carpeta de Inmobiliaria Baker en SharePoint (sincronizada con OneDrive) o desde la intranet.");
   if (!window.PANEL_PAQUETE) return cerrar("Falta el archivo del Panel", "No se encontró panel.js junto a esta página. Vuelve a sincronizar la carpeta del Panel.");
   if (!window.crypto || !crypto.subtle) return cerrar("Navegador no compatible", "Abre el Panel con Chrome o Edge actualizados.");
-  var P = window.PANEL_PAQUETE, b64 = function (s) { var b = atob(s), a = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; };
+  var P = window.PANEL_PAQUETE, origen = "instalada", b64 = function (s) { var b = atob(s), a = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; };
+  /* a version the Administrador published from the intranet: the Panel leaves it in this tab's session and reloads; same key and format */
+  try { var g = sessionStorage.getItem("panel-paquete"); if (g) { var q = JSON.parse(g); if (q && q.P && q.P.c) { P = q.P; origen = "publicada"; } } } catch (e) {}
   /* AES-256-CBC + HMAC-SHA256 (encrypt-then-MAC) with this build's key: a damaged or swapped panel.js fails the MAC */
   (async function () {
     try {
       var k = b64(K), iv = b64(P.iv), c = b64(P.c), msg = new Uint8Array(iv.length + c.length); msg.set(iv); msg.set(c, iv.length);
       var mk = await crypto.subtle.importKey("raw", k.slice(32), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
-      if (!(await crypto.subtle.verify("HMAC", mk, b64(P.m), msg))) return cerrar("Archivos desactualizados", "index.html y panel.js no son de la misma versión. Vuelve a sincronizar la carpeta del Panel.");
+      if (!(await crypto.subtle.verify("HMAC", mk, b64(P.m), msg))) { if (origen === "publicada") { try { sessionStorage.removeItem("panel-paquete"); } catch (e) {} return location.reload(); } return cerrar("Archivos desactualizados", "index.html y panel.js no son de la misma versión. Vuelve a sincronizar la carpeta del Panel."); }
       var ek = await crypto.subtle.importKey("raw", k.slice(0, 32), "AES-CBC", false, ["decrypt"]);
       var html = new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-CBC", iv: iv }, ek, c));
       /* replace this page only once it finished loading: while the parser is still active, document.open() does nothing and write() would append the Panel to the shell */
       if (document.readyState !== "complete") await new Promise(function (ok) { window.addEventListener("load", ok, { once: true }); });
+      /* the key stays available to the Panel: it opens the versions the Administrador publishes from the intranet (same key, same format) */
+      window.PANEL_LLAVE = K; window.PANEL_ORIGEN = origen;
       document.open(); document.write(html); document.close();
     } catch (e) { cerrar("No se pudo abrir el Panel", "Vuelve a sincronizar la carpeta del Panel o avisa a la Gerencia de Control de Gestión."); }
   })();
