@@ -226,7 +226,6 @@
             <input class="search-input" id="filtro" type="text" placeholder="Filtrar esta carpeta…" oninput="renderLista()">
         </div>
         <button class="btn-doc btn-dl" onclick="buscarEnBiblioteca()" title="Busca por nombre en todo lo que tu usuario puede ver">🔎 Buscar en toda la biblioteca</button>
-        <button class="btn-doc btn-dl" onclick="copiarRutaPc(-1)" title="Copia la ruta de esta carpeta en tu PC (biblioteca sincronizada) para pegarla en el Explorador de archivos">📂 Ruta de esta carpeta</button>
         <button class="btn-doc btn-dl" id="btnSync" onclick="sincronizarConMiPc()" title="Deja la biblioteca en el Explorador de archivos de tu computador, siempre actualizada, para abrir los planos con AutoCAD sin descargarlos">🔄 Sincronizar con mi PC</button>
     </div>
     <div id="aviso"></div>
@@ -346,7 +345,7 @@ function renderLista() {
         const e = ext(it.name), puedeVer = PREVISUALIZABLES.includes(e), esDwg = e === 'dwg';
         const quien = it.lastModifiedBy && it.lastModifiedBy.user ? ' · ' + esc(it.lastModifiedBy.user.displayName) : '';
         return `<div class="fila"><div class="fila-ic">${iconoDe(it)}</div><div class="fila-info"><div class="fila-nombre">${esc(it.name)}${esDwg ? '<span class="etq dwg">DWG</span>' : ''}</div>${donde}<div class="fila-meta">${tam(it.size)} · Modificado ${fechaC(it.lastModifiedDateTime)}${quien}</div></div>
-            <div class="fila-acc">${puedeVer ? `<button class="btn-doc btn-ver" onclick="verItem(${idx})">Ver</button>` : ''}<button class="btn-doc btn-dl" onclick="descargarItem(${idx})">Descargar</button><button class="btn-doc btn-dl" onclick="copiarRutaPc(${idx})" title="Copia la ruta del archivo en tu PC (biblioteca sincronizada): pégala en el Explorador y se abre con AutoCAD">📂 Ruta en mi PC</button>${esDwg ? '<span class="fila-meta" style="align-self:center">Vista en línea próximamente</span>' : `<a class="btn-doc btn-dl" href="${esc(it.webUrl)}" target="_blank" rel="noopener">Abrir original</a>`}</div></div>`;
+            <div class="fila-acc">${puedeVer ? `<button class="btn-doc btn-ver" onclick="verItem(${idx})">Ver</button>` : ''}<button class="btn-doc btn-dl" onclick="descargarItem(${idx})">Descargar</button>${esDwg ? '<span class="fila-meta" style="align-self:center">Vista en línea próximamente</span>' : `<a class="btn-doc btn-dl" href="${esc(it.webUrl)}" target="_blank" rel="noopener">Abrir original</a>`}</div></div>`;
     }).join('');
 }
 function abrirItem(i) {
@@ -450,6 +449,9 @@ async function descargarItem(i) {
 }
 
 // ── Inicio ──
+
+// Sincroniza la biblioteca con OneDrive (mismo efecto que el botón «Sincronizar» de SharePoint): queda en el Explorador de archivos,
+// se actualiza sola cuando se publica un plano nuevo y los DWG se abren con AutoCAD desde ahí, sin descargarlos.
 
 // Sincroniza la biblioteca con OneDrive (mismo efecto que el botón «Sincronizar» de SharePoint): queda en el Explorador de archivos,
 // se actualiza sola cuando se publica un plano nuevo y los DWG se abren con AutoCAD desde ahí, sin descargarlos.
