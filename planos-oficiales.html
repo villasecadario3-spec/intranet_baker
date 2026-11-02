@@ -226,6 +226,7 @@
             <input class="search-input" id="filtro" type="text" placeholder="Filtrar esta carpeta…" oninput="renderLista()">
         </div>
         <button class="btn-doc btn-dl" onclick="buscarEnBiblioteca()" title="Busca por nombre en todo lo que tu usuario puede ver">🔎 Buscar en toda la biblioteca</button>
+        <button class="btn-doc btn-dl" onclick="copiarRutaPc(-1)" title="Copia la ruta de esta carpeta en tu PC (biblioteca sincronizada) para pegarla en el Explorador de archivos">📂 Ruta de esta carpeta</button>
         <button class="btn-doc btn-dl" id="btnSync" onclick="sincronizarConMiPc()" title="Deja la biblioteca en el Explorador de archivos de tu computador, siempre actualizada, para abrir los planos con AutoCAD sin descargarlos">🔄 Sincronizar con mi PC</button>
     </div>
     <div id="aviso"></div>
@@ -301,10 +302,16 @@ function irA(segs) { location.hash = '#/' + segs.map(encodeURIComponent).join('/
 window.addEventListener('hashchange', () => cargarRuta());
 
 function migas(segs) {
-    const partes = [`<a onclick="irA([])">${esc(BIBLIOTECA)}</a>`];
-    segs.forEach((s, i) => partes.push(i === segs.length - 1 ? `<span class="actual">${esc(s)}</span>` : `<a onclick="irA(${esc(JSON.stringify(segs.slice(0, i + 1)).replace(/"/g, "&quot;"))})">${esc(s)}</a>`));
+    // Sin onclick con JSON incrustado (los nombres con tildes o espacios lo rompían): cada tramo lleva su índice y un solo listener resuelve el clic.
+    const partes = [`<a data-mi="-1">${esc(BIBLIOTECA)}</a>`];
+    segs.forEach((s, i) => partes.push(i === segs.length - 1 ? `<span class="actual">${esc(s)}</span>` : `<a data-mi="${i}">${esc(s)}</a>`));
     document.getElementById('migas').innerHTML = partes.join('<span class="sep">/</span>');
 }
+document.getElementById('migas').addEventListener('click', ev => {
+    const a = ev.target.closest('a[data-mi]'); if (!a) return;
+    const i = Number(a.dataset.mi);
+    irA(i < 0 ? [] : rutaActual.slice(0, i + 1));
+});
 function iconoDe(it) {
     if (it.folder) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>';
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
@@ -339,7 +346,7 @@ function renderLista() {
         const e = ext(it.name), puedeVer = PREVISUALIZABLES.includes(e), esDwg = e === 'dwg';
         const quien = it.lastModifiedBy && it.lastModifiedBy.user ? ' · ' + esc(it.lastModifiedBy.user.displayName) : '';
         return `<div class="fila"><div class="fila-ic">${iconoDe(it)}</div><div class="fila-info"><div class="fila-nombre">${esc(it.name)}${esDwg ? '<span class="etq dwg">DWG</span>' : ''}</div>${donde}<div class="fila-meta">${tam(it.size)} · Modificado ${fechaC(it.lastModifiedDateTime)}${quien}</div></div>
-            <div class="fila-acc">${puedeVer ? `<button class="btn-doc btn-ver" onclick="verItem(${idx})">Ver</button>` : ''}<button class="btn-doc btn-dl" onclick="descargarItem(${idx})">Descargar</button>${esDwg ? '<span class="fila-meta" style="align-self:center">Vista en línea próximamente</span>' : `<a class="btn-doc btn-dl" href="${esc(it.webUrl)}" target="_blank" rel="noopener">Abrir original</a>`}</div></div>`;
+            <div class="fila-acc">${puedeVer ? `<button class="btn-doc btn-ver" onclick="verItem(${idx})">Ver</button>` : ''}<button class="btn-doc btn-dl" onclick="descargarItem(${idx})">Descargar</button><button class="btn-doc btn-dl" onclick="copiarRutaPc(${idx})" title="Copia la ruta del archivo en tu PC (biblioteca sincronizada): pégala en el Explorador y se abre con AutoCAD">📂 Ruta en mi PC</button>${esDwg ? '<span class="fila-meta" style="align-self:center">Vista en línea próximamente</span>' : `<a class="btn-doc btn-dl" href="${esc(it.webUrl)}" target="_blank" rel="noopener">Abrir original</a>`}</div></div>`;
     }).join('');
 }
 function abrirItem(i) {
@@ -361,8 +368,12 @@ function panelAccesoLimitado(titulo, detalle) {
     const rec = recientes();
     AVISO.innerHTML = `<div class="aviso"><b>${esc(titulo)}</b>${detalle}
         <div class="ruta-in"><input id="ruta-manual" type="text" placeholder="Comuna/Proyecto (ej.: Melipilla/Portal Oriente)" onkeydown="if(event.key==='Enter')irARutaManual()"><button class="btn-doc prim" onclick="irARutaManual()">Ir a la carpeta</button><button class="btn-doc btn-dl" onclick="buscarEnBiblioteca()">🔎 Buscar por nombre</button></div>
-        ${rec.length ? `<div class="chips">${rec.map(r => `<span class="chip" onclick="irA(${esc(JSON.stringify(r.split('/')).replace(/"/g, '&quot;'))})">📁 ${esc(r)}</span>`).join('')}</div>` : ''}</div>`;
+        ${rec.length ? `<div class="chips">${rec.map(r => `<span class="chip" data-ruta="${esc(r)}">📁 ${esc(r)}</span>`).join('')}</div>` : ''}</div>`;
 }
+document.addEventListener('click', ev => {
+    const ch = ev.target.closest('.chip[data-ruta]'); if (!ch) return;
+    irA(ch.dataset.ruta.split('/').filter(Boolean));
+});
 function irARutaManual() { const v = (document.getElementById('ruta-manual').value || '').trim().replace(/^[\/]+|[\/]+$/g, ''); if (v) irA(v.split('/').map(s => s.trim()).filter(Boolean)); }
 
 async function cargarRuta() {
@@ -404,7 +415,7 @@ async function buscarEnBiblioteca() {
         await resolverBiblioteca();
         const r = await graph(`/drives/${driveId}/root/search(q='${q.trim().replace(/'/g, "''")}')?$top=60&${CAMPOS}`);
         modoBusqueda = q.trim(); itemsActuales = r.value || [];
-        document.getElementById('migas').innerHTML = `<a onclick="irA([])">${esc(BIBLIOTECA)}</a><span class="sep">/</span><span class="actual">Búsqueda: «${esc(q.trim())}»</span>`;
+        document.getElementById('migas').innerHTML = `<a data-mi="-1">${esc(BIBLIOTECA)}</a><span class="sep">/</span><span class="actual">Búsqueda: «${esc(q.trim())}»</span>`;
         document.getElementById('barra').style.display = 'flex';
         renderLista();
     } catch (e) { mostrarError(e, rutaActual); }
@@ -442,6 +453,25 @@ async function descargarItem(i) {
 
 // Sincroniza la biblioteca con OneDrive (mismo efecto que el botón «Sincronizar» de SharePoint): queda en el Explorador de archivos,
 // se actualiza sola cuando se publica un plano nuevo y los DWG se abren con AutoCAD desde ahí, sin descargarlos.
+
+// ── Ruta local de la biblioteca sincronizada ──
+// Cuando se sincroniza con OneDrive, la biblioteca queda en una carpeta del PC con este nombre.
+// CONFIRMAR tras la primera sincronización (Explorador → clic derecho sobre la carpeta → Propiedades → Ubicación) y ajustar si difiere.
+const RUTA_SYNC_BASE = '%USERPROFILE%\\Inmobiliaria Baker\\Proyectos - ' + BIBLIOTECA;
+function copiarRutaPc(idx) {
+    const it = idx >= 0 ? itemsActuales[idx] : null;
+    const segs = it && modoBusqueda ? rutaDeItem(it) : rutaActual.slice();
+    const ruta = [RUTA_SYNC_BASE].concat(segs, it ? [it.name] : []).join('\\');
+    const listo = () => toast((it ? 'Ruta del plano copiada. ' : 'Ruta de la carpeta copiada. ') + 'Pégala en la barra del Explorador de archivos (Win+E) o en Win+R y presiona Enter. Requiere haber sincronizado la biblioteca (botón 🔄).');
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ruta).then(listo, () => copiarRutaPcPlanB(ruta, listo));
+    else copiarRutaPcPlanB(ruta, listo);
+}
+function copiarRutaPcPlanB(ruta, listo) {
+    const ta = document.createElement('textarea'); ta.value = ruta; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); listo(); } catch (e) { prompt('Copia esta ruta:', ruta); }
+    ta.remove();
+}
 async function sincronizarConMiPc() {
     const btn = document.getElementById('btnSync'); btn.disabled = true;
     try {
