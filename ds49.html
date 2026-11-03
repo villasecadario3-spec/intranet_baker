@@ -348,6 +348,28 @@
       <div id="infMsg" class="inf-msg"></div>
     </div>
   </div>
+
+  <div class="card" id="cardOrdenar">
+    <div class="card-header">
+      <div class="card-header-icon" style="background:#E3F0E6;"><svg viewBox="0 0 24 24" style="stroke:#1D6B33;" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></div>
+      <h2>Ordenar fichas por etapa</h2>
+    </div>
+    <div class="card-body">
+      <p style="font-size:0.85rem;color:var(--txt-dim);margin:0 0 14px;line-height:1.5;">Separa en carpetas las fichas ya generadas, según la hoja de la nómina en que aparece cada RUT. Devuelve un ZIP con una carpeta por etapa («Etapa 1», «Etapa 2»…). No vuelve a generar ni modifica las fichas: solo las reparte.</p>
+      <div class="field field-full"><label>Nómina del proyecto <span style="font-weight:400;color:var(--txt-dim)">(Excel con las hojas «Nómina E1», «Nómina E2»…)</span></label>
+        <input type="file" id="ordNominaFile" accept=".xlsx,.xls">
+        <div id="ordNominaNombre" style="font-size:0.78rem;color:var(--txt-dim);margin-top:4px;"></div>
+      </div>
+      <div class="field field-full" style="margin-top:12px;"><label>Fichas ya generadas <span style="font-weight:400;color:var(--txt-dim)">(el .zip que entrega el generador, o selecciona los .docx)</span></label>
+        <input type="file" id="ordFichasFile" accept=".docx,.zip" multiple>
+        <div id="ordFichasNombre" style="font-size:0.78rem;color:var(--txt-dim);margin-top:4px;"></div>
+      </div>
+      <div class="actions" style="margin-top:16px;">
+        <button class="btn btn-primary" id="ordGenerar" disabled>Ordenar y descargar ZIP</button>
+      </div>
+      <div id="ordMsg" class="inf-msg"></div>
+    </div>
+  </div>
 <style>
   .inf-msg{margin-top:12px;font-size:0.84rem;line-height:1.5;}
   .inf-msg ul{margin:6px 0 0 18px;padding:0;} .inf-msg li{margin-bottom:4px;}
@@ -2633,6 +2655,135 @@ $inf('infNominaFile').addEventListener('change', e => infCargarNomina(e.target.f
 $inf('infPrevia').addEventListener('click', infPrevia);
 $inf('infGenerar').addEventListener('click', infGenerar);
 setInterval(() => { if (infNomina) infActualizarBoton(); }, 1500);
+
+
+// ══════════════════════════════════════════════════════════════
+// ORDENAR FICHAS POR ETAPA
+// Reparte en carpetas («Etapa 1», «Etapa 2»…) las fichas .docx ya generadas, según la hoja
+// de la nómina donde aparece el RUT de cada una. No genera ni modifica fichas.
+// ══════════════════════════════════════════════════════════════
+const $ord = id => document.getElementById(id);
+let ordNomina = null;      // { E1: {hoja, filas}, E2: {...} }
+let ordFichas = [];        // [{ name, data }]
+
+function ordAviso(msg, tipo) { const el = $ord('ordMsg'); el.className = 'inf-msg ' + (tipo || ''); el.innerHTML = msg || ''; }
+function ordActualizarBoton() { $ord('ordGenerar').disabled = !(ordNomina && ordFichas.length); }
+
+// ── Lector de ZIP (soporta guardado sin comprimir y comprimido) ──
+async function ordLeerZip(buf) {
+  const b = new Uint8Array(buf), dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  let eocd = -1;
+  for (let i = b.length - 22; i >= 0 && i >= b.length - 65557; i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new Error('El archivo no parece un ZIP válido.');
+  const total = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const out = [];
+  for (let n = 0; n < total; n++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const metodo = dv.getUint16(p + 10, true);
+    const comp = dv.getUint32(p + 20, true);
+    const nameLen = dv.getUint16(p + 28, true), extraLen = dv.getUint16(p + 30, true), comLen = dv.getUint16(p + 32, true);
+    const lho = dv.getUint32(p + 42, true);
+    const nombre = new TextDecoder().decode(b.subarray(p + 46, p + 46 + nameLen));
+    p += 46 + nameLen + extraLen + comLen;
+    if (nombre.endsWith('/')) continue;
+    const lNameLen = dv.getUint16(lho + 26, true), lExtraLen = dv.getUint16(lho + 28, true);
+    const ini = lho + 30 + lNameLen + lExtraLen;
+    const crudo = b.subarray(ini, ini + comp);
+    let data;
+    if (metodo === 0) data = new Uint8Array(crudo);
+    else if (metodo === 8 && typeof DecompressionStream === 'function')
+      data = new Uint8Array(await new Response(new Blob([crudo]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+    else throw new Error('El ZIP usa un método de compresión que este navegador no sabe abrir. Sube los .docx directamente.');
+    out.push({ name: nombre.split('/').pop(), data });
+  }
+  return out;
+}
+
+// RUT que aparece en el nombre del archivo: el generador deja «…_12345678K.docx».
+function ordRutDeNombre(nombre) {
+  const base = nombre.replace(/\.docx$/i, '');
+  const cand = [];
+  const ultimo = infRut(base.split('_').pop());
+  if (ultimo.length >= 7) cand.push(ultimo);
+  (base.match(/\d[\dkK]{6,}/g) || []).forEach(x => { const r = infRut(x); if (r.length >= 7 && !cand.includes(r)) cand.push(r); });
+  return cand;
+}
+
+$ord('ordNominaFile').addEventListener('change', async (ev) => {
+  const f = ev.target.files[0]; ordNomina = null; $ord('ordNominaNombre').textContent = ''; ordActualizarBoton();
+  if (!f) return;
+  try {
+    const wb = XLSX.read(new Uint8Array(await f.arrayBuffer()), { type: 'array' });
+    ordNomina = infLeerNomina(wb);
+    const et = Object.keys(ordNomina).sort();
+    if (!et.length) { ordNomina = null; ordAviso('No encontré hojas llamadas «Nómina E1», «Nómina E2»… en ese archivo.', 'err'); }
+    else {
+      $ord('ordNominaNombre').textContent = f.name + ' — ' + et.map(k => k.replace('E', 'Etapa ') + ': ' + ordNomina[k].filas.length + ' familias').join(' · ');
+      ordAviso('');
+    }
+  } catch (e) { ordNomina = null; ordAviso('No pude leer el Excel: ' + e.message, 'err'); }
+  ordActualizarBoton();
+});
+
+$ord('ordFichasFile').addEventListener('change', async (ev) => {
+  const fs = [...ev.target.files]; ordFichas = []; $ord('ordFichasNombre').textContent = ''; ordActualizarBoton();
+  if (!fs.length) return;
+  try {
+    for (const f of fs) {
+      if (/\.zip$/i.test(f.name)) ordFichas.push(...(await ordLeerZip(await f.arrayBuffer())).filter(x => /\.docx$/i.test(x.name)));
+      else if (/\.docx$/i.test(f.name)) ordFichas.push({ name: f.name, data: new Uint8Array(await f.arrayBuffer()) });
+    }
+    if (!ordFichas.length) { ordAviso('No encontré fichas .docx en lo que subiste.', 'err'); }
+    else { $ord('ordFichasNombre').textContent = ordFichas.length + ' fichas leídas'; ordAviso(''); }
+  } catch (e) { ordFichas = []; ordAviso('No pude leer las fichas: ' + e.message, 'err'); }
+  ordActualizarBoton();
+});
+
+function ordSeparar() {
+  const porClave = new Map(), porCuerpo = new Map();
+  Object.keys(ordNomina).forEach(k => ordNomina[k].filas.forEach(f => {
+    if (f.clave) { if (!porClave.has(f.clave)) porClave.set(f.clave, new Set()); porClave.get(f.clave).add(k); }
+    if (f.cuerpo) { if (!porCuerpo.has(f.cuerpo)) porCuerpo.set(f.cuerpo, new Set()); porCuerpo.get(f.cuerpo).add(k); }
+  }));
+  const archivos = [], sinEtapa = [], repetidas = [];
+  const cuenta = {};
+  ordFichas.forEach(fi => {
+    let etapa = null, ambigua = false;
+    for (const c of ordRutDeNombre(fi.name)) {
+      let s = porClave.get(c) || porCuerpo.get(c.slice(0, -1)) || porCuerpo.get(c);
+      if (!s) continue;
+      if (s.size > 1) { ambigua = true; break; }
+      etapa = [...s][0]; break;
+    }
+    let carpeta;
+    if (ambigua) { carpeta = 'Revisar - en mas de una etapa'; repetidas.push(fi.name); }
+    else if (etapa) carpeta = 'Etapa ' + etapa.slice(1);
+    else { carpeta = 'Sin etapa en la nomina'; sinEtapa.push(fi.name); }
+    cuenta[carpeta] = (cuenta[carpeta] || 0) + 1;
+    archivos.push({ name: carpeta + '/' + fi.name, data: fi.data });
+  });
+  return { archivos, cuenta, sinEtapa, repetidas };
+}
+
+$ord('ordGenerar').addEventListener('click', () => {
+  $ord('ordGenerar').disabled = true;
+  try {
+    const R = ordSeparar();
+    const zip = new Blob([buildZipStore(R.archivos)], { type: 'application/zip' });
+    const proy = (document.getElementById('cfgProyecto').value || 'Proyecto').replace(/\s+/g, '_');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(zip);
+    a.download = 'Fichas_por_etapa_' + proy + '_' + new Date().toISOString().slice(0, 10) + '.zip';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    const lis = Object.keys(R.cuenta).sort().map(c => '<li><b>' + c + '</b>: ' + R.cuenta[c] + ' fichas</li>');
+    if (R.sinEtapa.length) lis.push('<li>Sin etapa: su RUT no está en ninguna hoja de la nómina. Revisa ' + R.sinEtapa.slice(0, 5).map(x => '«' + x + '»').join(', ') + (R.sinEtapa.length > 5 ? ' y ' + (R.sinEtapa.length - 5) + ' más' : '') + '.</li>');
+    if (R.repetidas.length) lis.push('<li>' + R.repetidas.length + ' fichas cuyo RUT aparece en más de una etapa: quedaron en «Revisar».</li>');
+    ordAviso('✓ ZIP descargado con ' + R.archivos.length + ' fichas.<ul style="margin:8px 0 0 18px;">' + lis.join('') + '</ul>', 'ok');
+  } catch (e) { console.error(e); ordAviso('No pude ordenar las fichas: ' + e.message, 'err'); }
+  $ord('ordGenerar').disabled = false;
+});
 
 </script>
 </body>
