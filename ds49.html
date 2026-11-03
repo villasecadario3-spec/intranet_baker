@@ -360,7 +360,7 @@
         <input type="file" id="ordNominaFile" accept=".xlsx,.xls">
         <div id="ordNominaNombre" style="font-size:0.78rem;color:var(--txt-dim);margin-top:4px;"></div>
       </div>
-      <div class="field field-full" style="margin-top:12px;"><label><input type="checkbox" id="ordSoloUltima" checked> Dejar solo la última respuesta de cada RUT <span style="font-weight:400;color:var(--txt-dim)">(hay personas que contestaron la encuesta más de una vez)</span></label></div>
+      <div class="field field-full" style="margin-top:12px;"><label><input type="checkbox" id="ordSoloUltima"> Dejar solo la última respuesta de cada RUT <span style="font-weight:400;color:var(--txt-dim)">(por defecto se listan todas; la columna «Repetida» marca cuál es la última)</span></label></div>
       <div class="field field-full" style="margin-top:12px;"><label>Fichas ya generadas <span style="font-weight:400;color:var(--txt-dim)">— opcional (el .zip que entrega el generador, o selecciona los .docx). Sin esto solo se arma el listado.</span></label>
         <input type="file" id="ordFichasFile" accept=".docx,.zip" multiple>
         <div id="ordFichasNombre" style="font-size:0.78rem;color:var(--txt-dim);margin-top:4px;"></div>
@@ -2816,7 +2816,12 @@ function ordAsignar(R, IX, soloUltima) {
     const mas = !a || (p.tsNum != null && a.tsNum != null ? p.tsNum >= a.tsNum : p.i > a.i);
     if (mas) ultima.set(p.rut, p);
   });
-  R.personas.forEach(p => { p.repetida = !!(p.rut && ultima.get(p.rut) !== p); });
+  const veces = new Map();
+  R.personas.forEach(p => { if (p.rut) veces.set(p.rut, (veces.get(p.rut) || 0) + 1); });
+  R.personas.forEach(p => {
+    p.repetida = !!(p.rut && ultima.get(p.rut) !== p);           // no es la última de su RUT
+    p.marca = (p.rut && veces.get(p.rut) > 1) ? (p.repetida ? 'Sí (anterior)' : 'Sí (última)') : '';
+  });
   R.usadas = soloUltima ? R.personas.filter(p => !p.repetida) : R.personas.slice();
 }
 
@@ -2833,9 +2838,9 @@ function ordListado(R, conFicha) {
   const wb = XLSX.utils.book_new();
   const cab = ['N°', 'Nombre', 'RUT', 'Fila en respuestas', 'Marca temporal', 'Repetida'];
   if (conFicha) cab.push('Ficha');
-  const an = [{ wch: 5 }, { wch: 38 }, { wch: 14 }, { wch: 10 }, { wch: 21 }, { wch: 10 }].concat(conFicha ? [{ wch: 46 }] : []);
+  const an = [{ wch: 5 }, { wch: 38 }, { wch: 14 }, { wch: 10 }, { wch: 17 }, { wch: 13 }].concat(conFicha ? [{ wch: 46 }] : []);
   const fila = (p, n) => {
-    const f = [n, p.nombre, ordRutGuion(p.rut), p.fila, p.ts, p.repetida ? 'Sí' : ''];
+    const f = [n, p.nombre, ordRutGuion(p.rut), p.fila, p.ts, p.marca];
     if (conFicha) f.push(p.ficha || '— sin ficha —');
     return f;
   };
@@ -2923,9 +2928,9 @@ $ord('ordGenerar').addEventListener('click', () => {
       ordDescargar(new Blob([buildZipStore(archivos)], { type: 'application/zip' }),
         'Respuestas_por_etapa_' + proy + '_' + new Date().toISOString().slice(0, 10) + '.zip');
 
-      const rep = R.personas.filter(p => p.repetida).length;
+      const rep = R.personas.filter(p => p.marca).length;
       const lis = Object.keys(cuenta).sort().map(c => '<li><b>' + c + '</b>: ' + cuenta[c] + ' personas</li>');
-      if (rep) lis.push('<li>' + rep + ' respuestas repetidas (mismo RUT contestó más de una vez)' + ($ord('ordSoloUltima').checked ? ': se dejó la última de cada una' : ': quedaron todas, porque desmarcaste la casilla') + '.</li>');
+      if (rep) lis.push('<li>' + rep + ' respuestas de personas que contestaron más de una vez' + ($ord('ordSoloUltima').checked ? ': se dejó solo la última de cada una' : ': quedaron todas listadas, marcadas en la columna «Repetida» como «última» o «anterior»') + '.</li>');
       if (L.faltan) lis.push('<li>' + L.faltan + ' personas de la nómina no contestaron la encuesta (hoja «Nomina sin respuesta»).</li>');
       if (sueltas.length) lis.push('<li>' + sueltas.length + ' fichas cuyo RUT no está en las respuestas: quedaron en «Fichas - sin etapa».</li>');
       ordAviso('✓ ZIP descargado.<ul style="margin:8px 0 0 18px;">' + lis.join('') + '</ul>'
