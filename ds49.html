@@ -352,20 +352,21 @@
   <div class="card" id="cardOrdenar">
     <div class="card-header">
       <div class="card-header-icon" style="background:#E3F0E6;"><svg viewBox="0 0 24 24" style="stroke:#1D6B33;" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></div>
-      <h2>Ordenar fichas por etapa</h2>
+      <h2>Separar las respuestas por etapa</h2>
     </div>
     <div class="card-body">
-      <p style="font-size:0.85rem;color:var(--txt-dim);margin:0 0 14px;line-height:1.5;">Con <b>solo la nómina</b> entrega un Excel con las personas separadas por etapa. Si además subes las fichas ya generadas, las reparte en carpetas («Etapa 1», «Etapa 2»…) dentro de un ZIP, junto con ese mismo Excel. No genera ni modifica fichas: solo las ordena.</p>
+      <p style="font-size:0.85rem;color:var(--txt-dim);margin:0 0 14px;line-height:1.5;">El Excel de respuestas trae mezcladas a las personas de todas las etapas. Esta sección cruza por RUT <b>el Excel de respuestas que subiste arriba</b> con la nómina, y entrega un ZIP con: el listado de personas por etapa, y el <b>mismo Excel de respuestas partido en uno por etapa</b> (mismas columnas), listo para volver a usarlo arriba y generar las fichas de una sola etapa. Si además subes las fichas ya generadas, las reparte en carpetas.</p>
       <div class="field field-full"><label>Nómina del proyecto <span style="font-weight:400;color:var(--txt-dim)">(Excel con las hojas «Nómina E1», «Nómina E2»…)</span></label>
         <input type="file" id="ordNominaFile" accept=".xlsx,.xls">
         <div id="ordNominaNombre" style="font-size:0.78rem;color:var(--txt-dim);margin-top:4px;"></div>
       </div>
+      <div class="field field-full" style="margin-top:12px;"><label><input type="checkbox" id="ordSoloUltima" checked> Dejar solo la última respuesta de cada RUT <span style="font-weight:400;color:var(--txt-dim)">(hay personas que contestaron la encuesta más de una vez)</span></label></div>
       <div class="field field-full" style="margin-top:12px;"><label>Fichas ya generadas <span style="font-weight:400;color:var(--txt-dim)">— opcional (el .zip que entrega el generador, o selecciona los .docx). Sin esto solo se arma el listado.</span></label>
         <input type="file" id="ordFichasFile" accept=".docx,.zip" multiple>
         <div id="ordFichasNombre" style="font-size:0.78rem;color:var(--txt-dim);margin-top:4px;"></div>
       </div>
       <div class="actions" style="margin-top:16px;">
-        <button class="btn btn-primary" id="ordGenerar" disabled>Descargar listado en Excel</button>
+        <button class="btn btn-primary" id="ordGenerar" disabled>Separar y descargar ZIP</button>
       </div>
       <div id="ordMsg" class="inf-msg"></div>
     </div>
@@ -2670,7 +2671,6 @@ function ordAviso(msg, tipo) { const el = $ord('ordMsg'); el.className = 'inf-ms
 function ordActualizarBoton() {
   const b = $ord('ordGenerar');
   b.disabled = !ordNomina;                               // la nómina basta: las fichas son opcionales
-  b.textContent = ordFichas.length ? 'Ordenar fichas y descargar ZIP' : 'Descargar listado en Excel';
 }
 
 // ── Lector de ZIP (soporta guardado sin comprimir y comprimido) ──
@@ -2745,6 +2745,7 @@ $ord('ordFichasFile').addEventListener('change', async (ev) => {
 });
 
 function ordRutTxt(f) { return f.cuerpo ? (f.cuerpo + (f.dv ? '-' + f.dv : '')) : ''; }
+const ordRutGuion = r => r && r.length > 1 ? r.slice(0, -1) + '-' + r.slice(-1) : (r || '');
 
 // Índices de la nómina: de cada RUT, en qué etapa(s) aparece.
 function ordIndices() {
@@ -2759,57 +2760,112 @@ function ordIndices() {
   }));
   return { porClave, porCuerpo, claveDeCuerpo };
 }
-
-// Reparte las fichas en carpetas por etapa. Devuelve también qué ficha le tocó a cada persona.
-function ordSeparar(IX) {
-  const archivos = [], sinEtapa = [], repetidas = [], cuenta = {}, porPersona = new Map();
-  ordFichas.forEach(fi => {
-    let etapa = null, ambigua = false, canon = null;
-    for (const c of ordRutDeNombre(fi.name)) {
-      const cu = c.slice(0, -1);
-      let s = IX.porClave.get(c); canon = c;
-      if (!s) { s = IX.porCuerpo.get(cu); if (s) canon = IX.claveDeCuerpo.get(cu) || c; }
-      if (!s) { s = IX.porCuerpo.get(c); if (s) canon = IX.claveDeCuerpo.get(c) || c; }
-      if (!s) continue;
-      if (s.size > 1) { ambigua = true; break; }
-      etapa = [...s][0]; break;
-    }
-    let carpeta;
-    if (ambigua) { carpeta = 'Revisar - en mas de una etapa'; repetidas.push(fi.name); }
-    else if (etapa) { carpeta = 'Etapa ' + etapa.slice(1); if (canon) porPersona.set(canon, fi.name); }
-    else { carpeta = 'Sin etapa en la nomina'; sinEtapa.push(fi.name); }
-    cuenta[carpeta] = (cuenta[carpeta] || 0) + 1;
-    archivos.push({ name: carpeta + '/' + fi.name, data: fi.data });
-  });
-  return { archivos, cuenta, sinEtapa, repetidas, porPersona };
+// Busca un RUT en la nómina. Devuelve { etapa, clave } (etapa null si no está, 'AMB' si está en más de una).
+function ordBuscar(IX, rut) {
+  if (!rut) return { etapa: null, clave: rut };
+  const cu = rut.slice(0, -1);
+  let s = IX.porClave.get(rut), clave = rut;
+  if (!s) { s = IX.porCuerpo.get(cu); if (s) clave = IX.claveDeCuerpo.get(cu) || rut; }
+  if (!s) { s = IX.porCuerpo.get(rut); if (s) clave = IX.claveDeCuerpo.get(rut) || rut; }
+  if (!s) return { etapa: null, clave: rut };
+  return { etapa: s.size > 1 ? 'AMB' : [...s][0], clave };
 }
 
-// Excel con las personas separadas por etapa: una hoja por etapa, más una hoja «Todas» para filtrar.
-function ordExcel(porPersona) {
-  const wb = XLSX.utils.book_new();
-  const etapas = Object.keys(ordNomina).sort();
-  const cab = ['N°', 'Nombre', 'RUT', 'Familia', 'Discapacidad', 'Solicita baja'];
-  if (porPersona) cab.push('Ficha');
-  const anchos = c => c.map(h => ({ wch: h === 'Nombre' ? 38 : (h === 'Ficha' ? 46 : (h === 'N°' ? 5 : 14)) }));
-  const todas = [['Etapa'].concat(cab)];
-  etapas.forEach(k => {
-    const filas = [cab];
-    ordNomina[k].filas.forEach((f, i) => {
-      const fila = [i + 1, f.nombre, ordRutTxt(f), f.familia || '', f.disc || '', f.baja ? 'Sí' : ''];
-      if (porPersona) fila.push(porPersona.get(f.clave) || '— sin ficha —');
-      filas.push(fila);
-      todas.push(['Etapa ' + k.slice(1)].concat(fila));
+// La «Marca temporal» viene como número de serie de Excel: se muestra como fecha legible.
+function ordFechaTxt(v) {
+  let d = null;
+  if (v instanceof Date) d = v;
+  else {
+    const t = String(v == null ? '' : v).trim();
+    if (!t) return '';
+    if (/^\d+(\.\d+)?$/.test(t)) { const n = parseFloat(t); d = (n > 20000 && n < 90000) ? new Date(Math.round((n - 25569) * 86400000)) : null; }
+    if (!d) { const ms = Date.parse(t); d = isNaN(ms) ? null : new Date(ms); }
+    if (!d) return t;
+  }
+  const z = n => String(n).padStart(2, '0');
+  return z(d.getDate()) + '-' + z(d.getMonth() + 1) + '-' + d.getFullYear() + ' ' + z(d.getHours()) + ':' + z(d.getMinutes());
+}
+
+// Lee el Excel de respuestas subido arriba: filas tal cual (para partirlo) y los datos de cada persona.
+function ordLeerRespuestas() {
+  const buf = Uint8Array.from(atob(excelBase64), c => c.charCodeAt(0));
+  const wb = XLSX.read(buf, { type: 'array', cellDates: true });   // cellDates: la marca temporal se conserva como fecha al partir el archivo
+  const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+  const crudoHeader = data[0] || [], crudo = data.slice(1);
+  let header = crudoHeader, filas = crudo.map(r => r.map(v => v == null ? '' : String(v).trim()));
+  if (detectLayoutB(header)) { const ad = adaptLayoutB(header, filas); header = ad.header; filas = ad.rows; }
+  const personas = [];
+  filas.forEach((r, i) => {
+    if (!(r[1] || '').trim() && !(r[2] || '').trim() && !(r[4] || '').trim()) return;
+    personas.push({
+      i, fila: i + 2, rut: infRut(r[4]),
+      nombre: [r[1], r[2], r[3]].map(x => String(x || '').trim()).filter(Boolean).join(' ') || ('Fila ' + (i + 2)),
+      ts: ordFechaTxt(r[0]), tsNum: infFechaNum(r[0]),
     });
-    const ws = XLSX.utils.aoa_to_sheet(filas);
-    ws['!cols'] = anchos(cab);
-    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: filas.length - 1, c: cab.length - 1 } }) };
-    XLSX.utils.book_append_sheet(wb, ws, ('Etapa ' + k.slice(1)).slice(0, 31));
   });
-  const wsT = XLSX.utils.aoa_to_sheet(todas);
-  wsT['!cols'] = [{ wch: 10 }].concat(anchos(cab));
-  wsT['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: todas.length - 1, c: cab.length } }) };
-  XLSX.utils.book_append_sheet(wb, wsT, 'Todas');
-  return new Uint8Array(XLSX.write(wb, { bookType: 'xlsx', type: 'array' }));
+  return { crudoHeader, crudo, personas };
+}
+
+// Asigna etapa a cada respuesta y marca las repetidas (se conserva la última de cada RUT).
+function ordAsignar(R, IX, soloUltima) {
+  R.personas.forEach(p => { const b = ordBuscar(IX, p.rut); p.etapa = b.etapa; p.clave = b.clave; });
+  const ultima = new Map();
+  R.personas.forEach(p => {
+    if (!p.rut) return;
+    const a = ultima.get(p.rut);
+    const mas = !a || (p.tsNum != null && a.tsNum != null ? p.tsNum >= a.tsNum : p.i > a.i);
+    if (mas) ultima.set(p.rut, p);
+  });
+  R.personas.forEach(p => { p.repetida = !!(p.rut && ultima.get(p.rut) !== p); });
+  R.usadas = soloUltima ? R.personas.filter(p => !p.repetida) : R.personas.slice();
+}
+
+function ordHoja(filas, anchos) {
+  const ws = XLSX.utils.aoa_to_sheet(filas);
+  if (anchos) ws['!cols'] = anchos;
+  if (filas.length > 1) ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: filas.length - 1, c: filas[0].length - 1 } }) };
+  return ws;
+}
+const ordXlsx = wb => new Uint8Array(XLSX.write(wb, { bookType: 'xlsx', type: 'array' }));
+
+// Listado legible: una hoja por etapa, una «Todas», los que no están en la nómina y los de la nómina que no contestaron.
+function ordListado(R, conFicha) {
+  const wb = XLSX.utils.book_new();
+  const cab = ['N°', 'Nombre', 'RUT', 'Fila en respuestas', 'Marca temporal', 'Repetida'];
+  if (conFicha) cab.push('Ficha');
+  const an = [{ wch: 5 }, { wch: 38 }, { wch: 14 }, { wch: 10 }, { wch: 21 }, { wch: 10 }].concat(conFicha ? [{ wch: 46 }] : []);
+  const fila = (p, n) => {
+    const f = [n, p.nombre, ordRutGuion(p.rut), p.fila, p.ts, p.repetida ? 'Sí' : ''];
+    if (conFicha) f.push(p.ficha || '— sin ficha —');
+    return f;
+  };
+  const etapas = Object.keys(ordNomina).sort();
+  const todas = [['Etapa'].concat(cab)];
+  const nombreEtapa = p => p.etapa === 'AMB' ? 'Revisar' : (p.etapa ? 'Etapa ' + p.etapa.slice(1) : 'Sin etapa');
+  etapas.forEach(k => {
+    const gente = R.usadas.filter(p => p.etapa === k);
+    XLSX.utils.book_append_sheet(wb, ordHoja([cab].concat(gente.map((p, n) => fila(p, n + 1))), an), ('Etapa ' + k.slice(1)).slice(0, 31));
+  });
+  R.usadas.forEach((p, n) => todas.push([nombreEtapa(p)].concat(fila(p, n + 1))));
+  const fuera = R.usadas.filter(p => !p.etapa || p.etapa === 'AMB');
+  if (fuera.length) XLSX.utils.book_append_sheet(wb, ordHoja([cab].concat(fuera.map((p, n) => fila(p, n + 1))), an), 'Sin etapa');
+  // Quién está en la nómina pero no contestó la encuesta
+  const conResp = new Set(R.usadas.map(p => p.clave).filter(Boolean));
+  const faltan = [['Etapa', 'Nombre', 'RUT', 'Familia']];
+  etapas.forEach(k => ordNomina[k].filas.forEach(f => {
+    if (!conResp.has(f.clave)) faltan.push(['Etapa ' + k.slice(1), f.nombre, ordRutTxt(f), f.familia || '']);
+  }));
+  if (faltan.length > 1) XLSX.utils.book_append_sheet(wb, ordHoja(faltan, [{ wch: 10 }, { wch: 38 }, { wch: 14 }, { wch: 14 }]), 'Nomina sin respuesta');
+  XLSX.utils.book_append_sheet(wb, ordHoja(todas, [{ wch: 10 }].concat(an)), 'Todas');
+  return { data: ordXlsx(wb), faltan: faltan.length - 1, fuera: fuera.length };
+}
+
+// El Excel de respuestas partido: mismas columnas, solo las filas de esa etapa.
+function ordPartirRespuestas(R, personas, titulo) {
+  const wb = XLSX.utils.book_new();
+  const filas = [R.crudoHeader].concat(personas.map(p => R.crudo[p.i]));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filas), titulo.slice(0, 31));
+  return ordXlsx(wb);
 }
 
 function ordDescargar(blob, nombre) {
@@ -2819,31 +2875,66 @@ function ordDescargar(blob, nombre) {
 }
 
 $ord('ordGenerar').addEventListener('click', () => {
+  if (!excelBase64) { ordAviso('Primero sube arriba el Excel de respuestas (el mismo de las fichas).', 'err'); return; }
   $ord('ordGenerar').disabled = true;
-  try {
-    const proy = (document.getElementById('cfgProyecto').value || 'Proyecto').replace(/\s+/g, '_');
-    const hoy = new Date().toISOString().slice(0, 10);
-    const etapas = Object.keys(ordNomina).sort();
-    const lis = [];
-    if (!ordFichas.length) {
-      // Solo la nómina: listado de personas por etapa.
-      ordDescargar(new Blob([ordExcel(null)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
-        'Listado_por_etapa_' + proy + '_' + hoy + '.xlsx');
-      etapas.forEach(k => lis.push('<li><b>Etapa ' + k.slice(1) + '</b>: ' + ordNomina[k].filas.length + ' personas</li>'));
-      ordAviso('✓ Excel descargado: una hoja por etapa y una hoja «Todas» para filtrar.<ul style="margin:8px 0 0 18px;">' + lis.join('') + '</ul>', 'ok');
-    } else {
-      const R = ordSeparar(ordIndices());
-      R.archivos.push({ name: 'Listado_por_etapa.xlsx', data: ordExcel(R.porPersona) });
-      ordDescargar(new Blob([buildZipStore(R.archivos)], { type: 'application/zip' }),
-        'Fichas_por_etapa_' + proy + '_' + hoy + '.zip');
-      Object.keys(R.cuenta).sort().forEach(c => lis.push('<li><b>' + c + '</b>: ' + R.cuenta[c] + ' fichas</li>'));
-      if (R.sinEtapa.length) lis.push('<li>Sin etapa: su RUT no está en ninguna hoja de la nómina. Revisa ' + R.sinEtapa.slice(0, 5).map(x => '«' + x + '»').join(', ') + (R.sinEtapa.length > 5 ? ' y ' + (R.sinEtapa.length - 5) + ' más' : '') + '.</li>');
-      if (R.repetidas.length) lis.push('<li>' + R.repetidas.length + ' fichas cuyo RUT aparece en más de una etapa: quedaron en «Revisar».</li>');
-      ordAviso('✓ ZIP descargado con ' + (R.archivos.length - 1) + ' fichas y el listado en Excel (la columna «Ficha» muestra a quién le falta).<ul style="margin:8px 0 0 18px;">' + lis.join('') + '</ul>', 'ok');
-    }
-  } catch (e) { console.error(e); ordAviso('No pude generar el listado: ' + e.message, 'err'); }
-  $ord('ordGenerar').disabled = false;
+  ordAviso('Separando…', 'info');
+  setTimeout(() => {
+    try {
+      const IX = ordIndices();
+      const R = ordLeerRespuestas();
+      ordAsignar(R, IX, $ord('ordSoloUltima').checked);
+
+      // Si subieron las fichas, se asocia cada una a su persona por el RUT del nombre del archivo.
+      let conFicha = false, sueltas = [];
+      if (ordFichas.length) {
+        conFicha = true;
+        const porRut = new Map();
+        R.personas.forEach(p => { if (p.rut && !porRut.has(p.rut)) porRut.set(p.rut, []); if (p.rut) porRut.get(p.rut).push(p); });
+        ordFichas.forEach(fi => {
+          let ok = false;
+          for (const c of ordRutDeNombre(fi.name)) {
+            const g = porRut.get(c) || porRut.get(c.slice(0, -1));
+            if (g) { g.forEach(p => { if (!p.ficha) p.ficha = fi.name; }); fi.etapa = g[0].etapa; ok = true; break; }
+          }
+          if (!ok) sueltas.push(fi.name);
+        });
+      }
+
+      const archivos = [];
+      const L = ordListado(R, conFicha);
+      archivos.push({ name: 'Listado_por_etapa.xlsx', data: L.data });
+
+      const etapas = Object.keys(ordNomina).sort();
+      const cuenta = {};
+      etapas.forEach(k => {
+        const g = R.usadas.filter(p => p.etapa === k);
+        cuenta['Etapa ' + k.slice(1)] = g.length;
+        if (g.length) archivos.push({ name: 'Respuestas_Etapa_' + k.slice(1) + '.xlsx', data: ordPartirRespuestas(R, g, 'Etapa ' + k.slice(1)) });
+      });
+      const fuera = R.usadas.filter(p => !p.etapa || p.etapa === 'AMB');
+      if (fuera.length) { cuenta['Sin etapa'] = fuera.length; archivos.push({ name: 'Respuestas_Sin_etapa.xlsx', data: ordPartirRespuestas(R, fuera, 'Sin etapa') }); }
+
+      if (conFicha) ordFichas.forEach(fi => {
+        const carpeta = fi.etapa === 'AMB' || !fi.etapa ? 'Fichas - sin etapa' : 'Fichas Etapa ' + fi.etapa.slice(1);
+        archivos.push({ name: carpeta + '/' + fi.name, data: fi.data });
+      });
+
+      const proy = (document.getElementById('cfgProyecto').value || 'Proyecto').replace(/\s+/g, '_');
+      ordDescargar(new Blob([buildZipStore(archivos)], { type: 'application/zip' }),
+        'Respuestas_por_etapa_' + proy + '_' + new Date().toISOString().slice(0, 10) + '.zip');
+
+      const rep = R.personas.filter(p => p.repetida).length;
+      const lis = Object.keys(cuenta).sort().map(c => '<li><b>' + c + '</b>: ' + cuenta[c] + ' personas</li>');
+      if (rep) lis.push('<li>' + rep + ' respuestas repetidas (mismo RUT contestó más de una vez)' + ($ord('ordSoloUltima').checked ? ': se dejó la última de cada una' : ': quedaron todas, porque desmarcaste la casilla') + '.</li>');
+      if (L.faltan) lis.push('<li>' + L.faltan + ' personas de la nómina no contestaron la encuesta (hoja «Nomina sin respuesta»).</li>');
+      if (sueltas.length) lis.push('<li>' + sueltas.length + ' fichas cuyo RUT no está en las respuestas: quedaron en «Fichas - sin etapa».</li>');
+      ordAviso('✓ ZIP descargado.<ul style="margin:8px 0 0 18px;">' + lis.join('') + '</ul>'
+        + '<div style="margin-top:8px;">Cada <b>Respuestas_Etapa_N.xlsx</b> tiene las mismas columnas que el original: puedes subirlo arriba para generar las fichas o el informe de esa sola etapa.</div>', 'ok');
+    } catch (e) { console.error(e); ordAviso('No pude separar: ' + e.message, 'err'); }
+    $ord('ordGenerar').disabled = false;
+  }, 30);
 });
+
 
 
 </script>
