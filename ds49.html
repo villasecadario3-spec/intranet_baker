@@ -356,7 +356,7 @@
     </div>
     <div class="card-body">
       <p style="font-size:0.85rem;color:var(--txt-dim);margin:0 0 14px;line-height:1.5;">El Excel de respuestas trae mezcladas a las personas de todas las etapas. Esta sección cruza por RUT <b>el Excel de respuestas que subiste arriba</b> con la nómina, y entrega un ZIP con: el listado de personas por etapa, y el <b>mismo Excel de respuestas partido en uno por etapa</b> (mismas columnas), listo para volver a usarlo arriba y generar las fichas de una sola etapa. Si además subes las fichas ya generadas, las reparte en carpetas.</p>
-      <div class="field field-full"><label>Nómina del proyecto <span style="font-weight:400;color:var(--txt-dim)">(Excel con las hojas «Nómina E1», «Nómina E2»…)</span></label>
+      <div class="field field-full"><label>Nómina de familias del proyecto <span style="font-weight:400;color:var(--txt-dim)">— el Excel que trae las hojas «Nómina E1» y «Nómina E2». <b>No es el de respuestas</b>: ese ya lo subiste arriba.</span></label>
         <input type="file" id="ordNominaFile" accept=".xlsx,.xls">
         <div id="ordNominaNombre" style="font-size:0.78rem;color:var(--txt-dim);margin-top:4px;"></div>
       </div>
@@ -2721,7 +2721,15 @@ $ord('ordNominaFile').addEventListener('change', async (ev) => {
     const wb = XLSX.read(new Uint8Array(await f.arrayBuffer()), { type: 'array' });
     ordNomina = infLeerNomina(wb);
     const et = Object.keys(ordNomina).sort();
-    if (!et.length) { ordNomina = null; ordAviso('No encontré hojas llamadas «Nómina E1», «Nómina E2»… en ese archivo.', 'err'); }
+    if (!et.length) {
+      ordNomina = null;
+      const hojas = wb.SheetNames;
+      const h0 = XLSX.utils.sheet_to_json(wb.Sheets[hojas[0]], { header: 1, defval: '' })[0] || [];
+      const esRespuestas = h0.some(x => /marca temporal/i.test(String(x))) || h0.some(x => /^rut postulante/i.test(String(x).trim()));
+      ordAviso(esRespuestas
+        ? 'Ese es el <b>Excel de respuestas de la encuesta</b>, y no sirve para separar: revisé sus columnas y <b>no trae la etapa en ninguna parte</b> (es un solo formulario para todos los proyectos).<br><br>Aquí va la <b>nómina de familias del proyecto</b>, el Excel con las hojas «Nómina E1» y «Nómina E2»: de ahí sale a qué etapa pertenece cada RUT. Las respuestas ya las toma del archivo que subiste arriba.'
+        : 'No encontré hojas llamadas «Nómina E1», «Nómina E2»… en ese archivo. Las hojas que tiene son: ' + hojas.map(h => '«' + h + '»').join(', ') + '. Renombra las de cada etapa como «Nómina E1» y «Nómina E2», o sube la nómina correcta.', 'err');
+    }
     else {
       $ord('ordNominaNombre').textContent = f.name + ' — ' + et.map(k => k.replace('E', 'Etapa ') + ': ' + ordNomina[k].filas.length + ' familias').join(' · ');
       ordAviso('');
