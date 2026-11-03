@@ -355,17 +355,17 @@
       <h2>Ordenar fichas por etapa</h2>
     </div>
     <div class="card-body">
-      <p style="font-size:0.85rem;color:var(--txt-dim);margin:0 0 14px;line-height:1.5;">Separa en carpetas las fichas ya generadas, según la hoja de la nómina en que aparece cada RUT. Devuelve un ZIP con una carpeta por etapa («Etapa 1», «Etapa 2»…). No vuelve a generar ni modifica las fichas: solo las reparte.</p>
+      <p style="font-size:0.85rem;color:var(--txt-dim);margin:0 0 14px;line-height:1.5;">Con <b>solo la nómina</b> entrega un Excel con las personas separadas por etapa. Si además subes las fichas ya generadas, las reparte en carpetas («Etapa 1», «Etapa 2»…) dentro de un ZIP, junto con ese mismo Excel. No genera ni modifica fichas: solo las ordena.</p>
       <div class="field field-full"><label>Nómina del proyecto <span style="font-weight:400;color:var(--txt-dim)">(Excel con las hojas «Nómina E1», «Nómina E2»…)</span></label>
         <input type="file" id="ordNominaFile" accept=".xlsx,.xls">
         <div id="ordNominaNombre" style="font-size:0.78rem;color:var(--txt-dim);margin-top:4px;"></div>
       </div>
-      <div class="field field-full" style="margin-top:12px;"><label>Fichas ya generadas <span style="font-weight:400;color:var(--txt-dim)">(el .zip que entrega el generador, o selecciona los .docx)</span></label>
+      <div class="field field-full" style="margin-top:12px;"><label>Fichas ya generadas <span style="font-weight:400;color:var(--txt-dim)">— opcional (el .zip que entrega el generador, o selecciona los .docx). Sin esto solo se arma el listado.</span></label>
         <input type="file" id="ordFichasFile" accept=".docx,.zip" multiple>
         <div id="ordFichasNombre" style="font-size:0.78rem;color:var(--txt-dim);margin-top:4px;"></div>
       </div>
       <div class="actions" style="margin-top:16px;">
-        <button class="btn btn-primary" id="ordGenerar" disabled>Ordenar y descargar ZIP</button>
+        <button class="btn btn-primary" id="ordGenerar" disabled>Descargar listado en Excel</button>
       </div>
       <div id="ordMsg" class="inf-msg"></div>
     </div>
@@ -2667,7 +2667,11 @@ let ordNomina = null;      // { E1: {hoja, filas}, E2: {...} }
 let ordFichas = [];        // [{ name, data }]
 
 function ordAviso(msg, tipo) { const el = $ord('ordMsg'); el.className = 'inf-msg ' + (tipo || ''); el.innerHTML = msg || ''; }
-function ordActualizarBoton() { $ord('ordGenerar').disabled = !(ordNomina && ordFichas.length); }
+function ordActualizarBoton() {
+  const b = $ord('ordGenerar');
+  b.disabled = !ordNomina;                               // la nómina basta: las fichas son opcionales
+  b.textContent = ordFichas.length ? 'Ordenar fichas y descargar ZIP' : 'Descargar listado en Excel';
+}
 
 // ── Lector de ZIP (soporta guardado sin comprimir y comprimido) ──
 async function ordLeerZip(buf) {
@@ -2740,50 +2744,107 @@ $ord('ordFichasFile').addEventListener('change', async (ev) => {
   ordActualizarBoton();
 });
 
-function ordSeparar() {
-  const porClave = new Map(), porCuerpo = new Map();
+function ordRutTxt(f) { return f.cuerpo ? (f.cuerpo + (f.dv ? '-' + f.dv : '')) : ''; }
+
+// Índices de la nómina: de cada RUT, en qué etapa(s) aparece.
+function ordIndices() {
+  const porClave = new Map(), porCuerpo = new Map(), claveDeCuerpo = new Map();
   Object.keys(ordNomina).forEach(k => ordNomina[k].filas.forEach(f => {
     if (f.clave) { if (!porClave.has(f.clave)) porClave.set(f.clave, new Set()); porClave.get(f.clave).add(k); }
-    if (f.cuerpo) { if (!porCuerpo.has(f.cuerpo)) porCuerpo.set(f.cuerpo, new Set()); porCuerpo.get(f.cuerpo).add(k); }
+    if (f.cuerpo) {
+      if (!porCuerpo.has(f.cuerpo)) porCuerpo.set(f.cuerpo, new Set());
+      porCuerpo.get(f.cuerpo).add(k);
+      if (!claveDeCuerpo.has(f.cuerpo)) claveDeCuerpo.set(f.cuerpo, f.clave);
+    }
   }));
-  const archivos = [], sinEtapa = [], repetidas = [];
-  const cuenta = {};
+  return { porClave, porCuerpo, claveDeCuerpo };
+}
+
+// Reparte las fichas en carpetas por etapa. Devuelve también qué ficha le tocó a cada persona.
+function ordSeparar(IX) {
+  const archivos = [], sinEtapa = [], repetidas = [], cuenta = {}, porPersona = new Map();
   ordFichas.forEach(fi => {
-    let etapa = null, ambigua = false;
+    let etapa = null, ambigua = false, canon = null;
     for (const c of ordRutDeNombre(fi.name)) {
-      let s = porClave.get(c) || porCuerpo.get(c.slice(0, -1)) || porCuerpo.get(c);
+      const cu = c.slice(0, -1);
+      let s = IX.porClave.get(c); canon = c;
+      if (!s) { s = IX.porCuerpo.get(cu); if (s) canon = IX.claveDeCuerpo.get(cu) || c; }
+      if (!s) { s = IX.porCuerpo.get(c); if (s) canon = IX.claveDeCuerpo.get(c) || c; }
       if (!s) continue;
       if (s.size > 1) { ambigua = true; break; }
       etapa = [...s][0]; break;
     }
     let carpeta;
     if (ambigua) { carpeta = 'Revisar - en mas de una etapa'; repetidas.push(fi.name); }
-    else if (etapa) carpeta = 'Etapa ' + etapa.slice(1);
+    else if (etapa) { carpeta = 'Etapa ' + etapa.slice(1); if (canon) porPersona.set(canon, fi.name); }
     else { carpeta = 'Sin etapa en la nomina'; sinEtapa.push(fi.name); }
     cuenta[carpeta] = (cuenta[carpeta] || 0) + 1;
     archivos.push({ name: carpeta + '/' + fi.name, data: fi.data });
   });
-  return { archivos, cuenta, sinEtapa, repetidas };
+  return { archivos, cuenta, sinEtapa, repetidas, porPersona };
+}
+
+// Excel con las personas separadas por etapa: una hoja por etapa, más una hoja «Todas» para filtrar.
+function ordExcel(porPersona) {
+  const wb = XLSX.utils.book_new();
+  const etapas = Object.keys(ordNomina).sort();
+  const cab = ['N°', 'Nombre', 'RUT', 'Familia', 'Discapacidad', 'Solicita baja'];
+  if (porPersona) cab.push('Ficha');
+  const anchos = c => c.map(h => ({ wch: h === 'Nombre' ? 38 : (h === 'Ficha' ? 46 : (h === 'N°' ? 5 : 14)) }));
+  const todas = [['Etapa'].concat(cab)];
+  etapas.forEach(k => {
+    const filas = [cab];
+    ordNomina[k].filas.forEach((f, i) => {
+      const fila = [i + 1, f.nombre, ordRutTxt(f), f.familia || '', f.disc || '', f.baja ? 'Sí' : ''];
+      if (porPersona) fila.push(porPersona.get(f.clave) || '— sin ficha —');
+      filas.push(fila);
+      todas.push(['Etapa ' + k.slice(1)].concat(fila));
+    });
+    const ws = XLSX.utils.aoa_to_sheet(filas);
+    ws['!cols'] = anchos(cab);
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: filas.length - 1, c: cab.length - 1 } }) };
+    XLSX.utils.book_append_sheet(wb, ws, ('Etapa ' + k.slice(1)).slice(0, 31));
+  });
+  const wsT = XLSX.utils.aoa_to_sheet(todas);
+  wsT['!cols'] = [{ wch: 10 }].concat(anchos(cab));
+  wsT['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: todas.length - 1, c: cab.length } }) };
+  XLSX.utils.book_append_sheet(wb, wsT, 'Todas');
+  return new Uint8Array(XLSX.write(wb, { bookType: 'xlsx', type: 'array' }));
+}
+
+function ordDescargar(blob, nombre) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = nombre; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
 $ord('ordGenerar').addEventListener('click', () => {
   $ord('ordGenerar').disabled = true;
   try {
-    const R = ordSeparar();
-    const zip = new Blob([buildZipStore(R.archivos)], { type: 'application/zip' });
     const proy = (document.getElementById('cfgProyecto').value || 'Proyecto').replace(/\s+/g, '_');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(zip);
-    a.download = 'Fichas_por_etapa_' + proy + '_' + new Date().toISOString().slice(0, 10) + '.zip';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-    const lis = Object.keys(R.cuenta).sort().map(c => '<li><b>' + c + '</b>: ' + R.cuenta[c] + ' fichas</li>');
-    if (R.sinEtapa.length) lis.push('<li>Sin etapa: su RUT no está en ninguna hoja de la nómina. Revisa ' + R.sinEtapa.slice(0, 5).map(x => '«' + x + '»').join(', ') + (R.sinEtapa.length > 5 ? ' y ' + (R.sinEtapa.length - 5) + ' más' : '') + '.</li>');
-    if (R.repetidas.length) lis.push('<li>' + R.repetidas.length + ' fichas cuyo RUT aparece en más de una etapa: quedaron en «Revisar».</li>');
-    ordAviso('✓ ZIP descargado con ' + R.archivos.length + ' fichas.<ul style="margin:8px 0 0 18px;">' + lis.join('') + '</ul>', 'ok');
-  } catch (e) { console.error(e); ordAviso('No pude ordenar las fichas: ' + e.message, 'err'); }
+    const hoy = new Date().toISOString().slice(0, 10);
+    const etapas = Object.keys(ordNomina).sort();
+    const lis = [];
+    if (!ordFichas.length) {
+      // Solo la nómina: listado de personas por etapa.
+      ordDescargar(new Blob([ordExcel(null)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+        'Listado_por_etapa_' + proy + '_' + hoy + '.xlsx');
+      etapas.forEach(k => lis.push('<li><b>Etapa ' + k.slice(1) + '</b>: ' + ordNomina[k].filas.length + ' personas</li>'));
+      ordAviso('✓ Excel descargado: una hoja por etapa y una hoja «Todas» para filtrar.<ul style="margin:8px 0 0 18px;">' + lis.join('') + '</ul>', 'ok');
+    } else {
+      const R = ordSeparar(ordIndices());
+      R.archivos.push({ name: 'Listado_por_etapa.xlsx', data: ordExcel(R.porPersona) });
+      ordDescargar(new Blob([buildZipStore(R.archivos)], { type: 'application/zip' }),
+        'Fichas_por_etapa_' + proy + '_' + hoy + '.zip');
+      Object.keys(R.cuenta).sort().forEach(c => lis.push('<li><b>' + c + '</b>: ' + R.cuenta[c] + ' fichas</li>'));
+      if (R.sinEtapa.length) lis.push('<li>Sin etapa: su RUT no está en ninguna hoja de la nómina. Revisa ' + R.sinEtapa.slice(0, 5).map(x => '«' + x + '»').join(', ') + (R.sinEtapa.length > 5 ? ' y ' + (R.sinEtapa.length - 5) + ' más' : '') + '.</li>');
+      if (R.repetidas.length) lis.push('<li>' + R.repetidas.length + ' fichas cuyo RUT aparece en más de una etapa: quedaron en «Revisar».</li>');
+      ordAviso('✓ ZIP descargado con ' + (R.archivos.length - 1) + ' fichas y el listado en Excel (la columna «Ficha» muestra a quién le falta).<ul style="margin:8px 0 0 18px;">' + lis.join('') + '</ul>', 'ok');
+    }
+  } catch (e) { console.error(e); ordAviso('No pude generar el listado: ' + e.message, 'err'); }
   $ord('ordGenerar').disabled = false;
 });
+
 
 </script>
 </body>
