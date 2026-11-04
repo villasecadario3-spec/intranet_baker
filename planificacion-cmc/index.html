@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="author" content="Desarrollado por: Javier Cumplido - oct 2026">
+<meta name="copyright" content="Inmobiliaria Baker SpA · Gerencia de Control de Gestión y TI">
+<title>Planificación CMC</title>
+<!-- Planificación CMC · intranet · Desarrollado por: Javier Cumplido - oct 2026 · Gerencia de Control de Gestión y TI · Uso exclusivo de Inmobiliaria Baker.
+     Este archivo solo abre la aplicación: el código y los datos base van cifrados en panel.js; la configuración, en config.js. -->
+<style>
+  :root { --brand: #ff002e; --ink: #1a1a1a; --muted: #666; --bg: #f4f4f4; --card: #fff; }
+  @media (prefers-color-scheme: dark) { :root { --ink: #eee; --muted: #aaa; --bg: #161616; --card: #222; } }
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg); color: var(--ink); font-family: Montserrat, system-ui, sans-serif; -webkit-user-select: none; user-select: none; }
+  main { width: 100%; max-width: 440px; background: var(--card); border-radius: 10px; border-top: 4px solid var(--brand); padding: 24px; box-shadow: 0 8px 30px rgba(0,0,0,.12); box-sizing: border-box; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { font-size: 13px; color: var(--muted); margin: 0; }
+  .pie { font-size: 11.5px; color: var(--muted); margin: 16px 0 0; line-height: 1.4; }
+</style>
+</head>
+<body>
+<main id="caja">
+  <h1>Planificación CMC</h1>
+  <p class="sub" id="estado">Abriendo…</p>
+  <p class="pie">Uso exclusivo de Inmobiliaria Baker y sus empresas relacionadas. El código y los datos son confidenciales: prohibida su copia o entrega a terceros.</p>
+</main>
+<script src="config.js"></script>
+<script src="panel.js"></script>
+<script>
+(function () {
+  var RUTA_PRUEBA = false, K = "f76E7V2Z4EnTFv5Hwej7JLNKxCJGwJuBsWavKeeayjIAcD0qnx4LkBPa1zOT9KEKx7sQcYews+67TtaUjiOfmA==";
+  var caja = document.getElementById("caja");
+  function cerrar(t, x) { caja.innerHTML = "<h1>" + t + "</h1><p class='sub'>" + x + "</p><p class='pie'>Planificación CMC · Gerencia de Control de Gestión y TI · Uso exclusivo de Inmobiliaria Baker.</p>"; }
+  var u = decodeURIComponent(location.href).toLowerCase();
+  var rutaOk = /^https:\/\/([\w-]+\.)*(ibaker|intranetbaker)\.cl\//.test(u) || (RUTA_PRUEBA && /^http:\/\/localhost:\d+\//.test(u));
+  if (!rutaOk) return cerrar("Ubicación no autorizada", "Planificación CMC solo se abre desde la intranet de la empresa.");
+  if (!window.PANEL_PAQUETE) return cerrar("Falta el archivo de la aplicación", "No se encontró panel.js junto a esta página. Avisa a TI.");
+  if (!window.crypto || !crypto.subtle) return cerrar("Navegador no compatible", "Abre la aplicación con Chrome o Edge actualizados.");
+  var P = window.PANEL_PAQUETE, origen = "instalada", b64 = function (s) { var b = atob(s), a = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; };
+  /* a version the Administrador maestro published from the app: it is left in this tab's session and the page reloads; same key and format */
+  try { var g = sessionStorage.getItem("panel-paquete"); if (g) { var q = JSON.parse(g); if (q && q.P && q.P.c) { P = q.P; origen = "publicada"; } } } catch (e) {}
+  /* AES-256-CBC + HMAC-SHA256 (encrypt-then-MAC): a damaged or swapped panel.js fails the MAC */
+  (async function () {
+    try {
+      var k = b64(K), iv = b64(P.iv), c = b64(P.c), msg = new Uint8Array(iv.length + c.length); msg.set(iv); msg.set(c, iv.length);
+      var mk = await crypto.subtle.importKey("raw", k.slice(32), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+      if (!(await crypto.subtle.verify("HMAC", mk, b64(P.m), msg))) { if (origen === "publicada") { try { sessionStorage.removeItem("panel-paquete"); } catch (e) {} return location.reload(); } return cerrar("Archivos desactualizados", "index.html y panel.js no son de la misma instalación. Avisa a TI."); }
+      var ek = await crypto.subtle.importKey("raw", k.slice(0, 32), "AES-CBC", false, ["decrypt"]);
+      var html = new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-CBC", iv: iv }, ek, c));
+      if (document.readyState !== "complete") await new Promise(function (ok) { window.addEventListener("load", ok, { once: true }); });
+      /* the key and the configuration stay available to the app: it opens the versions the Administrador maestro publishes */
+      var cfg = window.PANEL_CONFIG; window.PANEL_LLAVE = K; window.PANEL_ORIGEN = origen;
+      document.open(); document.write(html); document.close();
+      window.PANEL_CONFIG = cfg; window.PANEL_LLAVE = K; window.PANEL_ORIGEN = origen;
+    } catch (e) { cerrar("No se pudo abrir la aplicación", "Vuelve a cargar la página o avisa a TI."); }
+  })();
+})();
+</script>
+</body>
+</html>
