@@ -2274,8 +2274,11 @@ function renderCargoFiltro(){
 // Vigente = tiene costo empresa según el Excel de nómina (source 'excel') o
 // fue agregado desde una marca real de Asistencia BUK (source 'ingreso').
 // Proyectado = lo agregaste a mano en "Agregar personal proyectado".
-function esVigente(w){ return w.source === 'excel' || w.source === 'ingreso'; }
 function esProyectado(w){ return w.source === 'proyectado'; }
+// Vigente = toda persona que no es una proyección (Excel BUK, ingresos manuales y la base del módulo).
+// Definido como "lo que no es proyectado" para que Vigentes + Proyectados siempre dé la Dotación,
+// aunque más adelante aparezcan otros orígenes.
+function esVigente(w){ return !esProyectado(w); }
 
 function renderEstadoOrigenFiltro(){
   const sel = document.getElementById('estadoOrigenFiltro');
@@ -2827,9 +2830,11 @@ function attachToggleSubDotacionListeners(){
   });
   // Las filas de cargo (tercer nivel) se muestran solo si su grupo padre
   // (Vigentes/Proyectados) está expandido — se aplica después de dibujar.
+  // Se ven solo si están abiertos LOS DOS niveles: el centro de costo y su grupo
+  // (antes solo se miraba el grupo, así que al cerrar el centro quedaban colgando).
   document.querySelectorAll('.cargo-row').forEach(row=>{
-    const grupo = row.dataset.grupo;
-    row.style.display = expandedDotacionGrupo.has(grupo) ? 'table-row' : 'none';
+    const abierto = expandedDotacionCC.has(row.dataset.parent) && expandedDotacionGrupo.has(row.dataset.grupo);
+    row.style.display = abierto ? 'table-row' : 'none';
   });
 }
 
