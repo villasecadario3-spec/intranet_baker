@@ -1615,6 +1615,29 @@ async function ds19GenerarWordLote(li) {
 
 // ── RECORTE MASIVO DE ESCRITURAS (hasta las firmas) ──────────────
 let cortarJobId = null;
+// El trabajo en curso se recuerda en este navegador: si se recarga la página o se cierra la
+// pestaña, al volver se retoma el avance en vez de perderlo de vista.
+const CORTAR_LS = 'cartas:recorte-en-curso';
+function cortarRecordar(jobId, total, adjuntos) {
+  try { localStorage.setItem(CORTAR_LS, JSON.stringify({ jobId, total, adjuntos, en: Date.now() })); } catch (e) {}
+}
+function cortarOlvidar() { try { localStorage.removeItem(CORTAR_LS); } catch (e) {} }
+async function cortarRetomarTrabajo() {
+  let g = null;
+  try { g = JSON.parse(localStorage.getItem(CORTAR_LS) || 'null'); } catch (e) {}
+  if (!g || !g.jobId) return;
+  if (Date.now() - (g.en || 0) > 12 * 3600 * 1000) return cortarOlvidar();   // de ayer: ya no sirve
+  try {
+    const r = await fetch(`${API_BASE}/recorte-escrituras/estado/${g.jobId}`);
+    if (!r.ok) return cortarOlvidar();                      // el servidor ya no lo tiene
+    const data = await r.json();
+    if (data.estado === 'error') return cortarOlvidar();
+    cortarJobId = g.jobId;
+    const caja = document.getElementById('cortar-progreso');
+    if (caja) caja.style.display = 'block';
+    cortarEsperarResultado(g.total || 0, [], g.adjuntos || 0);
+  } catch (e) {}
+}
 const CORTAR_MAX_MB = 300; // cada PDF viaja en su propio envío (multipart); el servidor admite hasta 300 MB por archivo
 
 function cortarLeerArchivoBase64(file) {
@@ -1715,6 +1738,7 @@ async function cortarSubirLote() {
       method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(opciones)
     }));
     progreso.innerHTML = `⏳ Procesando ${subidos} escritura(s) con OCR…`;
+    cortarRecordar(cortarJobId, subidos, adjSubidos);
     cortarEsperarResultado(subidos, omitidos, adjSubidos);
   } catch(e) {
     progreso.innerHTML = `❌ Error: ${cortarEsc(e.message)}`;
@@ -1750,9 +1774,11 @@ async function cortarEsperarResultado(total, omitidos, nAdjuntos) {
         (omitidos || []).forEach(o => avisos.push(`⚠ No se subió: ${cortarEsc(o)}`));
         progreso.innerHTML = lineas.concat(avisos).join('<br>');
         document.getElementById('cortar-descarga').style.display = 'block';
+        cortarOlvidar();
         return;
       } else if (data.estado === 'error') {
         progreso.innerHTML = `❌ Error: ${cortarEsc(data.error)}`;
+        cortarOlvidar();
         return;
       } else {
         const p = data.progreso;
@@ -1760,17 +1786,27 @@ async function cortarEsperarResultado(total, omitidos, nAdjuntos) {
         if (senal && senal !== ultimaSenal) { ultimaSenal = senal; ultimoAvance = Date.now(); }
         const espera = `<span style="opacity:.7">· llevamos ${minutos()} min</span>`;
         const detenido = Date.now() - ultimoAvance > SIN_AVANCE_MS;
-        progreso.innerHTML = p
-          ? (p.fase === 'adjuntos'
-              ? `⏳ Leyendo los documentos a pegar (${Math.min(p.hechos + 1, p.total)} de ${p.total}): ${cortarEsc(p.actual)}… ${espera}`
-              : `⏳ Procesando ${Math.min(p.hechos + 1, total)} de ${total}: ${cortarEsc(p.actual)}… ${espera}`)
-          : `⏳ Trabajando… ${espera}`;
+        if (p) {
+          const n = p.total || total || 0;
+          const listas = Math.min(p.hechos || 0, n);
+          const pct = n ? Math.round(listas / n * 100) : 0;
+          const titulo = p.fase === 'adjuntos' ? 'Leyendo los documentos a pegar' : 'Cortando escrituras';
+          progreso.innerHTML = `
+            <div style="font-weight:700;font-size:15px;margin-bottom:4px;">${titulo}: ${listas} de ${n} listas ${espera}</div>
+            <div style="background:rgba(127,127,127,.25);border-radius:6px;height:8px;overflow:hidden;margin:6px 0 8px;">
+              <div style="background:#3b82f6;height:100%;width:${pct}%;transition:width .4s;"></div>
+            </div>
+            <div style="font-size:12px;opacity:.85;">Ahora: ${cortarEsc(p.actual || '—')}</div>`;
+        } else {
+          progreso.innerHTML = `⏳ Trabajando… ${espera}`;
+        }
         if (detenido) progreso.innerHTML += `<br><span style="color:#b8860b;">⚠ Lleva ${Math.round((Date.now()-ultimoAvance)/60000)} min sin avanzar. Puede estar pegado: revisa la consola del servidor. Si cierras esta pestaña el trabajo se pierde.</span>`;
       }
     } catch(e) {
       // 404 = el servidor ya no conoce el trabajo (se reinició o lo limpió): seguir esperando no sirve.
       if (/no encontrado|404/i.test(String(e.message))) {
         progreso.innerHTML = '❌ El servidor perdió este trabajo (probablemente se reinició mientras procesaba). Vuelve a subir las escrituras.';
+        cortarOlvidar();
         return;
       }
       fallos++;
@@ -1795,6 +1831,7 @@ if (elFechaIngresoDS19) {
   ds19ActualizarCarpetaBase();
 }
 initAuth();
+cortarRetomarTrabajo();   // si quedó un recorte corriendo, se vuelve a enganchar al avance
 </script>
 </body>
 </html>
